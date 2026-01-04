@@ -425,7 +425,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         if request.input_images and (
             request.document_model
             or not AIModelSpec.objects.get(
-                model_id=request.selected_model
+                name=request.selected_model
             ).llm_is_vision_model
         ):
             yield "Running Azure Form Recognizer..."
@@ -1584,19 +1584,20 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         return total
 
     def additional_notes(self):
+        llm_cost = get_non_ivr_price_credits(self.current_sr)
+
         try:
             model = AIModelSpec.objects.get(
-                model_id=gui.session_state.get("selected_model")
-            ).label
+                name=gui.session_state.get("selected_model")
+            )
+            if model.name == "agrillm_qwen3_30b":
+                llm_cost += 100
+            label = model.label
         except AIModelSpec.DoesNotExist:
-            model = "LLM"
-
-        llm_cost = get_non_ivr_price_credits(self.current_sr)
-        if model == "agrillm_qwen3_30b":
-            llm_cost += 100
+            label = "LLM"
 
         notes = (
-            f"\nBreakdown: {math.ceil(llm_cost)} ({model}) + {self.PROFIT_CREDITS}/run"
+            f"\nBreakdown: {math.ceil(llm_cost)} ({label}) + {self.PROFIT_CREDITS}/run"
         )
 
         if (

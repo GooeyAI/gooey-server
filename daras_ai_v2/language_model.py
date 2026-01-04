@@ -157,7 +157,7 @@ def run_language_model(
     if model.is_deprecated:
         if not model.redirect_to:
             raise UserError(f"Model {model} is deprecated.")
-        return run_language_model(**(locals() | {"model": model.redirect_to}))
+        return run_language_model(**(locals() | {"model": model.redirect_to.name}))
 
     if model.llm_max_output_tokens:
         max_tokens = min(max_tokens, model.llm_max_output_tokens)
@@ -305,7 +305,7 @@ def _run_text_model(
         case ModelProvider.aks:
             return [
                 _run_self_hosted_llm(
-                    model=model,
+                    model_id=model,
                     text_inputs=prompt,
                     max_tokens=max_tokens,
                     temperature=temperature,
@@ -419,7 +419,7 @@ def _run_chat_model(
                 {
                     "role": CHATML_ROLE_ASSISTANT,
                     "content": _run_self_hosted_llm(
-                        model=model.model_id,
+                        model_id=model.model_id,
                         text_inputs=messages,
                         max_tokens=max_tokens,
                         temperature=temperature,
@@ -434,7 +434,7 @@ def _run_chat_model(
 
 def _run_self_hosted_llm(
     *,
-    model: str,
+    model_id: str,
     text_inputs: list[ConversationEntry] | str,
     max_tokens: int,
     temperature: float,
@@ -445,7 +445,10 @@ def _run_self_hosted_llm(
     from usage_costs.models import ModelSku
 
     # sea lion doesnt support system prompt
-    if not isinstance(text_inputs, str) and model.name == "sea_lion_7b_instruct":
+    if (
+        not isinstance(text_inputs, str)
+        and model_id == "aisingapore/sea-lion-7b-instruct"
+    ):
         for i, entry in enumerate(text_inputs):
             if entry["role"] == CHATML_ROLE_SYSTEM:
                 text_inputs[i]["role"] = CHATML_ROLE_USER
@@ -454,7 +457,7 @@ def _run_self_hosted_llm(
     ret = call_celery_task(
         "llm.chat",
         pipeline=dict(
-            model_id=model,
+            model_id=model_id,
             fallback_chat_template_from="meta-llama/Llama-2-7b-chat-hf",
         ),
         inputs=dict(
@@ -468,12 +471,12 @@ def _run_self_hosted_llm(
 
     if usage := ret.get("usage"):
         record_cost_auto(
-            model=model,
+            model=model_id,
             sku=ModelSku.llm_prompt,
             quantity=usage["prompt_tokens"],
         )
         record_cost_auto(
-            model=model,
+            model=model_id,
             sku=ModelSku.llm_completion,
             quantity=usage["completion_tokens"],
         )
@@ -694,6 +697,8 @@ def run_openai_chat(
             *[
                 _get_chat_completions_create(
                     model=model_id,
+                    api_key=model.api_key,
+                    base_url=model.base_url,
                     messages=messages,
                     stop=stop or NOT_GIVEN,
                     n=num_outputs,
@@ -714,8 +719,10 @@ def run_openai_chat(
         return ret
 
 
-def _get_chat_completions_create(model: str, **kwargs):
-    client = get_openai_client(model)
+def _get_chat_completions_create(
+    model: str, api_key: str | None, base_url: str | None, **kwargs
+):
+    client = get_openai_client(model, api_key, base_url)
 
     @wraps(client.chat.completions.create)
     def wrapper():
@@ -910,10 +917,18 @@ def _run_openai_text(
     return [choice.text for choice in r.choices]
 
 
-def get_openai_client(model: str):
+def get_openai_client(
+    model: str, api_key: str | None = None, base_url: str | None = None
+):
     import openai
 
-    if model.startswith(AZURE_OPENAI_MODEL_PREFIX) and "-ca-" in model:
+    if base_url:
+        client = openai.OpenAI(
+            api_key=api_key or settings.OPENAI_API_KEY,
+            max_retries=0,
+            base_url=base_url,
+        )
+    elif model.startswith(AZURE_OPENAI_MODEL_PREFIX) and "-ca-" in model:
         client = openai.AzureOpenAI(
             api_key=settings.AZURE_OPENAI_KEY_CA,
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT_CA,

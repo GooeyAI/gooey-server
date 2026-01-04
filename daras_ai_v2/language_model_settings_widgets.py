@@ -1,13 +1,13 @@
+import gooey_gui as gui
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
+from ai_models.models import AIModelSpec, ModelProvider
 from daras_ai_v2.enum_selector_widget import enum_selector, BLANK_OPTION
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.language_model import (
     ResponseFormatType,
     ReasoningEffort,
 )
-from ai_models.models import AIModelSpec, ModelProvider
 
 
 class LanguageModelSettings(BaseModel):
@@ -57,14 +57,15 @@ def language_model_selector(
     key: str = "selected_model",
 ):
     options = dict(
-        AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list(
-            "name", "label"
-        )
+        AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm)
+        .exclude_deprecated(selected_models=gui.session_state.get(key))
+        .values_list("name", "label")
     )
     return gui.selectbox(
         options=options,
         format_func=options.__getitem__,
         label=label,
+        label_visibility=label_visibility,
         key=key,
     )
 

@@ -1,4 +1,7 @@
 from django.db import models
+from django.db.models import Q
+
+from bots.custom_fields import CustomURLField
 
 
 class ModelProvider(models.IntegerChoices):
@@ -21,8 +24,14 @@ class ModelProvider(models.IntegerChoices):
 
 
 class AIModelSpecQuerySet(models.QuerySet):
-    def get_queryset(self):
-        return super().get_queryset().filter(is_deprecated=False)
+    def exclude_deprecated(self, *, selected_models: list[str] | str | None = None):
+        q = Q(is_deprecated=False)
+        if selected_models:
+            if isinstance(selected_models, str):
+                q |= Q(name=selected_models)
+            else:
+                q |= Q(name__in=selected_models)
+        return self.filter(q)
 
 
 class AIModelSpec(models.Model):
@@ -49,8 +58,7 @@ class AIModelSpec(models.Model):
         help_text="The internal API provider / huggingface model id.",
     )
     schema = models.JSONField(
-        help_text="The schema of the model parameters.",
-        default=dict,
+        help_text="The schema of the model parameters.", default=dict, blank=True
     )
 
     provider = models.IntegerField(
@@ -68,6 +76,9 @@ class AIModelSpec(models.Model):
         default=None,
     )
     version = models.FloatField(default=1)
+
+    api_key = models.TextField(blank=True, default="")
+    base_url = CustomURLField(blank=True, default="")
 
     llm_context_window = models.IntegerField(default=0, verbose_name="Context Window")
     llm_max_output_tokens = models.IntegerField(

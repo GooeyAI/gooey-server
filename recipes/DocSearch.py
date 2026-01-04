@@ -218,7 +218,7 @@ class DocSearchPage(BasePage):
     def additional_notes(self):
         try:
             model = AIModelSpec.objects.get(
-                model_id=gui.session_state["selected_model"]
+                name=gui.session_state["selected_model"]
             ).label
         except AIModelSpec.DoesNotExist:
             model = "LLM"

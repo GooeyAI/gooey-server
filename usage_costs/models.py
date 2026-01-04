@@ -52,23 +52,6 @@ class ModelCategory(models.IntegerChoices):
     VIDEO_GENERATION = 5, "Video Generation"
 
 
-def get_model_choices():
-    # from daras_ai_v2.language_model import LargeLanguageModels
-    from recipes.DeforumSD import AnimationModels
-    from daras_ai_v2.stable_diffusion import Text2ImgModels, Img2ImgModels
-
-    return (
-        # [(api.name, api.value) for api in LargeLanguageModels]
-        [(model.name, model.label) for model in AnimationModels]
-        + [(model.name, model.value) for model in Text2ImgModels]
-        + [(model.name, model.value) for model in Img2ImgModels]
-        + [(model.name, model.value) for model in InpaintingModels]
-        + [("wav2lip", "LipSync (wav2lip)")]
-        + [("sadtalker", "LipSync (sadtalker)")]
-        + [(model.name, model.label) for model in IVRPlatformMedium]
-    )
-
-
 class ModelSku(models.IntegerChoices):
     llm_prompt = 1, "LLM Prompt (Text)"
     llm_completion = 2, "LLM Completion"
@@ -110,7 +93,6 @@ class ModelPricing(models.Model):
     )
     model_name = models.CharField(
         max_length=255,
-        choices=get_model_choices(),
         help_text="The name of the model. Only used for Display purposes.",
         blank=True,
         default="",
@@ -135,4 +117,4 @@ class ModelPricing(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_provider_display()} / {self.get_model_name_display() or self.model_id} / {self.get_sku_display()}"
+        return f"{self.get_provider_display()} / {self.model_name or self.model_id} / {self.get_sku_display()}"

@@ -5,10 +5,10 @@ import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from itertools import zip_longest
 
+import gooey_gui as gui
 import typing_extensions
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
 from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
@@ -230,9 +230,9 @@ Here's what you uploaded:
                 del_button(del_key)
 
         options = dict(
-            AIModelSpec.objects.filter(llm_supports_json=True).values_list(
-                "model_id", "label"
-            )
+            AIModelSpec.objects.filter(llm_supports_json=True)
+            .exclude_deprecated(selected_models=gui.session_state.get("selected_model"))
+            .values_list("name", "label")
         )
         gui.selectbox(
             "##### Language Model",
@@ -378,10 +378,10 @@ def submit(
     return futs
 
 
-def _run_language_model(selected_model: str, prompt: str, result: TaskResult):
+def _run_language_model(model: str, prompt: str, result: TaskResult):
     ret = json.loads(
         run_language_model(
-            model=selected_model,
+            model=model,
             prompt=prompt,
             response_format_type="json_object",
         )[0]

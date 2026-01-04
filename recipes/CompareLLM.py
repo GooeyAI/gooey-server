@@ -37,7 +37,7 @@ class CompareLLMPage(BasePage):
 
     class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None = None
-        selected_models: str | None = None
+        selected_models: list[str] | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -59,9 +59,11 @@ class CompareLLMPage(BasePage):
         )
 
         options = dict(
-            AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list(
-                "name", "label"
+            AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm)
+            .exclude_deprecated(
+                selected_models=gui.session_state.get("selected_models")
             )
+            .values_list("name", "label")
         )
         gui.multiselect(
             label="#### 🧠 Language Models",
@@ -158,7 +160,7 @@ class CompareLLMPage(BasePage):
 def _render_outputs(state, height):
     selected_models = state.get("selected_models", [])
     for key in selected_models:
-        output_text: dict = state.get("output_text", {}).get(key, [])
+        output_text: list = state.get("output_text", {}).get(key, [])
         for idx, text in enumerate(output_text):
             gui.text_area(
                 f"**{AIModelSpec.objects.get(name=key).label}**",

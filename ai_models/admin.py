@@ -20,9 +20,8 @@ class AIModelSpecAdmin(admin.ModelAdmin):
     ]
 
     list_filter = [
-        "pricing__category",
-        "pricing__provider",
         "category",
+        "provider",
         "is_deprecated",
         "created_at",
         "updated_at",
@@ -76,6 +75,15 @@ class AIModelSpecAdmin(admin.ModelAdmin):
                     "llm_supports_temperature",
                     "llm_supports_input_audio",
                     "llm_is_audio_model",
+                ]
+            },
+        ),
+        (
+            "API Settings",
+            {
+                "fields": [
+                    "api_key",
+                    "base_url",
                 ]
             },
         ),
