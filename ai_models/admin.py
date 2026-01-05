@@ -13,14 +13,16 @@ class AIModelSpecAdmin(admin.ModelAdmin):
         "label",
         "model_id",
         "category",
+        "is_deprecated",
+        "redirect_to",
         "created_at",
         "updated_at",
     ]
 
     list_filter = [
-        "pricing__category",
-        "pricing__provider",
         "category",
+        "provider",
+        "is_deprecated",
         "created_at",
         "updated_at",
     ]
@@ -28,7 +30,7 @@ class AIModelSpecAdmin(admin.ModelAdmin):
     search_fields = ["name", "label", "model_id", "category"] + [
         f"pricing__{field}" for field in ModelPricingAdmin.search_fields
     ]
-    autocomplete_fields = ["pricing"]
+    autocomplete_fields = ["pricing", "redirect_to"]
 
     readonly_fields = [
         "created_at",
@@ -46,6 +48,42 @@ class AIModelSpecAdmin(admin.ModelAdmin):
                     "model_id",
                     "schema",
                     "pricing",
+                ]
+            },
+        ),
+        (
+            "Provider Settings",
+            {
+                "fields": [
+                    "provider",
+                    "is_deprecated",
+                    "redirect_to",
+                    "version",
+                ]
+            },
+        ),
+        (
+            "LLM Settings",
+            {
+                "fields": [
+                    "llm_context_window",
+                    "llm_max_output_tokens",
+                    "llm_is_chat_model",
+                    "llm_is_vision_model",
+                    "llm_is_thinking_model",
+                    "llm_supports_json",
+                    "llm_supports_temperature",
+                    "llm_supports_input_audio",
+                    "llm_is_audio_model",
+                ]
+            },
+        ),
+        (
+            "API Settings",
+            {
+                "fields": [
+                    "api_key",
+                    "base_url",
                 ]
             },
         ),

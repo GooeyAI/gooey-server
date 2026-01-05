@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import deque
 
+from ai_models.models import AIModelSpec, ModelProvider
+
 __import__("gooeysite.wsgi")
 
 import asyncio
@@ -47,7 +49,7 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.bots import BotIntegrationLookupFailed, BotInterface, build_system_vars
 from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 from daras_ai_v2.exceptions import UserError, raise_for_status
-from daras_ai_v2.language_model import ConversationEntry, LargeLanguageModels, LLMApis
+from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from functions.recipe_functions import WorkflowLLMTool
@@ -180,8 +182,8 @@ async def main(
 ):
     from livekit.plugins import noise_cancellation
 
-    llm_model = LargeLanguageModels[request.selected_model]
-    if llm_model.is_audio_model:
+    llm_model = await AIModelSpec.objects.aget(name=request.selected_model)
+    if llm_model.llm_is_audio_model:
         session = await create_audio_model_session(llm_model, request)
     else:
         session = await create_stt_llm_tts_session(page, request, llm_model)
@@ -211,7 +213,7 @@ async def main(
 
 
 async def create_audio_model_session(
-    llm_model: LargeLanguageModels, request: VideoBotsPage.RequestModel
+    llm_model: AIModelSpec, request: VideoBotsPage.RequestModel
 ):
     if "gemini" in llm_model.model_id:
         from livekit.plugins import google
@@ -227,7 +229,7 @@ async def create_audio_model_session(
         from livekit.plugins import openai
         from openai.types.beta.realtime.session import TurnDetection
 
-        if llm_model.supports_temperature:
+        if llm_model.llm_supports_temperature:
             temperature = request.sampling_temperature
             temperature = clamp(temperature, 0.6, 1.2)
         else:
@@ -254,16 +256,16 @@ async def create_audio_model_session(
 async def create_stt_llm_tts_session(
     page: VideoBotsPage,
     request: VideoBotsPage.RequestModel,
-    llm_model: LargeLanguageModels,
+    llm_model: AIModelSpec,
 ):
     from livekit.plugins import silero
 
-    if llm_model.supports_temperature:
+    if llm_model.llm_supports_temperature:
         temperature = request.sampling_temperature
     else:
         temperature = NOT_GIVEN
 
-    match llm_model.llm_api:
+    match llm_model.provider:
         case _ if "gemini" in llm_model.model_id:
             from livekit.plugins import google
 
@@ -282,7 +284,7 @@ async def create_stt_llm_tts_session(
                 api_key=settings.ANTHROPIC_API_KEY,
             )
 
-        case LLMApis.openai:
+        case ModelProvider.openai:
             from livekit.plugins import openai
 
             model_id = llm_model.model_id
@@ -292,7 +294,7 @@ async def create_stt_llm_tts_session(
             kwargs = {}
             if (
                 request.reasoning_effort
-                and llm_model.is_thinking_model
+                and llm_model.llm_is_thinking_model
                 and not llm_model.name.startswith("o")
             ):
                 kwargs["reasoning_effort"] = request.reasoning_effort
@@ -304,7 +306,7 @@ async def create_stt_llm_tts_session(
                 **kwargs,
             )
 
-        case LLMApis.mistral:
+        case ModelProvider.mistral:
             from livekit.plugins import mistralai
 
             llm = mistralai.LLM(
@@ -313,7 +315,7 @@ async def create_stt_llm_tts_session(
                 api_key=settings.MISTRAL_API_KEY,
             )
 
-        case LLMApis.fireworks:
+        case ModelProvider.fireworks:
             from livekit.plugins import openai
 
             llm = openai.LLM.with_fireworks(
@@ -322,7 +324,7 @@ async def create_stt_llm_tts_session(
                 api_key=settings.FIREWORKS_API_KEY,
             )
 
-        case LLMApis.groq:
+        case ModelProvider.groq:
             from livekit.plugins import groq
 
             llm = groq.LLM(
@@ -332,7 +334,7 @@ async def create_stt_llm_tts_session(
             )
 
         case _:
-            raise UserError(f"Unsupported LLM API: {llm_model.llm_api}")
+            raise UserError(f"Unsupported LLM API: {llm_model.provider}")
 
     return AgentSession(
         stt=GooeySTT(request=request),

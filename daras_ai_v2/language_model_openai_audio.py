@@ -9,6 +9,7 @@ from furl import furl
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect, ClientConnection
 
+from ai_models.models import AIModelSpec
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import audio_url_to_wav
@@ -18,15 +19,13 @@ from daras_ai_v2.utils import clamp
 from functions.recipe_functions import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json, send_recv_json
 
-if typing.TYPE_CHECKING:
-    from daras_ai_v2.language_model import LargeLanguageModels
 
 threadlocal = threading.local()
 
 
 def run_openai_audio(
     *,
-    model: LargeLanguageModels,
+    model: AIModelSpec,
     audio_url: str | None,
     audio_session_extra: dict | None,
     messages: list,
@@ -191,7 +190,7 @@ def init_ws_session(
 
 def stream_ws_response(
     ws: ClientConnection,
-    model: LargeLanguageModels,
+    model: AIModelSpec,
     wait_for_transcript: bool,
     start_chunk_size: int = 50,
     stop_chunk_size: int = 400,

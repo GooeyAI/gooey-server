@@ -5,10 +5,11 @@ import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from itertools import zip_longest
 
+import gooey_gui as gui
 import typing_extensions
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
@@ -18,10 +19,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.field_render import field_title, field_desc
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.language_model import (
-    run_language_model,
-    LargeLanguageModels,
-)
+from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
 from daras_ai_v2.variables_widget import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
@@ -180,9 +178,7 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
             """,
         )
 
-        selected_model: typing.Literal[
-            tuple(e.name for e in LargeLanguageModels if e.supports_json)
-        ] = LargeLanguageModels.gpt_4_turbo.name
+        selected_model: str = "gpt_4_turbo"
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -233,11 +229,16 @@ Here's what you uploaded:
             with col2:
                 del_button(del_key)
 
+        options = dict(
+            AIModelSpec.objects.filter(llm_supports_json=True)
+            .exclude_deprecated(selected_models=gui.session_state.get("selected_model"))
+            .values_list("name", "label")
+        )
         gui.selectbox(
             "##### Language Model",
-            options=[e.name for e in LargeLanguageModels if e.supports_json],
+            options=options,
             key="selected_model",
-            format_func=lambda e: LargeLanguageModels[e].value,
+            format_func=options.__getitem__,
         )
 
         gui.write(
@@ -315,15 +316,11 @@ Here's what you uploaded:
         return super().fields_to_save() + [NROWS_CACHE_KEY]
 
     def get_raw_price(self, state: dict) -> float:
-        try:
-            price = LargeLanguageModels[state["selected_model"]].price
-        except KeyError:
-            price = 1
         nprompts = len(state.get("eval_prompts") or {}) or 1
         nrows = (
             state.get(NROWS_CACHE_KEY) or get_nrows(state.get("documents") or []) or 1
         )
-        return price * nprompts * nrows
+        return nprompts * nrows
 
     def render_steps(self):
         documents = gui.session_state.get("documents") or []
@@ -367,7 +364,7 @@ def submit(
                 futs.append(
                     pool.submit(
                         _run_language_model,
-                        model=LargeLanguageModels[request.selected_model],
+                        model=request.selected_model,
                         prompt=prompt,
                         result=TaskResult(
                             llm_output={},
@@ -381,10 +378,10 @@ def submit(
     return futs
 
 
-def _run_language_model(model: LargeLanguageModels, prompt: str, result: TaskResult):
+def _run_language_model(model: str, prompt: str, result: TaskResult):
     ret = json.loads(
         run_language_model(
-            model=model.name,
+            model=model,
             prompt=prompt,
             response_format_type="json_object",
         )[0]

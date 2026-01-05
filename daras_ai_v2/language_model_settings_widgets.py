@@ -1,12 +1,11 @@
+import gooey_gui as gui
 from pydantic import BaseModel, Field
 
-import gooey_gui as gui
+from ai_models.models import AIModelSpec, ModelProvider
 from daras_ai_v2.enum_selector_widget import enum_selector, BLANK_OPTION
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.language_model import (
-    LargeLanguageModels,
     ResponseFormatType,
-    LLMApis,
     ReasoningEffort,
 )
 
@@ -57,12 +56,17 @@ def language_model_selector(
     label_visibility: str = "visible",
     key: str = "selected_model",
 ):
-    return enum_selector(
-        LargeLanguageModels,
+    options = dict(
+        AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm)
+        .exclude_deprecated(selected_models=gui.session_state.get(key))
+        .values_list("name", "label")
+    )
+    return gui.selectbox(
+        options=options,
+        format_func=options.__getitem__,
         label=label,
         label_visibility=label_visibility,
         key=key,
-        use_selectbox=True,
     )
 
 
@@ -72,12 +76,7 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
     elif not selected_models:
         selected_models = []
 
-    llms = []
-    for model in selected_models:
-        try:
-            llms.append(LargeLanguageModels[model])
-        except KeyError:
-            pass
+    llms = list(AIModelSpec.objects.filter(name__in=selected_models))
 
     col1, col2 = gui.columns(2)
     with col1:
@@ -105,7 +104,7 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
     with col1:
         if llms:
             max_output_tokens = min(
-                [llm.max_output_tokens or llm.context_window for llm in llms]
+                llm.llm_max_output_tokens or llm.llm_context_window for llm in llms
             )
         else:
             max_output_tokens = 4096
@@ -119,7 +118,7 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
             step=2,
         )
 
-    if any(llm.supports_temperature for llm in llms):
+    if any(llm.llm_supports_temperature for llm in llms):
         with col2:
             gui.slider(
                 label=(
@@ -141,7 +140,10 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
             min_value=1,
             max_value=4,
         )
-    if any(not llm.is_chat_model and llm.llm_api == LLMApis.openai for llm in llms):
+    if any(
+        not llm.llm_is_chat_model and llm.provider == ModelProvider.openai
+        for llm in llms
+    ):
         with col2:
             gui.slider(
                 label="###### " + field_title(LanguageModelSettings, "quality"),
@@ -152,7 +154,7 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
                 step=0.1,
             )
 
-    if any(llm.is_thinking_model for llm in llms):
+    if any(llm.llm_is_thinking_model for llm in llms):
         col1, _ = gui.columns(2)
         with col1:
             enum_selector(

@@ -5,14 +5,10 @@ import typing
 import gooey_gui as gui
 from pydantic import BaseModel
 
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.enum_selector_widget import enum_multiselect
-from daras_ai_v2.language_model import (
-    run_language_model,
-    LargeLanguageModels,
-    SUPERSCRIPT,
-)
+from daras_ai_v2.language_model import run_language_model, SUPERSCRIPT
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
     LanguageModelSettings,
@@ -41,17 +37,13 @@ class CompareLLMPage(BasePage):
 
     class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None = None
-        selected_models: (
-            list[typing.Literal[tuple(e.name for e in LargeLanguageModels)]] | None
-        ) = None
+        selected_models: list[str] | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
 
     class ResponseModel(BaseModel):
-        output_text: dict[
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)], list[str]
-        ]
+        output_text: dict[str, list[str]]
 
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
@@ -66,11 +58,18 @@ class CompareLLMPage(BasePage):
             help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
-        enum_multiselect(
-            LargeLanguageModels,
+        options = dict(
+            AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm)
+            .exclude_deprecated(
+                selected_models=gui.session_state.get("selected_models")
+            )
+            .values_list("name", "label")
+        )
+        gui.multiselect(
             label="#### 🧠 Language Models",
             key="selected_models",
-            checkboxes=False,
+            options=options,
+            format_func=options.__getitem__,
         )
 
         gui.markdown("#### 💪 Capabilities")
@@ -94,11 +93,10 @@ class CompareLLMPage(BasePage):
         prompt = render_prompt_vars(request.input_prompt, state)
         state["output_text"] = output_text = {}
 
-        for selected_model in request.selected_models:
-            model = LargeLanguageModels[selected_model]
-            yield f"Running {model.value}..."
+        for model in AIModelSpec.objects.filter(name__in=request.selected_models):
+            yield f"Running {model.label}..."
             ret = run_language_model(
-                model=selected_model,
+                model=model.name,
                 quality=request.quality,
                 num_outputs=request.num_outputs,
                 temperature=request.sampling_temperature,
@@ -110,8 +108,8 @@ class CompareLLMPage(BasePage):
                 stream=True,
             )
             for i, entries in enumerate(ret):
-                output_text[selected_model] = [e["content"] for e in entries]
-                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
+                output_text[model.name] = [e["content"] for e in entries]
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.label}..."
 
     def render_output(self):
         _render_outputs(gui.session_state, 450)
@@ -130,9 +128,7 @@ class CompareLLMPage(BasePage):
     def get_raw_price(self, state: dict) -> float:
         grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
         price = sum(map(math.ceil, grouped_costs.values()))
-        if LargeLanguageModels.agrillm_qwen3_30b.name in state.get(
-            "selected_models", []
-        ):
+        if "agrillm_qwen3_30b" in state.get("selected_models", []):
             price += 100
 
         return price + self.PROFIT_CREDITS
@@ -142,7 +138,7 @@ class CompareLLMPage(BasePage):
         if not grouped_costs:
             return
         parts = [
-            f"{math.ceil(total)}Cr for {LargeLanguageModels[model_name].value}"
+            f"{math.ceil(total)}Cr for {AIModelSpec.objects.get(name=model_name).label}"
             for model_name, total in grouped_costs.items()
         ]
         return f"\n*Breakdown: {' + '.join(parts)} + {self.PROFIT_CREDITS}Cr/run*"
@@ -164,10 +160,10 @@ class CompareLLMPage(BasePage):
 def _render_outputs(state, height):
     selected_models = state.get("selected_models", [])
     for key in selected_models:
-        output_text: dict = state.get("output_text", {}).get(key, [])
+        output_text: list = state.get("output_text", {}).get(key, [])
         for idx, text in enumerate(output_text):
             gui.text_area(
-                f"**{LargeLanguageModels[key].value}**",
+                f"**{AIModelSpec.objects.get(name=key).label}**",
                 help=f"output {key} {idx} {random.random()}",
                 disabled=True,
                 value=text,

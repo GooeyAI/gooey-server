@@ -20,6 +20,7 @@ from bots.models import (
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.exceptions import UserError
+from ai_models.models import AIModelSpec
 from functions.recipe_functions import BaseLLMTool
 from payments.plans import PricingPlan
 from daras_ai_v2 import icons, settings
@@ -70,7 +71,6 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     SUPERSCRIPT,
     ConversationEntry,
-    LargeLanguageModels,
     calc_gpt_tokens,
     format_chat_entry,
     get_entry_images,
@@ -162,7 +162,6 @@ class VideoBotsPage(BasePage):
         "elevenlabs_stability": 0.5,
         "elevenlabs_similarity_boost": 0.75,
         # gpt3
-        "selected_model": LargeLanguageModels.text_davinci_003.name,
         "avoid_repetition": True,
         "num_outputs": 1,
         "quality": 1.0,
@@ -227,9 +226,7 @@ class VideoBotsPage(BasePage):
         )
 
         # llm model
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
         document_model: str | None = Field(
             None,
             title="🩻 Photo / Document Intelligence",
@@ -369,7 +366,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
                 """
             )
 
-        llm_model = LargeLanguageModels[request.selected_model]
+        try:
+            llm_model = AIModelSpec.objects.get(name=request.selected_model)
+        except AIModelSpec.DoesNotExist:
+            raise UserError(
+                f"Model {request.selected_model} not found. Should be one of: {AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list('name', flat=True)}"
+            )
         user_input = (request.input_prompt or "").strip()
         if not (
             user_input
@@ -422,7 +424,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
         ocr_texts = []
         if request.input_images and (
             request.document_model
-            or not LargeLanguageModels[request.selected_model].is_vision_model
+            or not AIModelSpec.objects.get(
+                name=request.selected_model
+            ).llm_is_vision_model
         ):
             yield "Running Azure Form Recognizer..."
             for url in request.input_images:
@@ -460,7 +464,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         if (
             not request.input_audio
             or is_realtime_audio_url(request.input_audio)
-            or (model.supports_input_audio and not request.asr_model)
+            or (model.llm_supports_input_audio and not request.asr_model)
         ):
             # unless an ASR model is explicitly specified,
             # have the audio-enabled LLM accept the audio directly
@@ -539,7 +543,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
         # truncate the history to fit the model's max tokens
         max_history_tokens = (
-            model.context_window
+            model.llm_context_window
             - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
             - request.max_tokens
             - SAFETY_BUFFER
@@ -553,7 +557,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             filter(None, [system_prompt, *history_prompt, user_prompt])
         )
         # ensure input script is not too big
-        max_allowed_tokens = model.context_window - calc_gpt_tokens(
+        max_allowed_tokens = model.llm_context_window - calc_gpt_tokens(
             response.final_prompt
         )
         if max_allowed_tokens < 0:
@@ -567,7 +571,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             query_msgs = request.messages + [
                 format_chat_entry(role=CHATML_ROLE_USER, content_text=user_input)
             ]
-            clip_idx = convo_window_clipper(query_msgs, model.context_window // 2)
+            clip_idx = convo_window_clipper(query_msgs, model.llm_context_window // 2)
             query_msgs = query_msgs[clip_idx:]
 
             chat_history = messages_as_prompt(query_msgs)
@@ -592,7 +596,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
                 yield "Finding keywords..."
                 k_request = request.model_copy()
                 # other models dont support JSON mode
-                k_request.selected_model = LargeLanguageModels.gpt_4_o.name
+                k_request.selected_model = "gpt_4_o"
                 k_request.max_tokens = 4096
                 keyword_query = json.loads(
                     generate_final_search_query(
@@ -644,21 +648,21 @@ Translation Glossary for LLM Language (English) -> User Langauge
         *,
         request: "VideoBotsPage.RequestModel",
         response: "VideoBotsPage.ResponseModel",
-        model: LargeLanguageModels,
+        model: AIModelSpec,
         asr_msg: str | None = None,
         prev_output_text: list[str] | None = None,
         tools_by_name: dict[str, BaseLLMTool] | None = None,
     ) -> typing.Iterator[str | None]:
-        yield f"Summarizing with {model.value}..."
+        yield f"Summarizing with {model.label}..."
 
         audio_session_extra = None
-        if model.is_audio_model:
+        if model.llm_is_audio_model:
             audio_session_extra = {}
             if request.openai_voice_name:
                 audio_session_extra["voice"] = request.openai_voice_name
 
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
-            model=request.selected_model,
+            model=model.name,
             messages=response.final_prompt,
             max_tokens=request.max_tokens,
             num_outputs=request.num_outputs,
@@ -730,7 +734,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     )
                 response.finish_reason = finish_reason
             else:
-                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.value}..."
+                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.label}..."
 
         if not tool_calls:
             return
@@ -789,7 +793,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         return output_text
 
     def tts_step(self, model, request, response):
-        if request.tts_provider and not model.is_audio_model:
+        if request.tts_provider and not model.llm_is_audio_model:
             response.output_audio = []
             for text in response.raw_tts_text or response.raw_output_text:
                 tts_state = TextToSpeechPage.RequestModel.model_validate(
@@ -883,7 +887,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
         )
 
-        if not LargeLanguageModels[language_model].is_audio_model:
+        if not AIModelSpec.objects.filter(
+            name=language_model, llm_is_audio_model=True
+        ).exists():
             bulk_documents_uploader(
                 label=(
                     "#### <i class='fa-light fa-books' style='fontSize:20px'></i> "
@@ -1566,7 +1572,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
 
-        if state.get("selected_model") == LargeLanguageModels.agrillm_qwen3_30b.name:
+        if state.get("selected_model") == "agrillm_qwen3_30b":
             total += 100
 
         if is_realtime_audio_url(state.get("input_audio")):
@@ -1578,17 +1584,20 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         return total
 
     def additional_notes(self):
-        try:
-            model = LargeLanguageModels[gui.session_state["selected_model"]].value
-        except KeyError:
-            model = "LLM"
-
         llm_cost = get_non_ivr_price_credits(self.current_sr)
-        if model == LargeLanguageModels.agrillm_qwen3_30b.value:
-            llm_cost += 100
+
+        try:
+            model = AIModelSpec.objects.get(
+                name=gui.session_state.get("selected_model")
+            )
+            if model.name == "agrillm_qwen3_30b":
+                llm_cost += 100
+            label = model.label
+        except AIModelSpec.DoesNotExist:
+            label = "LLM"
 
         notes = (
-            f"\nBreakdown: {math.ceil(llm_cost)} ({model}) + {self.PROFIT_CREDITS}/run"
+            f"\nBreakdown: {math.ceil(llm_cost)} ({label}) + {self.PROFIT_CREDITS}/run"
         )
 
         if (

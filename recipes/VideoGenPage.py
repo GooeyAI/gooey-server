@@ -119,6 +119,8 @@ class VideoGenPage(BasePage):
                 model.name: model
                 for model in AIModelSpec.objects.filter(
                     category=AIModelSpec.Categories.video
+                ).exclude_deprecated(
+                    selected_models=gui.session_state.get("selected_models")
                 )
             }
         )
@@ -127,6 +129,8 @@ class VideoGenPage(BasePage):
                 model.name: model
                 for model in AIModelSpec.objects.filter(
                     category=AIModelSpec.Categories.audio
+                ).exclude_deprecated(
+                    selected_models=gui.session_state.get("selected_audio_model")
                 )
             }
         )

@@ -4,6 +4,7 @@ from enum import Enum
 import gooey_gui as gui
 from pydantic import BaseModel
 
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
@@ -12,7 +13,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
-    LargeLanguageModels,
     run_language_model,
     calc_gpt_tokens,
 )
@@ -55,7 +55,6 @@ class DocSummaryPage(BasePage):
         "num_outputs": 1,
         "quality": 1.0,
         "avoid_repetition": True,
-        "selected_model": LargeLanguageModels.text_davinci_003.name,
         "chain_type": CombineDocumentsChains.map_reduce.name,
     }
 
@@ -65,9 +64,7 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None = None
         merge_instructions: str | None = None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
 
         chain_type: (
             typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None
@@ -205,7 +202,7 @@ def documents_as_prompt(docs: list[str], sep="\n\n") -> str:
 
 
 def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: dict):
-    model = LargeLanguageModels[request.selected_model]
+    model = AIModelSpec.objects.get(name=request.selected_model)
 
     task_instructions = request.task_instructions.strip()
     merge_instructions = request.merge_instructions.strip()
@@ -216,14 +213,14 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
     )
 
     # to merge 2 outputs, we need to have at least 1/3 of the max tokens available
-    max_tokens_bound = (model.context_window - prompt_token_count) // 3
+    max_tokens_bound = (model.llm_context_window - prompt_token_count) // 3
     assert request.max_tokens <= max_tokens_bound, (
-        f"To summarize accurately, output size must be at max {max_tokens_bound} for {model.value}, "
+        f"To summarize accurately, output size must be at max {max_tokens_bound} for {model.label}, "
         f"but got {request.max_tokens}. Please reduce the output size."
     )
 
     # logic: model context window = prompt + output + document chunk
-    chunk_size = model.context_window - (prompt_token_count + request.max_tokens)
+    chunk_size = model.llm_context_window - (prompt_token_count + request.max_tokens)
     docs = text_splitter(
         full_text,
         chunk_size=chunk_size,
@@ -258,7 +255,7 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
 
     while True:
         progress += 1
-        yield f"[{progress}] Summarizing using {model.value}..."
+        yield f"[{progress}] Summarizing using {model.label}..."
         documents = map_parallel(llm, llm_prompts, max_workers=4)
         # append the left over document from the previous iteration
         if extra_doc:
