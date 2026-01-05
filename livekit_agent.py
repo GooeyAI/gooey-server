@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from collections import deque
-
-from ai_models.models import AIModelSpec, ModelProvider
-
 __import__("gooeysite.wsgi")
+
 
 import asyncio
 import uuid
+from collections import deque
 from functools import wraps
 
 import aiohttp
@@ -32,6 +30,7 @@ from livekit.agents.utils import AudioBuffer
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from livekit.rtc.room import ConnectionState
 
+from ai_models.models import AIModelSpec, ModelProvider
 from bots.models.bot_integration import BotIntegration, Platform
 from bots.models.convo_msg import Conversation, db_msgs_to_entries
 from daras_ai.image_input import (
