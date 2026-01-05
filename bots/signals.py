@@ -18,6 +18,8 @@ def run_after_message_save(instance: Message, **kwargs):
         and not instance._analysis_started
         # this is the assistant's response
         and instance.role == CHATML_ROLE_ASSISTANT
+        # msg is acutally produced by a copilot run
+        and instance.saved_run
     ):
 
         @transaction.on_commit
