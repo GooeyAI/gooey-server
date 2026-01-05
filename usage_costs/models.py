@@ -66,6 +66,10 @@ class ModelSku(models.IntegerChoices):
 
 
 class ModelPricing(models.Model):
+    model_name = models.CharField(
+        max_length=255,
+        help_text="The name of the model. Must match the name of the AI Model",
+    )
     model_id = models.TextField(
         help_text="The model ID. Model ID + SKU should be unique together."
     )
@@ -90,12 +94,6 @@ class ModelPricing(models.Model):
     provider = models.IntegerField(
         choices=ModelProvider.choices,
         help_text="The provider of the model. Only used for Display purposes.",
-    )
-    model_name = models.CharField(
-        max_length=255,
-        help_text="The name of the model. Only used for Display purposes.",
-        blank=True,
-        default="",
     )
 
     notes = models.TextField(
