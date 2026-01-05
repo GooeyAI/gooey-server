@@ -661,13 +661,13 @@ def run_openai_chat(
         # cap the max tokens at the model's max limit
         max_tokens = min(max_tokens, model.llm_max_output_tokens)
 
-    if "openai" in model.label:
+    if "openai" in model.label.lower():
         # openai renamed max_tokens to max_completion_tokens
         kwargs["max_completion_tokens"] = max_tokens
     else:
         kwargs["max_tokens"] = max_tokens
 
-    if "openai" in model.label and model.llm_is_thinking_model:
+    if "openai" in model.label.lower() and model.llm_is_thinking_model:
         # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
 
