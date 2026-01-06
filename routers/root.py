@@ -798,7 +798,7 @@ def page_wrapper(
             container.render_sidebar()
 
     with pane_content:
-        with gui.div(className="d-flex flex-column min-vh-100 w-100 px-2"):
+        with gui.div(className="d-flex flex-column min-vh-100 w-100"):
             gui.html(templates.get_template("gtag.html").render(**context))
 
             with (
