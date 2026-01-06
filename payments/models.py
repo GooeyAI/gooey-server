@@ -81,6 +81,8 @@ class Subscription(models.Model):
     monthly_spending_notification_sent_at = models.DateTimeField(null=True, blank=True)
     monthly_budget_email_sent_at = models.DateTimeField(null=True, blank=True)
 
+    seats = models.PositiveIntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -133,8 +135,13 @@ class Subscription(models.Model):
     def get_tier(self) -> PricingTier | None:
         if not (self.amount and self.charged_amount):
             return None
+
+        per_seat_credits = self.amount // max(1, self.seats)
+        per_seat_monthly_charge = round(self.charged_amount / 100) // max(1, self.seats)
         return PricingTier(
-            credits=self.amount, monthly_charge=round(self.charged_amount / 100)
+            per_seat_credits=per_seat_credits,
+            per_seat_monthly_charge=per_seat_monthly_charge,
+            seats=self.seats,
         )
 
     @property

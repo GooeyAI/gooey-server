@@ -75,6 +75,7 @@ class PaypalWebhookHandler:
             plan=plan,
             workspace=Workspace.objects.from_pp_custom_id(pp_sub.custom_id),
             external_id=pp_sub.id,
+            seats=1,  # PayPal doesn't support per-seat billing
         )
 
     @classmethod
@@ -192,6 +193,19 @@ class StripeWebhookHandler:
         amount = int(stripe_sub.quantity)
         charged_amount = round(Decimal(stripe_sub.plan.amount_decimal) * amount)
 
+        # For TEAM plan, get seats from metadata or calculate from charged amount
+        seats = 1
+        if plan == PricingPlan.TEAM:
+            # Try to get seats from metadata first
+            try:
+                seats = int(stripe_sub.metadata.get("seats", "1"))
+            except (ValueError, TypeError):
+                seats = (
+                    workspace
+                    and workspace.subscription
+                    and workspace.subscription.seats
+                )
+
         set_workspace_subscription(
             provider=cls.PROVIDER,
             plan=plan,
@@ -199,6 +213,7 @@ class StripeWebhookHandler:
             external_id=stripe_sub.id,
             amount=amount,
             charged_amount=charged_amount,
+            seats=seats,
         )
 
     @classmethod
@@ -269,6 +284,7 @@ def set_workspace_subscription(
     external_id: str | None,
     amount: int = 0,
     charged_amount: int = 0,
+    seats: int = 1,
     cancel_old: bool = True,
 ) -> Subscription:
     with transaction.atomic():
@@ -284,6 +300,7 @@ def set_workspace_subscription(
         new_sub.charged_amount = charged_amount
         new_sub.payment_provider = provider
         new_sub.external_id = external_id
+        new_sub.seats = seats
         new_sub.full_clean()
         new_sub.save()
 

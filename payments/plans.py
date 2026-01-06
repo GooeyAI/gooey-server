@@ -21,12 +21,21 @@ if typing.TYPE_CHECKING:
 
 
 class PricingTier(typing.NamedTuple):
-    credits: int
-    monthly_charge: int
+    per_seat_credits: int
+    per_seat_monthly_charge: int
+    seats: int = 1
 
     @property
     def label(self) -> str:
         return f"{self.credits:,} Credits for ${self.monthly_charge}/month"
+
+    @property
+    def credits(self) -> int:
+        return self.per_seat_credits * self.seats
+
+    @property
+    def monthly_charge(self) -> int:
+        return self.per_seat_monthly_charge * self.seats
 
 
 class PricingPlanData(typing.NamedTuple):
@@ -62,15 +71,11 @@ class PricingPlanData(typing.NamedTuple):
 
     def get_active_credits(self, tier: PricingTier | None = None) -> int:
         """Get credits for specific tier or default"""
-        if tier is not None:
-            return tier.credits
-        return self.credits
+        return tier and tier.credits or self.credits
 
     def get_active_monthly_charge(self, tier: PricingTier | None = None) -> int:
         """Get monthly charge for specific tier or default"""
-        if tier is not None:
-            return tier.monthly_charge
-        return self.monthly_charge
+        return tier and tier.monthly_charge or self.monthly_charge
 
     def get_default_tier(self) -> PricingTier:
         if self.tiers:
@@ -264,12 +269,12 @@ class PricingPlan(PricingPlanData, Enum):
         </ul>
         """,
         tiers=[
-            PricingTier(credits=2_000, monthly_charge=25),
-            PricingTier(credits=4_200, monthly_charge=50),
-            PricingTier(credits=9_000, monthly_charge=100),
-            PricingTier(credits=20_000, monthly_charge=200),
-            PricingTier(credits=32_000, monthly_charge=300),
-            PricingTier(credits=44_000, monthly_charge=400),
+            PricingTier(per_seat_credits=2_000, per_seat_monthly_charge=25),
+            PricingTier(per_seat_credits=4_200, per_seat_monthly_charge=50),
+            PricingTier(per_seat_credits=9_000, per_seat_monthly_charge=100),
+            PricingTier(per_seat_credits=20_000, per_seat_monthly_charge=200),
+            PricingTier(per_seat_credits=32_000, per_seat_monthly_charge=300),
+            PricingTier(per_seat_credits=44_000, per_seat_monthly_charge=400),
         ],
     )
 
@@ -283,7 +288,7 @@ class PricingPlan(PricingPlanData, Enum):
         credits=2_500,
         long_description=dedent(
             """
-            #### All Standard Features +
+            #### All Free Features +
             <ul class="text-muted">
               <li>Private Team Workspace</li>
               <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
@@ -306,6 +311,14 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
+        tiers=[
+            PricingTier(per_seat_credits=2_500, per_seat_monthly_charge=40),
+            PricingTier(per_seat_credits=5_000, per_seat_monthly_charge=60),
+            PricingTier(per_seat_credits=9_000, per_seat_monthly_charge=110),
+            PricingTier(per_seat_credits=20_000, per_seat_monthly_charge=200),
+            PricingTier(per_seat_credits=32_000, per_seat_monthly_charge=300),
+            PricingTier(per_seat_credits=44_000, per_seat_monthly_charge=400),
+        ],
     )
 
     ENTERPRISE = PricingPlanData(
