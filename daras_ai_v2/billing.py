@@ -136,12 +136,13 @@ def render_current_plan(workspace: "Workspace"):
                 gui.caption("per month" + provider_text)
 
         with right, gui.div(className="text-end"):
-            seats_heading = f"{seats} seats" if seats > 1 else ""
-            credits_heading = f"{credits:,} credits"
-            gui.write(
-                f"# {' & '.join([seats_heading, credits_heading])}",
-                className="no-margin",
-            )
+            if seats > 1:
+                gui.write(
+                    f"# {seats} seats & {credits:,} credits", className="no-margin"
+                )
+            else:
+                gui.write(f"# {credits:,} credits", className="no-margin")
+
             if monthly_charge:
                 text = f"**${monthly_charge:,}** monthly renewal for "
                 if tier and seats > 1:
@@ -271,10 +272,7 @@ def _render_plan_compact(
         ),
     ):
         _render_plan_heading(plan)
-        with gui.div(className="my-3"):
-            selected_tier = _render_plan_pricing(
-                plan, selected_payment_provider, workspace
-            )
+        selected_tier = _render_plan_pricing(plan, selected_payment_provider, workspace)
         with gui.div(
             className="flex-grow-1 d-flex flex-column justify-content-between"
         ):
@@ -292,7 +290,7 @@ def _render_plan_compact(
 
 def _render_plan_details(plan: PricingPlan):
     """Render plan details and return selected tier key if plan has tiers"""
-    with gui.div():
+    with gui.div(className="mt-3"):
         gui.write(plan.long_description, unsafe_allow_html=True)
     with gui.div(className="mt-3"):
         gui.write(plan.footer, unsafe_allow_html=True)
@@ -319,39 +317,50 @@ def _render_plan_pricing(
     if not plan.tiers or payment_provider != PaymentProvider.STRIPE:
         selected_tier = None
     else:
-        current_tier = workspace.subscription.get_tier()
+        current_tier = workspace.subscription and workspace.subscription.get_tier()
 
-        with gui.div(className="my-3"):
+        colspec = [3, 1] if plan == PricingPlan.TEAM else [12, 0]
+        col1, col2 = gui.columns(colspec, responsive=True)
+        with col1:
             choices = {tier.per_seat_monthly_charge: tier for tier in plan.tiers}
+            if plan == PricingPlan.TEAM:
+                label = "Monthly credits per member"
+            else:
+                label = "Monthly credits"
             per_seat_monthly_charge: int = gui.selectbox(
-                label="",
+                label=label,
                 options=choices.keys(),
                 format_func=lambda k: choices[k].label,
                 key=f"tier-select-{plan.key}",
                 value=(current_tier and current_tier.per_seat_monthly_charge),
+                className="mb-0 container-margin-reset",
             )
 
-            if plan == PricingPlan.TEAM:
+        if plan == PricingPlan.TEAM:
+            workspace_size = workspace.memberships.count()
+            with col2:
                 seats: int = gui.selectbox(
-                    label="Number of seats:",
+                    label="Seats",
                     options=[1, 2, 3, 4, 5, 10, 15, 20, 25, 50],
-                    key=f"seats-select-{plan.key}",
-                    value=(current_tier and current_tier.seats),
+                    key=f"seats-select-{plan.key}-{workspace.id}",
+                    value=(current_tier and current_tier.seats or workspace_size),
+                    className="mb-0 container-margin-reset",
                 )
-            else:
-                seats = 1
+        else:
+            seats = 1
 
-            selected_tier = PricingTier(
-                per_seat_credits=choices[per_seat_monthly_charge].per_seat_credits,
-                per_seat_monthly_charge=per_seat_monthly_charge,
-                seats=seats,
-            )
+        selected_tier = PricingTier(
+            per_seat_credits=choices[per_seat_monthly_charge].per_seat_credits,
+            per_seat_monthly_charge=per_seat_monthly_charge,
+            seats=seats,
+        )
 
     with pricing_div:
         with gui.tag("h3", className="my-0 d-inline me-2"):
             gui.html(plan.get_pricing_title(selected_tier))
-        with gui.tag("p", className="text-muted my-0"):
-            gui.html(plan.get_pricing_caption(selected_tier))
+        if caption := plan.get_pricing_caption(selected_tier):
+            with gui.tag("p", className="text-muted my-0"):
+                gui.html(caption)
 
     return selected_tier
 
