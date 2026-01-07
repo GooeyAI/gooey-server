@@ -835,15 +835,16 @@ def page_wrapper(
                 with gui.div(
                     className="d-flex justify-content-end flex-grow-1 align-items-center"
                 ):
-                    render_gooey_builder_launcher(
-                        request=request,
-                        current_workspace=get_current_workspace(
-                            request.user, request.session
+                    if is_recipe_page:
+                        render_gooey_builder_launcher(
+                            request=request,
+                            current_workspace=get_current_workspace(
+                                request.user, request.session
+                            )
+                            if request.user
+                            else None,
+                            is_fab_button=False,
                         )
-                        if request.user
-                        else None,
-                        is_fab_button=False,
-                    )
 
                     if show_search_bar:
                         _render_mobile_search_button(request, search_filters)
