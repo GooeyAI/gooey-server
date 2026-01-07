@@ -136,20 +136,19 @@ def render_current_plan(workspace: "Workspace"):
                 gui.caption("per month" + provider_text)
 
         with right, gui.div(className="text-end"):
-            gui.write(f"# {credits:,} credits", className="no-margin")
+            seats_heading = f"{seats} seats" if seats > 1 else ""
+            credits_heading = f"{credits:,} credits"
+            gui.write(
+                f"# {' & '.join([seats_heading, credits_heading])}",
+                className="no-margin",
+            )
             if monthly_charge:
-                if (
-                    plan == PricingPlan.TEAM
-                    and workspace.subscription
-                    and workspace.subscription.seats > 1
-                ):
-                    gui.write(
-                        f"**${monthly_charge:,}** monthly renewal for {credits:,} credits ({seats} seats)"
-                    )
+                text = f"**${monthly_charge:,}** monthly renewal for "
+                if tier and seats > 1:
+                    text += f"{seats} seats with {tier.per_seat_credits:,} credits each"
                 else:
-                    gui.write(
-                        f"**${monthly_charge:,}** monthly renewal for {credits:,} credits"
-                    )
+                    text += f"{credits:,} credits"
+                gui.caption(text)
 
 
 def render_credit_balance(workspace: "Workspace"):
@@ -618,6 +617,8 @@ def _render_create_subscription_button(
 
 
 def get_order_summary_content(plan: PricingPlan, selected_tier: PricingTier):
+    from routers.account import members_route
+
     per_seat_charge = selected_tier.per_seat_monthly_charge
     total_charge = selected_tier.monthly_charge
     extra_seats = selected_tier.seats - 1
@@ -630,10 +631,10 @@ def get_order_summary_content(plan: PricingPlan, selected_tier: PricingTier):
         extra_seats_line = f"""
 **{extra_seats_title:·<40} ${extra_seats * per_seat_charge}**
 {extra_seats} x ${per_seat_charge}/month
-[View members](/account/members)
+[View members]({get_route_path(members_route)})
 """
     else:
-        extra_seats_line = "[View members](/account/members)\n"
+        extra_seats_line = f"[View members]({get_route_path(members_route)})\n"
 
     plan_tier_title = f"{plan.title} {per_seat_charge} Plan "
 
