@@ -63,11 +63,7 @@ class PricingPlanData(typing.NamedTuple):
         return f"${monthly_charge}/month"
 
     def get_pricing_caption(self, tier: PricingTier | None = None) -> str:
-        if self.pricing_caption is not None:
-            return self.pricing_caption
-
-        credits = self.get_active_credits(tier)
-        return f"{credits:,} credits/month"
+        return self.pricing_caption or ""
 
     def get_active_credits(self, tier: PricingTier | None = None) -> int:
         """Get credits for specific tier or default"""
@@ -283,7 +279,6 @@ class PricingPlan(PricingPlanData, Enum):
         key="team_2025",
         title="Team",
         description="AI Teams that collaborate together can change the world.",
-        pricing_caption="Monthly credits per member",
         monthly_charge=40,
         credits=2_500,
         long_description=dedent(
