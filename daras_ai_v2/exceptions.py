@@ -69,6 +69,11 @@ class GPUError(UserError):
     pass
 
 
+class StopRequested(UserError):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 class InsufficientCredits(UserError):
     def __init__(self, user: "AppUser", sr: "SavedRun"):
         from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
