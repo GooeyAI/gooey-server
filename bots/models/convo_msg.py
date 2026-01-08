@@ -631,7 +631,12 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
                 "created_at": msg.created_at.isoformat(),
             }
         elif msg.role == CHATML_ROLE_ASSISTANT:
-            references = msg.saved_run.state.get("references")
+            saved_run = msg.saved_run
+            references = []
+            web_url = ""
+            if saved_run:
+                references = saved_run.state.get("references") or []
+                web_url = saved_run.get_app_url()
             buttons, text, _ = parse_bot_html(msg.display_content)
             yield {
                 "role": msg.role,
@@ -643,7 +648,7 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
                 "buttons": buttons,
                 "output_images": images,
                 "output_audio": audio,
-                "web_url": msg.saved_run.get_app_url(),
+                "web_url": web_url,
                 "user_message_id": msg.platform_msg_id,
                 "bot_message_id": msg.platform_msg_id.strip(MSG_ID_PREFIX),
                 "references": references,
