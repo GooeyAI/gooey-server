@@ -70,9 +70,17 @@ def get_objects(*args):
             yield export(bi.saved_run)
         if bi.published_run_id:
             yield from export_pr(bi.published_run)
+        if bi.shared_phone_number_id:
+            yield export(bi.shared_phone_number)
         yield export(
             bi,
-            include_fks={"workspace", "created_by", "saved_run", "published_run"},
+            include_fks={
+                "workspace",
+                "created_by",
+                "saved_run",
+                "published_run",
+                "shared_phone_number",
+            },
             # exclude sensitive fields from the export
             exclude={
                 "fb_page_access_token",
