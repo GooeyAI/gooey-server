@@ -3,6 +3,7 @@ import sys
 from django.core import serializers
 from django.db.models import NOT_PROVIDED
 
+from ai_models.models import AIModelSpec
 from app_users.models import AppUser
 from bots.models import (
     BotIntegration,
@@ -11,6 +12,7 @@ from bots.models import (
     WorkflowMetadata,
 )
 from daras_ai_v2 import settings
+from usage_costs.models import ModelPricing
 from workspaces.models import Workspace
 
 
@@ -95,6 +97,18 @@ def get_objects(*args):
 
     for metadata in WorkflowMetadata.objects.all():
         yield export(metadata)
+
+    for pricing in ModelPricing.objects.all():
+        yield export(pricing)
+
+    for model_spec in AIModelSpec.objects.all():
+        if model_spec.redirect_to:
+            yield export(model_spec.redirect_to)
+        yield export(
+            model_spec,
+            include_fks={"pricing", "redirect_to"},
+            exclude={"api_key"},
+        )
 
 
 def export_pr(pr: PublishedRun):
