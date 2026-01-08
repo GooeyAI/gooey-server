@@ -49,6 +49,7 @@ class Text2ImgModels(Enum):
     flux_1_dev = "FLUX.1 [dev]"
 
     gpt_image_1 = "GPT Image 1 (OpenAI)"
+    gpt_image_1_5 = "GPT Image 1.5 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
     dall_e = "DALL·E 2 (OpenAI)"
 
@@ -80,6 +81,7 @@ class Text2ImgModels(Enum):
             cls.openjourney_2,
             cls.openjourney,
             cls.protogen_5_3,
+            cls.gpt_image_1,
         }
 
 
@@ -87,6 +89,7 @@ text2img_model_ids = {
     Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
     Text2ImgModels.nano_banana: "fal-ai/nano-banana",
     Text2ImgModels.gpt_image_1: "gpt-image-1",
+    Text2ImgModels.gpt_image_1_5: "gpt-image-1.5",
     Text2ImgModels.dall_e_3: "dall-e-3",
     Text2ImgModels.dall_e: "dall-e-2",
     Text2ImgModels.flux_1_dev: "fal-ai/flux-general",
@@ -104,6 +107,7 @@ class Img2ImgModels(Enum):
     flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
 
     gpt_image_1 = "GPT Image 1 (OpenAI)"
+    gpt_image_1_5 = "GPT Image 1.5 (OpenAI)"
 
     instruct_pix2pix = "✨ InstructPix2Pix (Tim Brooks)"
 
@@ -131,11 +135,17 @@ class Img2ImgModels(Enum):
             cls.analog_diffusion,
             cls.protogen_5_3,
             cls.dall_e,
+            cls.gpt_image_1,
         }
 
     @classmethod
     def _multi_image_models(cls):
-        return {cls.nano_banana, cls.nano_banana_pro, cls.gpt_image_1}
+        return {
+            cls.nano_banana,
+            cls.nano_banana_pro,
+            cls.gpt_image_1,
+            cls.gpt_image_1_5,
+        }
 
 
 img2img_model_ids = {
@@ -146,6 +156,7 @@ img2img_model_ids = {
     Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Img2ImgModels.dall_e: "dall-e-2",
     Img2ImgModels.gpt_image_1: "gpt-image-1",
+    Img2ImgModels.gpt_image_1_5: "gpt-image-1.5",
     Img2ImgModels.nano_banana: "fal-ai/nano-banana/edit",
     Img2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro/edit",
 }
@@ -351,7 +362,7 @@ def text2img(
                 payload=payload,
             )
             return output_images
-        case Text2ImgModels.gpt_image_1:
+        case Text2ImgModels.gpt_image_1 | Text2ImgModels.gpt_image_1_5:
             from openai import OpenAI
 
             client = OpenAI()
@@ -541,6 +552,7 @@ def img2img(
     if not prompt and selected_model in (
         Img2ImgModels.flux_pro_kontext.name,
         Img2ImgModels.gpt_image_1.name,
+        Img2ImgModels.gpt_image_1_5.name,
         Img2ImgModels.nano_banana.name,
         Img2ImgModels.nano_banana_pro.name,
     ):
@@ -572,7 +584,7 @@ def img2img(
             )
 
             return output_images
-        case Img2ImgModels.gpt_image_1.name:
+        case Img2ImgModels.gpt_image_1.name | Img2ImgModels.gpt_image_1_5.name:
             from openai import NOT_GIVEN, OpenAI
 
             payload_input_images = []

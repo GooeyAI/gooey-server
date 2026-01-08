@@ -182,7 +182,11 @@ class Img2ImgPage(BasePage):
 
         if (
             request.selected_model
-            in [Img2ImgModels.dall_e.name, Img2ImgModels.gpt_image_1.name]
+            in [
+                Img2ImgModels.dall_e.name,
+                Img2ImgModels.gpt_image_1.name,
+                Img2ImgModels.gpt_image_1_5.name,
+            ]
             and request.selected_controlnet_model
         ):
             raise UserError("ControlNet is not supported for OpenAI models")
@@ -240,7 +244,7 @@ class Img2ImgPage(BasePage):
                 unit_price = 20
             case Img2ImgModels.flux_pro_kontext.name:
                 unit_price = 10
-            case Img2ImgModels.gpt_image_1.name:
+            case Img2ImgModels.gpt_image_1.name | Img2ImgModels.gpt_image_1_5.name:
                 unit_price = 45
             case Img2ImgModels.nano_banana.name:
                 unit_price = 8
