@@ -650,7 +650,8 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
                 "output_audio": audio,
                 "web_url": web_url,
                 "user_message_id": msg.platform_msg_id,
-                "bot_message_id": msg.platform_msg_id.strip(MSG_ID_PREFIX),
+                "bot_message_id": msg.platform_msg_id
+                and msg.platform_msg_id.removeprefix(MSG_ID_PREFIX),
                 "references": references,
             }
 
