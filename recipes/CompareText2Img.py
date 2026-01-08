@@ -279,15 +279,17 @@ class CompareText2ImgPage(BasePage):
     def get_raw_price(self, state: dict) -> int:
         selected_models = state.get("selected_models", [])
         total = 0
-        for name in selected_models:
-            match name:
+        for model in selected_models:
+            match model:
                 case Text2ImgModels.deepfloyd_if.name:
                     total += 5
                 case Text2ImgModels.dall_e.name | Text2ImgModels.dall_e_3.name:
                     total += 15
-                case Text2ImgModels.gpt_image_1.name:
+                case (
+                    Text2ImgModels.gpt_image_1.name | Text2ImgModels.gpt_image_1_5.name
+                ):
                     grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
-                    if cost := grouped_costs.get(Text2ImgModels.gpt_image_1.name):
+                    if cost := grouped_costs.get(Text2ImgModels[model].name):
                         total += math.ceil(float(cost) * 2.5)
                         continue
                     match state.get("gpt_image_1_quality"):
