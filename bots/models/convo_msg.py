@@ -9,7 +9,7 @@ import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models import OuterRef, Q, QuerySet, Subquery
 from django.utils.text import Truncator
 
 from bots.custom_fields import CustomURLField
@@ -595,6 +595,65 @@ class MessageAttachment(models.Model):
         if self.metadata_id:
             return f"{self.metadata.name} ({self.url})"
         return self.url
+
+
+def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
+    from daras_ai_v2.bots import parse_bot_html
+    from routers.bots_api import MSG_ID_PREFIX
+
+    for msg in msgs:
+        msg: Message
+        images = list(
+            msg.attachments.filter(
+                metadata__mime_type__startswith="image/"
+            ).values_list("url", flat=True)
+        )
+        audios = list(
+            msg.attachments.filter(
+                metadata__mime_type__startswith="audio/"
+            ).values_list("url", flat=True)
+        )
+        audio = audios and audios[0]
+        if msg.role == CHATML_ROLE_USER:
+            # any document type other than audio/image
+            documents = list(
+                msg.attachments.exclude(
+                    Q(metadata__mime_type__startswith="image/")
+                    | Q(metadata__mime_type__startswith="audio/")
+                ).values_list("url", flat=True)
+            )
+            yield {
+                "role": msg.role,
+                "input_prompt": msg.display_content or msg.content,
+                "input_images": images,
+                "input_audio": audio,
+                "input_documents": documents,
+                "created_at": msg.created_at.isoformat(),
+            }
+        elif msg.role == CHATML_ROLE_ASSISTANT:
+            saved_run = msg.saved_run
+            references = []
+            web_url = ""
+            if saved_run:
+                references = saved_run.state.get("references") or []
+                web_url = saved_run.get_app_url()
+            buttons, text, _ = parse_bot_html(msg.display_content)
+            yield {
+                "role": msg.role,
+                "created_at": msg.created_at.isoformat(),
+                "status": "completed",
+                "type": "final_response",
+                "raw_output_text": [msg.content],
+                "output_text": [text],
+                "buttons": buttons,
+                "output_images": images,
+                "output_audio": audio,
+                "web_url": web_url,
+                "user_message_id": msg.platform_msg_id,
+                "bot_message_id": msg.platform_msg_id
+                and msg.platform_msg_id.removeprefix(MSG_ID_PREFIX),
+                "references": references,
+            }
 
 
 class FeedbackQuerySet(models.QuerySet):

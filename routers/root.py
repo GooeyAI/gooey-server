@@ -25,6 +25,10 @@ from starlette.responses import (
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, PublishedRun, Workflow
+from bots.models.convo_msg import (
+    Conversation,
+    db_msgs_to_api_json,
+)
 from daras_ai.image_input import safe_filename, upload_file_from_bytes
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -537,8 +541,12 @@ def chat_explore_route(request: Request):
 
 
 @app.get("/chat/{integration_name}-{integration_id}/")
+@app.get("/chat/{integration_name}-{integration_id}/share/{conversation_id}/")
 def chat_route(
-    request: Request, integration_id: str = None, integration_name: str = None
+    request: Request,
+    integration_id: str | None = None,
+    integration_name: str | None = None,
+    conversation_id: str | None = None,
 ):
     from daras_ai_v2.bot_integration_widgets import get_web_widget_embed_code
     from routers.bots_api import api_hashids
@@ -548,12 +556,36 @@ def chat_route(
     except (IndexError, BotIntegration.DoesNotExist):
         raise HTTPException(status_code=404)
 
+    if conversation_id:
+        try:
+            conversation: Conversation = Conversation.objects.get(
+                id=api_hashids.decode(conversation_id)[0],
+            )
+        except (IndexError, Conversation.DoesNotExist):
+            raise HTTPException(status_code=404)
+        messages = list(db_msgs_to_api_json(conversation.last_n_msgs()))
+        conversation_data = dict(
+            id=conversation_id,
+            bot_id=integration_id,
+            timestamp=conversation.created_at.isoformat(),
+            user_id=conversation.web_user_id,
+            messages=messages,
+        )
+    else:
+        conversation_data = None
+
     return templates.TemplateResponse(
         "chat_fullscreen.html",
         {
             "request": request,
             "bi": bi,
-            "embed_code": get_web_widget_embed_code(bi, config=dict(mode="fullscreen")),
+            "embed_code": get_web_widget_embed_code(
+                bi,
+                config=dict(
+                    mode="fullscreen",
+                    conversationData=conversation_data,
+                ),
+            ),
             "meta": raw_build_meta_tags(
                 url=get_og_url_path(request),
                 title=f"Chat with {bi.name}",
