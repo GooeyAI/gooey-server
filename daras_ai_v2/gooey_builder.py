@@ -27,10 +27,12 @@ def render_gooey_builder_launcher(
 ):
     if not can_launch_gooey_builder(request, current_workspace):
         return
-    from bots.models import BotIntegration
 
     sidebar_ref = use_sidebar("builder-sidebar", request.session)
-    bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
+    try:
+        bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
+    except BotIntegration.DoesNotExist:
+        return
     branding = bi.get_web_widget_branding()
     photo_url = branding.get(
         "photoUrl",
