@@ -122,7 +122,7 @@ class CompareText2ImgPage(BasePage):
             Dalle-3: 15 Cr
             Nano Banana: 8 Cr
             Nano Banana Pro: 20 or 40 Cr
-            GPT-Image 1: 3, 10 or 40 Cr
+            GPT Image 1.5: 3, 10 or 40 Cr
             """
         )
 
