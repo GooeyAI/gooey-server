@@ -91,6 +91,7 @@ def render_gooey_builder_inline(
 
     if gui.session_state.pop("onCloseGooeyBuilder", None):
         sidebar_ref.set_open(False)
+        sidebar_ref.set_mobile_open(False)
         raise gui.RerunException()
 
     bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
