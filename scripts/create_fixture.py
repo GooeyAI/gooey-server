@@ -11,6 +11,7 @@ from bots.models import (
     WorkflowAccessLevel,
     WorkflowMetadata,
 )
+from bots.models.published_run import Tag
 from daras_ai_v2 import settings
 from usage_costs.models import ModelPricing
 from workspaces.models import Workspace
@@ -33,6 +34,10 @@ def run(*args):
 
 
 def get_objects(*args):
+    # export all tags
+    for tag in Tag.objects.all():
+        yield export(tag)
+
     # export all root recipes and 100 latest examples
     pr_qs = (
         list(
