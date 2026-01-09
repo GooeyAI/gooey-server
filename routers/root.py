@@ -563,13 +563,13 @@ def chat_route(
             )
         except (IndexError, Conversation.DoesNotExist):
             raise HTTPException(status_code=404)
-        mesasges = list(db_msgs_to_api_json(conversation.last_n_msgs()))
+        messages = list(db_msgs_to_api_json(conversation.last_n_msgs()))
         conversation_data = dict(
             id=conversation_id,
             bot_id=integration_id,
             timestamp=conversation.created_at.isoformat(),
             user_id=conversation.web_user_id,
-            messages=mesasges,
+            messages=messages,
         )
     else:
         conversation_data = None
