@@ -336,6 +336,7 @@ def text2img(
         Text2ImgModels.dall_e_3,
         Text2ImgModels.flux_1_dev,
         Text2ImgModels.gpt_image_1,
+        Text2ImgModels.gpt_image_1_5,
         Text2ImgModels.nano_banana,
         Text2ImgModels.nano_banana_pro,
     }:
