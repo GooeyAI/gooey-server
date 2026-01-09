@@ -701,14 +701,6 @@ class WorkspaceInvite(models.Model):
             "Email mismatch"
         )
 
-        membership, created = WorkspaceMembership.objects.get_or_create(
-            workspace=self.workspace,
-            user=invitee,
-            defaults=dict(invite=self, role=self.role),
-        )
-        if not created:
-            return membership, created
-
         # can't accept an invite that is already accepted / rejected / canceled
         if self.status != self.Status.PENDING:
             raise ValidationError(
@@ -719,6 +711,14 @@ class WorkspaceInvite(models.Model):
             raise ValidationError(
                 "This invitation has expired. Please ask your team admin to send a new one."
             )
+
+        membership, created = WorkspaceMembership.objects.get_or_create(
+            workspace=self.workspace,
+            user=invitee,
+            defaults=dict(invite=self, role=self.role),
+        )
+        if not created:
+            return membership, created
 
         self.updated_by = updated_by
         self.status = self.Status.ACCEPTED
