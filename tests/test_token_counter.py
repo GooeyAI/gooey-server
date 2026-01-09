@@ -7,6 +7,7 @@ from daras_ai_v2.language_model import (
 from daras_ai_v2.text_splitter import default_length_function
 
 
+@pytest.mark.django_db
 def test_default_length_function():
     models = []
     for llm in AIModelSpec.objects.filter(
