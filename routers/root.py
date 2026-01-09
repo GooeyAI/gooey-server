@@ -53,9 +53,7 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from widgets.sidebar import sidebar_layout, use_sidebar
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
-from workspaces.models import Workspace
 from workspaces.widgets import (
-    SESSION_SELECTED_WORKSPACE,
     get_current_workspace,
     global_workspace_selector,
     workspace_selector_link,
@@ -879,7 +877,7 @@ def page_wrapper(
                 id="main-content",
                 className="container-xxl "
                 if not is_builder_sidebar_open
-                else "mx-2 w-100" + className,
+                else "mx-2 w-100 " + className,
             ):
                 yield current_workspace
 
