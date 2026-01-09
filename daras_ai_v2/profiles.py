@@ -252,8 +252,11 @@ def _render_member_photos(workspace: Workspace):
 
 
 def render_public_runs_list(request: Request, workspace: Workspace):
-    qs = PublishedRun.objects.filter(workspace=workspace).exclude(
-        public_access=WorkflowAccessLevel.VIEW_ONLY
+    qs = (
+        PublishedRun.objects.select_related("workspace", "saved_run", "last_edited_by")
+        .prefetch_related("tags")
+        .filter(workspace=workspace)
+        .exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
     )
 
     prs, cursor = paginate_queryset(
@@ -265,12 +268,7 @@ def render_public_runs_list(request: Request, workspace: Workspace):
         return
 
     def _render(pr: PublishedRun):
-        workflow = Workflow(pr.workflow)
-        render_saved_workflow_preview(
-            workflow.page_cls,
-            pr,
-            workflow_pill=f"{workflow.get_or_create_metadata().emoji} {workflow.short_title}",
-        )
+        render_saved_workflow_preview(pr, show_workflow_pill=True)
 
     grid_layout(1, prs, _render)
 

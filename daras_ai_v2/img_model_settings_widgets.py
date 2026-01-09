@@ -14,6 +14,7 @@ PROPRIETARY_MODELS = {
     Text2ImgModels.nano_banana_pro.name,
     Text2ImgModels.nano_banana.name,
     Text2ImgModels.gpt_image_1.name,
+    Text2ImgModels.gpt_image_1_5.name,
     Text2ImgModels.dall_e_3.name,
     Text2ImgModels.dall_e.name,
 }
@@ -226,9 +227,12 @@ def quality_setting(selected_models: set[str]):
             key="dall_e_3_style",
         )
 
-    if Text2ImgModels.gpt_image_1.name in selected_models:
+    if selected_models & {
+        Text2ImgModels.gpt_image_1.name,
+        Text2ImgModels.gpt_image_1_5.name,
+    }:
         gui.selectbox(
-            """##### GPT Image 1 Quality""",
+            """##### GPT Image 1.5 Quality""",
             options=["low", "medium", "high"],
             key="gpt_image_1_quality",
         )
@@ -349,7 +353,10 @@ def output_resolution_setting(selected_models: set[str]):
     elif selected_models <= {Text2ImgModels.dall_e_3.name}:
         pixel_options = ["1024p"]
         allowed_shapes = ["square", "wide"]
-    elif selected_models <= {Text2ImgModels.gpt_image_1.name}:
+    elif selected_models <= {
+        Text2ImgModels.gpt_image_1.name,
+        Text2ImgModels.gpt_image_1_5.name,
+    }:
         pixel_options = ["1024p"]
         allowed_shapes = ["square", "camera"]
     else:

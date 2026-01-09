@@ -3,6 +3,7 @@ import sys
 from django.core import serializers
 from django.db.models import NOT_PROVIDED
 
+from ai_models.models import AIModelSpec
 from app_users.models import AppUser
 from bots.models import (
     BotIntegration,
@@ -10,7 +11,9 @@ from bots.models import (
     WorkflowAccessLevel,
     WorkflowMetadata,
 )
+from bots.models.published_run import Tag
 from daras_ai_v2 import settings
+from usage_costs.models import ModelPricing
 from workspaces.models import Workspace
 
 
@@ -31,6 +34,10 @@ def run(*args):
 
 
 def get_objects(*args):
+    # export all tags
+    for tag in Tag.objects.all():
+        yield export(tag)
+
     # export all root recipes and 100 latest examples
     pr_qs = (
         list(
@@ -68,9 +75,17 @@ def get_objects(*args):
             yield export(bi.saved_run)
         if bi.published_run_id:
             yield from export_pr(bi.published_run)
+        if bi.shared_phone_number_id:
+            yield export(bi.shared_phone_number)
         yield export(
             bi,
-            include_fks={"workspace", "created_by", "saved_run", "published_run"},
+            include_fks={
+                "workspace",
+                "created_by",
+                "saved_run",
+                "published_run",
+                "shared_phone_number",
+            },
             # exclude sensitive fields from the export
             exclude={
                 "fb_page_access_token",
@@ -95,6 +110,18 @@ def get_objects(*args):
 
     for metadata in WorkflowMetadata.objects.all():
         yield export(metadata)
+
+    for pricing in ModelPricing.objects.all():
+        yield export(pricing)
+
+    for model_spec in AIModelSpec.objects.all():
+        if model_spec.redirect_to:
+            yield export(model_spec.redirect_to)
+        yield export(
+            model_spec,
+            include_fks={"pricing", "redirect_to"},
+            exclude={"api_key"},
+        )
 
 
 def export_pr(pr: PublishedRun):

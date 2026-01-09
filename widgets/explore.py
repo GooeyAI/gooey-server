@@ -16,6 +16,7 @@ from widgets.workflow_search import (
     get_filtered_published_runs,
     render_search_filters,
     render_search_results,
+    render_search_suggestions,
 )
 
 META_TITLE = "Explore AI Workflows"
@@ -69,6 +70,8 @@ def render(request: Request, search_filters: SearchFilters | None):
             search_filters=search_filters,
             max_width="600px",
         )
+        if not search_filters.search:
+            render_search_suggestions(search_filters=search_filters)
         with gui.div(className="mt-3"):
             new_filters = render_search_filters(
                 current_user=request.user,
@@ -77,9 +80,7 @@ def render(request: Request, search_filters: SearchFilters | None):
             )
             if new_filters != search_filters:
                 # if the search bar value has changed, redirect to the new search page
-                raise gui.QueryParamsRedirectException(
-                    new_filters.model_dump(exclude_defaults=True)
-                )
+                raise gui.QueryParamsRedirectException(new_filters.get_query_params())
 
     if search_filters:
         with gui.div(className="my-4"):

@@ -501,10 +501,7 @@ def _process_and_send_msg(
         body["user_language"] = bot.user_language
     if bot.request_overrides:
         body.update(bot.request_overrides)
-        try:
-            variables.update(bot.request_overrides["variables"])
-        except KeyError:
-            pass
+        body["variables"] = variables | bot.request_overrides.get("variables", {})
     result, sr = submit_api_call(
         page_cls=bot.page_cls,
         query_params=bot.query_params,

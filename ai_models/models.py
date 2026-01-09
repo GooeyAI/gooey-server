@@ -1,10 +1,44 @@
 from django.db import models
+from django.db.models import Q
+
+from bots.custom_fields import CustomURLField
+
+
+class ModelProvider(models.IntegerChoices):
+    openai = 1, "OpenAI"
+    openai_audio = 16, "Openai Audio"
+    azure_openai = 4, "Azure OpenAI"
+    google = 2, "Google"
+    together_ai = 3, "TogetherAI"
+    anthropic = 6, "Anthropic"
+    groq = 7, "groq"
+    fireworks = 8, "Fireworks AI"
+    mistral = 9, "Mistral AI"
+    sarvam = 10, "sarvam.ai"
+    fal_ai = 11, "fal.ai"
+    twilio = 12, "Twilio"
+    sea_lion = 13, "sea-lion.ai"
+    publicai = 14, "PublicAI"
+    modal = 15, "Modal"
+    aks = 5, "Azure Kubernetes Service"
+
+
+class AIModelSpecQuerySet(models.QuerySet):
+    def exclude_deprecated(self, *, selected_models: list[str] | str | None = None):
+        q = Q(is_deprecated=False)
+        if selected_models:
+            if isinstance(selected_models, str):
+                q |= Q(name=selected_models)
+            else:
+                q |= Q(name__in=selected_models)
+        return self.filter(q)
 
 
 class AIModelSpec(models.Model):
     class Categories(models.IntegerChoices):
         video = (1, "🎥 Video")
         audio = (2, "🎵 Audio")
+        llm = (3, "💬 LLM")
 
     category = models.IntegerField(
         choices=Categories.choices,
@@ -24,9 +58,47 @@ class AIModelSpec(models.Model):
         help_text="The internal API provider / huggingface model id.",
     )
     schema = models.JSONField(
-        help_text="The schema of the model parameters.",
-        default=dict,
+        help_text="The schema of the model parameters.", default=dict, blank=True
     )
+
+    provider = models.IntegerField(
+        choices=ModelProvider.choices,
+        help_text="The API provider for this model.",
+        default=ModelProvider.modal,
+    )
+    is_deprecated = models.BooleanField(default=False)
+    redirect_to = models.ForeignKey(
+        "ai_models.AIModelSpec",
+        on_delete=models.SET_NULL,
+        related_name="redirect_to_ai_model_specs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    version = models.FloatField(default=1)
+
+    api_key = models.TextField(blank=True, default="")
+    base_url = CustomURLField(blank=True, default="")
+
+    llm_context_window = models.IntegerField(default=0, verbose_name="Context Window")
+    llm_max_output_tokens = models.IntegerField(
+        default=0, verbose_name="Max Output Tokens"
+    )
+    llm_is_chat_model = models.BooleanField(default=True, verbose_name="Chat Model")
+    llm_is_vision_model = models.BooleanField(
+        default=False, verbose_name="Vision Model"
+    )
+    llm_is_thinking_model = models.BooleanField(
+        default=False, verbose_name="Thinking Model"
+    )
+    llm_supports_json = models.BooleanField(default=False, verbose_name="Supports JSON")
+    llm_supports_temperature = models.BooleanField(
+        default=True, verbose_name="Supports Temperature"
+    )
+    llm_supports_input_audio = models.BooleanField(
+        default=False, verbose_name="Supports Input Audio"
+    )
+    llm_is_audio_model = models.BooleanField(default=False, verbose_name="Audio Model")
 
     pricing = models.ForeignKey(
         "usage_costs.ModelPricing",
@@ -42,6 +114,8 @@ class AIModelSpec(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = AIModelSpecQuerySet.as_manager()
 
     class Meta:
         verbose_name = "AI Model Spec"

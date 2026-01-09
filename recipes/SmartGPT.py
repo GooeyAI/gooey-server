@@ -8,7 +8,6 @@ from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
-    LargeLanguageModels,
     run_language_model,
     CHATML_ROLE_USER,
     CHATML_ROLE_ASSISTANT,
@@ -36,9 +35,7 @@ class SmartGPTPage(BasePage):
         reflexion_prompt: str | None = None
         dera_prompt: str | None = None
 
-        selected_model: (
-            typing.Literal[tuple(e.name for e in LargeLanguageModels)] | None
-        ) = None
+        selected_model: str | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
