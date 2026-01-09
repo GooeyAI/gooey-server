@@ -36,12 +36,11 @@ def use_sidebar(key: str, session: dict, default_open: bool = True) -> SidebarRe
     last_load_time = session.get(f"{key}:last_load_time", 0)
     current_time = time.time()
 
-    # If more than 1 second has passed since last load, consider it a fresh page load
+    # If more than 0.5 second has passed since last load, consider it a fresh page load
     if current_time - last_load_time > 0.5:
         # Fresh page load - clear mobile state
         mobile_key = key + ":mobile"
-        if mobile_key in session:
-            del session[mobile_key]
+        session.pop(mobile_key, None)
 
     # Update the last load time
     session[f"{key}:last_load_time"] = current_time
@@ -66,7 +65,7 @@ sidebar_mobile_width = "100vw"
 
 def sidebar_layout(sidebar_ref: SidebarRef):
     is_mobile_open = sidebar_ref.is_mobile_open
-    sidebar_funtion_classes = (
+    sidebar_function_classes = (
         "gooey-sidebar-open"
         if sidebar_ref.is_open or sidebar_ref.is_mobile_open
         else "gooey-sidebar-closed"
@@ -158,7 +157,7 @@ def sidebar_layout(sidebar_ref: SidebarRef):
         ),
     ):
         sidebar_content_placeholder = gui.div(
-            className=f"d-flex flex-column flex-grow-1 gooey-sidebar {sidebar_funtion_classes}",
+            className=f"d-flex flex-column flex-grow-1 gooey-sidebar {sidebar_function_classes}",
         )
         pane_content_placeholder = gui.div(className="d-flex flex-grow-1 mw-100")
     return sidebar_content_placeholder, pane_content_placeholder
