@@ -7,10 +7,8 @@ from pydantic import BaseModel, Field
 
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai.text_format import format_timedelta
-from daras_ai_v2 import icons
-from daras_ai_v2 import breadcrumbs
-from daras_ai_v2.base import BasePage
+from daras_ai_v2 import breadcrumbs, icons
+from daras_ai_v2.base import BasePage, raise_if_stop_requested
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
@@ -242,6 +240,9 @@ To understand what each field represents, check out our [API docs](https://api.g
     def render_run_preview_output(self, state: dict):
         render_documents(state)
 
+    def render_stop_button(self):
+        super().render_stop_button()
+
     def render_output(self):
         eval_runs = gui.session_state.get("eval_runs")
 
@@ -298,8 +299,14 @@ To understand what each field represents, check out our [API docs](https://api.g
             )
             response.output_documents.append(f)
 
+            progress = 0
             df_slices = list(slice_request_df(df, request))
             for slice_ix, (df_ix, arr_len) in enumerate(df_slices):
+                raise_if_stop_requested(
+                    f"**Only {progress}% Completed**\n\n"
+                    f"Last completed run:\n- On **{slice_ix}** of **{len(df_slices)}** rows \n- Document  **{request.documents[doc_ix]}**"
+                )
+
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
 

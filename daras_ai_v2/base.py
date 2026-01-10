@@ -120,6 +120,7 @@ class RecipeRunState(Enum):
     starting = "starting"
     running = "running"
     completed = "completed"
+    stopped = "stopped"
     failed = "failed"
 
 
@@ -133,6 +134,19 @@ class StateKeys:
     pressed_randomize = "__randomize"
 
     hidden = "__hidden"
+    stop_requested = "__stop_requested"
+
+
+def raise_if_stop_requested(message: str = "Stop requested by user"):
+    from celeryapp.tasks import get_running_saved_run
+    from daras_ai_v2.exceptions import StopRequested
+
+    sr = get_running_saved_run()
+    if not sr:
+        return
+    sr.refresh_from_db(fields=["state"])
+    if sr.state.get(StateKeys.stop_requested):
+        raise StopRequested(message)
 
 
 class BasePageRequest:
@@ -1906,6 +1920,8 @@ class BasePage:
                 return RecipeRunState.starting
             else:
                 return RecipeRunState.running
+        elif state.get(StateKeys.stop_requested):
+            return RecipeRunState.stopped
         elif state.get(StateKeys.error_msg):
             return RecipeRunState.failed
         elif state.get(StateKeys.run_time):
@@ -1979,6 +1995,7 @@ class BasePage:
     def _render_running_output(self):
         run_status = gui.session_state.get(StateKeys.run_status)
         html_spinner(run_status, scroll_into_view=self.scroll_into_view)
+        self.render_stop_button()
         self.render_extra_waiting_output()
 
     def render_extra_waiting_output(self):
@@ -2008,6 +2025,27 @@ class BasePage:
 
     def estimate_run_duration(self) -> int | None:
         pass
+
+    def render_stop_button(self):
+        sr = self.current_sr
+        sr.refresh_from_db(fields=["state"])
+
+        if sr.state.get(StateKeys.stop_requested):
+            gui.write(
+                "⏳ **Stopping...** Please wait for the current task to complete.",
+                className="text-danger",
+            )
+            return
+
+        if gui.button(
+            f"{icons.cancel} Stop Run",
+            key="--stop-run",
+            type="tertiary",
+            className="text-danger",
+        ):
+            sr.state[StateKeys.stop_requested] = True
+            sr.save(update_fields=["state"])
+            gui.rerun()
 
     def submit_and_redirect(
         self, unsaved_state: dict[str, typing.Any] = None
