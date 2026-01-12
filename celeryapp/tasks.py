@@ -20,7 +20,7 @@ from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.base import BasePage, StateKeys
-from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.exceptions import StopRequested, UserError
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
 from gooeysite.bg_db_conn import db_middleware
@@ -133,6 +133,9 @@ def runner_task(
         error_msg = err_msg_for_exc(e)
         sr.error_type = type(e).__qualname__
         sr.error_code = getattr(e, "status_code", None)
+
+        if isinstance(e, StopRequested) and deduct_credits:
+            sr.transaction, sr.price = page.deduct_credits(gui.session_state, amount=1)
 
     # run completed successfully, deduct credits
     else:
