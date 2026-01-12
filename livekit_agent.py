@@ -12,6 +12,7 @@ import aiohttp
 import requests
 from asgiref.sync import sync_to_async
 from decouple import config
+from furl import furl
 from livekit import agents, api, rtc
 from livekit.agents import (
     Agent,
@@ -298,10 +299,34 @@ async def create_stt_llm_tts_session(
             ):
                 kwargs["reasoning_effort"] = request.reasoning_effort
 
+            if llm_model.base_url:
+                base_url = llm_model.base_url
+                api_key = llm_model.api_key
+            elif model_id.startswith("sarvam-"):
+                api_key = settings.SARVAM_API_KEY
+                base_url = "https://api.sarvam.ai/v1"
+            elif model_id.startswith("aisingapore/"):
+                api_key = settings.SEA_LION_API_KEY
+                base_url = "https://api.sea-lion.ai/v1"
+            elif model_id.startswith("swiss-ai/"):
+                api_key = settings.PUBLICAI_API_KEY
+                base_url = "https://api.publicai.co/v1"
+            elif model_id.startswith("AI71ai/"):
+                import modal
+                from modal_functions.agri_llm import app
+
+                modal_fn = modal.Function.from_name(app.name, "serve")
+                api_key = settings.MODAL_VLLM_API_KEY
+                base_url = str(furl(modal_fn.get_web_url()) / "v1")
+            else:
+                api_key = settings.OPENAI_API_KEY
+                base_url = NOT_GIVEN
+
             llm = openai.LLM(
                 model=model_id,
                 temperature=temperature,
-                api_key=settings.OPENAI_API_KEY,
+                api_key=api_key,
+                base_url=base_url,
                 **kwargs,
             )
 
