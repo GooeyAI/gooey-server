@@ -70,7 +70,7 @@ class GPUError(UserError):
 
 
 class StopRequested(UserError):
-    def __init__(self, message: str = None):
+    def __init__(self, message: str):
         super().__init__(message)
 
 

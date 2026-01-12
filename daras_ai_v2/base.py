@@ -357,14 +357,15 @@ class BasePage:
         channel = self.realtime_channel_name(sr.run_id, sr.uid)
         output = gui.realtime_pull([channel])[0]
         if output:
-            # check this condition
-            if (
-                self.get_run_state(gui.session_state) == RecipeRunState.stopping
-                and output.get(
-                    StateKeys.run_status
-                )  # celery still has a status (running)
+            # Don't let stale celery output overwrite "Stopping..." status
+
+            if self.get_run_state(
+                gui.session_state
+            ) == RecipeRunState.stopping and output.get(StateKeys.run_status) not in (
+                None,
+                STOPPING_STATE,
             ):
-                output.pop(StateKeys.run_status, None)
+                output.pop(StateKeys.run_status)
 
             gui.session_state.update(output)
 
@@ -1684,24 +1685,30 @@ class BasePage:
                 self.render_run_cost()
             with col2:
                 run_state = self.get_run_state(gui.session_state)
-                if run_state in (RecipeRunState.starting, RecipeRunState.running):
-                    if gui.button(
-                        f"{icons.cancel} Stop",
-                        key="--stop-run",
-                        type="secondary",
-                        className="my-0 py-2 text-danger",
-                    ):
-                        self.trigger_stop()
-                        gui.rerun()
-                    return False
-
-                submitted = gui.button(
+                is_running = run_state in (
+                    RecipeRunState.starting,
+                    RecipeRunState.running,
+                )
+                stop_clicked = is_running and gui.button(
+                    f"{icons.cancel} Stop",
+                    key="--stop-run",
+                    type="secondary",
+                    className="my-0 py-2 text-danger",
+                )
+                submitted = not is_running and gui.button(
                     f"{icons.run} Run",
                     key=key,
                     type="primary",
                     className="my-0 py-2",
                     disabled=run_state == RecipeRunState.stopping,
                 )
+            if stop_clicked:
+                if self.trigger_stop():
+                    gui.rerun()
+                else:
+                    gui.error("You don't have permission to stop this run.")
+            if is_running:
+                return False
             if not submitted:
                 return False
             try:
@@ -2221,10 +2228,13 @@ class BasePage:
         return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
 
     def trigger_stop(self):
+        if not (self.is_current_user_owner() or self.is_current_user_admin()):
+            return False
         sr = self.current_sr
         gui.session_state[StateKeys.run_status] = STOPPING_STATE
         sr.run_status = STOPPING_STATE
         sr.save(update_fields=["run_status"])
+        return True
 
     def _setup_rng_seed(self):
         seed = gui.session_state.get("seed")
