@@ -1,5 +1,5 @@
-from functools import partial
 import typing
+from functools import partial
 
 import gooey_gui as gui
 import sentry_sdk
@@ -167,8 +167,6 @@ def render_all_plans(
     all_plans = [plan for plan in PricingPlan if not plan.deprecated]
     if not workspace.is_personal and current_plan != PricingPlan.STANDARD:
         all_plans.remove(PricingPlan.STANDARD)
-    if workspace.is_personal and current_plan != PricingPlan.TEAM:
-        all_plans.remove(PricingPlan.TEAM)
     grid_plans = [plan for plan in all_plans if not plan.full_width]
     full_width_plans = [plan for plan in all_plans if plan.full_width]
 
@@ -337,13 +335,12 @@ def _render_plan_pricing(
             )
 
         if plan == PricingPlan.TEAM:
-            workspace_size = workspace.memberships.count()
             with col2:
                 seats: int = gui.selectbox(
                     label="Seats",
                     options=[1, 2, 3, 4, 5, 10, 15, 20, 25, 50],
                     key=f"seats-select-{plan.key}-{workspace.id}",
-                    value=(current_tier and current_tier.seats or workspace_size),
+                    value=(current_tier and current_tier.seats or workspace.used_seats),
                     className="mb-0 container-margin-reset",
                 )
         else:
@@ -376,18 +373,14 @@ def _render_plan_action_button(
 ):
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
-    if plan == current_plan:
-        if (
-            plan.tiers
-            and selected_tier
-            and workspace.subscription
-            and selected_tier != workspace.subscription.get_tier()
-        ):
-            render_change_subscription_button(
-                workspace=workspace, plan=plan, selected_tier=selected_tier
-            )
-        else:
-            gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
+    if plan == current_plan and (
+        not plan.tiers
+        or (
+            workspace.subscription
+            and workspace.subscription.get_tier() == selected_tier
+        )
+    ):
+        gui.button("Your Plan", className="w-100", disabled=True, type="tertiary")
 
     elif current_plan == PricingPlan.ENTERPRISE:
         gui.button(
@@ -402,12 +395,11 @@ def _render_plan_action_button(
             gui.html("Let's Talk")
 
     elif (
-        plan == PricingPlan.BUSINESS_2025
+        plan == PricingPlan.TEAM
         and workspace.is_personal
         and any(
-            w.subscription_id and w.subscription.plan == plan.db_value
+            w.subscription and w.subscription.plan == plan.db_value
             for w in user.cached_workspaces
-            if w != workspace
         )
     ):
         _render_switch_workspace_button(workspace=workspace, user=user, session=session)
@@ -469,19 +461,44 @@ def render_change_subscription_button(
     plan: PricingPlan,
     selected_tier: PricingTier | None = None,
 ):
+    # subscription exists, show upgrade/downgrade button
+    from routers.account import members_route
+
     current_plan = PricingPlan.from_sub(workspace.subscription)
     current_tier = workspace.subscription and workspace.subscription.get_tier()
-
     current_monthly_charge = current_plan.get_active_monthly_charge(current_tier)
+
     selected_monthly_charge = plan.get_active_monthly_charge(selected_tier)
+    selected_seats = selected_tier and selected_tier.seats or 1
+
+    if not workspace.is_personal and workspace.used_seats > selected_seats:
+        if selected_monthly_charge > current_monthly_charge:
+            label, btn_type = "Upgrade", "primary"
+        else:
+            label, btn_type = "Downgrade", "secondary"
+
+        ref = gui.use_alert_dialog(key=f"--modal-{plan.key}")
+        if gui.button(label, type=btn_type):
+            ref.set_open(True)
+
+        if ref.is_open:
+            with gui.alert_dialog(
+                ref, modal_title=f"#### {icons.alert} Alert", unsafe_allow_html=True
+            ):
+                gui.write(f"""
+You are currently using **{workspace.used_seats} seats** in this workspace.
+
+Please select a plan with at least {workspace.used_seats} seats or remove some members in order to switch to this plan.
+
+[View Members]({get_route_path(members_route)})
+                """)
+        return
 
     if plan > current_plan or (
         plan == current_plan
         and plan.tiers
-        and current_tier
         and selected_monthly_charge > current_monthly_charge
     ):
-        # subscription exists, show upgrade/downgrade button
         _render_upgrade_subscription_button(
             workspace=workspace, plan=plan, selected_tier=selected_tier
         )
@@ -496,7 +513,7 @@ def render_change_subscription_button(
 Are you sure you want to downgrade from: **{current_plan.title} @ {fmt_price(current_monthly_charge)}** to **{plan.title} @ {fmt_price(selected_monthly_charge)}**?
 
 This will take effect from the next billing cycle.
-            """,
+    """,
         confirm_label="Downgrade",
         confirm_className="border-danger bg-danger text-white",
     )
@@ -530,7 +547,7 @@ def _render_upgrade_subscription_button(
         upgrade_dialog.set_open(True)
 
     # For TEAM plan on team workspaces, show detailed order summary
-    if plan == PricingPlan.TEAM and not workspace.is_personal:
+    if plan == PricingPlan.TEAM:
         assert selected_tier is not None
 
         modal_content = get_order_summary_content(plan, selected_tier)
@@ -589,12 +606,10 @@ def _render_create_subscription_button(
     payment_provider: PaymentProvider,
     selected_tier: PricingTier | None = None,
 ):
-    label = "Upgrade"
-
     # Standard plan is only for personal workspaces, skip workspace creation popup
     if workspace.is_personal and plan != PricingPlan.STANDARD:
         if gui.button(
-            label,
+            "Create Team",
             type="primary",
             onClick=open_create_workspace_popup_js(selected_plan=plan),
         ):
@@ -614,7 +629,7 @@ def _render_create_subscription_button(
             case PaymentProvider.STRIPE:
                 pressed = gui.session_state.pop("pressed_create_workspace", False)
                 render_stripe_subscription_button(
-                    label=label,
+                    label="Upgrade",
                     workspace=workspace,
                     plan=plan,
                     pressed=pressed,
