@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import typing
 from datetime import timedelta
+from functools import cached_property
 
 import hashids
 import stripe
@@ -266,6 +267,11 @@ class Workspace(SafeDeleteModel):
             workspace_memberships__role__in=role_filter,
             workspace_memberships__deleted__isnull=True,
         )
+
+    @cached_property
+    def used_seats(self) -> int:
+        # exclude admin emails from seat count
+        return self.memberships.exclude(user__email__in=settings.ADMIN_EMAILS).count()
 
     @db_middleware
     @transaction.atomic
@@ -711,6 +717,16 @@ class WorkspaceInvite(models.Model):
             raise ValidationError(
                 "This invitation has expired. Please ask your team admin to send a new one."
             )
+
+        if invitee.email not in settings.ADMIN_EMAILS:
+            plan = PricingPlan.from_sub(self.workspace.subscription)
+            tier = (
+                self.workspace.subscription and self.workspace.subscription.get_tier()
+            )
+            if plan == PricingPlan.TEAM and tier.seats <= self.workspace.used_seats:
+                raise ValidationError(
+                    "Your team has reached the maximum number of members allowed by your current plan. Please contact your workspace admin to upgrade your plan."
+                )
 
         membership, created = WorkspaceMembership.objects.get_or_create(
             workspace=self.workspace,
