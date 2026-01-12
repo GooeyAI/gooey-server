@@ -143,10 +143,16 @@ def run_mms_tts(language: str, text: str, upload_url: str):
 def upload_audio(audio, url: str, rate: int = 16_000):
     import scipy
     import io
+    import numpy as np
+
+    # Convert from pcm_f32le to pcm_s16le
+    # Clip values to [-1.0, 1.0] range and scale to int16 range
+    audio_clipped = np.clip(audio, -1.0, 1.0)
+    audio_int16 = (audio_clipped * 32767).astype(np.int16)
 
     # The resulting audio output can be saved as a .wav file:
     f = io.BytesIO()
-    scipy.io.wavfile.write(f, rate=rate, data=audio)
+    scipy.io.wavfile.write(f, rate=rate, data=audio_int16)
     audio_bytes = f.getvalue()
     # upload to given url
     upload_audio_from_bytes(audio_bytes, url)
