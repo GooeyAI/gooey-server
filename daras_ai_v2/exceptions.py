@@ -76,15 +76,14 @@ class StopRequested(UserError):
 
 def is_stop_requested() -> bool:
     from celeryapp.tasks import get_running_saved_run
-    from daras_ai_v2.base import StateKeys, STOPPING_STATE
+    from daras_ai_v2.base import STOPPING_STATE
 
     sr = get_running_saved_run()
     if not sr:
         return False
 
-    sr.refresh_from_db(fields=["state"])
-    run_status = sr.state.get(StateKeys.run_status) or ""
-    return run_status.lower().strip(". ") == STOPPING_STATE.lower().strip(". ")
+    sr.refresh_from_db(fields=["run_status"])
+    return sr.run_status == STOPPING_STATE
 
 
 class InsufficientCredits(UserError):

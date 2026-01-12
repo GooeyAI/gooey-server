@@ -2222,10 +2222,9 @@ class BasePage:
 
     def trigger_stop(self):
         sr = self.current_sr
-        sr.refresh_from_db(fields=["state"])
-        sr.state[StateKeys.run_status] = STOPPING_STATE
-        sr.save(update_fields=["state"])
         gui.session_state[StateKeys.run_status] = STOPPING_STATE
+        sr.run_status = STOPPING_STATE
+        sr.save(update_fields=["run_status"])
 
     def _setup_rng_seed(self):
         seed = gui.session_state.get("seed")
