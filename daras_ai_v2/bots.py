@@ -533,7 +533,10 @@ def _process_and_send_msg(
                 bot.recipe_run_state = bot.page_cls.get_run_state(state)
                 bot.run_status = state.get(StateKeys.run_status) or ""
                 # check for errors
-                if bot.recipe_run_state == RecipeRunState.failed:
+                if bot.recipe_run_state in (
+                    RecipeRunState.failed,
+                    RecipeRunState.stopping,
+                ):
                     err_msg = state.get(StateKeys.error_msg)
                     bot.send_msg(text=ERROR_MSG.format(err_msg))
                     return  # abort
