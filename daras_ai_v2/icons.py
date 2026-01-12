@@ -52,6 +52,7 @@ star = '<i class="fa-solid fa-star"></i>'
 filter = '<i class="fa-solid fa-bars-filter"></i>'
 sort = '<i class="fa-solid fa-sort"></i>'
 info = "<i class='fa-regular fa-circle-info'></i>"
+alert = '<i class="fa-solid fa-triangle-exclamation"></i>'
 search = '<i class="fa-solid fa-magnifying-glass"></i>'
 library = '<i class="fa-solid fa-book"></i>'
 
