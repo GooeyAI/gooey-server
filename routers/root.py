@@ -7,7 +7,10 @@ from contextlib import contextmanager
 from enum import Enum
 from time import time
 
-from daras_ai_v2.gooey_builder import render_gooey_builder_launcher
+from daras_ai_v2.gooey_builder import (
+    can_launch_gooey_builder,
+    render_gooey_builder_launcher,
+)
 import gooey_gui as gui
 import sentry_sdk
 from fastapi import Depends, HTTPException, Query
@@ -784,12 +787,7 @@ def page_wrapper(
     container = page if page else None
     sidebar_ref = use_sidebar("builder-sidebar", request.session, default_open=False)
     sidebar_content, pane_content = sidebar_layout(sidebar_ref)
-
     is_builder_sidebar_open = sidebar_ref.is_open
-    if not is_recipe_page and is_builder_sidebar_open:
-        sidebar_ref.set_open(False)
-        sidebar_ref.set_mobile_open(False)
-        raise gui.RerunException()
 
     with pane_content:
         with gui.div(className="d-flex flex-column min-vh-100 w-100"):
@@ -880,9 +878,21 @@ def page_wrapper(
             gui.html(templates.get_template("footer.html").render(**context))
             gui.html(templates.get_template("login_scripts.html").render(**context))
 
-    with sidebar_content:
-        if container:
-            container.render_sidebar()
+    close_sidebar = (
+        not is_recipe_page
+        or not can_launch_gooey_builder(
+            request, get_current_workspace(request.user, request.session)
+        )
+    ) and is_builder_sidebar_open  # pre-check to close the sidebar if it's not needed
+
+    if close_sidebar:
+        sidebar_ref.set_open(False)
+        sidebar_ref.set_mobile_open(False)
+        raise gui.RerunException()
+    else:
+        with sidebar_content:
+            if container:
+                container.render_sidebar()
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
