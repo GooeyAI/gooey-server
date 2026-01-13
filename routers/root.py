@@ -880,8 +880,11 @@ def page_wrapper(
 
     close_sidebar = (
         not is_recipe_page
-        or not can_launch_gooey_builder(
-            request, get_current_workspace(request.user, request.session)
+        or not (
+            request.user
+            and can_launch_gooey_builder(
+                request, get_current_workspace(request.user, request.session)
+            )
         )
     ) and is_builder_sidebar_open  # pre-check to close the sidebar if it's not needed
 
