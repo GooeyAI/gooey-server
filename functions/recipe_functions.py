@@ -58,6 +58,8 @@ class BaseLLMTool:
         self.spec_openai = {"type": "function", "function": self.spec_function}
         # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
         self.spec_openai_audio = {"type": "function"} | self.spec_function
+        # https://platform.openai.com/docs/guides/tools?api-mode=responses&tool-type=function-calling
+        self.spec_openai_responses = {"type": "function"} | self.spec_function
 
         self.await_audio_completed = await_audio_completed
 

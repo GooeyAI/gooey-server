@@ -5,7 +5,6 @@ import json
 import mimetypes
 import re
 import typing
-from enum import Enum
 from functools import wraps
 
 import aifail
@@ -21,6 +20,14 @@ from openai.types.chat import (
     ChatCompletion,
     ChatCompletionMessageToolCallParam,
 )
+from openai.types.completion_usage import CompletionUsage
+from openai.types.responses import (
+    Response,
+    ResponseCompletedEvent,
+    ResponseStreamEvent,
+    ResponseUsage,
+)
+from openai import Stream
 
 from ai_models.models import AIModelSpec, ModelProvider
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
@@ -81,6 +88,7 @@ def calc_gpt_tokens(
 class ConversationEntry(typing_extensions.TypedDict, total=False):
     role: typing.Literal["user", "system", "assistant", "tool"]
     content: str | list[ChatCompletionContentPartParam]
+    chunk: typing_extensions.NotRequired[str]
 
     tool_calls: typing_extensions.NotRequired[list[ChatCompletionMessageToolCallParam]]
     tool_call_id: typing_extensions.NotRequired[str]
@@ -384,6 +392,17 @@ def _run_chat_model(
                 reasoning_effort=reasoning_effort,
                 stream=stream,
             )
+        case ModelProvider.openai_responses:
+            return run_openai_responses(
+                model=model,
+                max_output_tokens=max_tokens,
+                messages=messages,
+                temperature=temperature,
+                tools=tools,
+                response_format_type=response_format_type,
+                reasoning_effort=reasoning_effort,
+                stream=stream,
+            )
         case ModelProvider.google:
             if tools:
                 raise ValueError("Only OpenAI chat models support Tools")
@@ -603,6 +622,81 @@ def _run_anthropic_chat(
 
 
 @retry_if(openai_should_retry)
+def run_openai_responses(
+    *,
+    model: AIModelSpec,
+    messages: list[ConversationEntry],
+    max_output_tokens: int,
+    temperature: float | None = None,
+    tools: list[BaseLLMTool] | None = None,
+    response_format_type: ResponseFormatType | None = None,
+    reasoning_effort: ReasoningEffort.api_choices | None = None,
+    stream: bool = False,
+) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
+    from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
+
+    kwargs = {}
+
+    if model.llm_is_thinking_model:
+        thinking_budget = ReasoningEffort.high.thinking_budget
+        if reasoning_effort:
+            re = ReasoningEffort.from_api(reasoning_effort)
+            if re == ReasoningEffort.minimal:  # deprecated
+                re = ReasoningEffort.low
+            kwargs["reasoning_effort"] = re.name
+        # add some extra tokens for thinking
+        max_output_tokens = max(thinking_budget + 1000, max_output_tokens)
+
+    if model.llm_max_output_tokens:
+        # cap the max tokens at the model's max limit
+        max_output_tokens = min(max_output_tokens, model.llm_max_output_tokens)
+
+    kwargs["max_output_tokens"] = max_output_tokens
+
+    if tools:
+        kwargs["tools"] = [tool.spec_openai_responses for tool in tools]
+
+    if response_format_type:
+        kwargs["text"] = {"format": {"type": response_format_type}}
+
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+
+    model_ids = model.model_id
+    if isinstance(model_ids, str):
+        model_ids = [model_ids]
+
+    with capture_openai_content_policy_violation():
+        response, used_model = try_all(
+            *[
+                _get_responses_create(
+                    model=model_id,
+                    api_key=model.api_key,
+                    base_url=model.base_url,
+                    messages=messages,
+                    stream=stream,
+                    **kwargs,
+                )
+                for model_id in model_ids
+            ],
+        )
+        if isinstance(response, Stream):
+            return _stream_openai_responses(response, used_model, messages)
+        else:
+            ret = []
+            if response.output_text:
+                ret.append(
+                    {"role": CHATML_ROLE_ASSISTANT, "content": response.output_text}
+                )
+            else:
+                # If no valid content found, return empty response
+                ret = [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
+
+            record_openai_llm_usage(used_model, response, messages, ret)
+            return ret
+
+
+@retry_if(openai_should_retry)
 def run_openai_chat(
     *,
     model: AIModelSpec,
@@ -719,6 +813,46 @@ def run_openai_chat(
         return ret
 
 
+def _get_responses_create(
+    model: str, api_key: str | None, base_url: str | None, stream: bool, **kwargs
+):
+    client = get_openai_client(model, api_key, base_url)
+
+    @wraps(client.responses.create)
+    def wrapper():
+        # Convert messages format to responses API input format
+        messages = kwargs.pop("messages", [])
+        input_messages = []
+        for msg in messages:
+            if msg["role"] == "assistant" and "tool_calls" in msg:
+                for tool_call in msg["tool_calls"]:
+                    input_messages.append(
+                        {
+                            "type": "function_call",
+                            "call_id": tool_call.get("id", ""),
+                            "name": tool_call["function"]["name"],
+                            "arguments": tool_call["function"]["arguments"],
+                        }
+                    )
+            elif msg["role"] == "tool":
+                input_messages.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": msg["tool_call_id"],
+                        "output": msg["content"],
+                    }
+                )
+            else:
+                input_messages.append({"role": msg["role"], "content": msg["content"]})
+
+        response = client.responses.create(
+            model=model, input=input_messages, stream=stream, **kwargs
+        )
+        return response, model
+
+    return wrapper
+
+
 def _get_chat_completions_create(
     model: str, api_key: str | None, base_url: str | None, **kwargs
 ):
@@ -800,6 +934,61 @@ def _stream_openai_chunked(
     record_openai_llm_usage(used_model, completion_chunk, messages, ret)
 
 
+def _stream_openai_responses(
+    r: typing.Iterable[ResponseStreamEvent],
+    used_model: str,
+    messages: list[ConversationEntry],
+    *,
+    start_chunk_size: int = 50,
+    stop_chunk_size: int = 400,
+    step_chunk_size: int = 300,
+) -> typing.Generator[list[ConversationEntry], None, None]:
+    entry: ConversationEntry = dict(role="assistant", content="", chunk="")
+    ret = [entry]
+    chunk_size = start_chunk_size
+
+    last_event = None
+    for event in r:
+        last_event = event
+
+        # Handle different event types from Responses API
+        if event.type == "response.output_text.delta":
+            changed = False
+            entry["chunk"] += event.delta
+            changed = is_llm_chunk_large_enough(entry, chunk_size)
+            if changed:
+                # increase the chunk size, but don't go over the max
+                chunk_size = min(chunk_size + step_chunk_size, stop_chunk_size)
+                # stream the chunk
+                yield ret
+
+        elif (
+            event.type == "response.output_item.done"
+            and event.item.type == "function_call"
+        ):
+            entry.setdefault("tool_calls", []).append(
+                {
+                    "id": event.item.call_id,
+                    "type": "function",
+                    "function": {
+                        "name": event.item.name,
+                        "arguments": event.item.arguments,
+                    },
+                }
+            )
+
+            # Mark the function call as complete and yield
+            yield ret
+
+    # add the leftover chunks
+    for entry in ret:
+        entry["content"] += entry["chunk"]
+    yield ret
+
+    if isinstance(last_event, ResponseCompletedEvent):
+        record_openai_llm_usage(used_model, last_event.response, messages, ret)
+
+
 def is_llm_chunk_large_enough(entry: dict, chunk_size: int) -> bool:
     from pyquery import PyQuery as pq
 
@@ -840,19 +1029,22 @@ def is_llm_chunk_large_enough(entry: dict, chunk_size: int) -> bool:
 
 def record_openai_llm_usage(
     model: str,
-    completion: ChatCompletion | ChatCompletionChunk,
+    completion: ChatCompletion | ChatCompletionChunk | Response,
     messages: list[ConversationEntry],
     choices: list[ConversationEntry],
 ):
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
-    if completion.usage:
+    if isinstance(completion.usage, CompletionUsage):
         prompt_tokens = completion.usage.prompt_tokens
-        completion_tokens = (
-            completion.usage.completion_tokens
-            or completion.usage.completion_tokens_details.reasoning_tokens
+        completion_tokens = completion.usage.completion_tokens or (
+            completion.usage.completion_tokens_details
+            and completion.usage.completion_tokens_details.reasoning_tokens
         )
+    elif isinstance(completion.usage, ResponseUsage):
+        prompt_tokens = completion.usage.input_tokens
+        completion_tokens = completion.usage.output_tokens
     else:
         prompt_tokens = sum(
             default_length_function(get_entry_text(entry), model=completion.model)
@@ -999,7 +1191,6 @@ def _run_groq_chat(
     max_tokens: int,
     tools: list[BaseLLMTool] | None,
     temperature: float,
-    avoid_repetition: bool,
     stop: list[str] | None,
     response_format_type: ResponseFormatType | None,
 ):
@@ -1014,9 +1205,6 @@ def _run_groq_chat(
     )
     if tools:
         data["tools"] = [tool.spec_openai for tool in tools]
-    if avoid_repetition:
-        data["frequency_penalty"] = 0.1
-        data["presence_penalty"] = 0.25
     if stop:
         data["stop"] = stop
     if response_format_type:
