@@ -85,7 +85,11 @@ def render_gooey_builder_launcher(
 
 
 def render_gooey_builder_inline(
-    page_slug: str, builder_state: dict, sidebar_ref: SidebarRef, request: Request
+    page_slug: str,
+    builder_state: dict,
+    sidebar_ref: SidebarRef,
+    current_app_url: str,
+    request: Request,
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
@@ -123,7 +127,7 @@ def render_gooey_builder_inline(
 
     config.setdefault("payload", {}).setdefault("variables", {})
     config["enableShareConversation"] = True
-    config["currentRunPath"] = request.url._url
+    config["currentRunPath"] = current_app_url or ""
 
     # will be added later in the js code
     variables = dict(
@@ -131,8 +135,8 @@ def render_gooey_builder_inline(
     )
 
     # get the conversation data if it is a shared conversation
-    open_bot_builder = request.query_params.get("botBuilder") == "true"
-    conversation_id = request.query_params.get("conversationId") or None
+    open_bot_builder = request.query_params.get("bot_builder") == "true"
+    conversation_id = request.query_params.get("conversation_id") or None
     if conversation_id and open_bot_builder:
         try:
             conversation: Conversation = Conversation.objects.get(

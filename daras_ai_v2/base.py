@@ -1235,7 +1235,7 @@ class BasePage:
 
         # close the sidebar for other tabs
         open_bot_builder_requested = (
-            self.request.query_params.get("botBuilder") == "true"
+            self.request.query_params.get("bot_builder") == "true"
         )
         bot_builder_closed = gui.session_state.get("bot_builder_closed_manually")
 
@@ -1306,6 +1306,7 @@ class BasePage:
                         ),
                     ),
                     sidebar_ref=sidebar_ref,
+                    current_app_url=self.current_app_url(),
                     request=self.request,
                 )
 
