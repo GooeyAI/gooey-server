@@ -1745,6 +1745,10 @@ class BasePage:
                     saved_run=self.current_sr, trigger=FunctionTrigger.post
                 )
 
+                gui.write(
+                    f"**Run Time: {self.current_sr.run_time.total_seconds():.2f}s**"
+                )
+
     def _render_help(self):
         placeholder = gui.div()
         try:

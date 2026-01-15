@@ -2,11 +2,14 @@ from __future__ import annotations
 
 __import__("gooeysite.wsgi")
 
-
 import asyncio
+import base64
+import datetime
+import os
 import uuid
 from collections import deque
 from functools import wraps
+from time import time
 
 import aiohttp
 import requests
@@ -16,16 +19,21 @@ from furl import furl
 from livekit import agents, api, rtc
 from livekit.agents import (
     Agent,
+    AgentServer,
     AgentSession,
     APIConnectOptions,
     AudioConfig,
     BackgroundAudioPlayer,
     BuiltinAudioClip,
+    CloseEvent,
+    ConversationItemAddedEvent,
+    ErrorEvent,
     RoomInputOptions,
     function_tool,
     stt,
     tts,
 )
+from livekit.agents.telemetry import set_tracer_provider
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, NotGivenOr
 from livekit.agents.utils import AudioBuffer
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -34,11 +42,13 @@ from livekit.rtc.room import ConnectionState
 from ai_models.models import AIModelSpec, ModelProvider
 from bots.models.bot_integration import BotIntegration, Platform
 from bots.models.convo_msg import Conversation, db_msgs_to_entries
+from bots.models.saved_run import SavedRun
 from daras_ai.image_input import (
     gcs_blob_for,
     gcs_bucket,
     get_mimetype_from_response,
     upload_gcs_blob_from_bytes,
+    upload_file_from_bytes,
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
@@ -52,6 +62,7 @@ from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
+from daras_ai_v2.utils import clamp
 from functions.recipe_functions import WorkflowLLMTool
 from number_cycling.utils import EXTENSION_NUMBER_LENGTH
 from recipes.TextToSpeech import TextToSpeechPage
@@ -61,15 +72,24 @@ from recipes.VideoBots import (
     infer_asr_model_and_language,
 )
 from routers.api import create_new_run
+from loguru import logger
 
 DTMF_TIMEOUT = 30
 MAX_TRIES = 5
 
-from daras_ai_v2.utils import clamp
+
+server = AgentServer(
+    num_idle_processes=config("MAX_THREADS", default=1, cast=int),
+    job_memory_warn_mb=1024,
+    job_memory_limit_mb=4096,
+)
 
 
+@server.rtc_session()
 async def entrypoint(ctx: agents.JobContext):
     from livekit.plugins import openai
+
+    setup_langfuse()
 
     @ctx.room.on("participant_attributes_changed")
     @asyncio_create_task
@@ -77,7 +97,7 @@ async def entrypoint(ctx: agents.JobContext):
         changed_attributes: dict, participant: rtc.Participant
     ):
         if changed_attributes.get("sip.callStatus") == "hangup":
-            session.shutdown()
+            dtmf_session.shutdown()
             ctx.shutdown()
             try:
                 await ctx.api.room.delete_room(
@@ -99,8 +119,8 @@ async def entrypoint(ctx: agents.JobContext):
     # logger.info(participant.attributes)
     dtmf_queue = asyncio.Queue()
 
-    session = AgentSession(tts=openai.TTS())
-    await session.start(room=ctx.room, agent=Agent(instructions=""))
+    dtmf_session = AgentSession(tts=openai.TTS())
+    await dtmf_session.start(room=ctx.room, agent=Agent(instructions=""), record=False)
 
     dtmf_digits = deque(maxlen=EXTENSION_NUMBER_LENGTH)
 
@@ -110,9 +130,7 @@ async def entrypoint(ctx: agents.JobContext):
         # logger.info(f"{dtmf=}")
         dtmf_digits.append(dtmf.digit)
         await dtmf_queue.put(dtmf.digit)
-        await session.interrupt()
-
-    # ctx.room.on("sip_dtmf_received", sip_dtmf_received)
+        await dtmf_session.interrupt()
 
     for i in range(MAX_TRIES):
         if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
@@ -132,12 +150,12 @@ async def entrypoint(ctx: agents.JobContext):
                 input_text = "/disconnect"
             else:
                 input_text = "/extension " + extension_number.split("*")[-1]
-            page, request, agent, bi = await create_run(
+            page, sr, request, agent, bi = await create_run(
                 data=participant.attributes, input_text=input_text
             )
         except BotIntegrationLookupFailed as e:
             # logger.info(f"{e=}")
-            await session.say(text=e.message, allow_interruptions=(i == 0))
+            await dtmf_session.say(text=e.message, allow_interruptions=(i == 0))
             # wait for for the user to press a digit
             try:
                 await asyncio.wait_for(dtmf_queue.get(), timeout=DTMF_TIMEOUT)
@@ -145,13 +163,13 @@ async def entrypoint(ctx: agents.JobContext):
                 pass
         except UserError as e:
             # logger.info(f"{e=}")
-            session.say(text=e.message, allow_interruptions=False)
+            dtmf_session.say(text=e.message, allow_interruptions=False)
             raise
         else:
             if i > 0:
-                session.say(text="Connecting you to the agent")
+                dtmf_session.say(text="Connecting you to the agent")
             # logger.info(f"{dtmf_digits=} {page=} {agent=} {bi=}")
-            await main(ctx, page, request, agent, bi)
+            await main(ctx, page, sr, request, agent, bi)
 
             while True:
                 digit = await dtmf_queue.get()
@@ -160,7 +178,7 @@ async def entrypoint(ctx: agents.JobContext):
                 if digit == "*":  # change extension
                     break
 
-    await session.say(
+    await dtmf_session.say(
         text="You have exceeded the maximum number of attempts. Please try again later."
     )
 
@@ -176,6 +194,7 @@ def asyncio_create_task(fn):
 async def main(
     ctx: agents.JobContext,
     page: VideoBotsPage,
+    sr: SavedRun,
     request: VideoBotsPage.RequestModel,
     agent: Agent,
     bi: BotIntegration,
@@ -188,6 +207,29 @@ async def main(
     else:
         session = await create_stt_llm_tts_session(page, request, llm_model)
 
+    @ctx.room.on("participant_attributes_changed")
+    @asyncio_create_task
+    async def participant_attributes_changed(
+        changed_attributes: dict, participant: rtc.Participant
+    ):
+        if changed_attributes.get("sip.callStatus") == "hangup":
+            session.shutdown()
+
+    @session.on("error")
+    @asyncio_create_task
+    async def on_error(event: ErrorEvent):
+        session.say("I'm having trouble connecting right now.")
+        sr.error_msg = repr(event.error)
+        sr.run_time = datetime.timedelta(seconds=time() - session._started_at)
+        sr.run_status = ""
+        await sr.asave()
+
+    @session.on("close")
+    @session.on("conversation_item_added")
+    def on_step(event: ConversationItemAddedEvent | CloseEvent):
+        save_on_step(sr, llm_model, session, event)
+
+    ctx._primary_agent_session = None
     await session.start(
         room=ctx.room,
         agent=agent,
@@ -196,6 +238,11 @@ async def main(
             noise_cancellation=noise_cancellation.BVC(),
         ),
     )
+
+    if bi.twilio_initial_text:
+        await session.say(text=bi.twilio_initial_text)
+    else:
+        await session.generate_reply(user_input="Hello")
 
     background_audio = BackgroundAudioPlayer(
         ambient_sound=AudioConfig(BuiltinAudioClip.OFFICE_AMBIENCE, volume=0.8),
@@ -206,10 +253,64 @@ async def main(
     )
     await background_audio.start(room=ctx.room, agent_session=session)
 
-    if bi.twilio_initial_text:
-        await session.say(text=bi.twilio_initial_text)
+
+@asyncio_create_task
+@sync_to_async
+def save_on_step(
+    sr: SavedRun,
+    llm_model: AIModelSpec,
+    session: AgentSession,
+    event: ConversationItemAddedEvent | CloseEvent,
+):
+    sr.run_time = datetime.timedelta(seconds=time() - session._started_at)
+    if isinstance(event, CloseEvent):
+        sr.run_status = ""
+        audio_path = session._recorder_io and session._recorder_io.output_path
+        if audio_path:
+            sr.state["output_audio"] = [
+                upload_file_from_bytes("call_recording.ogg", audio_path.read_bytes())
+            ]
     else:
-        await session.generate_reply(user_input="Hello")
+        sr.run_status = f"Calling with {llm_model.label}..."
+
+    sr.state["final_prompt"] = final_prompt = [
+        item.model_dump()
+        for item in session.history.items
+        if item.type != "agent_handoff"
+    ]
+    final_prompt.sort(
+        key=lambda item: (
+            item.get("metrics", {}).get("stopped_speaking_at") or item.get("created_at")
+        ),
+    )
+
+    sr.state["messages"] = messages = [
+        {
+            "role": item["role"],
+            "content": (
+                format_timestamp(item["created_at"] - session._started_at)
+                + " ".join(item["content"])
+            ),
+        }
+        for item in final_prompt
+        if item.get("type") == "message"
+    ]
+
+    if messages and messages[-1]["role"] == "assistant":
+        sr.state["output_text"] = [messages.pop()["content"]]
+    else:
+        sr.state["output_text"] = [""]
+    if messages and messages[-1]["role"] == "user":
+        sr.state["input_prompt"] = messages.pop()["content"]
+    else:
+        sr.state["input_prompt"] = ""
+
+    sr.save()
+
+
+def format_timestamp(elapsed: float) -> str:
+    minutes, seconds = divmod(elapsed, 60)
+    return f"[{minutes:02.0f}:{seconds:02.0f}] "
 
 
 async def create_audio_model_session(
@@ -394,7 +495,6 @@ def create_run(data: dict, input_text: str):
         current_user=bot.bi.created_by,
         workspace=bot.bi.workspace,
         request_body=body,
-        run_status=None,
     )
 
     sr.transaction, sr.price = page.deduct_credits(sr.state)
@@ -412,7 +512,7 @@ def create_run(data: dict, input_text: str):
         ],
     )
 
-    return page, request, agent, bot.bi
+    return page, sr, request, agent, bot.bi
 
 
 def entry_to_chat_item(entry: ConversationEntry) -> agents.ChatItem:
@@ -425,17 +525,19 @@ class LivekitVoice(BotInterface):
     platform = Platform.TWILIO
 
     def __init__(self, data: dict, input_text: str):
-        # "sip.ruleID": "XXXX",
-        # "sip.callID": "XXXX",
-        # "sip.callIDFull": "XXXX",
-        # "sip.hostname": "XXXX.pstn.twilio.com",
-        # "sip.twilio.callSid": "CAXXXX",
-        # "sip.trunkID": "ST_XXXX",
-        # "sip.callStatus": "XXXX",
-        # "sip.callTag": "XXXX",
-        # "sip.twilio.accountSid": "XXXX",
-        # "sip.trunkPhoneNumber": "+1XXXX",
-        # "sip.phoneNumber": "+1XXXX"
+        # data = {
+        #     "sip.ruleID": "XXXX",
+        #     "sip.callID": "XXXX",
+        #     "sip.callIDFull": "XXXX",
+        #     "sip.hostname": "XXXX.pstn.twilio.com",
+        #     "sip.twilio.callSid": "CAXXXX",
+        #     "sip.trunkID": "ST_XXXX",
+        #     "sip.callStatus": "XXXX",
+        #     "sip.callTag": "XXXX",
+        #     "sip.twilio.accountSid": "XXXX",
+        #     "sip.trunkPhoneNumber": "+13613043404",
+        #     "sip.phoneNumber": "+12125552368",
+        # }
         self.bot_id = data["sip.trunkPhoneNumber"]
         self.user_id = data["sip.phoneNumber"]
 
@@ -638,12 +740,34 @@ def tts_step(
     return audio_wav_bytes, mime_type
 
 
-if __name__ == "__main__":
-    agents.cli.run_app(
-        agents.WorkerOptions(
-            entrypoint_fnc=entrypoint,
-            num_idle_processes=config("MAX_THREADS", default=1, cast=int),
-            job_memory_warn_mb=1024,
-            job_memory_limit_mb=4096,
+# https://docs.livekit.io/deploy/observability/data/#opentelemetry-integration
+def setup_langfuse():
+    if not (
+        settings.LANGFUSE_PUBLIC_KEY
+        and settings.LANGFUSE_SECRET_KEY
+        and settings.LANGFUSE_BASE_URL
+    ):
+        logger.warning(
+            "LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_BASE_URL must be set for langfuse telemetry"
         )
+        return
+
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    langfuse_auth = base64.b64encode(
+        f"{settings.LANGFUSE_PUBLIC_KEY}:{settings.LANGFUSE_SECRET_KEY}".encode()
+    ).decode()
+    os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
+        f"{settings.LANGFUSE_BASE_URL.rstrip('/')}/api/public/otel"
     )
+    os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {langfuse_auth}"
+
+    trace_provider = TracerProvider()
+    trace_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    set_tracer_provider(trace_provider)
+
+
+if __name__ == "__main__":
+    agents.cli.run_app(server)
