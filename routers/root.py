@@ -842,7 +842,7 @@ def page_wrapper(
                         _render_mobile_search_button(request, search_filters)
 
                     with gui.div(
-                        className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
+                        className="d-flex gap-2 justify-content-end align-items-center"
                     ):
                         for url, label in settings.HEADER_LINKS:
                             render_header_link(
