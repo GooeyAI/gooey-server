@@ -135,8 +135,8 @@ def render_gooey_builder_inline(
     )
 
     # get the conversation data if it is a shared conversation
-    open_bot_builder = request.query_params.get("botBuilder") == "true"
-    conversation_id = request.query_params.get("conversationId") or None
+    open_bot_builder = request.query_params.get("bot_builder") == "true"
+    conversation_id = request.query_params.get("conversation_id") or None
     if conversation_id and open_bot_builder:
         try:
             conversation: Conversation = Conversation.objects.get(
