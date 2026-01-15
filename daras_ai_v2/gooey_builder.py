@@ -1,3 +1,5 @@
+from starlette.exceptions import HTTPException
+from bots.models.convo_msg import Conversation, db_msgs_to_api_json
 import gooey_gui as gui
 
 from bots.models import BotIntegration
@@ -29,6 +31,13 @@ def render_gooey_builder_launcher(
         return
 
     sidebar_ref = use_sidebar("builder-sidebar", request.session)
+    if gui.session_state.pop("open_bot_builder", False):
+        gui.session_state.pop("bot_builder_closed_manually", None)
+        sidebar_ref.set_mobile_open(True)
+        sidebar_ref.set_open(True)
+        raise gui.RerunException()
+        return
+
     try:
         bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     except BotIntegration.DoesNotExist:
@@ -56,6 +65,7 @@ def render_gooey_builder_launcher(
                     },
                 )
             if gooey_builder_open_button:
+                gui.session_state.pop("bot_builder_closed_manually", None)
                 sidebar_ref.set_open(True)
                 raise gui.RerunException()
     else:
@@ -69,15 +79,18 @@ def render_gooey_builder_launcher(
             },
         )
         if gooey_builder_mobile_open_button:
+            gui.session_state.pop("bot_builder_closed_manually", None)
             sidebar_ref.set_mobile_open(True)
             raise gui.RerunException()
 
 
 def render_gooey_builder_inline(
-    page_slug: str, builder_state: dict, sidebar_ref: SidebarRef
+    page_slug: str, builder_state: dict, sidebar_ref: SidebarRef, request: Request
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
+
+    from routers.bots_api import api_hashids
 
     # hidden button to trigger the onClose event passed in the widget config
     gui.tag(
@@ -89,11 +102,15 @@ def render_gooey_builder_inline(
         id="onClose",
     )
 
+    # close builder button was clicked
     if gui.session_state.pop("onCloseGooeyBuilder", None):
         sidebar_ref.set_open(False)
         sidebar_ref.set_mobile_open(False)
+        gui.session_state["bot_builder_closed_manually"] = True
+        gui.session_state.pop("open_bot_builder", None)
         raise gui.RerunException()
 
+    # get the config for the builder
     bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     config = bi.get_web_widget_config(
         hostname="gooey.ai", target="#gooey-builder-embed"
@@ -105,10 +122,36 @@ def render_gooey_builder_inline(
     branding["showPoweredByGooey"] = False
 
     config.setdefault("payload", {}).setdefault("variables", {})
+    config["enableShareConversation"] = True
+    config["currentRunPath"] = request.url._url
+
     # will be added later in the js code
     variables = dict(
         update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
     )
+
+    # get the conversation data if it is a shared conversation
+    open_bot_builder = request.query_params.get("botBuilder") == "true"
+    conversation_id = request.query_params.get("conversationId") or None
+    if conversation_id and open_bot_builder:
+        try:
+            conversation: Conversation = Conversation.objects.get(
+                id=api_hashids.decode(conversation_id)[0],
+            )
+        except (IndexError, Conversation.DoesNotExist):
+            raise HTTPException(status_code=404)
+        messages = list(db_msgs_to_api_json(conversation.last_n_msgs()))
+        conversation_data = dict(
+            id=conversation_id,
+            bot_id=settings.GOOEY_BUILDER_INTEGRATION_ID,
+            timestamp=conversation.created_at.isoformat(),
+            user_id=conversation.web_user_id,
+            messages=messages,
+        )
+    else:
+        conversation_data = None
+
+    config["conversationData"] = conversation_data
 
     gui.html(
         # language=html

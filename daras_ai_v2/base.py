@@ -49,6 +49,7 @@ from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.gooey_builder import (
+    can_launch_gooey_builder,
     render_gooey_builder_inline,
     render_gooey_builder_launcher,
 )
@@ -1233,8 +1234,23 @@ class BasePage:
         sidebar_ref = use_sidebar("builder-sidebar", self.request.session)
 
         # close the sidebar for other tabs
+        open_bot_builder_requested = (
+            self.request.query_params.get("botBuilder") == "true"
+        )
+        bot_builder_closed = gui.session_state.get("bot_builder_closed_manually")
+
+        open_bot_builder = open_bot_builder_requested
+        if bot_builder_closed:
+            open_bot_builder = False
+
+        gui.session_state["open_bot_builder"] = open_bot_builder
+
         if self.tab != RecipeTabs.run and self.tab != RecipeTabs.preview:
-            if sidebar_ref.is_open or sidebar_ref.is_mobile_open:
+            if (
+                sidebar_ref.is_open
+                or sidebar_ref.is_mobile_open
+                and not open_bot_builder
+            ):
                 sidebar_ref.set_open(False)
                 sidebar_ref.set_mobile_open(False)
                 raise gui.RerunException()
@@ -1248,7 +1264,9 @@ class BasePage:
                 current_workspace=current_workspace,
                 is_fab_button=True,
             )
-        else:  # open the sidebar for the builder
+        elif self.request.user and can_launch_gooey_builder(
+            self.request, self.current_workspace
+        ):  # open the sidebar for the builder
             with gui.div(className="w-100 h-100"):
                 update_gui_state: dict | None = gui.session_state.pop(
                     "update_gui_state", None
@@ -1288,6 +1306,7 @@ class BasePage:
                         ),
                     ),
                     sidebar_ref=sidebar_ref,
+                    request=self.request,
                 )
 
     def _render_version_history(self):
