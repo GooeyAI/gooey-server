@@ -1306,6 +1306,7 @@ class BasePage:
                         ),
                     ),
                     sidebar_ref=sidebar_ref,
+                    current_app_url=self.current_app_url(),
                     request=self.request,
                 )
 
