@@ -88,7 +88,11 @@ def calc_gpt_tokens(
 class ConversationEntry(typing_extensions.TypedDict, total=False):
     role: typing.Literal["user", "system", "assistant", "tool"]
     content: str | list[ChatCompletionContentPartParam]
+
     chunk: typing_extensions.NotRequired[str]
+
+    reasoning_summary: typing_extensions.NotRequired[str]
+    reasoning_id: typing_extensions.NotRequired[str]
 
     tool_calls: typing_extensions.NotRequired[list[ChatCompletionMessageToolCallParam]]
     tool_call_id: typing_extensions.NotRequired[str]
@@ -639,11 +643,12 @@ def run_openai_responses(
 
     if model.llm_is_thinking_model:
         thinking_budget = ReasoningEffort.high.thinking_budget
+        kwargs["reasoning"] = {"summary": "auto"}
         if reasoning_effort:
             re = ReasoningEffort.from_api(reasoning_effort)
             if re == ReasoningEffort.minimal:  # deprecated
                 re = ReasoningEffort.low
-            kwargs["reasoning_effort"] = re.name
+            kwargs["reasoning"]["effort"] = re.name
         # add some extra tokens for thinking
         max_output_tokens = max(thinking_budget + 1000, max_output_tokens)
 
@@ -824,7 +829,23 @@ def _get_responses_create(
         messages = kwargs.pop("messages", [])
         input_messages = []
         for msg in messages:
+            if msg["role"] == "assistant" and "reasoning_summary" in msg:
+                input_messages.append(
+                    {
+                        "id": msg.get("reasoning_id", ""),
+                        "type": "reasoning",
+                        "content": [],
+                        "summary": [
+                            {
+                                "type": "summary_text",
+                                "text": msg["reasoning_summary"],
+                            }
+                        ],
+                    }
+                )
+
             if msg["role"] == "assistant" and "tool_calls" in msg:
+                # function calls
                 for tool_call in msg["tool_calls"]:
                     input_messages.append(
                         {
@@ -835,6 +856,7 @@ def _get_responses_create(
                         }
                     )
             elif msg["role"] == "tool":
+                # function call output
                 input_messages.append(
                     {
                         "type": "function_call_output",
@@ -979,6 +1001,16 @@ def _stream_openai_responses(
 
             # Mark the function call as complete and yield
             yield ret
+
+        elif (
+            event.type == "response.output_item.done"
+            and event.item.type == "reasoning"
+            and event.item.summary
+        ):
+            entry["reasoning_summary"] = "\n\n".join(
+                content.text for content in event.item.summary
+            )
+            entry["reasoning_id"] = event.item.id
 
     # add the leftover chunks
     for entry in ret:
