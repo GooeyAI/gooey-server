@@ -15,8 +15,8 @@ from workspaces.models import Workspace
 def render_workflow_bulk_runs_list(
     *,
     key: str = "bulk_runs",
-    user: AppUser,
-    workspace: Workspace,
+    user: AppUser | None,
+    workspace: Workspace | None,
     sr: SavedRun,
     pr: PublishedRun,
     default_url: str = "https://gooey.ai/bulk/copilot-evaluator-g179r9bdulc1/",
@@ -57,7 +57,7 @@ def render_inputs(
     d: dict,
     *,
     bulk_runs: list[dict],
-    user: AppUser,
+    user: AppUser | None,
 ):
     from recipes.BulkRunner import BulkRunnerPage
 
@@ -79,14 +79,14 @@ def render_inputs(
 
 def submit_evaluation_button(
     *,
-    user: AppUser,
-    workspace: Workspace,
+    user: AppUser | None,
+    workspace: Workspace | None,
     key: str,
     bulk_runs: list[dict],
     sr: SavedRun,
     pr: PublishedRun,
 ):
-    if not bulk_runs:
+    if not (bulk_runs and user and workspace):
         return
 
     success_alert = gui.use_alert_dialog(key=f"{key}_evaluation_success")

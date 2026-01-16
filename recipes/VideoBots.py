@@ -939,7 +939,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             control_keys=["bulk_runs"],
             render_section=lambda: render_workflow_bulk_runs_list(
                 user=self.request.user,
-                workspace=self.current_workspace,
+                workspace=self.request.user and self.current_workspace,
                 sr=self.current_sr,
                 pr=self.current_pr,
             ),
