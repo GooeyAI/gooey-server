@@ -1,3 +1,4 @@
+import html
 import json
 import math
 import typing
@@ -335,6 +336,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
         output_text: list[str] = []
         output_audio: list[HttpUrlStr] = []
         output_video: list[HttpUrlStr] = []
+
+        # reasoning info
+        reasoning_summary: list[str] = []
 
         # intermediate text
         raw_input_text: str | None = None
@@ -682,7 +686,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         for i, choices in enumerate(chunks):
             if not choices:
                 continue
-
             tool_calls = choices[0].get("tool_calls")
             output_text = [
                 (prev_text + "\n\n" + entry["content"]).strip()
@@ -690,6 +693,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     (prev_output_text or []), choices, fillvalue=""
                 )
             ]
+            response.reasoning_summary = list(
+                filter(None, (entry.get("reasoning_summary") for entry in choices))
+            )
 
             try:
                 response.raw_input_text = choices[0]["input_audio_transcript"]
@@ -1322,10 +1328,15 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                 buttons, text, disable_feedback = parse_bot_html(text)
             else:
                 buttons = []
+
+            reasoning_summary = "\n".join(
+                gui.session_state.get("reasoning_summary") or []
+            )
             text = "\n\n".join(
                 filter(
                     None,
                     [
+                        self._render_reasoning_summary_as_html(reasoning_summary),
                         render_called_functions_as_html(
                             saved_run=self.current_sr, trigger=FunctionTrigger.pre
                         ),
@@ -1429,6 +1440,21 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
             ),
             messages=messages,
         )
+
+    def _render_reasoning_summary_as_html(self, text: str | None) -> str | None:
+        if not text:
+            return None
+        return f"""
+<details>
+<summary>🧠 <strong>Reasoning</strong></summary>
+
+{html.escape(text)}
+
+<hr />
+<div style="height: 20px;"></div>
+
+</details>
+        """
 
     def _render_regenerate_button(self):
         pass

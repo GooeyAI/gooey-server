@@ -7,6 +7,7 @@ from bots.custom_fields import CustomURLField
 class ModelProvider(models.IntegerChoices):
     openai = 1, "OpenAI"
     openai_audio = 16, "Openai Audio"
+    openai_responses = 17, "OpenAI Responses"
     azure_openai = 4, "Azure OpenAI"
     google = 2, "Google"
     together_ai = 3, "TogetherAI"
