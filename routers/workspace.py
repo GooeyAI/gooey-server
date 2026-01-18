@@ -289,15 +289,14 @@ def popup_close_or_navgiate_js(next_url: str) -> str:
     )
 
 
-delimiters = re.compile(r"[\s,;|]+")
+email_re = re.compile(r"[\w\-\.+%]+@(?:[\w-]+\.)+[\w-]{2,}")
 
 
 def validate_emails_csv(emails_csv: str, max_emails: int = 5) -> list[str]:
     """Raises ValidationError if an email is invalid"""
 
-    emails = [email.lower().strip() for email in delimiters.split(emails_csv)]
-    emails = filter(bool, emails)  # remove empty strings
-    emails = set(emails)  # remove duplicates
+    emails = email_re.findall(emails_csv)
+    emails = {email.lower() for email in emails}  # lowercase + remove duplicates
     emails = list(emails)[:max_emails]  # take up to max_emails from the list
 
     error_messages = []
