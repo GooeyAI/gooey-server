@@ -167,6 +167,7 @@ class BotIntegration(models.Model):
     )
 
     by_line = models.TextField(blank=True, default="")
+    input_placeholder = models.TextField(blank=True, default="")
     descripton = models.TextField(blank=True, default="")
     conversation_starters = models.JSONField(default=list, blank=True)
     photo_url = CustomURLField(default="", blank=True)
@@ -599,6 +600,7 @@ class BotIntegration(models.Model):
             conversationStarters=self.conversation_starters,
             photoUrl=self.photo_url,
             websiteUrl=self.website_url,
+            inputPlaceholderText=self.input_placeholder,
         )
 
     def translate(self, text: str) -> str:
