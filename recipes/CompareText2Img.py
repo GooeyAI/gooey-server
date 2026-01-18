@@ -29,6 +29,7 @@ from daras_ai_v2.stable_diffusion import (
     LoraWeight,
 )
 from daras_ai_v2.variables_widget import render_prompt_vars
+from daras_ai_v2.exceptions import StopRequested, is_stop_requested
 
 
 class CompareText2ImgPage(BasePage):
@@ -210,6 +211,10 @@ class CompareText2ImgPage(BasePage):
 
         for selected_model in request.selected_models:
             model = Text2ImgModels[selected_model]
+
+            if is_stop_requested():
+                raise StopRequested(self.get_stop_message())
+
             yield f"Running {model.value}..."
 
             output_images[selected_model] = yield from text2img(
@@ -277,9 +282,11 @@ class CompareText2ImgPage(BasePage):
                 )
 
     def get_raw_price(self, state: dict) -> int:
-        selected_models = state.get("selected_models", [])
+        models_to_charge = list(state.get("output_images", {}).keys()) or state.get(
+            "selected_models", []
+        )
         total = 0
-        for model in selected_models:
+        for model in models_to_charge:
             match model:
                 case Text2ImgModels.deepfloyd_if.name:
                     total += 5

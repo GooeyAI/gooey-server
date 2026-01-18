@@ -69,6 +69,23 @@ class GPUError(UserError):
     pass
 
 
+class StopRequested(UserError):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+def is_stop_requested() -> bool:
+    from celeryapp.tasks import get_running_saved_run
+    from daras_ai_v2.base import STOPPING_STATE
+
+    sr = get_running_saved_run()
+    if not sr:
+        return False
+
+    sr.refresh_from_db(fields=["run_status"])
+    return sr.run_status == STOPPING_STATE
+
+
 class InsufficientCredits(UserError):
     def __init__(self, user: "AppUser", sr: "SavedRun"):
         from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
