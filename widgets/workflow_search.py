@@ -369,7 +369,7 @@ def render_workflow_filter(key: str = "workflow_filter", value: str = ""):
     from daras_ai_v2.all_pages import all_home_pages
 
     workflow_options = {
-        p.workflow.short_slug: f"{p.workflow.emoji} {p.workflow.short_title}"
+        p.workflow.short_slug.lower(): f"{p.workflow.emoji} {p.workflow.short_title}"
         for p in all_home_pages
     }
     return _render_selectbox(
