@@ -1,0 +1,37 @@
+<style>
+.gooey-spinner {
+    scroll-margin: 20px;
+    display: inline-block;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top: 2px solid #03dac5;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+.tool-name {
+    font-size: 14px;
+}
+</style>
+  
+<details>
+{% if thinking_duration %}
+<summary>🧠 Thought for {{ thinking_duration }}s</summary>
+{% else %}
+<summary><div class='gooey-spinner'></div>&nbsp; Thinking</summary>
+{% endif %}
+
+{{ thinking }}  
+
+</details>
+<div style="height: 20px;"></div>
+
+{{ text }}

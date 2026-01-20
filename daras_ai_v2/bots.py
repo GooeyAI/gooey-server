@@ -252,7 +252,7 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons, text, disable_feedback = parse_bot_html(text)
+        buttons, text, thinking, disable_feedback = parse_bot_html(text)
         if disable_feedback:
             send_feedback_buttons = False
 
@@ -336,12 +336,14 @@ class BotInterface:
             return text or ""
 
 
-def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, bool]:
+def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]:
     from pyquery import PyQuery as pq
 
     if not text:
-        return [], text, False
+        return [], text, "", False
+
     doc = pq(f"<root>{text}</root>")
+
     buttons = []
     disable_feedback = False
     for idx, btn in enumerate(doc("button") or []):
@@ -365,7 +367,9 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, bool]:
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
     )
 
-    return buttons, text, disable_feedback
+    thinking = "\n\n".join(elem.text for elem in (doc("think") or []) if elem.text)
+
+    return buttons, text, thinking, disable_feedback
 
 
 def _echo(bot, input_text):
