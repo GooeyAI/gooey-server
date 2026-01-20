@@ -5,7 +5,7 @@ class RendererWhatsApp(markdown_it.renderer.RendererProtocol):
     __output__ = "WhatsApp"
 
     def __init__(self, parser=None):
-        self.collected_img_urls = []
+        self.collected_media_urls: list[str] = []
 
         self.heading_open = self.strong_open
         self.heading_close = self.strong_close
@@ -84,5 +84,5 @@ class RendererWhatsApp(markdown_it.renderer.RendererProtocol):
     def image(self, token):
         url = token.attrs.get("src")
         if url and url.startswith("http"):  # ignore local images
-            self.collected_img_urls.append(url)
+            self.collected_media_urls.append(url)
         return ""
