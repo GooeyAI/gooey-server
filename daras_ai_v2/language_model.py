@@ -4,6 +4,7 @@ import base64
 import json
 import mimetypes
 import re
+from time import time
 import typing
 from functools import wraps
 
@@ -90,9 +91,6 @@ class ConversationEntry(typing_extensions.TypedDict, total=False):
     content: str | list[ChatCompletionContentPartParam]
 
     chunk: typing_extensions.NotRequired[str]
-
-    reasoning_summary: typing_extensions.NotRequired[str]
-    reasoning_id: typing_extensions.NotRequired[str]
 
     tool_calls: typing_extensions.NotRequired[list[ChatCompletionMessageToolCallParam]]
     tool_call_id: typing_extensions.NotRequired[str]
@@ -829,21 +827,6 @@ def _get_responses_create(
         messages = kwargs.pop("messages", [])
         input_messages = []
         for msg in messages:
-            if msg["role"] == "assistant" and "reasoning_summary" in msg:
-                input_messages.append(
-                    {
-                        "id": msg.get("reasoning_id", ""),
-                        "type": "reasoning",
-                        "content": [],
-                        "summary": [
-                            {
-                                "type": "summary_text",
-                                "text": msg["reasoning_summary"],
-                            }
-                        ],
-                    }
-                )
-
             if msg["role"] == "assistant" and "tool_calls" in msg:
                 # function calls
                 for tool_call in msg["tool_calls"]:
@@ -965,20 +948,35 @@ def _stream_openai_responses(
     stop_chunk_size: int = 400,
     step_chunk_size: int = 300,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
-    entry: ConversationEntry = dict(role="assistant", content="", chunk="")
+    entry: ConversationEntry = dict(role="assistant", content="", chunk="", metrics={})
     ret = [entry]
     chunk_size = start_chunk_size
+    thinking_started_at = time()
 
-    last_event = None
     for event in r:
-        last_event = event
+        if (
+            event.type == "response.output_item.added"
+            and event.item.type == "reasoning"
+        ):
+            thinking_started_at = time()
+            entry["chunk"] += "<think>\n\n"
+        elif event.type == "response.reasoning_summary_part.done":
+            entry["chunk"] += "\n\n"
+        elif (
+            event.type == "response.output_item.done" and event.item.type == "reasoning"
+        ):
+            entry["chunk"] += "</think>\n\n"
+            entry["metrics"]["thinking_duration_sec"] = round(
+                time() - thinking_started_at
+            )
 
         # Handle different event types from Responses API
-        if event.type == "response.output_text.delta":
-            changed = False
+        if event.type in [
+            "response.output_text.delta",
+            "response.reasoning_summary_text.delta",
+        ]:
             entry["chunk"] += event.delta
-            changed = is_llm_chunk_large_enough(entry, chunk_size)
-            if changed:
+            if is_llm_chunk_large_enough(entry, chunk_size):
                 # increase the chunk size, but don't go over the max
                 chunk_size = min(chunk_size + step_chunk_size, stop_chunk_size)
                 # stream the chunk
@@ -1002,23 +1000,13 @@ def _stream_openai_responses(
             # Mark the function call as complete and yield
             yield ret
 
-        elif (
-            event.type == "response.output_item.done"
-            and event.item.type == "reasoning"
-            and event.item.summary
-        ):
-            entry["reasoning_summary"] = "\n\n".join(
-                content.text for content in event.item.summary
-            )
-            entry["reasoning_id"] = event.item.id
+        if isinstance(event, ResponseCompletedEvent):
+            record_openai_llm_usage(used_model, event.response, messages, ret)
 
     # add the leftover chunks
     for entry in ret:
         entry["content"] += entry["chunk"]
     yield ret
-
-    if isinstance(last_event, ResponseCompletedEvent):
-        record_openai_llm_usage(used_model, last_event.response, messages, ret)
 
 
 def is_llm_chunk_large_enough(entry: dict, chunk_size: int) -> bool:

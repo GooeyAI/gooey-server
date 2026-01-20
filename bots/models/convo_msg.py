@@ -637,7 +637,7 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
             if saved_run:
                 references = saved_run.state.get("references") or []
                 web_url = saved_run.get_app_url()
-            buttons, text, _ = parse_bot_html(msg.display_content)
+            buttons, text = parse_bot_html(msg.display_content)[:2]
             yield {
                 "role": msg.role,
                 "created_at": msg.created_at.isoformat(),
@@ -650,8 +650,10 @@ def db_msgs_to_api_json(msgs: list["Message"]) -> typing.Iterator[dict]:
                 "output_audio": audio,
                 "web_url": web_url,
                 "user_message_id": msg.platform_msg_id,
-                "bot_message_id": msg.platform_msg_id
-                and msg.platform_msg_id.removeprefix(MSG_ID_PREFIX),
+                "bot_message_id": (
+                    msg.platform_msg_id
+                    and msg.platform_msg_id.removeprefix(MSG_ID_PREFIX)
+                ),
                 "references": references,
             }
 
