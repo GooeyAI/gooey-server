@@ -1,5 +1,6 @@
 import requests
 from furl import furl
+from loguru import logger
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai.image_input import (
@@ -15,11 +16,15 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
 from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.exceptions import UserError, raise_for_status
+from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.text_splitter import text_splitter
 
 WA_IMG_MAX_SIZE = 5 * 1024**2
 
 WA_MSG_MAX_SIZE = 1024
+
+WA_SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png"}
+WA_SUPPORTED_VIDEO_TYPES = {"video/mp4", "video/3gpp"}
 
 
 def get_wa_auth_header(access_token: str | None = None):
@@ -163,10 +168,17 @@ class WhatsappBot(BotInterface):
         user_number: str,
         access_token: str | None = None,
     ) -> str | None:
+        video = video or []
+        images = []
         if text:
-            text, images = markdown_to_wa(text)
-        else:
-            images = None
+            text, media_urls = markdown_to_wa(text)
+
+            for url in media_urls:
+                mimetype = _get_media_mimetype(url)
+                if mimetype in WA_SUPPORTED_VIDEO_TYPES:
+                    video.append(url)
+                elif mimetype in WA_SUPPORTED_IMAGE_TYPES:
+                    images.append(url)
 
         # split text into chunks if too long
         if text and len(text) > WA_MSG_MAX_SIZE:
@@ -210,7 +222,7 @@ class WhatsappBot(BotInterface):
         else:
             messages = []
 
-        # see https://developers.facebook.com/docs/whatsapp/api/messages/media/
+        # see https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages
         if video:
             # video msg at the start
             messages = [
@@ -279,6 +291,19 @@ def retrieve_wa_media_by_id(
     content = r2.content
     # return content and mime type
     return content, media_info["mime_type"]
+
+
+def _get_media_mimetype(url: str) -> str:
+    try:
+        kwargs = requests_scraping_kwargs() | dict(
+            timeout=settings.EXTERNAL_REQUEST_TIMEOUT_SEC
+        )
+        r = requests.head(url, **kwargs)
+        raise_for_status(r)
+        return get_mimetype_from_response(r)
+    except requests.RequestException as e:
+        logger.warning(f"ignore error while retrieving mimetype of {url}: {e}")
+        return ""
 
 
 def _build_msg_buttons(

@@ -74,5 +74,5 @@ def markdown_to_wa(text: str) -> tuple[str, list[str]]:
 
     return (
         "".join(map(_render_line, text.split("\n"))),
-        md.renderer.collected_img_urls,
+        md.renderer.collected_media_urls,
     )

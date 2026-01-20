@@ -41,7 +41,7 @@ class BotBroadcastRequestModel(BaseModel):
     audio: str | None = Field(None, description="Audio URL to send to all users")
     video: str | None = Field(None, description="Video URL to send to all users")
     documents: list[str] | None = Field(
-        None, description="Video URL to send to all users"
+        None, description="Document URLs to send to all users"
     )
     integration_id: str | None = Field(
         description="The Bot's Integration ID as shown in the Copilot Deploy tab or as variables in a function call."
