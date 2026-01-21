@@ -13,6 +13,8 @@ DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.app
 def can_launch_gooey_builder(
     request: Request, current_workspace: Workspace | None
 ) -> bool:
+    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
+        return False
     if not request.user or request.user.is_anonymous:
         return False
     if request.user.is_admin():
