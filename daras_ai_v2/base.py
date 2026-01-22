@@ -1308,6 +1308,7 @@ class BasePage:
                     sidebar_ref=sidebar_ref,
                     current_app_url=self.current_app_url(),
                     request=self.request,
+                    published_run_id=self.current_pr.published_run_id,
                 )
 
     def _render_version_history(self):

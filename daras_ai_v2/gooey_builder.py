@@ -90,6 +90,7 @@ def render_gooey_builder_inline(
     sidebar_ref: SidebarRef,
     current_app_url: str,
     request: Request,
+    published_run_id: str,
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
@@ -127,7 +128,8 @@ def render_gooey_builder_inline(
 
     config.setdefault("payload", {}).setdefault("variables", {})
     config["enableShareConversation"] = True
-    config["currentRunPath"] = current_app_url or ""
+    config["isBotBuilder"] = True
+    config["userIdSuffix"] = published_run_id
 
     # will be added later in the js code
     variables = dict(
