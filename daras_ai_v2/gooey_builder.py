@@ -156,7 +156,14 @@ def render_gooey_builder_inline(
         conversation_data = None
 
     config["conversationData"] = conversation_data
-
+    config["theme"] = dict(
+        accentColor="#eee",
+        primaryBackgroundColor="#f9f9f9",
+        secondaryBackgroundColor="#eee",
+        primaryTextColor="#374151",
+        mutedTextColor="#6b7280",
+        borderColor="#f4f4f4",
+    )
     gui.html(
         # language=html
         f"""
