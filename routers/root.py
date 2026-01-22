@@ -7,10 +7,6 @@ from contextlib import contextmanager
 from enum import Enum
 from time import time
 
-from daras_ai_v2.gooey_builder import (
-    can_launch_gooey_builder,
-    render_gooey_builder_launcher,
-)
 import gooey_gui as gui
 import sentry_sdk
 from fastapi import Depends, HTTPException, Query
@@ -46,6 +42,10 @@ from daras_ai_v2.fastapi_tricks import (
     get_route_path,
     resolve_url,
 )
+from daras_ai_v2.gooey_builder import (
+    render_gooey_builder,
+    render_gooey_builder_launcher,
+)
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -54,16 +54,12 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
-from widgets.sidebar import sidebar_layout, use_sidebar
+from widgets.sidebar import sidebar_layout
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
 from workspaces.widgets import (
-    get_current_workspace,
     global_workspace_selector,
     workspace_selector_link,
 )
-
-if typing.TYPE_CHECKING:
-    from daras_ai_v2.base import BasePage
 
 app = CustomAPIRouter()
 
@@ -755,7 +751,7 @@ def render_recipe_page(
     if not gui.session_state:
         gui.session_state.update(page.current_sr_to_session_state())
 
-    with page_wrapper(request, page=page, is_recipe_page=True):
+    with page_wrapper(request, page=page):
         page.render()
 
     return dict(
@@ -774,133 +770,109 @@ def get_og_url_path(request) -> str:
 @contextmanager
 def page_wrapper(
     request: Request,
-    page: typing.Optional["BasePage"] = None,
     className="",
     search_filters: typing.Optional[SearchFilters] = None,
     show_search_bar: bool = True,
-    is_recipe_page: bool = False,
+    page: typing.Optional["BasePage"] = None,
 ):
     from routers.account import explore_in_current_workspace
+    from recipes.VideoBots import VideoBotsPage
 
     context = {"request": request, "block_incognito": True}
 
-    container = page if page else None
-    sidebar_ref = use_sidebar("builder-sidebar", request.session, default_open=False)
-    sidebar_content, pane_content = sidebar_layout(sidebar_ref)
-    is_builder_sidebar_open = sidebar_ref.is_open
+    display_gooey_builder = (
+        isinstance(page, VideoBotsPage) and page.tab == RecipeTabs.run
+    )
 
-    with pane_content:
-        with gui.div(className="d-flex flex-column min-vh-100 w-100"):
-            gui.html(templates.get_template("gtag.html").render(**context))
+    sidebar, page_content = sidebar_layout(
+        key="builder-sidebar",
+        session=request.session,
+        disabled=not display_gooey_builder,
+    )
 
+    with page_content, gui.div(className="d-flex flex-column min-vh-100 w-100"):
+        gui.html(templates.get_template("gtag.html").render(**context))
+
+        with (
+            gui.div(className="header"),
+            gui.div(className="navbar navbar-expand-xl bg-transparent p-0 my-2"),
+            gui.div(
+                className="position-relative w-100 d-flex justify-content-between gap-2"
+            ),
+        ):
             with (
-                gui.div(className="header"),
-                gui.div(className="navbar navbar-expand-xl bg-transparent p-0 m-0"),
-                gui.div(
-                    className="container-xxl my-2"
-                    if not is_builder_sidebar_open
-                    else "my-2 mx-2 w-100"
-                ),
-                gui.div(
-                    className="position-relative w-100 d-flex justify-content-between gap-2"
-                ),
+                gui.div(className="d-md-block"),
+                gui.tag("a", href="/"),
             ):
-                with (
-                    gui.div(className="d-md-block"),
-                    gui.tag("a", href="/"),
-                ):
-                    gui.tag(
-                        "img",
-                        src=settings.GOOEY_LOGO_IMG,
-                        width="300",
-                        height="142",
-                        className="img-fluid logo d-none d-sm-block",
-                    )
-                    gui.tag(
-                        "img",
-                        src=settings.GOOEY_LOGO_RECT,
-                        width="145",
-                        height="40",
-                        className="img-fluid logo d-sm-none",
-                    )
+                gui.tag(
+                    "img",
+                    src=settings.GOOEY_LOGO_IMG,
+                    width="300",
+                    height="142",
+                    className="img-fluid logo d-none d-sm-block",
+                )
+                gui.tag(
+                    "img",
+                    src=settings.GOOEY_LOGO_RECT,
+                    width="145",
+                    height="40",
+                    className="img-fluid logo d-sm-none",
+                )
 
-                with gui.div(
-                    className="d-flex justify-content-end flex-grow-1 align-items-center"
-                ):
-                    if is_recipe_page:
-                        render_gooey_builder_launcher(
-                            request=request,
-                            current_workspace=get_current_workspace(
-                                request.user, request.session
-                            )
-                            if request.user
-                            else None,
-                            is_fab_button=False,
-                        )
-
-                    if show_search_bar:
-                        _render_mobile_search_button(request, search_filters)
-
-                    with gui.div(
-                        className="d-flex gap-2 justify-content-end align-items-center"
-                    ):
-                        for url, label in settings.HEADER_LINKS:
-                            render_header_link(
-                                url=url,
-                                label=label,
-                                icon=settings.HEADER_ICONS.get(url),
-                            )
-
-                        if request.user and not request.user.is_anonymous:
-                            render_header_link(
-                                url=get_route_path(explore_in_current_workspace),
-                                label="Saved",
-                                icon=icons.save,
-                            )
-
-                            current_workspace = global_workspace_selector(
-                                request.user, request.session
-                            )
-                        else:
-                            current_workspace = None
-                            anonymous_login_container(request, context)
-
-            gui.html(copy_to_clipboard_scripts)
+            if show_search_bar:
+                _render_mobile_search_button(request, search_filters)
 
             with gui.div(
-                id="main-content",
-                className="container-xxl "
-                if not is_builder_sidebar_open
-                else "mx-2 w-100 " + className,
+                className="d-flex gap-2 justify-content-end flex-wrap align-items-center"
             ):
-                yield current_workspace
+                for url, label in settings.HEADER_LINKS:
+                    render_header_link(
+                        url=url, label=label, icon=settings.HEADER_ICONS.get(url)
+                    )
 
-            gui.html(templates.get_template("footer.html").render(**context))
-            gui.html(templates.get_template("login_scripts.html").render(**context))
+                if request.user and not request.user.is_anonymous:
+                    render_header_link(
+                        url=get_route_path(explore_in_current_workspace),
+                        label="Saved",
+                        icon=icons.save,
+                    )
 
-    close_sidebar = (
-        not is_recipe_page
-        or not (
-            request.user
-            and can_launch_gooey_builder(
-                request, get_current_workspace(request.user, request.session)
+                    launcher_div = gui.div()
+
+                    current_workspace = global_workspace_selector(
+                        request.user, request.session
+                    )
+
+                    if display_gooey_builder:
+                        with launcher_div:
+                            render_gooey_builder_launcher(
+                                request=request,
+                                current_workspace=current_workspace,
+                            )
+                else:
+                    current_workspace = None
+                    anonymous_login_container(request, context)
+
+        gui.html(copy_to_clipboard_scripts)
+
+        with gui.div(id="main-content", className=className):
+            yield current_workspace
+
+        gui.html(templates.get_template("footer.html").render(**context))
+        gui.html(templates.get_template("login_scripts.html").render(**context))
+
+    if display_gooey_builder:
+        with sidebar:
+            render_gooey_builder(
+                request=request,
+                page=page,
+                current_workspace=current_workspace,
             )
-        )
-    ) and is_builder_sidebar_open  # pre-check to close the sidebar if it's not needed
-
-    if close_sidebar:
-        sidebar_ref.set_open(False)
-        sidebar_ref.set_mobile_open(False)
-        raise gui.RerunException()
-    else:
-        with sidebar_content:
-            if container:
-                container.render_sidebar()
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
     with gui.div(
-        className="d-flex d-md-none justify-content-end",
+        className="d-flex d-md-none flex-grow-1 justify-content-end",
     ):
         gui.button(
             icons.search,

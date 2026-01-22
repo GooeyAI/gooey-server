@@ -1,100 +1,124 @@
+from __future__ import annotations
+
+import typing
+
 import gooey_gui as gui
+from starlette.requests import Request
 
 from bots.models import BotIntegration
 from daras_ai_v2 import settings
-from widgets.sidebar import SidebarRef, use_sidebar
-from starlette.requests import Request
-
 from workspaces.models import Workspace
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
 
 DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg"
 
 
-def can_launch_gooey_builder(
-    request: Request, current_workspace: Workspace | None
-) -> bool:
-    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
-        return False
-    if not request.user or request.user.is_anonymous:
-        return False
-    if request.user.is_admin():
-        return True
-    return current_workspace and current_workspace.enable_bot_builder
-
-
 def render_gooey_builder_launcher(
     request: Request,
-    current_workspace: Workspace | None = None,
-    is_fab_button: bool = False,
+    current_workspace: Workspace | None,
 ):
     if not can_launch_gooey_builder(request, current_workspace):
         return
 
-    sidebar_ref = use_sidebar("builder-sidebar", request.session)
     try:
         bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     except BotIntegration.DoesNotExist:
         return
     branding = bi.get_web_widget_branding()
-    photo_url = branding.get(
-        "photoUrl",
-        DEFAULT_GOOEY_BUILDER_PHOTO_URL,
-    )
-    branding["showPoweredByGooey"] = False
-    if is_fab_button:
-        with gui.styled("& .gooey-builder-open-button:hover { scale: 1.2; }"):
-            with gui.div(
-                className="w-100 position-absolute",
-                style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
+    photo_url = branding.get("photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL)
+
+    with gui.styled("& button:hover { scale: 1.2; }"):
+        with gui.div(
+            className="w-100 position-fixed",
+            style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
+        ):
+            with gui.tag(
+                "button",
+                type="button",
+                className="btn btn-secondary border-0 d-none d-xxl-block p-0 builder-sidebar-button",
+                onClick="window.dispatchEvent(new CustomEvent('builder-sidebar:open'))",
+                style={
+                    "width": "56px",
+                    "height": "56px",
+                    "borderRadius": "50%",
+                    "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
+                },
             ):
-                gooey_builder_open_button = gui.button(
-                    label=f"<img src='{photo_url}' style='width: 56px; height: 56px; border-radius: 50%;' />",
-                    className="btn btn-secondary border-0 d-none d-md-block p-0 gooey-builder-open-button",
-                    style={
-                        "width": "56px",
-                        "height": "56px",
-                        "borderRadius": "50%",
-                        "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
-                    },
+                gui.html(
+                    f"<img src='{photo_url}' style='width: 56px; height: 56px; border-radius: 50%;' />"
                 )
-            if gooey_builder_open_button:
-                sidebar_ref.set_open(True)
-                raise gui.RerunException()
-    else:
-        gooey_builder_mobile_open_button = gui.button(
-            label=f"<img src='{photo_url}' style='width: 36px; height: 36px; border-radius: 50%;' />",
-            className="border-0 m-0 btn btn-secondary rounded-pill d-md-none gooey-builder-open-button p-0",
-            style={
-                "width": "36px",
-                "height": "36px",
-                "borderRadius": "50%",
-            },
+
+    with gui.tag(
+        "button",
+        type="button",
+        className="border-0 m-0 btn btn-secondary rounded-pill d-xxl-none p-0 builder-sidebar-button",
+        onClick="window.dispatchEvent(new CustomEvent('builder-sidebar:open'))",
+        style={
+            "width": "36px",
+            "height": "36px",
+            "borderRadius": "50%",
+        },
+    ):
+        gui.html(
+            f"<img src='{photo_url}' style='width: 36px; height: 36px; border-radius: 50%;' />"
         )
-        if gooey_builder_mobile_open_button:
-            sidebar_ref.set_mobile_open(True)
-            raise gui.RerunException()
 
 
-def render_gooey_builder_inline(
-    page_slug: str, builder_state: dict, sidebar_ref: SidebarRef
+def render_gooey_builder(
+    *,
+    request: Request,
+    page: BasePage | None,
+    current_workspace: Workspace | None,
 ):
-    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
+    from daras_ai_v2.base import StateKeys, extract_model_fields
+
+    if not can_launch_gooey_builder(request, current_workspace):
         return
 
-    # hidden button to trigger the onClose event passed in the widget config
-    gui.tag(
-        "button",
-        type="submit",
-        name="onCloseGooeyBuilder",
-        value="yes",
-        hidden=True,
-        id="onClose",
-    )
+    with gui.div(className="w-100 h-100"):
+        update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
+        if update_gui_state:
+            new_state = (
+                {
+                    k: v
+                    for k, v in gui.session_state.items()
+                    if k in page.fields_to_save()
+                }
+                | {
+                    "--has-request-changed": True,
+                }
+                | update_gui_state
+            )
+            gui.session_state.clear()
+            gui.session_state.update(new_state)
 
-    if gui.session_state.pop("onCloseGooeyBuilder", None):
-        sidebar_ref.set_open(False)
-        sidebar_ref.set_mobile_open(False)
-        raise gui.RerunException()
+        render_gooey_builder_inline(
+            page_slug=page.slug_versions[-1],
+            builder_state=dict(
+                status=dict(
+                    error_msg=gui.session_state.get(StateKeys.error_msg),
+                    run_status=gui.session_state.get(StateKeys.run_status),
+                    run_time=gui.session_state.get(StateKeys.run_time),
+                ),
+                request=extract_model_fields(
+                    model=page.RequestModel, state=gui.session_state
+                ),
+                response=extract_model_fields(
+                    model=page.ResponseModel, state=gui.session_state
+                ),
+                metadata=dict(
+                    title=page.current_pr.title,
+                    description=page.current_pr.notes,
+                ),
+            ),
+        )
+
+
+def render_gooey_builder_inline(*, page_slug: str, builder_state: dict):
+    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
+        return
 
     bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     config = bi.get_web_widget_config(
@@ -132,11 +156,9 @@ async function onload() {
     GooeyEmbed.setGooeyBuilderVariables = (value) => {
         config.payload.variables = value;
     };
-    
     GooeyEmbed.setGooeyBuilderVariables(variables);
-    
     config.onClose = function() {
-        document.getElementById("onClose").click();
+        window.dispatchEvent(new CustomEvent('builder-sidebar:close'))
     };
     GooeyEmbed.mount(config);
 }
@@ -154,3 +176,15 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.setGooeyBuilderVariables) {
         config=config,
         variables=variables,
     )
+
+
+def can_launch_gooey_builder(
+    request: Request, current_workspace: Workspace | None
+) -> bool:
+    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
+        return False
+    if not request.user or request.user.is_anonymous:
+        return False
+    if request.user.is_admin():
+        return True
+    return current_workspace and current_workspace.enable_bot_builder
