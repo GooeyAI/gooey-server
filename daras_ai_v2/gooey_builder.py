@@ -51,7 +51,7 @@ def render_gooey_builder_launcher(
     if is_fab_button:
         with gui.styled("& .gooey-builder-open-button:hover { scale: 1.2; }"):
             with gui.div(
-                className="w-100 position-absolute",
+                className="w-100 position-fixed",
                 style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
             ):
                 gooey_builder_open_button = gui.button(
