@@ -456,6 +456,9 @@ def _get_called_functions_items(
     """Generate data for called functions for reuse across renderers."""
     from bots.models import Workflow
 
+    if trigger == FunctionTrigger.prompt:
+        yield from _get_external_tool_calls_items(saved_run)
+
     if not is_functions_enabled():
         return
 
@@ -488,20 +491,11 @@ def _get_called_functions_items(
             is_running=bool(fn_sr.run_status),
         )
 
-    if trigger == FunctionTrigger.prompt:
-        yield from _get_external_tool_calls_items(saved_run)
-
 
 def _get_external_tool_calls_items(saved_run: SavedRun) -> typing.Iterable[dict]:
     final_prompt = saved_run.state.get("final_prompt")
     if not final_prompt:
         return []
-
-    external_tools = {
-        tool_slug
-        for fn in saved_run.state.get("functions", [])
-        if (tool_slug := get_external_tool_slug_from_url(fn["url"]))
-    }
 
     items_by_id = {}
     for entry in final_prompt:
@@ -522,8 +516,6 @@ def _get_external_tool_calls_items(saved_run: SavedRun) -> typing.Iterable[dict]
         for tool_call in entry.get("tool_calls", []):
             tool_call_id = tool_call["id"]
             tool_name = tool_call["function"]["name"]
-            if tool_name not in external_tools:
-                continue
             inputs = tool_call["function"]["arguments"]
             try:
                 inputs = json.loads(inputs)

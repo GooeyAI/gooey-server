@@ -995,21 +995,24 @@ def _stream_openai_responses(
             yield ret
 
         elif (
-            event.type == "response.output_item.done"
+            event.type in ["response.output_item.added", "response.output_item.done"]
             and event.item.type == "function_call"
         ):
-            entry.setdefault("tool_calls", []).append(
-                {
-                    "id": event.item.call_id,
-                    "type": "function",
-                    "function": {
-                        "name": event.item.name,
-                        "arguments": event.item.arguments,
-                    },
-                }
-            )
-
-            # Mark the function call as complete and yield
+            tool_calls = entry.setdefault("tool_calls", [])
+            new_tc = {
+                "id": event.item.call_id,
+                "type": "function",
+                "function": {
+                    "name": event.item.name,
+                    "arguments": event.item.arguments,
+                },
+            }
+            for tc in tool_calls:
+                if tc["id"] == new_tc["id"]:
+                    tc.update(new_tc)
+                    break
+            else:
+                tool_calls.append(new_tc)
             yield ret
 
         if isinstance(event, ResponseCompletedEvent):

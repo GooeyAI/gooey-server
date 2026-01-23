@@ -680,6 +680,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
         tool_calls = None
         output_text = None
+        response.final_prompt.append({"role": CHATML_ROLE_ASSISTANT, "content": ""})
 
         for i, choices in enumerate(chunks):
             if not choices:
@@ -696,6 +697,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     (prev_output_text or []), choices, fillvalue=""
                 )
             ]
+
+            if tool_calls:
+                response.final_prompt[-1]["tool_calls"] = tool_calls
+            response.final_prompt[-1]["content"] = choices[0]["content"] or ""
 
             try:
                 response.raw_input_text = choices[0]["input_audio_transcript"]
@@ -744,15 +749,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
         if not tool_calls:
             return
-        response.final_prompt.append(
-            dict(
-                role=choices[0]["role"],
-                content=choices[0]["content"],
-                tool_calls=tool_calls,
-            )
-        )
         for call in tool_calls:
             tool, arguments = get_tool_from_call(call["function"], tools_by_name)
+            if not arguments:
+                continue
             yield f"🛠 {tool.label}..."
             output = tool.call_json(arguments)
             response.final_prompt.append(
