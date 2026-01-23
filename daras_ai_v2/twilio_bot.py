@@ -12,7 +12,7 @@ from twilio.twiml.voice_response import VoiceResponse
 
 from bots.models import BotIntegration, Platform, Conversation
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import BotInterface, ReplyButton
+from daras_ai_v2.bots import BotInterface, BotIntegrationLookupFailed, ReplyButton
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fastapi_tricks import get_api_route_url
 
@@ -131,7 +131,7 @@ class TwilioVoice(BotInterface):
     platform = Platform.TWILIO
 
     @classmethod
-    def from_webhook_data(cls, data: dict):
+    def from_webhook_data(cls, data: dict, input_override: str | None = None):
         ## data samples:
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['ringing'], 'CallToken': ['XXXX'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'StirVerstat': ['XXXX'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
         # {'AccountSid': ['XXXX'], 'ApiVersion': ['2010-04-01'], 'CallSid': ['XXXX'], 'CallStatus': ['in-progress'], 'Called': ['XXXX'], 'CalledCity': ['XXXX'], 'CalledCountry': ['XXXX'], 'CalledState': ['XXXX'], 'CalledZip': ['XXXX'], 'Caller': ['XXXX'], 'CallerCity': ['XXXX'], 'CallerCountry': ['XXXX'], 'CallerState': ['XXXX'], 'CallerZip': ['XXXX'], 'Confidence': ['0.9128386'], 'Direction': ['inbound'], 'From': ['XXXX'], 'FromCity': ['XXXX'], 'FromCountry': ['XXXX'], 'FromState': ['XXXX'], 'FromZip': ['XXXX'], 'Language': ['en-US'], 'SpeechResult': ['Hello.'], 'To': ['XXXX'], 'ToCity': ['XXXX'], 'ToCountry': ['XXXX'], 'ToState': ['XXXX'], 'ToZip': ['XXXX']}
@@ -140,30 +140,29 @@ class TwilioVoice(BotInterface):
         account_sid = data["AccountSid"][0]
         if account_sid == settings.TWILIO_ACCOUNT_SID:
             account_sid = ""
-        call_sid = data["CallSid"][0]
         user_number, bot_number = data["From"][0], data["To"][0]
         try:
-            # cases where user is calling the bot
-            bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=bot_number
+            bi, _ = BotInterface.lookup_bot_integration_for_voice(
+                platform=Platform.TWILIO,
+                bot_lookup=dict(twilio_phone_number=bot_number),
+                user_lookup=dict(twilio_phone_number=user_number),
+                bot_id=bot_number,
+                input_text=input_override,
             )
-            will_be_missed = bi.twilio_use_missed_call
-        except BotIntegration.DoesNotExist:
-            #  cases where bot is calling the user
-            user_number, bot_number = bot_number, user_number
-            bi = BotIntegration.objects.get(
-                twilio_account_sid=account_sid, twilio_phone_number=bot_number
-            )
-            will_be_missed = False
+        except UserError as e:
+            if isinstance(e, BotIntegrationLookupFailed):
+                raise BotIntegrationLookupFailed(e.message)
+            else:
+                raise
 
-        if will_be_missed:
-            # for calls that we will reject and callback, the convo is not used so we don't want to create one
-            convo = Conversation(
-                bot_integration=bi,
-                twilio_phone_number=user_number,
-                twilio_call_sid=call_sid,
-            )
-        elif bi.twilio_fresh_conversation_per_call:
+        return cls.from_bot_integration(bi, data)
+
+    @classmethod
+    def from_bot_integration(cls, bi: BotIntegration, data: dict) -> "TwilioVoice":
+        call_sid = data["CallSid"][0]
+        user_number = data["From"][0]
+
+        if bi.twilio_fresh_conversation_per_call:
             convo = Conversation.objects.get_or_create(
                 bot_integration=bi,
                 twilio_phone_number=user_number,

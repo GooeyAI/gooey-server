@@ -1,23 +1,27 @@
 import asyncio
 import typing
+import json
 from collections import defaultdict
 from typing import Dict
+
 
 from fastapi import WebSocket
 from furl import furl
 from loguru import logger
 from starlette.background import BackgroundTasks
 from starlette.websockets import WebSocketDisconnect
-from twilio.twiml.voice_response import Connect, VoiceResponse
+from twilio.twiml.voice_response import Connect, Gather, VoiceResponse
 from websockets import ConnectionClosed
 
 from ai_models.models import AIModelSpec
 from bots.models import BotIntegration
 from bots.models.convo_msg import ConvoBlockedStatus
 from daras_ai_v2 import settings
-from daras_ai_v2.bots import msg_handler_raw
+from daras_ai_v2.bots import BotIntegrationLookupFailed, msg_handler_raw
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_urlencoded_body,
+    get_api_route_url,
     get_route_path,
 )
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
@@ -32,6 +36,8 @@ from routers.twilio_api import (
 app = CustomAPIRouter()
 
 T = typing.TypeVar("T")
+
+MAX_EXTENSION_TRIES = 5
 
 
 class TwilioVoiceWs(TwilioVoice):
@@ -65,16 +71,109 @@ def twilio_voice_ws(
 ):
     try:
         bot = TwilioVoiceWs.from_webhook_data(data)
-    except BotIntegration.DoesNotExist as e:
-        logger.debug(f"could not find bot integration for {data=} {e=}")
+        # Returning caller - has existing mapping
         resp = VoiceResponse()
+        gather = Gather(
+            input="dtmf",
+            num_digits=5,
+            timeout=4,
+            action=get_api_route_url(twilio_voice_ws_extension),
+        )
+        resp.append(gather)
+
+        resp.redirect(
+            get_api_route_url(twilio_voice_ws_connect) + f"?bi_id={bot.bi.id}"
+        )
+        return twiml_response(resp)
+
+    except BotIntegrationLookupFailed as e:
+        resp = VoiceResponse()
+        gather = Gather(
+            input="dtmf",
+            num_digits=5,
+            action=get_api_route_url(twilio_voice_ws_extension),
+            timeout=10,
+        )
+        gather.say(e.message)  # Say inside Gather - allows interruption
+        resp.append(gather)
+        resp.say("We didn't receive any input. Goodbye.")
+        return twiml_response(resp)
+
+    except UserError as e:
+        # Not a shared number and no direct bot integration found
+        resp = VoiceResponse()
+        resp.say(e.message)
         resp.reject()
         return twiml_response(resp)
 
+
+@app.post("/__/twilio/voice/ws/extension/")
+def twilio_voice_ws_extension(
+    background_tasks: BackgroundTasks,
+    data: dict = fastapi_request_urlencoded_body,
+    retries: int = 0,
+):
+    # Check retry limit
+    if retries >= MAX_EXTENSION_TRIES:
+        resp = VoiceResponse()
+        resp.say("You have exceeded the maximum number of attempts. Goodbye.")
+        resp.reject()
+        return twiml_response(resp)
+
+    # Extract and parse DTMF digits
+    digits = data.get("Digits", [""])[0]
+    extension_number = digits.split("*")[-1] if digits else ""
+    input_override = f"/extension {extension_number}" if extension_number else None
+    try:
+        bot = TwilioVoiceWs.from_webhook_data(data, input_override=input_override)
+    except BotIntegrationLookupFailed as e:
+        # Invalid extension or no digits - re-prompt
+        resp = VoiceResponse()
+        resp.say(e.message)
+        gather = Gather(
+            input="dtmf",
+            num_digits=5,
+            action=get_api_route_url(twilio_voice_ws_extension)
+            + f"?retries={retries + 1}",
+            timeout=10,
+        )
+        resp.append(gather)
+        resp.say("We didn't receive any input. Goodbye.")
+        return twiml_response(resp)
+    except UserError as e:
+        resp = VoiceResponse()
+        resp.say(e.message)
+        resp.reject()
+        return twiml_response(resp)
+
+    return _connect_to_bot(background_tasks, bot)
+
+
+@app.post("/__/twilio/voice/ws/connect/")
+def twilio_voice_ws_connect(
+    background_tasks: BackgroundTasks,
+    data: dict = fastapi_request_urlencoded_body,
+    bi_id: int | None = None,
+):
+    try:
+        bi = BotIntegration.objects.get(id=bi_id)
+        bot = TwilioVoiceWs.from_bot_integration(bi, data)
+
+    except BotIntegration.DoesNotExist:
+        resp = VoiceResponse()
+        resp.say("Sorry, we couldn't find that bot integration. Please try again.")
+        resp.reject()
+        return twiml_response(resp)
+
+    return _connect_to_bot(background_tasks, bot)
+
+
+def _connect_to_bot(background_tasks: BackgroundTasks, bot: TwilioVoiceWs):
     if bot.convo.blocked_status == ConvoBlockedStatus.BLOCKED:
         resp = VoiceResponse()
         resp.reject()
         return twiml_response(resp)
+
     try:
         ensure_bot_rate_limits(bot.convo)
     except RateLimitExceeded as e:

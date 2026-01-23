@@ -160,27 +160,60 @@ class BotInterface:
         self.streaming_enabled = self.bi.streaming_enabled
 
     def lookup_bot_integration(
-        self, *, bot_lookup: dict, user_lookup: dict
+        self, *, bot_lookup: dict, user_lookup: dict, input_override: str | None = None
     ) -> BotIntegration:
+        # Use provided input_text or fall back to instance method
+        if input_override:
+            input_text = input_override
+        else:
+            input_text = self.get_input_text() or ""
+
+        bi, should_replace_input = self.lookup_bot_integration_for_voice(
+            platform=self.platform,
+            bot_lookup=bot_lookup,
+            user_lookup=user_lookup,
+            bot_id=self.bot_id,
+            input_text=input_text,
+        )
+
+        if should_replace_input:
+            self.get_input_text = lambda: "Hello"
+
+        return bi
+
+    @staticmethod
+    def lookup_bot_integration_for_voice(
+        *,
+        platform: Platform,
+        bot_lookup: dict,
+        user_lookup: dict,
+        bot_id: str,
+        input_text: str | None = None,
+    ) -> tuple[BotIntegration, bool]:
+        """
+        Lookup bot integration for voice calls.
+        This is a static method that can be called from classmethods.
+        """
         try:
             shared_number = SharedPhoneNumber.objects.get(
                 **bot_lookup,
-                platform=self.platform,
-                is_active=True,
+                platform=platform,
             )
         except SharedPhoneNumber.DoesNotExist:
             try:
-                return BotIntegration.objects.filter(
+                bi = BotIntegration.objects.filter(
                     **bot_lookup,
                     shared_phone_number__isnull=True,
                 ).latest()
+                return bi, False
             except BotIntegration.DoesNotExist as e:
                 # ideally, send an email to the admin here
                 raise UserError(
-                    f"phone number {self.bot_id} is not configured for {self.platform.label}"
+                    f"phone number {bot_id} is not configured for {platform.label}"
                 ) from e
 
-        input_text = self.get_input_text() or ""
+        # Use provided input_text
+        input_text = input_text or ""
         input_text = input_text.strip().lower()
 
         if input_text.startswith("/disconnect"):
@@ -191,11 +224,20 @@ class BotInterface:
             raise BotIntegrationLookupFailed("Extension disconnected. Bye!")
 
         extension_number = parse_extension_number(input_text)
+
+        # If user is attempting to enter an extension but it's incomplete/invalid, re-prompt
+        if input_text.startswith("/ext") and not extension_number:
+            raise BotIntegrationLookupFailed(
+                "That doesn't look like a valid extension. Please enter a 5 digit extension number."
+            )
         try:
-            bi_user = SharedPhoneNumberBotUser.objects.filter(
-                shared_phone_number=shared_number,
-                **user_lookup,
-            ).latest()
+            if not extension_number:
+                bi_user = SharedPhoneNumberBotUser.objects.filter(
+                    shared_phone_number=shared_number,
+                    **user_lookup,
+                ).latest()
+            else:
+                bi_user = None
         except SharedPhoneNumberBotUser.DoesNotExist as e:
             bi_user = None
             if not extension_number:
@@ -203,10 +245,11 @@ class BotInterface:
                     "Hi from Gooey.AI. Please enter a 5 digit extension number."
                 ) from e
 
+        should_replace_input = False
         if (not bi_user) or (input_text.startswith("/ext") and extension_number):
             try:
                 bi = BotIntegration.objects.filter(
-                    platform=self.platform,
+                    platform=platform,
                     shared_phone_number=shared_number,
                     extension_number=extension_number,
                 ).latest()
@@ -220,10 +263,9 @@ class BotInterface:
                 **user_lookup,
                 defaults=dict(bot_integration=bi),
             )[0]
-            # replace the ext number with a prompt for the bot to start
-            self.get_input_text = lambda: "Hello"
+            should_replace_input = True
 
-        return bi_user.bot_integration
+        return bi_user.bot_integration, should_replace_input
 
     def send_msg(
         self,
