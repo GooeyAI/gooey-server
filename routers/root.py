@@ -780,9 +780,10 @@ def page_wrapper(
 
     context = {"request": request, "block_incognito": True}
 
-    display_gooey_builder = (
-        isinstance(page, VideoBotsPage) and page.tab == RecipeTabs.run
-    )
+    display_gooey_builder = isinstance(page, VideoBotsPage) and page.tab in [
+        RecipeTabs.run,
+        RecipeTabs.preview,
+    ]
 
     sidebar, page_content = sidebar_layout(
         key="builder-sidebar",
@@ -849,6 +850,12 @@ def page_wrapper(
                                 request=request,
                                 current_workspace=current_workspace,
                             )
+                        with sidebar:
+                            render_gooey_builder(
+                                request=request,
+                                page=page,
+                                current_workspace=current_workspace,
+                            )
                 else:
                     current_workspace = None
                     anonymous_login_container(request, context)
@@ -860,14 +867,6 @@ def page_wrapper(
 
         gui.html(templates.get_template("footer.html").render(**context))
         gui.html(templates.get_template("login_scripts.html").render(**context))
-
-    if display_gooey_builder:
-        with sidebar:
-            render_gooey_builder(
-                request=request,
-                page=page,
-                current_workspace=current_workspace,
-            )
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):

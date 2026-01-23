@@ -8,15 +8,14 @@ def sidebar_layout(*, key: str, session, disabled: bool = False):
     except KeyError:
         default_open = session.get(default_open_key)
 
-    page_content = gui.RenderTreeNode(name="page-content")
     sidebar = gui.RenderTreeNode(
         name="sidebar",
         props=dict(
             name=key,
-            page_content=page_content,
             disabled=disabled,
             defaultOpen=default_open,
         ),
     )
     sidebar.mount()
-    return gui.NestingCtx(sidebar), gui.NestingCtx(page_content)
+    with gui.NestingCtx(sidebar):
+        return gui.div(), gui.div()
