@@ -4,9 +4,9 @@ import base64
 import json
 import mimetypes
 import re
-from time import time
 import typing
 from functools import wraps
+from time import time
 
 import aifail
 import requests
@@ -15,6 +15,7 @@ from aifail import openai_should_retry, retry_if, vertex_ai_should_retry, try_al
 from django.conf import settings
 from furl import furl
 from loguru import logger
+from openai import Stream
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionChunk,
@@ -28,7 +29,6 @@ from openai.types.responses import (
     ResponseStreamEvent,
     ResponseUsage,
 )
-from openai import Stream
 
 from ai_models.models import AIModelSpec, ModelProvider
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
@@ -891,6 +891,7 @@ def _stream_openai_chunked(
             continue
 
         changed = False
+
         for choice in completion_chunk.choices:
             delta = choice.delta
             if not delta:
@@ -918,11 +919,16 @@ def _stream_openai_chunked(
                             tc["function"]["arguments"] = ""
                         tc["function"]["arguments"] += tc_delta.function.arguments
 
-            # append the delta to the current chunk
-            if not delta.content:
-                continue
-            entry["chunk"] += delta.content
-            changed = is_llm_chunk_large_enough(entry, chunk_size)
+            if delta.content:
+                # append the delta to the current chunk
+                entry["chunk"] += delta.content
+                changed = is_llm_chunk_large_enough(entry, chunk_size)
+            elif entry["chunk"]:
+                # content stream has ended, stream the chunk
+                entry["content"] += entry["chunk"]
+                entry["chunk"] = ""
+                changed = True
+
         if changed:
             # increase the chunk size, but don't go over the max
             chunk_size = min(chunk_size + step_chunk_size, stop_chunk_size)
@@ -981,6 +987,12 @@ def _stream_openai_responses(
                 chunk_size = min(chunk_size + step_chunk_size, stop_chunk_size)
                 # stream the chunk
                 yield ret
+
+        elif event.type == "response.output_text.done":
+            # content stream has ended, stream the chunk immediately
+            entry["content"] += entry["chunk"]
+            entry["chunk"] = ""
+            yield ret
 
         elif (
             event.type == "response.output_item.done"
