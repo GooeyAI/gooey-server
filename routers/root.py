@@ -776,14 +776,10 @@ def page_wrapper(
     page: typing.Optional["BasePage"] = None,
 ):
     from routers.account import explore_in_current_workspace
-    from recipes.VideoBots import VideoBotsPage
 
     context = {"request": request, "block_incognito": True}
 
-    display_gooey_builder = isinstance(page, VideoBotsPage) and page.tab in [
-        RecipeTabs.run,
-        RecipeTabs.preview,
-    ]
+    display_gooey_builder = page.tab in [RecipeTabs.run, RecipeTabs.preview]
 
     sidebar, page_content = sidebar_layout(
         key="builder-sidebar",
