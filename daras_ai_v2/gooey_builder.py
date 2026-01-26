@@ -80,19 +80,11 @@ def render_gooey_builder(
     with gui.div(className="w-100 h-100"):
         update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
         if update_gui_state:
-            new_state = (
-                {
-                    k: v
-                    for k, v in gui.session_state.items()
-                    if k in page.fields_to_save()
-                }
-                | {
-                    "--has-request-changed": True,
-                }
-                | update_gui_state
+            gui.session_state.update(update_gui_state)
+            sr = page.create_and_validate_new_run(
+                enable_rate_limits=True, run_status=None
             )
-            gui.session_state.clear()
-            gui.session_state.update(new_state)
+            raise gui.RedirectException(sr.get_app_url())
 
         render_gooey_builder_inline(
             page_slug=page.slug_versions[-1],
