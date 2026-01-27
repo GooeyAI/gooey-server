@@ -23,9 +23,6 @@ WA_IMG_MAX_SIZE = 5 * 1024**2
 
 WA_MSG_MAX_SIZE = 1024
 
-WA_SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png"}
-WA_SUPPORTED_VIDEO_TYPES = {"video/mp4", "video/3gpp"}
-
 
 def get_wa_auth_header(access_token: str | None = None):
     return {"Authorization": f"Bearer {access_token or settings.WHATSAPP_ACCESS_TOKEN}"}
@@ -175,9 +172,9 @@ class WhatsappBot(BotInterface):
 
             for url in media_urls:
                 mimetype = _get_media_mimetype(url)
-                if mimetype in WA_SUPPORTED_VIDEO_TYPES:
+                if mimetype.startswith("video/"):
                     video.append(url)
-                elif mimetype in WA_SUPPORTED_IMAGE_TYPES:
+                elif mimetype.startswith("image/"):
                     images.append(url)
 
         # split text into chunks if too long
