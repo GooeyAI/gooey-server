@@ -47,7 +47,9 @@ class ComposioLLMTool(BaseLLMTool):
             )
         except composio_client.BadRequestError as e:
             is_auth_error = (
-                requires_auth and e.body and e.body.get("error", {}).get("code") == 1803
+                requires_auth
+                and e.body
+                and e.body.get("error", {}).get("code") in [1803, 1810]
             )
             if not is_auth_error:
                 raise
