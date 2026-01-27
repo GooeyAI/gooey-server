@@ -56,10 +56,11 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from widgets.sidebar import sidebar_layout
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
-from workspaces.widgets import (
-    global_workspace_selector,
-    workspace_selector_link,
-)
+from workspaces.widgets import global_workspace_selector, workspace_selector_link
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
+
 
 app = CustomAPIRouter()
 
@@ -779,7 +780,7 @@ def page_wrapper(
 
     context = {"request": request, "block_incognito": True}
 
-    display_gooey_builder = page.tab in [RecipeTabs.run, RecipeTabs.preview]
+    display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]
 
     sidebar, page_content = sidebar_layout(
         key="builder-sidebar",
