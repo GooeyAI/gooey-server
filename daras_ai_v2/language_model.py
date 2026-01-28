@@ -1228,6 +1228,7 @@ def _run_groq_chat(
     temperature: float,
     stop: list[str] | None,
     response_format_type: ResponseFormatType | None,
+    avoid_repetition: bool = False,
 ):
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
@@ -1244,6 +1245,9 @@ def _run_groq_chat(
         data["stop"] = stop
     if response_format_type:
         data["response_format"] = {"type": response_format_type}
+    if avoid_repetition:
+        data["frequency_penalty"] = 0.1
+        data["presence_penalty"] = 0.25
     r = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
