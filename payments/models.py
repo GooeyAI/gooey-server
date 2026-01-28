@@ -12,7 +12,7 @@ from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from workspaces.models import Workspace
-from .plans import PricingPlan, stripe_get_addon_product
+from .plans import PricingPlan, stripe_get_addon_product, PricingTier
 
 
 class PaymentMethodSummary(typing.NamedTuple):
@@ -36,6 +36,19 @@ class SubscriptionQuerySet(models.QuerySet):
 
 class Subscription(models.Model):
     plan = models.IntegerField(choices=PricingPlan.db_choices())
+
+    amount = models.IntegerField(
+        help_text="The amount (Gooey credits) added/deducted in this transaction.<br>"
+        "Positive for credits added, negative for credits deducted.",
+        default=0,
+    )
+    charged_amount = models.PositiveIntegerField(
+        help_text="The charged dollar amount in the currency’s smallest unit.<br>"
+        "E.g. for 10 USD, this would be of 1000 (that is, 1000 cents).<br>"
+        "<a href='https://stripe.com/docs/currencies'>Learn More</a>",
+        default=0,
+    )
+
     payment_provider = models.IntegerField(
         choices=PaymentProvider.choices, blank=True, null=True, default=None
     )
@@ -68,6 +81,8 @@ class Subscription(models.Model):
     monthly_spending_notification_sent_at = models.DateTimeField(null=True, blank=True)
     monthly_budget_email_sent_at = models.DateTimeField(null=True, blank=True)
 
+    seats = models.PositiveIntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -87,18 +102,11 @@ class Subscription(models.Model):
             ret = f"Auto | {ret}"
         return ret
 
-    def full_clean(
-        self,
-        amount: int | None = None,
-        charged_amount: int | None = None,
-        *args,
-        **kwargs,
-    ):
+    def full_clean(self, *args, **kwargs):
         if self.auto_recharge_enabled:
-            if amount is None:
-                amount = PricingPlan.from_sub(self).credits
-            if charged_amount is None:
-                charged_amount = PricingPlan.from_sub(self).monthly_charge * 100
+            plan = PricingPlan.from_sub(self)
+            amount = self.amount or plan.credits
+            charged_amount = self.charged_amount or (plan.monthly_charge * 100)
             self.ensure_default_auto_recharge_params(
                 amount=amount, charged_amount=charged_amount
             )
@@ -123,6 +131,18 @@ class Subscription(models.Model):
             self.monthly_spending_notification_threshold = int(
                 0.8 * self.monthly_spending_budget
             )
+
+    def get_tier(self) -> PricingTier | None:
+        if not (self.amount and self.charged_amount):
+            return None
+
+        per_seat_credits = self.amount // max(1, self.seats)
+        per_seat_monthly_charge = round(self.charged_amount / 100) // max(1, self.seats)
+        return PricingTier(
+            per_seat_credits=per_seat_credits,
+            per_seat_monthly_charge=per_seat_monthly_charge,
+            seats=self.seats,
+        )
 
     @property
     def has_user(self) -> bool:
