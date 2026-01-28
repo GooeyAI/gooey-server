@@ -191,10 +191,13 @@ class BotInterface:
 
         extension_number = parse_extension_number(input_text)
         try:
-            bi_user = SharedPhoneNumberBotUser.objects.filter(
-                shared_phone_number=shared_number,
-                **user_lookup,
-            ).latest()
+            if not extension_number:
+                bi_user = SharedPhoneNumberBotUser.objects.filter(
+                    shared_phone_number=shared_number,
+                    **user_lookup,
+                ).latest()
+            else:
+                bi_user = None
         except SharedPhoneNumberBotUser.DoesNotExist as e:
             bi_user = None
             if not extension_number:
