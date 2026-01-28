@@ -131,8 +131,10 @@ def login(request: Request):
         return RedirectResponse(
             request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
         )
+
     context = {
         "request": request,
+        "enable_sso_login": bool(settings.FIREBASE_AUTH_SSO_PROVIDERS),
     }
 
     try:
@@ -147,10 +149,21 @@ def login(request: Request):
         traceback.print_exc()
         sentry_sdk.capture_exception(e)
 
-    return templates.TemplateResponse(
-        "login_options.html",
-        context=context,
-    )
+    return templates.TemplateResponse("login_options.html", context=context)
+
+
+@app.get("/login/sso/")
+def login_sso(request: Request):
+    if request.user and not request.user.is_anonymous:
+        return RedirectResponse(
+            request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
+        )
+
+    context = {
+        "request": request,
+        "sso_providers": settings.FIREBASE_AUTH_SSO_PROVIDERS,
+    }
+    return templates.TemplateResponse("login_sso.html", context=context)
 
 
 async def form_id_token(request: Request):

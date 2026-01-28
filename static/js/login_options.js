@@ -16,7 +16,7 @@ const uiConfig = {
   signInFlow: "popup",
   // signInSuccessUrl: '/',
   callbacks: {
-    signInSuccessWithAuthResult: function (authResult, redirectUrl) {
+    signInSuccessWithAuthResult: function(authResult, redirectUrl) {
       console.log("signInSuccessWithAuthResult");
       // User successfully signed in.
       // Return type determines whether we continue the redirect automatically
@@ -26,21 +26,22 @@ const uiConfig = {
     },
     // signInFailure callback must be provided to handle merge conflicts which
     // occur when an existing credential is linked to an anonymous user.
-    signInFailure: function (error) {
+    signInFailure: function(error) {
       // For merge conflicts, the error.code will be
       // 'firebaseui/anonymous-upgrade-merge-conflict'.
       if (error.code != "firebaseui/anonymous-upgrade-merge-conflict") {
         return Promise.resolve();
       }
-      // The credential the user tried to sign in with.
-      const cred = error.credential;
       // Finish sign-in
       return handleCredential(error.credential);
     },
-    uiShown: function () {
+    uiShown: function() {
       // The widget is rendered.
       // Hide the loader.
       document.getElementById("firebaseui-spinner").style.display = "none";
+
+      let ssoContainer = document.getElementById("sso-auth-container");
+      if (ssoContainer) ssoContainer.style.display = "block";
     },
   },
   signInOptions: [
