@@ -132,35 +132,53 @@ async def entrypoint(ctx: agents.JobContext):
         await dtmf_queue.put(dtmf.digit)
         await dtmf_session.interrupt()
 
+    INITIAL_WAIT = 4  # Seconds to wait for comma-pause DTMF dialing
+    DIGIT_GAP = 2  # Max seconds between consecutive digits
+
     for i in range(MAX_TRIES):
         if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
             return
 
-        # wait for the user to stop typing
+        # Wait for first digit (short on first try, long on retry after error)
+        first_digit_timeout = INITIAL_WAIT if i == 0 else DTMF_TIMEOUT
+        try:
+            await asyncio.wait_for(dtmf_queue.get(), timeout=first_digit_timeout)
+        except asyncio.TimeoutError:
+            # Grace period: catch digits that arrive just after timeout (network delay)
+            try:
+                await asyncio.wait_for(dtmf_queue.get(), timeout=2)
+            except asyncio.TimeoutError:
+                pass
+
+        # Collect remaining digits
         if dtmf_digits or not dtmf_queue.empty():
             while True:
                 try:
-                    await asyncio.wait_for(dtmf_queue.get(), timeout=2)
+                    await asyncio.wait_for(dtmf_queue.get(), timeout=DIGIT_GAP)
                 except asyncio.TimeoutError:
                     break
 
+        raw_digits = "".join(dtmf_digits)
+        extension = raw_digits.split("*")[-1]  # * allows re-dialing new extension
+
         try:
-            extension_number = "".join(dtmf_digits)
-            if extension_number.endswith("#"):
+            if dtmf_digits and len(extension) != EXTENSION_NUMBER_LENGTH:
+                dtmf_digits.clear()
+                raise BotIntegrationLookupFailed(
+                    "Please try again with a 5 digit extension number."
+                )
+
+            if raw_digits.endswith("#"):
                 input_text = "/disconnect"
             else:
-                input_text = "/extension " + extension_number.split("*")[-1]
+                input_text = f"/extension {extension}"
+
             page, sr, request, agent, bi = await create_run(
                 data=participant.attributes, input_text=input_text
             )
         except BotIntegrationLookupFailed as e:
             # logger.info(f"{e=}")
             await dtmf_session.say(text=e.message, allow_interruptions=(i == 0))
-            # wait for for the user to press a digit
-            try:
-                await asyncio.wait_for(dtmf_queue.get(), timeout=DTMF_TIMEOUT)
-            except asyncio.TimeoutError:
-                pass
         except UserError as e:
             # logger.info(f"{e=}")
             dtmf_session.say(text=e.message, allow_interruptions=False)
