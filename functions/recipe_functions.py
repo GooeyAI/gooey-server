@@ -171,6 +171,7 @@ class WorkflowLLMTool(BaseLLMTool):
             saved_run=self.saved_run,
             function_run=fn_sr,
             trigger=self.trigger.db_value,
+            tool_name=self.name,
         )
 
         # wait for the result if its a pre request function
@@ -456,13 +457,11 @@ def _get_called_functions_items(
     """Generate data for called functions for reuse across renderers."""
     from bots.models import Workflow
 
-    if trigger == FunctionTrigger.prompt:
-        yield from _get_external_tool_calls_items(saved_run)
-
-    if not is_functions_enabled():
-        return
-
     qs = saved_run.called_functions.filter(trigger=trigger.db_value)
+
+    if trigger == FunctionTrigger.prompt:
+        yield from _get_external_tool_calls_items(saved_run, called_functions=qs)
+
     for called_fn in qs:
         fn_sr = called_fn.function_run
         page_cls = Workflow(fn_sr.workflow).page_cls
@@ -492,10 +491,18 @@ def _get_called_functions_items(
         )
 
 
-def _get_external_tool_calls_items(saved_run: SavedRun) -> typing.Iterable[dict]:
+def _get_external_tool_calls_items(
+    saved_run: SavedRun,
+    *,
+    called_functions: typing.Iterable[CalledFunction] = (),
+) -> typing.Iterable[dict]:
     final_prompt = saved_run.state.get("final_prompt")
     if not final_prompt:
         return []
+
+    workflow_tools = {
+        called_fn.tool_name for called_fn in called_functions if called_fn.tool_name
+    }
 
     items_by_id = {}
     for entry in final_prompt:
@@ -516,6 +523,8 @@ def _get_external_tool_calls_items(saved_run: SavedRun) -> typing.Iterable[dict]
         for tool_call in entry.get("tool_calls", []):
             tool_call_id = tool_call["id"]
             tool_name = tool_call["function"]["name"]
+            if tool_name in workflow_tools:
+                continue
             inputs = tool_call["function"]["arguments"]
             try:
                 inputs = json.loads(inputs)
