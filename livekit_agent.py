@@ -181,11 +181,11 @@ async def entrypoint(ctx: agents.JobContext):
             await dtmf_session.say(text=e.message, allow_interruptions=(i == 0))
         except UserError as e:
             # logger.info(f"{e=}")
-            dtmf_session.say(text=e.message, allow_interruptions=False)
+            await dtmf_session.say(text=e.message, allow_interruptions=False)
             raise
         else:
             if i > 0:
-                dtmf_session.say(text="Connecting you to the agent")
+                await dtmf_session.say(text="Connecting you to the agent")
             # logger.info(f"{dtmf_digits=} {page=} {agent=} {bi=}")
             await main(ctx, page, sr, request, agent, bi)
 
