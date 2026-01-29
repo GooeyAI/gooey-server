@@ -122,6 +122,12 @@ async def entrypoint(ctx: agents.JobContext):
     dtmf_session = AgentSession(tts=openai.TTS())
     await dtmf_session.start(room=ctx.room, agent=Agent(instructions=""), record=False)
 
+    # Play background audio while waiting for DTMF digits
+    wait_audio = BackgroundAudioPlayer(
+        ambient_sound=AudioConfig(BuiltinAudioClip.HOLD_MUSIC, volume=0.1),
+    )
+    await wait_audio.start(room=ctx.room, agent_session=dtmf_session)
+
     dtmf_digits = deque(maxlen=EXTENSION_NUMBER_LENGTH)
 
     @ctx.room.on("sip_dtmf_received")
@@ -181,11 +187,13 @@ async def entrypoint(ctx: agents.JobContext):
             await dtmf_session.say(text=e.message, allow_interruptions=(i == 0))
         except UserError as e:
             # logger.info(f"{e=}")
-            dtmf_session.say(text=e.message, allow_interruptions=False)
+            await dtmf_session.say(text=e.message, allow_interruptions=False)
             raise
         else:
+            # Stop the waiting audio before connecting to agent
+            await wait_audio.aclose()
             if i > 0:
-                dtmf_session.say(text="Connecting you to the agent")
+                await dtmf_session.say(text="Connecting you to the agent")
             # logger.info(f"{dtmf_digits=} {page=} {agent=} {bi=}")
             await main(ctx, page, sr, request, agent, bi)
 
@@ -196,6 +204,7 @@ async def entrypoint(ctx: agents.JobContext):
                 if digit == "*":  # change extension
                     break
 
+    await wait_audio.aclose()
     await dtmf_session.say(
         text="You have exceeded the maximum number of attempts. Please try again later."
     )
