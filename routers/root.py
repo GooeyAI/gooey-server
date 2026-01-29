@@ -134,7 +134,6 @@ def login(request: Request):
 
     context = {
         "request": request,
-        "enable_sso_login": bool(settings.FIREBASE_AUTH_SSO_PROVIDERS),
     }
 
     try:
@@ -161,7 +160,6 @@ def login_sso(request: Request):
 
     context = {
         "request": request,
-        "sso_providers": settings.FIREBASE_AUTH_SSO_PROVIDERS,
     }
     return templates.TemplateResponse("login_sso.html", context=context)
 

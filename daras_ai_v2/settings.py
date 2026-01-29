@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import datetime
-import json
 import os
 from pathlib import Path
 
@@ -276,10 +275,6 @@ MAX_UPLOAD_SIZE = config("MAX_UPLOAD_SIZE", default=1024 * 1024 * 250, cast=int)
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
-
-FIREBASE_AUTH_SSO_PROVIDERS = config(
-    "FIREBASE_AUTH_SSO_PROVIDERS", default="[]", cast=json.loads
-)
 
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
