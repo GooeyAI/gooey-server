@@ -89,16 +89,25 @@ class FunctionScopes(FunctionScope, GooeyEnum):
         workspace: Workspace | None,
         user: AppUser | None,
         published_run: PublishedRun | None,
+        current_user: AppUser | None = None,
     ) -> str:
         scope = cls.get(name)
         if not scope:
             return "Select Scope"
         match scope:
-            case cls.workspace if workspace and not workspace.is_personal:
-                return f"{workspace.display_html()} Members"
+            case cls.workspace if workspace:
+                if workspace.is_personal:
+                    return (
+                        f"{workspace.html_icon()} Only I ({workspace.display_name()})"
+                    )
+                else:
+                    return f"{workspace.display_html()} Members"
 
             case cls.workspace_member if user:
-                label = f"Only I ({user.full_name()})"
+                if user == current_user:
+                    label = f"Only I ({user.full_name()})"
+                else:
+                    label = f"Only {user.full_name()}"
                 photo = user.get_photo()
                 if photo:
                     label = f'<img align="left" src="{photo}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;"> &nbsp; {label}'
@@ -146,6 +155,27 @@ class FunctionScopes(FunctionScope, GooeyEnum):
 
             case _:
                 return f"{scope.icon} {scope.label}"
+
+    @classmethod
+    def from_user_id(
+        cls, user_id: str
+    ) -> tuple[FunctionScopes, dict[ScopeParts, str]] | None:
+        parts = user_id.split("/")
+        user_id_scope_parts = parts[::2]
+        scope_values = {
+            ScopeParts(part): value
+            for part, value in zip(user_id_scope_parts, parts[1::2])
+        }
+
+        for scope in cls:
+            scope_parts = [part.value for part in scope.parts]
+            if user_id_scope_parts == scope_parts:
+                return scope, scope_values
+        return None
+
+    @classmethod
+    def get_user_id_prefix_for_workspace(cls, workspace: Workspace) -> str:
+        return f"{ScopeParts.workspace.value}/{workspace.id}"
 
     @classmethod
     def get_user_id_for_scope(

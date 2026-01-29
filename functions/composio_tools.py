@@ -267,3 +267,11 @@ def get_tools_for_toolkit(toolkit_slug: str) -> dict[str, dict]:
             toolkits=[toolkit_slug], limit=9999
         )
     }
+
+
+def get_toolkit_name_by_slug(toolkit_slug: str) -> str:
+    toolkits = list_toolkits()
+    for toolkit in toolkits:
+        if toolkit["slug"] == toolkit_slug:
+            return toolkit["name"]
+    return toolkit_slug
