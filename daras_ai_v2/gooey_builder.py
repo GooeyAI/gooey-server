@@ -16,6 +16,7 @@ DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.app
 
 
 def render_gooey_builder_launcher(
+    sidebar_key: str,
     request: Request,
     current_workspace: Workspace | None,
 ):
@@ -31,14 +32,14 @@ def render_gooey_builder_launcher(
 
     with gui.styled("& button:hover { scale: 1.2; }"):
         with gui.div(
-            className="w-100 position-fixed",
+            className="position-fixed d-none d-xxl-block",
             style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
         ):
             with gui.tag(
                 "button",
                 type="button",
-                className="btn btn-secondary border-0 d-none d-xxl-block p-0 builder-sidebar-button",
-                onClick="window.dispatchEvent(new CustomEvent('builder-sidebar:open'))",
+                className=f"btn btn-secondary border-0 p-0 {sidebar_key}-button",
+                onClick=f"window.dispatchEvent(new CustomEvent(`{sidebar_key}:open`))",
                 style={
                     "width": "56px",
                     "height": "56px",
@@ -53,8 +54,8 @@ def render_gooey_builder_launcher(
     with gui.tag(
         "button",
         type="button",
-        className="border-0 m-0 btn btn-secondary rounded-pill d-xxl-none p-0 builder-sidebar-button",
-        onClick="window.dispatchEvent(new CustomEvent('builder-sidebar:open'))",
+        className=f"border-0 m-0 btn btn-secondary rounded-pill d-xxl-none p-0 {sidebar_key}-button",
+        onClick=f"window.dispatchEvent(new CustomEvent(`{sidebar_key}:open`))",
         style={
             "width": "36px",
             "height": "36px",
@@ -68,6 +69,7 @@ def render_gooey_builder_launcher(
 
 def render_gooey_builder(
     *,
+    sidebar_key: str,
     request: Request,
     page: BasePage | None,
     current_workspace: Workspace | None,
@@ -87,6 +89,7 @@ def render_gooey_builder(
             raise gui.RedirectException(sr.get_app_url())
 
         render_gooey_builder_inline(
+            sidebar_key=sidebar_key,
             page_slug=page.slug_versions[-1],
             builder_state=dict(
                 status=dict(
@@ -108,7 +111,9 @@ def render_gooey_builder(
         )
 
 
-def render_gooey_builder_inline(*, page_slug: str, builder_state: dict):
+def render_gooey_builder_inline(
+    *, sidebar_key: str, page_slug: str, builder_state: dict
+):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
 
@@ -150,7 +155,7 @@ async function onload() {
     };
     GooeyEmbed.setGooeyBuilderVariables(variables);
     config.onClose = function() {
-        window.dispatchEvent(new CustomEvent('builder-sidebar:close'))
+        window.dispatchEvent(new CustomEvent(`${sidebar_key}:close`))
     };
     GooeyEmbed.mount(config);
 }
@@ -167,6 +172,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.setGooeyBuilderVariables) {
         """,
         config=config,
         variables=variables,
+        sidebar_key=sidebar_key,
     )
 
 
