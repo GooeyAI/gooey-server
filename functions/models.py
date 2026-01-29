@@ -253,6 +253,7 @@ class CalledFunction(models.Model):
     trigger = models.IntegerField(
         choices=FunctionTrigger.db_choices(),
     )
+    tool_name = models.TextField(blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
