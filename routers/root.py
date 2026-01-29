@@ -132,9 +132,12 @@ def login(request: Request):
             request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
         )
 
-    context = {
-        "request": request,
-    }
+    login_sso_url = get_route_path(login_sso)
+    next_url = request.query_params.get("next") or ""
+    if next_url:
+        login_sso_url = str(furl(login_sso_url, query_params={"next": next_url}))
+
+    context = {"request": request, "login_sso_url": login_sso_url}
 
     try:
         if (
@@ -158,9 +161,12 @@ def login_sso(request: Request):
             request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
         )
 
-    context = {
-        "request": request,
-    }
+    login_url = get_route_path(login)
+    next_url = request.query_params.get("next") or ""
+    if next_url:
+        login_url = str(furl(login_url, query_params={"next": next_url}))
+
+    context = {"request": request, "login_url": login_url}
     return templates.TemplateResponse("login_sso.html", context=context)
 
 
