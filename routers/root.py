@@ -844,11 +844,13 @@ def page_wrapper(
                     if display_gooey_builder:
                         with launcher_div:
                             render_gooey_builder_launcher(
+                                sidebar_key="builder-sidebar",
                                 request=request,
                                 current_workspace=current_workspace,
                             )
                         with sidebar:
                             render_gooey_builder(
+                                sidebar_key="builder-sidebar",
                                 request=request,
                                 page=page,
                                 current_workspace=current_workspace,
