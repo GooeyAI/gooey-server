@@ -9,6 +9,7 @@ elif [ "$RUN_DJANGO" ]; then
   ./manage.py runscript setup_vespa_db
   ./manage.py migrate
   ./manage.py collectstatic
+  ./manage.py runscript init_llm_models
   ./manage.py runscript init_llm_pricing
   ./manage.py runscript init_ivr_pricing
   ./manage.py runscript init_image_generation_pricing
