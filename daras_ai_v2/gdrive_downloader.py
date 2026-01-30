@@ -1,10 +1,15 @@
-import io
 import typing
+
+import requests
 from furl import furl
 
-from daras_ai_v2.exceptions import UserError
+from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.functional import flatmap_parallel
-from daras_ai_v2.exceptions import raise_for_status
+from functions.composio_tools import get_composio_connected_account
+
+if typing.TYPE_CHECKING:
+    pass
 
 DOCS_EXPORT_MIMETYPES = {
     "application/vnd.google-apps.document": "text/plain",
@@ -71,57 +76,110 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
 def gdrive_download(
     f: furl, mime_type: str, export_links: typing.Optional[dict] = None
 ) -> tuple[bytes, str]:
-    from googleapiclient import discovery
-    from googleapiclient.http import MediaIoBaseDownload
+    try:
+        return _gdrive_download(default_gdrive_session(), f, mime_type, export_links)
+    except requests.HTTPError as e:
+        if e.response is None or e.response.status_code not in {401, 403, 404}:
+            raise
+        return _gdrive_download(composio_gdrive_session(), f, mime_type, export_links)
+
+
+def _gdrive_download(
+    session: requests.Session,
+    f: furl,
+    mime_type: str,
+    export_links: typing.Optional[dict] = None,
+) -> tuple[bytes, str]:
+    file_id = url_to_gdrive_file_id(f)
+    export_mime_type = DOCS_EXPORT_MIMETYPES.get(mime_type, mime_type)
+    if f.host != "drive.google.com":
+        f_url_export = export_links and export_links.get(export_mime_type, None)
+        if f_url_export:
+            r = session.get(f_url_export)
+            raise_for_status(r)
+            return r.content, export_mime_type
+        else:
+            r = gdrive_file_api_get(
+                session,
+                path=[file_id, "export"],
+                params=dict(mimeType=export_mime_type),
+            )
+            return r.content, export_mime_type
+    else:
+        r = gdrive_file_api_get(
+            session,
+            path=[file_id],
+            params=dict(alt="media", supportsAllDrives="true"),
+        )
+        return r.content, mime_type
+
+
+def gdrive_metadata(
+    file_id: str,
+    *,
+    fields: str = "name,md5Checksum,modifiedTime,mimeType,size,exportLinks",
+) -> dict:
+    try:
+        return _gdrive_metadata(default_gdrive_session(), file_id, fields)
+    except requests.HTTPError as e:
+        if e.response is None or e.response.status_code not in {401, 403, 404}:
+            raise
+        return _gdrive_metadata(composio_gdrive_session(), file_id, fields)
+
+
+def _gdrive_metadata(session: requests.Session, file_id: str, fields: str) -> dict:
+    return gdrive_file_api_get(
+        session, path=[file_id], params=dict(supportsAllDrives="true", fields=fields)
+    ).json()
+
+
+def gdrive_file_api_get(
+    session: requests.Session,
+    path: list[str],
+    params: dict[str, str] | None = None,
+) -> requests.Response:
+    f = furl("https://www.googleapis.com/drive/v3/files")
+    f.path.segments.extend(path)
+    r = session.get(str(f), params=params)
+    raise_for_status(r)
+    return r
+
+
+def default_gdrive_session() -> requests.Session:
     from daras_ai_v2.asr import get_google_auth_session
 
-    if export_links is None:
-        export_links = {}
+    return get_google_auth_session("https://www.googleapis.com/auth/drive.readonly")[0]
 
-    # get drive file id
-    file_id = url_to_gdrive_file_id(f)
-    # get metadata
-    service = discovery.build("drive", "v3")
 
-    if f.host != "drive.google.com":
-        # export google docs to appropriate type
-        export_mime_type = DOCS_EXPORT_MIMETYPES.get(mime_type, mime_type)
-        if f_url_export := export_links.get(export_mime_type, None):
-            session, _ = get_google_auth_session(
-                "https://www.googleapis.com/auth/drive.readonly"
-            )
-            r = session.get(f_url_export)
-            raise_for_status(r, is_user_url=True)
-            file_bytes = r.content
-            return file_bytes, export_mime_type
+def composio_gdrive_session() -> requests.Session:
+    session = requests.Session()
+    session.headers["Authorization"] = f"Bearer {gdrive_access_token()}"
+    return session
 
-    request = service.files().get_media(
-        fileId=file_id,
-        supportsAllDrives=True,
+
+def gdrive_access_token() -> str | None:
+    if not settings.COMPOSIO_API_KEY:
+        return None
+
+    from composio import Composio
+    from celeryapp.tasks import get_running_saved_run
+    from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
+    from functions.models import FunctionScopes
+
+    sr = get_running_saved_run()
+    if not sr or not sr.workspace_id:
+        return None
+
+    user_id = FunctionScopes.get_user_id_for_scope(
+        FunctionScopes.workspace, workspace=sr.workspace
     )
-    # download
-    file = io.BytesIO()
-    downloader = MediaIoBaseDownload(file, request)
-    done = False
-    while done is False:
-        _, done = downloader.next_chunk()
-        # print(f"Download {int(status.progress() * 100)}%")
-    file_bytes = file.getvalue()
 
-    return file_bytes, mime_type
-
-
-def gdrive_metadata(file_id: str) -> dict:
-    from googleapiclient import discovery
-
-    service = discovery.build("drive", "v3")
-    metadata = (
-        service.files()
-        .get(
-            supportsAllDrives=True,
-            fileId=file_id,
-            fields="name,md5Checksum,modifiedTime,mimeType,size,exportLinks",
-        )
-        .execute()
+    connected_account = get_composio_connected_account(
+        Composio(),
+        toolkit="GOOGLEDRIVE",
+        redirect_url=sr.get_app_url({SUBMIT_AFTER_LOGIN_Q: "1"}),
+        user_id=user_id,
     )
-    return metadata
+
+    val = getattr(connected_account.state, "val", None)
+    return getattr(val, "access_token", None)

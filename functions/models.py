@@ -152,8 +152,8 @@ class FunctionScopes(FunctionScope, GooeyEnum):
         cls,
         scope: FunctionScopes | None,
         workspace: Workspace,
-        user: AppUser,
-        published_run: PublishedRun,
+        user: AppUser | None = None,
+        published_run: PublishedRun | None = None,
     ) -> str:
         if scope:
             scope_parts = set(scope.parts)
@@ -164,9 +164,12 @@ class FunctionScopes(FunctionScope, GooeyEnum):
         if ScopeParts.workspace in scope_parts:
             parts += [ScopeParts.workspace.value, workspace.id]
         if ScopeParts.member in scope_parts:
-            parts += [ScopeParts.member.value, user.id]
+            parts += [ScopeParts.member.value, user and user.id]
         if ScopeParts.saved_workflow in scope_parts:
-            parts += [ScopeParts.saved_workflow.value, published_run.published_run_id]
+            parts += [
+                ScopeParts.saved_workflow.value,
+                published_run and published_run.published_run_id,
+            ]
         variables = gui.session_state.get("variables", {})
         if ScopeParts.deployment in scope_parts:
             parts += [ScopeParts.deployment.value, variables.get("integration_id")]

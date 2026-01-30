@@ -12,6 +12,8 @@ from functions.recipe_functions import BaseLLMTool
 
 if typing.TYPE_CHECKING:
     from composio.types import Tool
+    from composio import Composio
+    from composio.client.types import AuthConfig
 
 
 class ComposioLLMTool(BaseLLMTool):
@@ -56,32 +58,12 @@ class ComposioLLMTool(BaseLLMTool):
 
         if requires_auth:
             toolkit = self.tool.toolkit.slug
-            auth_configs = composio.auth_configs.list(toolkit_slug=toolkit)
-            if auth_configs.items:
-                auth_config = auth_configs.items[0]
-            else:
-                auth_config = composio.auth_configs.create(
-                    toolkit=toolkit,
-                    options={
-                        "type": "use_composio_managed_auth",
-                        "name": f"{toolkit}-gooey",
-                    },
-                )
-
-            connected_accounts = composio.connected_accounts.list(
-                user_ids=[self.user_id],
-                auth_config_ids=[auth_config.id],
-                statuses=["ACTIVE"],
+            get_composio_connected_account(
+                composio,
+                toolkit=toolkit,
+                redirect_url=self.redirect_url,
+                user_id=self.user_id,
             )
-            if not connected_accounts.items:
-                connection_request = composio.connected_accounts.link(
-                    user_id=self.user_id,
-                    auth_config_id=auth_config.id,
-                    callback_url=self.redirect_url,
-                )
-                raise UserError(
-                    f"Please authenticate {connection_request.redirect_url}"
-                )
 
         return composio.tools.execute(
             slug=self.tool.slug, user_id=self.user_id, arguments=kwargs
@@ -267,3 +249,37 @@ def get_tools_for_toolkit(toolkit_slug: str) -> dict[str, dict]:
             toolkits=[toolkit_slug], limit=9999
         )
     }
+
+
+def get_composio_connected_account(
+    composio: Composio, *, toolkit: str, redirect_url: str, user_id: str
+) -> AuthConfig:
+    auth_config = get_or_create_composio_auth_config(composio, toolkit)
+    connected_accounts = composio.connected_accounts.list(
+        user_ids=[user_id],
+        auth_config_ids=[auth_config.id],
+        statuses=["ACTIVE"],
+    )
+    if not connected_accounts.items:
+        connection_request = composio.connected_accounts.link(
+            user_id=user_id,
+            auth_config_id=auth_config.id,
+            callback_url=redirect_url,
+        )
+        raise UserError(f"Please authenticate {connection_request.redirect_url}")
+    return connected_accounts.items[0]
+
+
+def get_or_create_composio_auth_config(composio: Composio, toolkit: str) -> AuthConfig:
+    auth_configs = composio.auth_configs.list(toolkit_slug=toolkit)
+    if auth_configs.items:
+        return auth_configs.items[0]
+    else:
+        auth_config = composio.auth_configs.create(
+            toolkit=toolkit,
+            options={
+                "type": "use_composio_managed_auth",
+                "name": f"{toolkit}-gooey",
+            },
+        )
+    return auth_config
