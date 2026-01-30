@@ -58,7 +58,7 @@ class ComposioLLMTool(BaseLLMTool):
 
         if requires_auth:
             toolkit = self.tool.toolkit.slug
-            get_composio_connected_account(
+            ensure_composio_connected_account(
                 composio,
                 toolkit=toolkit,
                 redirect_url=self.redirect_url,
@@ -251,14 +251,34 @@ def get_tools_for_toolkit(toolkit_slug: str) -> dict[str, dict]:
     }
 
 
-def get_composio_connected_account(
-    composio: Composio, *, toolkit: str, redirect_url: str, user_id: str
-) -> AuthConfig:
-    auth_config = get_or_create_composio_auth_config(composio, toolkit)
+def ensure_composio_connected_account(
+    composio: Composio,
+    *,
+    toolkit: str,
+    redirect_url: str,
+    user_id: str,
+):
+    get_composio_connected_accounts(
+        composio,
+        auth_config=get_or_create_composio_auth_config(composio, toolkit),
+        redirect_url=redirect_url,
+        user_id=user_id,
+    )
+
+
+def get_composio_connected_accounts(
+    composio: Composio,
+    *,
+    auth_config: AuthConfig,
+    redirect_url: str,
+    user_id: str,
+):
     connected_accounts = composio.connected_accounts.list(
         user_ids=[user_id],
         auth_config_ids=[auth_config.id],
         statuses=["ACTIVE"],
+        order_by="updated_at",
+        order_direction="desc",
     )
     if not connected_accounts.items:
         connection_request = composio.connected_accounts.link(
@@ -267,7 +287,7 @@ def get_composio_connected_account(
             callback_url=redirect_url,
         )
         raise UserError(f"Please authenticate {connection_request.redirect_url}")
-    return connected_accounts.items[0]
+    return connected_accounts.items
 
 
 def get_or_create_composio_auth_config(composio: Composio, toolkit: str) -> AuthConfig:

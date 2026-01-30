@@ -1,12 +1,15 @@
 import typing
-
+from functools import wraps
 import requests
 from furl import furl
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.functional import flatmap_parallel
-from functions.composio_tools import get_composio_connected_account
+from functions.composio_tools import (
+    get_composio_connected_accounts,
+    get_or_create_composio_auth_config,
+)
 
 if typing.TYPE_CHECKING:
     pass
@@ -73,23 +76,67 @@ def gdrive_list_urls_of_files_in_folder(f: furl, max_depth: int = 4) -> list[str
     return filter(None, urls)
 
 
+AUTH_STATUS_CODES = {401, 403, 404}
+
+
+def _gdrive_api_wrapper(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except requests.HTTPError as err:
+            if (
+                err.response is None
+                or err.response.status_code not in AUTH_STATUS_CODES
+            ):
+                raise
+            if not settings.COMPOSIO_API_KEY:
+                raise
+            from composio import Composio
+            from celeryapp.tasks import get_running_saved_run
+
+            sr = get_running_saved_run()
+            if not sr or not sr.workspace_id:
+                raise
+
+            composio = Composio()
+            tokens, user_id, auth_config, redirect_url = composio_gdrive_tokens(
+                composio, sr
+            )
+
+            for token in tokens:
+                try:
+                    return fn(*args, session=composio_gdrive_session(token), **kwargs)
+                except requests.HTTPError as e:
+                    if (
+                        e.response is None
+                        or e.response.status_code not in AUTH_STATUS_CODES
+                    ):
+                        raise
+
+            connection_request = composio.connected_accounts.initiate(
+                user_id=user_id,
+                auth_config_id=auth_config.id,
+                callback_url=redirect_url,
+                allow_multiple=True,
+            )
+            raise UserError(
+                f"This file is not accessible by your account or it was deleted. Please re-authenticate {connection_request.redirect_url}"
+            ) from err
+
+    return wrapper
+
+
+@_gdrive_api_wrapper
 def gdrive_download(
-    f: furl, mime_type: str, export_links: typing.Optional[dict] = None
-) -> tuple[bytes, str]:
-    try:
-        return _gdrive_download(default_gdrive_session(), f, mime_type, export_links)
-    except requests.HTTPError as e:
-        if e.response is None or e.response.status_code not in {401, 403, 404}:
-            raise
-        return _gdrive_download(composio_gdrive_session(), f, mime_type, export_links)
-
-
-def _gdrive_download(
-    session: requests.Session,
     f: furl,
     mime_type: str,
     export_links: typing.Optional[dict] = None,
+    *,
+    session: requests.Session | None = None,
 ) -> tuple[bytes, str]:
+    if session is None:
+        session = default_gdrive_session()
     file_id = url_to_gdrive_file_id(f)
     export_mime_type = DOCS_EXPORT_MIMETYPES.get(mime_type, mime_type)
     if f.host != "drive.google.com":
@@ -114,20 +161,15 @@ def _gdrive_download(
         return r.content, mime_type
 
 
+@_gdrive_api_wrapper
 def gdrive_metadata(
     file_id: str,
     *,
     fields: str = "name,md5Checksum,modifiedTime,mimeType,size,exportLinks",
+    session: requests.Session | None = None,
 ) -> dict:
-    try:
-        return _gdrive_metadata(default_gdrive_session(), file_id, fields)
-    except requests.HTTPError as e:
-        if e.response is None or e.response.status_code not in {401, 403, 404}:
-            raise
-        return _gdrive_metadata(composio_gdrive_session(), file_id, fields)
-
-
-def _gdrive_metadata(session: requests.Session, file_id: str, fields: str) -> dict:
+    if session is None:
+        session = default_gdrive_session()
     return gdrive_file_api_get(
         session, path=[file_id], params=dict(supportsAllDrives="true", fields=fields)
     ).json()
@@ -151,35 +193,30 @@ def default_gdrive_session() -> requests.Session:
     return get_google_auth_session("https://www.googleapis.com/auth/drive.readonly")[0]
 
 
-def composio_gdrive_session() -> requests.Session:
+def composio_gdrive_session(token: str) -> requests.Session:
     session = requests.Session()
-    session.headers["Authorization"] = f"Bearer {gdrive_access_token()}"
+    session.headers["Authorization"] = f"Bearer {token}"
     return session
 
 
-def gdrive_access_token() -> str | None:
-    if not settings.COMPOSIO_API_KEY:
-        return None
-
-    from composio import Composio
-    from celeryapp.tasks import get_running_saved_run
-    from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
+def composio_gdrive_tokens(composio, sr):
     from functions.models import FunctionScopes
-
-    sr = get_running_saved_run()
-    if not sr or not sr.workspace_id:
-        return None
+    from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
 
     user_id = FunctionScopes.get_user_id_for_scope(
         FunctionScopes.workspace, workspace=sr.workspace
     )
-
-    connected_account = get_composio_connected_account(
-        Composio(),
-        toolkit="GOOGLEDRIVE",
-        redirect_url=sr.get_app_url({SUBMIT_AFTER_LOGIN_Q: "1"}),
+    auth_config = get_or_create_composio_auth_config(composio, "GOOGLEDRIVE")
+    redirect_url = sr.get_app_url({SUBMIT_AFTER_LOGIN_Q: "1"})
+    connected_accounts = get_composio_connected_accounts(
+        composio,
+        auth_config=auth_config,
+        redirect_url=redirect_url,
         user_id=user_id,
     )
-
-    val = getattr(connected_account.state, "val", None)
-    return getattr(val, "access_token", None)
+    tokens = [
+        token
+        for item in connected_accounts
+        if (token := getattr(getattr(item.state, "val", None), "access_token", None))
+    ]
+    return tokens, user_id, auth_config, redirect_url
