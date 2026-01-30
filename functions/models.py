@@ -9,6 +9,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from daras_ai_v2 import icons
 from daras_ai_v2.custom_enum import GooeyEnum
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 
 if typing.TYPE_CHECKING:
@@ -164,12 +165,13 @@ class FunctionScopes(FunctionScope, GooeyEnum):
         if ScopeParts.workspace in scope_parts:
             parts += [ScopeParts.workspace.value, workspace.id]
         if ScopeParts.member in scope_parts:
-            parts += [ScopeParts.member.value, user and user.id]
+            if user is None:
+                raise UserError("Missing user for member scope.")
+            parts += [ScopeParts.member.value, user.id]
         if ScopeParts.saved_workflow in scope_parts:
-            parts += [
-                ScopeParts.saved_workflow.value,
-                published_run and published_run.published_run_id,
-            ]
+            if published_run is None:
+                raise UserError("Missing published run for saved workflow scope.")
+            parts += [ScopeParts.saved_workflow.value, published_run.published_run_id]
         variables = gui.session_state.get("variables", {})
         if ScopeParts.deployment in scope_parts:
             parts += [ScopeParts.deployment.value, variables.get("integration_id")]
