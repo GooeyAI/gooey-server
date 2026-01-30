@@ -497,7 +497,7 @@ def _get_external_tool_calls_items(
     called_functions: typing.Iterable[CalledFunction] = (),
 ) -> typing.Iterable[dict]:
     final_prompt = saved_run.state.get("final_prompt")
-    if not final_prompt:
+    if not final_prompt or isinstance(final_prompt, str):
         return []
 
     workflow_tools = {
