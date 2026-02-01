@@ -151,7 +151,12 @@ def _handle_invite_accepted(
         )
         return
 
-    invite.accept(current_user, updated_by=current_user)
+    try:
+        invite.accept(current_user, updated_by=current_user)
+    except ValidationError as e:
+        gui.error("\n".join(e.messages))
+        return
+
     set_current_workspace(session, int(invite.workspace_id))
     raise gui.RedirectException(workspace_redirect_url)
 
@@ -286,6 +291,7 @@ def member_invite_button_with_dialog(
     close_on_confirm: bool = True,
     **props,
 ):
+    from routers.account import account_route
     from routers.workspace import validate_and_invite_from_emails_csv
 
     if not membership.can_invite():
@@ -299,11 +305,52 @@ def member_invite_button_with_dialog(
     if not ref.is_open:
         return
 
+    plan = PricingPlan.from_sub(membership.workspace.subscription)
+    current_tier = (
+        membership.workspace.subscription
+        and membership.workspace.subscription.get_tier()
+    )
+    if plan == PricingPlan.TEAM and current_tier:
+        available_seats = current_tier.seats
+    elif plan == PricingPlan.STARTER:
+        available_seats = 1
+    else:
+        # enterprise or a legacy paid plan
+        available_seats = float("inf")
+
+    unused_seats = available_seats - membership.workspace.used_seats
+    if unused_seats <= 0:
+        with gui.alert_dialog(ref=ref, modal_title="#### Invite Members"):
+            gui.error(
+                f"""
+                You have used all your available seats ({available_seats}).
+                Please [upgrade your plan]({get_route_path(account_route)}) to invite more members
+                """
+            )
+        return
+
     with gui.confirm_dialog(
         ref=ref,
         modal_title="#### Invite Members",
         confirm_label=f"{icons.send} Send",
     ):
+        gui.write(f"**{membership.workspace.display_html()}**.", unsafe_allow_html=True)
+
+        plan = PricingPlan.from_sub(membership.workspace.subscription)
+        if unused_seats != float("inf"):
+            with gui.div(className="alert alert-info"):
+                gui.write(
+                    f"""
+                    You can invite **{unused_seats}** more {ngettext("member", "members", unused_seats)} based on your current subscription: **{plan.title} ({available_seats} seats)**.
+                    """
+                )
+                gui.write(
+                    f"""
+                    [Upgrade]({get_route_path(account_route)}) to add more seats.
+                    """,
+                    className="container-margin-reset",
+                )
+
         role, emails_csv = render_invite_creation_form(membership.workspace)
         if not ref.pressed_confirm:
             return
@@ -384,10 +431,9 @@ def clear_invite_creation_form():
         gui.session_state.pop(k, None)
 
 
-def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
+def render_invite_creation_form(workspace: Workspace) -> tuple[int, str]:
     from routers.workspace import render_emails_csv_input
-
-    gui.write(f"Invite to **{workspace.display_name()}**.")
+    from routers.account import account_route
 
     emails_csv = render_emails_csv_input(key="invite-form-emails", max_emails=5)
 
@@ -592,7 +638,7 @@ def render_pending_invites_list(
                             )
                         )
                     with gui.tag("td"):
-                        last_invited_at = invite.last_email_sent_at or invite.created_at
+                        last_invited_at = invite.last_email_sent_at or invite.updated_at
                         gui.html(str(naturaltime(last_invited_at)))
                     with gui.tag("td", className="text-end"):
                         render_invitation_actions(invite, current_member=current_member)
