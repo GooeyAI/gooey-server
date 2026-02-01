@@ -15,6 +15,7 @@ from daras_ai_v2.language_model_settings_widgets import (
 )
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.variables_widget import render_prompt_vars
+from daras_ai_v2.exceptions import StopRequested, is_stop_requested
 
 
 class CompareLLMPage(BasePage):
@@ -94,6 +95,9 @@ class CompareLLMPage(BasePage):
         state["output_text"] = output_text = {}
 
         for model in AIModelSpec.objects.filter(name__in=request.selected_models):
+            if is_stop_requested():
+                raise StopRequested(self.get_stop_message())
+
             yield f"Running {model.label}..."
             ret = run_language_model(
                 model=model.name,
@@ -128,7 +132,12 @@ class CompareLLMPage(BasePage):
     def get_raw_price(self, state: dict) -> float:
         grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
         price = sum(map(math.ceil, grouped_costs.values()))
-        if "agrillm_qwen3_30b" in state.get("selected_models", []):
+
+        models_to_charge = list(state.get("output_text", {}).keys()) or state.get(
+            "selected_models", []
+        )
+
+        if "agrillm_qwen3_30b" in models_to_charge:
             price += 100
 
         return price + self.PROFIT_CREDITS

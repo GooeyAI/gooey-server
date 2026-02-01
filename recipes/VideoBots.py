@@ -1312,7 +1312,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             match run_status:
                 case RecipeRunState.starting:
                     event_type = "conversation_start"
-                case RecipeRunState.running:
+                case RecipeRunState.running | RecipeRunState.stopping:
                     event_type = "message_part"
                 case RecipeRunState.failed:
                     event_type = "error"

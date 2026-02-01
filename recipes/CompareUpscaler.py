@@ -158,8 +158,12 @@ class CompareUpscalerPage(BasePage):
             _render_outputs(state)
 
     def get_raw_price(self, state: dict) -> int:
-        selected_models = state.get("selected_models", [])
-        return 5 * len(selected_models)
+        output_keys = set(state.get("output_images", {}).keys()) | set(
+            state.get("output_videos", {}).keys()
+        )
+        models_to_charge = list(output_keys) or state.get("selected_models", [])
+
+        return 5 * len(models_to_charge)
 
     def related_workflows(self) -> list:
         from recipes.CompareText2Img import CompareText2ImgPage
