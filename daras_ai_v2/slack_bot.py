@@ -152,6 +152,7 @@ class SlackBot(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        **kwargs,
     ) -> str | None:
         text = text or "\u200b"  # handle empty text with zero-width space
 
