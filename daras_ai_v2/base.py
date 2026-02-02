@@ -39,13 +39,13 @@ from bots.models import (
 )
 from bots.models.published_run import Tag
 from daras_ai.image_input import truncate_text_words
+from daras_ai_v2 import exceptions
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
-from daras_ai_v2.exceptions import InsufficientCredits
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -1910,8 +1910,21 @@ class BasePage:
                 self._render_after_output()
 
     def _render_failed_output(self):
-        err_msg = gui.session_state.get(StateKeys.error_msg)
-        gui.error(err_msg, unsafe_allow_html=True)
+        html_msg = self._get_custom_error_msg()
+        if html_msg:
+            gui.html(html_msg)
+        else:
+            err_msg = gui.session_state.get(StateKeys.error_msg)
+            gui.error(err_msg, unsafe_allow_html=True)
+
+    def _get_custom_error_msg(self) -> str | None:
+        if not self.current_sr or not self.current_sr.error_type:
+            return None
+        exc_cls = getattr(exceptions, self.current_sr.error_type, None)
+        render = getattr(exc_cls, "render", None)
+        if not callable(render):
+            return None
+        return render(self.current_sr.error_params)
 
     def click_preview_tab(self):
         # show the preview tab when running
@@ -2015,7 +2028,7 @@ class BasePage:
         # if the user is not logged in and the error is due to insufficient credits,
         # then flag to submit the run after the user logs in
         if (
-            self.current_sr.error_type == InsufficientCredits.__name__
+            self.current_sr.error_type == exceptions.InsufficientCredits.__name__
             and not self.is_logged_in()
         ):
             self.request.query_params[SUBMIT_AFTER_LOGIN_Q] = "1"
@@ -2417,7 +2430,7 @@ class BasePage:
         if workspace.balance >= price:
             return
 
-        raise InsufficientCredits(self.request.user, sr)
+        raise exceptions.InsufficientCredits(self.request.user, sr)
 
     def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
         assert self.request.user, "request.user must be set to deduct credits"
