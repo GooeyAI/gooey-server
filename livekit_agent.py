@@ -165,18 +165,17 @@ async def entrypoint(ctx: agents.JobContext):
                     break
 
         raw_digits = "".join(dtmf_digits)
-        extension = raw_digits.split("*")[-1]  # * allows re-dialing new extension
+        extension = raw_digits.split("*")[-1]  # * allows restarting extension entry
 
         try:
-            if dtmf_digits and len(extension) != EXTENSION_NUMBER_LENGTH:
-                dtmf_digits.clear()
-                raise BotIntegrationLookupFailed(
-                    "Please try again with a 5 digit extension number."
-                )
-
-            if raw_digits.endswith("#"):
+            if raw_digits.endswith("#") or extension == "#":
                 input_text = "/disconnect"
             else:
+                if dtmf_digits and len(extension) != EXTENSION_NUMBER_LENGTH:
+                    dtmf_digits.clear()
+                    raise BotIntegrationLookupFailed(
+                        "Please try again with a 5 digit extension number."
+                    )
                 input_text = f"/extension {extension}"
 
             page, sr, request, agent, bi = await create_run(
@@ -201,8 +200,6 @@ async def entrypoint(ctx: agents.JobContext):
                 digit = await dtmf_queue.get()
                 if digit is None:  # hangup signal
                     return
-                if digit == "*":  # change extension
-                    break
 
     await wait_audio.aclose()
     await dtmf_session.say(
