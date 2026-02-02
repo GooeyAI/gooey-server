@@ -115,7 +115,7 @@ OneDrive access is currently unavailable.
 
 class ComposioAuthRequired(UserError):
     def __init__(self, redirect_url: str):
-        message = f"Document access required. Connect your account to continue: {redirect_url}"
+        message = f"Access required. Connect your account to continue: {redirect_url}"
         super().__init__(
             message,
             status_code=HTTP_401_UNAUTHORIZED,
