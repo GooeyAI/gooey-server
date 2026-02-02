@@ -4,7 +4,7 @@ import requests
 from furl import furl
 
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import UserError, raise_for_status
+from daras_ai_v2.exceptions import ComposioAuthRequired, UserError, raise_for_status
 from daras_ai_v2.functional import flatmap_parallel
 from functions.composio_tools import (
     get_composio_connected_accounts,
@@ -120,9 +120,7 @@ def _gdrive_api_wrapper(fn):
                 callback_url=redirect_url,
                 allow_multiple=True,
             )
-            raise UserError(
-                f"This file is not accessible by your account or it was deleted. Please re-authenticate {connection_request.redirect_url}"
-            ) from err
+            raise ComposioAuthRequired(connection_request.redirect_url) from err
 
     return wrapper
 

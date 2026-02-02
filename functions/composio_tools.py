@@ -6,7 +6,7 @@ from textwrap import dedent
 import gooey_gui as gui
 
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.exceptions import ComposioAuthRequired, UserError
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from functions.recipe_functions import BaseLLMTool
 
@@ -286,7 +286,7 @@ def get_composio_connected_accounts(
             auth_config_id=auth_config.id,
             callback_url=redirect_url,
         )
-        raise UserError(f"Please authenticate {connection_request.redirect_url}")
+        raise ComposioAuthRequired(connection_request.redirect_url)
     return connected_accounts.items
 
 

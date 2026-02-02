@@ -59,6 +59,7 @@ def runner_task(
 ):
     start_time = time()
     error_msg = None
+    error_params = None
 
     @db_middleware
     def save_on_step(yield_val: str | tuple[str, dict] = None, *, done: bool = False):
@@ -126,6 +127,7 @@ def runner_task(
         if isinstance(e, UserError):
             sentry_level = e.sentry_level
             logger.warning("\n".join(map(str, [e, e.__cause__])))
+            error_params = e.error_params
         else:
             sentry_level = "error"
             traceback.print_exc()
@@ -133,6 +135,7 @@ def runner_task(
         error_msg = err_msg_for_exc(e)
         sr.error_type = type(e).__qualname__
         sr.error_code = getattr(e, "status_code", None)
+        sr.error_params = error_params or {}
 
     # run completed successfully, deduct credits
     else:

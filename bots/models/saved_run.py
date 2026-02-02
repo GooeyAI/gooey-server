@@ -96,6 +96,11 @@ class SavedRun(models.Model):
     error_type = models.TextField(
         default="", blank=True, help_text="The exception type"
     )
+    error_params = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Structured error parameters for UI rendering or API responses.",
+    )
 
     hidden = models.BooleanField(default=False)
     is_flagged = models.BooleanField(default=False)
