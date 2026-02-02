@@ -166,7 +166,6 @@ class BotInterface:
             shared_number = SharedPhoneNumber.objects.get(
                 **bot_lookup,
                 platform=self.platform,
-                is_active=True,
             )
         except SharedPhoneNumber.DoesNotExist:
             try:
