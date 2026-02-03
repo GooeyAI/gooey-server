@@ -206,7 +206,10 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
                 )
 
             if workspace.description:
-                gui.write(workspace.description, className="container-margin-reset")
+                gui.markdown(
+                    workspace.description,
+                    className="container-margin-reset text-break text-start",
+                )
 
             with gui.div(className="mt-2"):
                 if workspace.handle:
