@@ -366,7 +366,7 @@ class TextToSpeechPage(BasePage):
 
                 model = (
                     OpenAI_TTS_Models.get(gui.session_state.get("openai_tts_model"))
-                    or OpenAI_TTS_Models.tts_1.name
+                    or OpenAI_TTS_Models.tts_1
                 )
                 voice = (
                     OpenAI_TTS_Voices.get(gui.session_state.get("openai_voice_name"))

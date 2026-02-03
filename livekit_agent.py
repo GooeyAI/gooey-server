@@ -85,10 +85,8 @@ server = AgentServer(
 )
 
 
-@server.rtc_session()
+@server.rtc_session(agent_name=config("LIVEKIT_AGENT_NAME", ""))
 async def entrypoint(ctx: agents.JobContext):
-    from livekit.plugins import openai
-
     setup_langfuse()
 
     @ctx.room.on("participant_attributes_changed")
@@ -107,26 +105,72 @@ async def entrypoint(ctx: agents.JobContext):
                 pass
             await dtmf_queue.put(None)
 
-    # logger.info(f"{ctx=}")
     await ctx.connect(rtc_config=rtc.RtcConfiguration())
-    # logger.info(f"{ctx.room=}")
     if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
         return
     await ctx.wait_for_participant()
-    # logger.info(f"{ctx.room.remote_participants=}")
 
     participant = list(ctx.room.remote_participants.values())[0]
-    # logger.info(participant.attributes)
+
+    dtmf_queue, dtmf_digits, dtmf_session = await start_dtmf_session(ctx)
+
+    prev_convo = None
+    prev_session = None
+    hold_player = None
+
+    for i in range(MAX_TRIES):
+        if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
+            return
+
+        try:
+            input_text = "/extension " + "".join(dtmf_digits)
+            dtmf_digits.clear()
+            bot = await create_livekit_voice_bot(
+                data=participant.attributes, input_text=input_text
+            )
+        except BotIntegrationLookupFailed as e:
+            # if the extension number is invalid,
+            # start the hold music, say the error and wait for the user to enter the correct extension number
+            prev_convo = None
+            if prev_session:
+                await prev_session.aclose()
+                prev_session = None
+            if not hold_player:
+                hold_player = await start_hold_music(ctx, dtmf_session)
+            dtmf_digits.clear()
+            await dtmf_session.say(text=e.message, allow_interruptions=(i == 0))
+        except UserError as e:
+            await dtmf_session.say(text=e.message, allow_interruptions=False)
+            raise
+        else:
+            # if the extension number has changed, create a new run and close the previous session
+            if not prev_convo or prev_convo != bot.convo:
+                if prev_session:
+                    await prev_session.aclose()
+                page, sr, request, agent, bi = await create_run(bot)
+                if i > 0:
+                    new_bot_name = bi.name or "the agent"
+                    await dtmf_session.say(text=f"Connecting you to {new_bot_name}")
+                if hold_player:
+                    await hold_player.aclose()
+                    hold_player = None
+                prev_session = await main(ctx, page, sr, request, agent, bi)
+                prev_convo = bot.convo
+
+        await wait_for_extension_code(dtmf_queue, dtmf_digits)
+
+    await dtmf_session.say(
+        text="You have exceeded the maximum number of attempts. Please try again later."
+    )
+
+
+async def start_dtmf_session(ctx: agents.JobContext):
+    from livekit.plugins import google
+
     dtmf_queue = asyncio.Queue()
 
-    dtmf_session = AgentSession(tts=openai.TTS())
+    dtmf_session = AgentSession(tts=google.TTS())
     await dtmf_session.start(room=ctx.room, agent=Agent(instructions=""), record=False)
-
-    # Play background audio while waiting for DTMF digits
-    wait_audio = BackgroundAudioPlayer(
-        ambient_sound=AudioConfig(BuiltinAudioClip.HOLD_MUSIC, volume=0.1),
-    )
-    await wait_audio.start(room=ctx.room, agent_session=dtmf_session)
 
     dtmf_digits = deque(maxlen=EXTENSION_NUMBER_LENGTH)
 
@@ -134,77 +178,46 @@ async def entrypoint(ctx: agents.JobContext):
     @asyncio_create_task
     async def sip_dtmf_received(dtmf: rtc.SipDTMF):
         # logger.info(f"{dtmf=}")
+        if not dtmf.digit.isdigit():
+            return
         dtmf_digits.append(dtmf.digit)
         await dtmf_queue.put(dtmf.digit)
         await dtmf_session.interrupt()
 
-    INITIAL_WAIT = 4  # Seconds to wait for comma-pause DTMF dialing
-    DIGIT_GAP = 2  # Max seconds between consecutive digits
+    return dtmf_queue, dtmf_digits, dtmf_session
 
-    for i in range(MAX_TRIES):
-        if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
-            return
 
-        # Wait for first digit (short on first try, long on retry after error)
-        first_digit_timeout = INITIAL_WAIT if i == 0 else DTMF_TIMEOUT
-        try:
-            await asyncio.wait_for(dtmf_queue.get(), timeout=first_digit_timeout)
-        except asyncio.TimeoutError:
-            # Grace period: catch digits that arrive just after timeout (network delay)
-            try:
-                await asyncio.wait_for(dtmf_queue.get(), timeout=2)
-            except asyncio.TimeoutError:
-                pass
-
-        # Collect remaining digits
-        if dtmf_digits or not dtmf_queue.empty():
-            while True:
-                try:
-                    await asyncio.wait_for(dtmf_queue.get(), timeout=DIGIT_GAP)
-                except asyncio.TimeoutError:
-                    break
-
-        raw_digits = "".join(dtmf_digits)
-        extension = raw_digits.split("*")[-1]  # * allows restarting extension entry
-
-        try:
-            if raw_digits.endswith("#") or extension == "#":
-                input_text = "/disconnect"
-            else:
-                if dtmf_digits and len(extension) != EXTENSION_NUMBER_LENGTH:
-                    dtmf_digits.clear()
-                    raise BotIntegrationLookupFailed(
-                        "Please try again with a 5 digit extension number."
-                    )
-                input_text = f"/extension {extension}"
-
-            page, sr, request, agent, bi = await create_run(
-                data=participant.attributes, input_text=input_text
-            )
-        except BotIntegrationLookupFailed as e:
-            # logger.info(f"{e=}")
-            await dtmf_session.say(text=e.message, allow_interruptions=(i == 0))
-        except UserError as e:
-            # logger.info(f"{e=}")
-            await dtmf_session.say(text=e.message, allow_interruptions=False)
-            raise
-        else:
-            # Stop the waiting audio before connecting to agent
-            await wait_audio.aclose()
-            if i > 0:
-                await dtmf_session.say(text="Connecting you to the agent")
-            # logger.info(f"{dtmf_digits=} {page=} {agent=} {bi=}")
-            await main(ctx, page, sr, request, agent, bi)
-
-            while True:
-                digit = await dtmf_queue.get()
-                if digit is None:  # hangup signal
-                    return
-
-    await wait_audio.aclose()
-    await dtmf_session.say(
-        text="You have exceeded the maximum number of attempts. Please try again later."
+async def start_hold_music(ctx: agents.JobContext, session: AgentSession):
+    wait_audio = BackgroundAudioPlayer(
+        ambient_sound=AudioConfig(BuiltinAudioClip.HOLD_MUSIC, volume=0.1),
     )
+    await wait_audio.start(room=ctx.room, agent_session=session)
+    return wait_audio
+
+
+async def wait_for_extension_code(
+    dtmf_queue: asyncio.Queue,
+    dtmf_digits: deque,
+    fast_timeout: float = 1,
+    slow_timeout: float = 10,
+):
+    # wait for first user input
+    await dtmf_queue.get()
+    # wait fast for pre-filled dtmf code
+    while True:
+        try:
+            await asyncio.wait_for(dtmf_queue.get(), timeout=fast_timeout)
+        except asyncio.TimeoutError:
+            break
+    # wait slowly in case the user is entering the dtmf code manually
+    while len(dtmf_digits) < EXTENSION_NUMBER_LENGTH:
+        try:
+            await asyncio.wait_for(dtmf_queue.get(), timeout=slow_timeout)
+        except asyncio.TimeoutError:
+            break
+    # drain the queue
+    while not dtmf_queue.empty():
+        await dtmf_queue.get()
 
 
 def asyncio_create_task(fn):
@@ -223,8 +236,6 @@ async def main(
     agent: Agent,
     bi: BotIntegration,
 ):
-    from livekit.plugins import noise_cancellation
-
     llm_model = await AIModelSpec.objects.aget(name=request.selected_model)
     if llm_model.llm_is_audio_model:
         session = await create_audio_model_session(llm_model, request)
@@ -254,14 +265,7 @@ async def main(
         save_on_step(sr, llm_model, session, event)
 
     ctx._primary_agent_session = None
-    await session.start(
-        room=ctx.room,
-        agent=agent,
-        room_input_options=RoomInputOptions(
-            # For telephony applications, use `BVCTelephony` instead for best results
-            noise_cancellation=noise_cancellation.BVC(),
-        ),
-    )
+    await session.start(room=ctx.room, agent=agent)
 
     if bi.twilio_initial_text:
         await session.say(text=bi.twilio_initial_text)
@@ -276,6 +280,8 @@ async def main(
         ],
     )
     await background_audio.start(room=ctx.room, agent_session=session)
+
+    return session
 
 
 @asyncio_create_task
@@ -495,9 +501,12 @@ async def create_stt_llm_tts_session(
 
 
 @sync_to_async
-def create_run(data: dict, input_text: str):
-    bot = LivekitVoice(data, input_text)
+def create_livekit_voice_bot(data: dict, input_text: str) -> LivekitVoice:
+    return LivekitVoice(data, input_text)
 
+
+@sync_to_async
+def create_run(bot: LivekitVoice):
     # get latest messages for context
     saved_msgs = bot.convo.last_n_msgs()
 
