@@ -378,13 +378,15 @@ def create_new_run(
 
     # get saved state from db
     state = page.current_sr_to_session_state()
-    # extract variables
-    variables = request_body.pop("variables", None)
+    state["variables"] = state.get("variables") or {}
+
+    # merge variables: request overwrites, preserve existing; handle missing/null safely
+    request_vars = request_body.pop("variables", None)
+    if request_vars:
+        state["variables"].update(request_vars)
+
     # merge request data
     state.update(request_body)
-    # merge variables
-    if variables:
-        state.setdefault("variables", {}).update(variables)
 
     # set streamlit session state
     gui.set_session_state(state)

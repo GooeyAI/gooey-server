@@ -521,7 +521,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # construct the system prompt
         bot_script = (request.bot_script or "").strip()
         if bot_script:
-            variables = gui.session_state.get("variables", {})
+            variables = gui.session_state.get("variables") or {}
             for tool_name in tools_by_name:
                 variables.pop(tool_name, None)
             bot_script = render_prompt_vars(

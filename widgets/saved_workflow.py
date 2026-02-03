@@ -215,7 +215,7 @@ def render_footer_breadcrumbs(
     hide_version_notes: bool,
     hide_last_editor: bool,
 ):
-    latest_version = published_run.versions.latest()
+    latest_version = published_run.versions.order_by("-created_at").first()
 
     with (
         gui.styled(FOOTER_CSS),
