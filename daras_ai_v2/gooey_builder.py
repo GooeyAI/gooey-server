@@ -86,7 +86,8 @@ def render_gooey_builder(
             sr = page.create_and_validate_new_run(
                 enable_rate_limits=True, run_status=None
             )
-            raise gui.RedirectException(sr.get_app_url())
+            if sr:
+                raise gui.RedirectException(sr.get_app_url())
 
         render_gooey_builder_inline(
             sidebar_key=sidebar_key,
