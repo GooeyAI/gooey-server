@@ -3060,14 +3060,14 @@ types-protobuf = ">=3"
 
 [[package]]
 name = "livekit-agents"
-version = "1.4.0rc1"
+version = "1.3.12"
 description = "A powerful framework for building realtime voice AI agents"
 optional = false
 python-versions = "<3.14,>=3.9"
 groups = ["main"]
 files = [
-    {file = "livekit_agents-1.4.0rc1-py3-none-any.whl", hash = "sha256:4462c220fa66b0ae7ab45da1764cf433ae0319e46d1a2e7590436e5c037a5324"},
-    {file = "livekit_agents-1.4.0rc1.tar.gz", hash = "sha256:077b4d59338db9cf051f19e4639dcad717983354c56880c2e925456fffd1cead"},
+    {file = "livekit_agents-1.3.12-py3-none-any.whl", hash = "sha256:351fdb4cd0612215ab9a1458054cf6f4040f9a145b46e7407d1611e2b5b5dccc"},
+    {file = "livekit_agents-1.3.12.tar.gz", hash = "sha256:68bf78089661c23894ebcea27c1191f032aba167393f2d1ec1c8e5e1d0707d89"},
 ]
 
 [package.dependencies]
@@ -3079,16 +3079,16 @@ click = ">=8.1,<9.0"
 colorama = ">=0.4.6"
 docstring-parser = ">=0.16"
 eval-type-backport = "*"
-livekit = ">=1.0.23,<2"
+livekit = "1.0.23"
 livekit-api = ">=1.0.7,<2"
 livekit-blingfire = ">=1.0,<2.0"
-livekit-plugins-anthropic = {version = ">=1.4.0.rc1", optional = true, markers = "extra == \"anthropic\""}
-livekit-plugins-google = {version = ">=1.4.0.rc1", optional = true, markers = "extra == \"google\""}
-livekit-plugins-groq = {version = ">=1.4.0.rc1", optional = true, markers = "extra == \"groq\""}
-livekit-plugins-mistralai = {version = ">=1.4.0.rc1", optional = true, markers = "extra == \"mistralai\""}
-livekit-plugins-openai = {version = ">=1.4.0.rc1", optional = true, markers = "extra == \"openai\""}
-livekit-plugins-silero = {version = ">=1.4.0.rc1", optional = true, markers = "extra == \"silero\""}
-livekit-plugins-turn-detector = {version = ">=1.4.0.rc1", optional = true, markers = "extra == \"turn-detector\""}
+livekit-plugins-anthropic = {version = ">=1.3.12", optional = true, markers = "extra == \"anthropic\""}
+livekit-plugins-google = {version = ">=1.3.12", optional = true, markers = "extra == \"google\""}
+livekit-plugins-groq = {version = ">=1.3.12", optional = true, markers = "extra == \"groq\""}
+livekit-plugins-mistralai = {version = ">=1.3.12", optional = true, markers = "extra == \"mistralai\""}
+livekit-plugins-openai = {version = ">=1.3.12", optional = true, markers = "extra == \"openai\""}
+livekit-plugins-silero = {version = ">=1.3.12", optional = true, markers = "extra == \"silero\""}
+livekit-plugins-turn-detector = {version = ">=1.3.12", optional = true, markers = "extra == \"turn-detector\""}
 livekit-protocol = ">=1.1,<2"
 nest-asyncio = ">=1.6.0"
 numpy = ">=1.26.0"
@@ -3109,54 +3109,54 @@ typing-extensions = ">=4.12"
 watchfiles = ">=1.0"
 
 [package.extras]
-anam = ["livekit-plugins-anam (>=1.4.0.rc1)"]
-anthropic = ["livekit-plugins-anthropic (>=1.4.0.rc1)"]
-assemblyai = ["livekit-plugins-assemblyai (>=1.4.0.rc1)"]
-aws = ["livekit-plugins-aws (>=1.4.0.rc1)"]
-azure = ["livekit-plugins-azure (>=1.4.0.rc1)"]
-baseten = ["livekit-plugins-baseten (>=1.4.0.rc1)"]
-bey = ["livekit-plugins-bey (>=1.4.0.rc1)"]
-bithuman = ["livekit-plugins-bithuman (>=1.4.0.rc1)"]
-cartesia = ["livekit-plugins-cartesia (>=1.4.0.rc1)"]
-clova = ["livekit-plugins-clova (>=1.4.0.rc1)"]
+anam = ["livekit-plugins-anam (>=1.3.12)"]
+anthropic = ["livekit-plugins-anthropic (>=1.3.12)"]
+assemblyai = ["livekit-plugins-assemblyai (>=1.3.12)"]
+aws = ["livekit-plugins-aws (>=1.3.12)"]
+azure = ["livekit-plugins-azure (>=1.3.12)"]
+baseten = ["livekit-plugins-baseten (>=1.3.12)"]
+bey = ["livekit-plugins-bey (>=1.3.12)"]
+bithuman = ["livekit-plugins-bithuman (>=1.3.12)"]
+cartesia = ["livekit-plugins-cartesia (>=1.3.12)"]
+clova = ["livekit-plugins-clova (>=1.3.12)"]
 codecs = ["numpy (>=1.26.0)"]
-deepgram = ["livekit-plugins-deepgram (>=1.4.0.rc1)"]
-elevenlabs = ["livekit-plugins-elevenlabs (>=1.4.0.rc1)"]
-fal = ["livekit-plugins-fal (>=1.4.0.rc1)"]
-fireworksai = ["livekit-plugins-fireworksai (>=1.4.0.rc1)"]
+deepgram = ["livekit-plugins-deepgram (>=1.3.12)"]
+elevenlabs = ["livekit-plugins-elevenlabs (>=1.3.12)"]
+fal = ["livekit-plugins-fal (>=1.3.12)"]
+fireworksai = ["livekit-plugins-fireworksai (>=1.3.12)"]
 fishaudio = ["livekit-plugins-fishaudio (>=1.2.17) ; python_version >= \"3.10\""]
-gladia = ["livekit-plugins-gladia (>=1.4.0.rc1)"]
-google = ["livekit-plugins-google (>=1.4.0.rc1)"]
-gradium = ["livekit-plugins-gradium (>=1.4.0.rc1)"]
-groq = ["livekit-plugins-groq (>=1.4.0.rc1)"]
-hedra = ["livekit-plugins-hedra (>=1.4.0.rc1)"]
-hume = ["livekit-plugins-hume (>=1.4.0.rc1)"]
+gladia = ["livekit-plugins-gladia (>=1.3.12)"]
+google = ["livekit-plugins-google (>=1.3.12)"]
+gradium = ["livekit-plugins-gradium (>=1.3.12)"]
+groq = ["livekit-plugins-groq (>=1.3.12)"]
+hedra = ["livekit-plugins-hedra (>=1.3.12)"]
+hume = ["livekit-plugins-hume (>=1.3.12)"]
 images = ["pillow (>=10.3.0)"]
-inworld = ["livekit-plugins-inworld (>=1.4.0.rc1)"]
-langchain = ["livekit-plugins-langchain (>=1.4.0.rc1)"]
-lmnt = ["livekit-plugins-lmnt (>=1.4.0.rc1)"]
+inworld = ["livekit-plugins-inworld (>=1.3.12)"]
+langchain = ["livekit-plugins-langchain (>=1.3.12)"]
+lmnt = ["livekit-plugins-lmnt (>=1.3.12)"]
 mcp = ["mcp (>=1.10.0,<2) ; python_version >= \"3.10\""]
 minimax = ["livekit-plugins-minimax-ai (>=1.2.15)"]
-mistralai = ["livekit-plugins-mistralai (>=1.4.0.rc1)"]
-neuphonic = ["livekit-plugins-neuphonic (>=1.4.0.rc1)"]
-nltk = ["livekit-plugins-nltk (>=1.4.0.rc1)"]
-nvidia = ["livekit-plugins-nvidia (>=1.4.0.rc1)"]
-openai = ["livekit-plugins-openai (>=1.4.0.rc1)"]
-resemble = ["livekit-plugins-resemble (>=1.4.0.rc1)"]
-rime = ["livekit-plugins-rime (>=1.4.0.rc1)"]
-sarvam = ["livekit-plugins-sarvam (>=1.4.0.rc1)"]
-silero = ["livekit-plugins-silero (>=1.4.0.rc1)"]
-simli = ["livekit-plugins-simli (>=1.4.0.rc1)"]
-smallestai = ["livekit-plugins-smallestai (>=1.4.0.rc1)"]
-soniox = ["livekit-plugins-soniox (>=1.4.0.rc1)"]
-speechify = ["livekit-plugins-speechify (>=1.4.0.rc1)"]
-speechmatics = ["livekit-plugins-speechmatics (>=1.4.0.rc1)"]
-spitch = ["livekit-plugins-spitch (>=1.4.0.rc1)"]
-tavus = ["livekit-plugins-tavus (>=1.4.0.rc1)"]
-turn-detector = ["livekit-plugins-turn-detector (>=1.4.0.rc1)"]
-ultravox = ["livekit-plugins-ultravox (>=1.4.0.rc1)"]
-upliftai = ["livekit-plugins-upliftai (>=1.4.0.rc1)"]
-xai = ["livekit-plugins-xai (>=1.4.0.rc1)"]
+mistralai = ["livekit-plugins-mistralai (>=1.3.12)"]
+neuphonic = ["livekit-plugins-neuphonic (>=1.3.12)"]
+nltk = ["livekit-plugins-nltk (>=1.3.12)"]
+nvidia = ["livekit-plugins-nvidia (>=1.3.12)"]
+openai = ["livekit-plugins-openai (>=1.3.12)"]
+resemble = ["livekit-plugins-resemble (>=1.3.12)"]
+rime = ["livekit-plugins-rime (>=1.3.12)"]
+sarvam = ["livekit-plugins-sarvam (>=1.3.12)"]
+silero = ["livekit-plugins-silero (>=1.3.12)"]
+simli = ["livekit-plugins-simli (>=1.3.12)"]
+smallestai = ["livekit-plugins-smallestai (>=1.3.12)"]
+soniox = ["livekit-plugins-soniox (>=1.3.12)"]
+speechify = ["livekit-plugins-speechify (>=1.3.12)"]
+speechmatics = ["livekit-plugins-speechmatics (>=1.3.12)"]
+spitch = ["livekit-plugins-spitch (>=1.3.12)"]
+tavus = ["livekit-plugins-tavus (>=1.3.12)"]
+turn-detector = ["livekit-plugins-turn-detector (>=1.3.12)"]
+ultravox = ["livekit-plugins-ultravox (>=1.3.12)"]
+upliftai = ["livekit-plugins-upliftai (>=1.3.12)"]
+xai = ["livekit-plugins-xai (>=1.3.12)"]
 
 [[package]]
 name = "livekit-api"
@@ -3214,20 +3214,20 @@ files = [
 
 [[package]]
 name = "livekit-plugins-anthropic"
-version = "1.4.0rc1"
+version = "1.3.12"
 description = "Agent Framework plugin for services from Anthropic"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_anthropic-1.4.0rc1-py3-none-any.whl", hash = "sha256:ee65afc864013f10c65f5d20eb932f2e7dd8c52dec87fe41d35e58d992e6ee36"},
-    {file = "livekit_plugins_anthropic-1.4.0rc1.tar.gz", hash = "sha256:844906010e1030a43fe9cfa8fd84185464769ea6ed4be7d78144c01cb44e3093"},
+    {file = "livekit_plugins_anthropic-1.3.12-py3-none-any.whl", hash = "sha256:ee4998b1f058e277eb7789d8c83d22b6c50fe791f3bfb4e326e2a2d725e078c2"},
+    {file = "livekit_plugins_anthropic-1.3.12.tar.gz", hash = "sha256:169cfd52d86bee7bae0a1be5cfa13cfc1e60fcbeafedb0bc7f21bbc9b5bed52f"},
 ]
 
 [package.dependencies]
 anthropic = ">=0.41"
 httpx = "*"
-livekit-agents = ">=1.4.0.rc1"
+livekit-agents = ">=1.3.12"
 
 [[package]]
 name = "livekit-plugins-google"
@@ -3250,36 +3250,35 @@ livekit-agents = ">=1.3.6"
 
 [[package]]
 name = "livekit-plugins-groq"
-version = "1.4.0rc1"
+version = "1.3.12"
 description = "Groq inference plugin for LiveKit Agents"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_groq-1.4.0rc1-py3-none-any.whl", hash = "sha256:64435419869e35c237bee170701df925d4df84c448f3e30dcef366ca8972fef1"},
-    {file = "livekit_plugins_groq-1.4.0rc1.tar.gz", hash = "sha256:15bd18e21135153752c0d0a6a8ee486d67f3cb0c2a93fd830e3e31b722cd4556"},
+    {file = "livekit_plugins_groq-1.3.12-py3-none-any.whl", hash = "sha256:24891515e2f2910810907cb571dd9cfeff1edeb046ea4f0302ad50579b4c7f3d"},
+    {file = "livekit_plugins_groq-1.3.12.tar.gz", hash = "sha256:8996b74d44cb0d8fe64ab29342a1edf05f37141a4b324ea875acf884ddeaaad8"},
 ]
 
 [package.dependencies]
 aiohttp = "*"
 livekit = "*"
-livekit-agents = {version = ">=1.4.0.rc1", extras = ["codecs", "openai"]}
+livekit-agents = {version = ">=1.3.12", extras = ["codecs", "openai"]}
 
 [[package]]
 name = "livekit-plugins-mistralai"
-version = "1.4.0rc1"
+version = "1.3.12"
 description = "LiveKit Agents Plugin for services from AWS"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_mistralai-1.4.0rc1-py3-none-any.whl", hash = "sha256:98efc286831ace9bbff134daa265d9d667ac6fc628f9e82c759c83e2c3ecf47b"},
-    {file = "livekit_plugins_mistralai-1.4.0rc1.tar.gz", hash = "sha256:46c36f418a09e0c410611a1f506eae198bba44eac3d018135ecc2b48368069cf"},
+    {file = "livekit_plugins_mistralai-1.3.12-py3-none-any.whl", hash = "sha256:61730d50c95a809d86493de8ec52b199ef774e3043e2c71b0f486e3658d2435e"},
+    {file = "livekit_plugins_mistralai-1.3.12.tar.gz", hash = "sha256:4f0aa5f827745f81937f351773e63d74c151e7bed5ce7f9b1e6088c6d953057f"},
 ]
 
 [package.dependencies]
-livekit-agents = ">=1.4.0.rc1"
-livekit-plugins-openai = ">=1.2.5"
+livekit-agents = ">=1.3.12"
 mistralai = ">=1.9.11"
 
 [[package]]
@@ -3302,18 +3301,18 @@ livekit = ">=0.21.3"
 
 [[package]]
 name = "livekit-plugins-openai"
-version = "1.4.0rc1"
+version = "1.3.12"
 description = "Agent Framework plugin for services from OpenAI"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_openai-1.4.0rc1-py3-none-any.whl", hash = "sha256:b6cedaa4f7f40bf7565fbba9dc98e0ab55100bb4dbc29380243150f3cde9d231"},
-    {file = "livekit_plugins_openai-1.4.0rc1.tar.gz", hash = "sha256:9faf307bd7e1d97d157e668769cc1cab1b224860e82ced90df63392f5af6cb5f"},
+    {file = "livekit_plugins_openai-1.3.12-py3-none-any.whl", hash = "sha256:aec1f370fd635a2f9b4074805f0875a8903e266ba7db21c7e1077ae7fb675432"},
+    {file = "livekit_plugins_openai-1.3.12.tar.gz", hash = "sha256:0c3a64cf89ef6abfa3c4c42046c3b76f622e38116f148c90b5b2074aa95191b7"},
 ]
 
 [package.dependencies]
-livekit-agents = {version = ">=1.4.0.rc1", extras = ["codecs", "images"]}
+livekit-agents = {version = ">=1.3.12", extras = ["codecs", "images"]}
 openai = {version = ">=1.107.2", extras = ["realtime"]}
 
 [package.extras]
@@ -3321,36 +3320,36 @@ vertex = ["google-auth (>=2.0.0)"]
 
 [[package]]
 name = "livekit-plugins-silero"
-version = "1.4.0rc1"
+version = "1.3.12"
 description = "Agent Framework Plugin for Silero"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_silero-1.4.0rc1-py3-none-any.whl", hash = "sha256:5bbb165473cd67d4f35c025e03b96d6a48946c7b5d3f15dc4fadcb6142919b38"},
-    {file = "livekit_plugins_silero-1.4.0rc1.tar.gz", hash = "sha256:8473e85c62dace4057b5723c66596d4454e118488908d8025bfd8e033f61d57d"},
+    {file = "livekit_plugins_silero-1.3.12-py3-none-any.whl", hash = "sha256:98acc0acbaa02229d79724d4b2ab6aeb67e1576666b7551c8e861ac6e89ab4ae"},
+    {file = "livekit_plugins_silero-1.3.12.tar.gz", hash = "sha256:04be84a604dff365ac16c087b51fb5bf02f700aa31b4fdbfb7e135a1c9c3736d"},
 ]
 
 [package.dependencies]
-livekit-agents = ">=1.4.0.rc1"
+livekit-agents = ">=1.3.12"
 numpy = ">=1.26"
 onnxruntime = ">=1.18,<=1.23.1"
 
 [[package]]
 name = "livekit-plugins-turn-detector"
-version = "1.4.0rc1"
+version = "1.3.12"
 description = "End of utterance detection for LiveKit Agents"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_plugins_turn_detector-1.4.0rc1-py3-none-any.whl", hash = "sha256:a200b6c3f7dc5d093445b99aea6b144d4534c072da8ad237499745615aa5f6c1"},
-    {file = "livekit_plugins_turn_detector-1.4.0rc1.tar.gz", hash = "sha256:6dd9bd35270e8ff667044df05d12693b9dedb2dafac88a37f1e4bb57f89f4b51"},
+    {file = "livekit_plugins_turn_detector-1.3.12-py3-none-any.whl", hash = "sha256:0e96580794e51ecae0df476a5b15e19a6ee0bbea89670b7d483b37995ec89d1f"},
+    {file = "livekit_plugins_turn_detector-1.3.12.tar.gz", hash = "sha256:e60fe16caf32efaf81c656e1b9fd10f1bd6409183218c14cf2bbf1bf093688f7"},
 ]
 
 [package.dependencies]
 jinja2 = "*"
-livekit-agents = ">=1.4.0.rc1"
+livekit-agents = ">=1.3.12"
 numpy = ">=1.26"
 onnxruntime = ">=1.18"
 transformers = ">=4.47.1,<=4.57.1"
@@ -8023,4 +8022,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "3d762b331a1c994a0e2055b1bd54659ea66c2284aee6e54d88430ea1772e8d93"
+content-hash = "a32a3b5ab457760008866b5bc49e63c7147a6a8d7f04808be6a995d531fc3d44"
