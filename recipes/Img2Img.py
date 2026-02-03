@@ -245,15 +245,17 @@ class Img2ImgPage(BasePage):
             case Img2ImgModels.flux_pro_kontext.name:
                 unit_price = 10
             case Img2ImgModels.gpt_image_1.name | Img2ImgModels.gpt_image_1_5.name:
-                unit_price = 45
-            case Img2ImgModels.nano_banana.name:
-                unit_price = 8
-            case Img2ImgModels.nano_banana_pro.name:
-                match state.get("nano_banana_pro_resolution"):
-                    case "4K":
-                        unit_price = 40
+                match state.get("gpt_image_1_quality"):
+                    case "low":
+                        unit_price = 26
+                    case "medium":
+                        unit_price = 30
                     case _:
-                        unit_price = 20
+                        unit_price = 40
+            case Img2ImgModels.nano_banana.name:
+                unit_price = 26
+            case Img2ImgModels.nano_banana_pro.name:
+                unit_price = 30
             case _:
                 unit_price = 5
 
