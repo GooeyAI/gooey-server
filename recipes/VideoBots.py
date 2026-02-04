@@ -1384,14 +1384,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         )
         if bot_integration:
             bot_branding = bot_integration.get_web_widget_branding()
-            if self.current_pr.photo_url:
-                bot_branding["photoUrl"] = self.current_pr.photo_url
         else:
             bot_branding = dict(
                 name=self.current_pr.title,
-                photoUrl=self.current_pr.photo_url,
                 title=self.current_pr.title,
             )
+        if self.current_pr.photo_url:
+            bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
         gui.html(
             # language=html
