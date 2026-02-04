@@ -1430,8 +1430,10 @@ if (script) script.onload = loadGooeyEmbed;
 loadGooeyEmbed();
 window.addEventListener("hydrated", loadGooeyEmbed);
 
+// once the widget is already mounted, update the messages and branding to latest
 if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
     GooeyEmbed.controller.setMessages?.(messages);
+    GooeyEmbed.controller.updateConfig?.({ branding: config.branding });
 }
             """,
             config=dict(
