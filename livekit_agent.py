@@ -543,12 +543,6 @@ class LivekitVoice(BotInterface):
 
         self._input_text = input_text
 
-        call_sid = data["sip.twilio.callSid"]
-        account_sid = data["sip.twilio.accountSid"]
-        if account_sid == settings.TWILIO_ACCOUNT_SID:
-            account_sid = ""
-        # print(f"{user_number=} {bot_number=} {call_sid=} {account_sid=}")
-
         bi = self.lookup_bot_integration(
             bot_lookup=dict(twilio_phone_number=self.bot_id),
             user_lookup=dict(twilio_phone_number=self.user_id),
@@ -557,7 +551,11 @@ class LivekitVoice(BotInterface):
             self.convo = Conversation.objects.get_or_create(
                 bot_integration=bi,
                 twilio_phone_number=self.user_id,
-                twilio_call_sid=call_sid,
+                twilio_call_sid=(
+                    data.get("sip.twilio.callSid")
+                    or data.get("sip.callIDFull")
+                    or str(uuid.uuid1())
+                ),
             )[0]
         else:
             self.convo = Conversation.objects.get_or_create(
