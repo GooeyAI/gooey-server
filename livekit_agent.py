@@ -118,13 +118,13 @@ async def entrypoint(ctx: agents.JobContext):
     prev_session = None
     hold_player = None
 
-    for i in range(MAX_TRIES):
-        if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
-            return
+    async def try_main(step):
+        nonlocal prev_convo, prev_session, hold_player
+
+        input_text = "/extension " + "".join(dtmf_digits)
+        dtmf_digits.clear()
 
         try:
-            input_text = "/extension " + "".join(dtmf_digits)
-            dtmf_digits.clear()
             bot = await create_livekit_voice_bot(
                 data=participant.attributes, input_text=input_text
             )
@@ -138,24 +138,43 @@ async def entrypoint(ctx: agents.JobContext):
             if not hold_player:
                 hold_player = await start_hold_music(ctx, dtmf_session)
             dtmf_digits.clear()
-            await dtmf_session.say(text=e.message, allow_interruptions=(i == 0))
+            await dtmf_session.say(text=e.message, allow_interruptions=(step == 0))
+            return False
         except UserError as e:
             await dtmf_session.say(text=e.message, allow_interruptions=False)
             raise
-        else:
-            # if the extension number has changed, create a new run and close the previous session
-            if not prev_convo or prev_convo != bot.convo:
-                if prev_session:
-                    await prev_session.aclose()
-                page, sr, request, agent, bi = await create_run(bot)
-                if i > 0:
-                    new_bot_name = bi.name or "the agent"
-                    await dtmf_session.say(text=f"Connecting you to {new_bot_name}")
-                if hold_player:
-                    await hold_player.aclose()
-                    hold_player = None
-                prev_session = await main(ctx, page, sr, request, agent, bi)
-                prev_convo = bot.convo
+
+        # if the extension number hasn't changed, don't do anything
+        if prev_session and prev_convo and prev_convo == bot.convo:
+            return True
+
+        if prev_session:
+            await prev_session.aclose()
+            prev_session = None
+
+        page, sr, request, agent, bi = await create_run(bot)
+        prev_convo = bot.convo
+
+        if step > 0:
+            new_bot_name = bi.name or "the agent"
+            await dtmf_session.say(text=f"Connecting you to {new_bot_name}")
+        if hold_player:
+            await hold_player.aclose()
+            hold_player = None
+
+        prev_session = await main(ctx, page, sr, request, agent, bi)
+        return True
+
+    for i in range(MAX_TRIES):
+        if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
+            return
+
+        success = await try_main(i)
+
+        if success:
+            # if the session is running, wait indefinitely for user input
+            if await dtmf_queue.get() is None:
+                return  # user hung up
 
         await wait_for_extension_code(dtmf_queue, dtmf_digits)
 
@@ -182,7 +201,6 @@ async def start_dtmf_session(ctx: agents.JobContext):
             return
         dtmf_digits.append(dtmf.digit)
         await dtmf_queue.put(dtmf.digit)
-        await dtmf_session.interrupt()
 
     return dtmf_queue, dtmf_digits, dtmf_session
 
@@ -195,29 +213,19 @@ async def start_hold_music(ctx: agents.JobContext, session: AgentSession):
     return wait_audio
 
 
-async def wait_for_extension_code(
-    dtmf_queue: asyncio.Queue,
-    dtmf_digits: deque,
-    fast_timeout: float = 1,
-    slow_timeout: float = 10,
-):
-    # wait for first user input
-    await dtmf_queue.get()
-    # wait fast for pre-filled dtmf code
+async def wait_for_extension_code(dtmf_queue: asyncio.Queue, dtmf_digits: deque):
     while True:
+        if len(dtmf_digits) < EXTENSION_NUMBER_LENGTH:
+            # wait slowly for the full extension number
+            timeout = DTMF_TIMEOUT
+        else:
+            # drain the queue once we have the full extension number
+            timeout = 1
         try:
-            await asyncio.wait_for(dtmf_queue.get(), timeout=fast_timeout)
+            if await asyncio.wait_for(dtmf_queue.get(), timeout=timeout) is None:
+                return  # user hung up
         except asyncio.TimeoutError:
             break
-    # wait slowly in case the user is entering the dtmf code manually
-    while len(dtmf_digits) < EXTENSION_NUMBER_LENGTH:
-        try:
-            await asyncio.wait_for(dtmf_queue.get(), timeout=slow_timeout)
-        except asyncio.TimeoutError:
-            break
-    # drain the queue
-    while not dtmf_queue.empty():
-        await dtmf_queue.get()
 
 
 def asyncio_create_task(fn):
@@ -261,8 +269,9 @@ async def main(
 
     @session.on("close")
     @session.on("conversation_item_added")
-    def on_step(event: ConversationItemAddedEvent | CloseEvent):
-        save_on_step(sr, llm_model, session, event)
+    @asyncio_create_task
+    async def on_step(event: ConversationItemAddedEvent | CloseEvent):
+        await save_on_step(sr, llm_model, session, event)
 
     ctx._primary_agent_session = None
     await session.start(room=ctx.room, agent=agent)
@@ -284,7 +293,6 @@ async def main(
     return session
 
 
-@asyncio_create_task
 @sync_to_async
 def save_on_step(
     sr: SavedRun,
