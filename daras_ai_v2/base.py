@@ -1596,7 +1596,7 @@ class BasePage:
         with gui.div(
             className="position-sticky bottom-0 container-margin-reset p-2",
             style=dict(
-                background="rgba(255, 255, 255, 0.7)",
+                background="rgba(249, 249, 249, 0.7)",
                 backdropFilter="blur(7px)",
                 WebkitBackdropFilter="blur(7px)",
                 marginLeft="-0.5rem",
