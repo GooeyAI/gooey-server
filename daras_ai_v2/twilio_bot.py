@@ -92,6 +92,7 @@ class TwilioSMS(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        **kwargs,
     ) -> str | None:
         media = audio or video or documents
         if not (media or text):
@@ -232,6 +233,7 @@ class TwilioVoice(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        **kwargs,
     ) -> str | None:
         assert not documents, "Twilio does not support sending documents via Voice"
         assert not video, "Twilio does not support sending videos via Voice"

@@ -131,6 +131,7 @@ class WhatsappBot(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        **kwargs,
     ) -> str | None:
         return self.send_msg_to(
             bot_number=self.bot_id,
@@ -513,6 +514,7 @@ class FacebookBot(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        **kwargs,
     ) -> str | None:
         text = text or "\u200b"  # handle empty text with zero-width space
         return send_fb_msg(

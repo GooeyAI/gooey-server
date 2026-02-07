@@ -35,7 +35,7 @@ from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
-from recipes.VideoBots import VideoBotsPage, ReplyButton
+from recipes.VideoBots import ReplyButton
 from routers.api import submit_api_call
 from workspaces.models import Workspace
 from number_cycling.models import (
@@ -237,6 +237,7 @@ class BotInterface:
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
         should_translate: bool = False,
+        tool_calls: list[dict] | None = None,
     ) -> str | None:
         """
         Send a message response to the user using the bot's platform API
@@ -266,6 +267,7 @@ class BotInterface:
                 buttons=buttons,
                 documents=documents,
                 update_msg_id=update_msg_id,
+                tool_calls=tool_calls,
             )
             # send feedback buttons as a separate message
             return self._send_msg(
@@ -282,6 +284,7 @@ class BotInterface:
                 buttons=buttons,
                 documents=documents,
                 update_msg_id=update_msg_id,
+                tool_calls=tool_calls,
             )
 
     def _send_msg(
@@ -293,6 +296,7 @@ class BotInterface:
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        **kwargs,
     ) -> str | None:
         raise NotImplementedError
 
@@ -483,6 +487,9 @@ def _process_and_send_msg(
     input_text: str,
     recieved_time: datetime,
 ):
+    from functions.recipe_functions import get_called_functions_items
+    from functions.models import FunctionTrigger
+
     # get latest messages for context
     saved_msgs = bot.convo.last_n_msgs()
 
@@ -554,11 +561,17 @@ def _process_and_send_msg(
                     continue  # no text, wait for the next update
                 streaming_done = state.get("finish_reason")
                 # send the response to the user
+                tool_calls = list(
+                    get_called_functions_items(
+                        saved_run=sr, trigger=FunctionTrigger.prompt
+                    )
+                )
                 if bot.can_update_message:
                     update_msg_id = bot.send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        tool_calls=tool_calls,
                     )
                     last_idx = len(text)
                 else:
@@ -569,6 +582,7 @@ def _process_and_send_msg(
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        tool_calls=tool_calls,
                     )
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
@@ -594,6 +608,12 @@ def _process_and_send_msg(
     audio = state.get("output_audio")
     video = state.get("output_video")
     documents = state.get("output_documents")
+
+    # Extract tool calls using the existing get_called_functions_items function
+    tool_calls = list(
+        get_called_functions_items(saved_run=sr, trigger=FunctionTrigger.prompt)
+    )
+
     # check for empty response
     if not (text or audio or video or documents or send_feedback_buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
@@ -610,6 +630,7 @@ def _process_and_send_msg(
             documents=documents or None,
             send_feedback_buttons=send_feedback_buttons,
             update_msg_id=update_msg_id,
+            tool_calls=tool_calls,
         )
 
     # save msgs to db

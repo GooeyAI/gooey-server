@@ -33,12 +33,14 @@ class BaseLLMTool:
         label: str,
         description: str,
         properties: dict,
+        icon: str | None = None,
         required: list[str] | None = None,
         await_audio_completed: bool = False,
     ):
         self.name = name
         self.label = label
         self.properties = properties
+        self.icon = icon
 
         self.spec_parameters = {
             "type": "object",
@@ -107,6 +109,7 @@ class WorkflowLLMTool(BaseLLMTool):
             label=self.fn_pr.title or name,
             description=self.fn_pr.notes,
             properties=properties,
+            icon=(self.fn_pr.photo_url or None),
         )
 
     def bind(
@@ -414,7 +417,7 @@ def functions_input(
 
 
 def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
-    items = _get_called_functions_items(saved_run=saved_run, trigger=trigger)
+    items = get_called_functions_items(saved_run=saved_run, trigger=trigger)
     if not items:
         return
     for item in items:
@@ -437,21 +440,16 @@ def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
                 gui.json(item["return_value"])
 
 
-def render_called_functions_as_html(
-    *, saved_run: SavedRun, trigger: FunctionTrigger
-) -> str:
+def render_called_functions_as_html(called_functions: list[dict]) -> str:
     """Return HTML for functions called for a given run and trigger using a template."""
-    context_items = list(
-        _get_called_functions_items(saved_run=saved_run, trigger=trigger)
-    )
-    if not context_items:
+    if not called_functions:
         return ""
-    context = {"called_functions": context_items}
+    context = {"called_functions": called_functions}
     template = templates.get_template("functions/called_functions.html")
     return template.render(context)
 
 
-def _get_called_functions_items(
+def get_called_functions_items(
     *, saved_run: SavedRun, trigger: FunctionTrigger
 ) -> typing.Iterable[dict]:
     """Generate data for called functions for reuse across renderers."""
@@ -468,6 +466,20 @@ def _get_called_functions_items(
 
         pr = fn_sr.parent_published_run()
         title = pr and pr.title or "Function"
+
+        # Get icon: published_run.photo_url or workflow emoji fallback
+        icon = None
+        if pr and pr.photo_url:
+            icon = pr.photo_url
+        else:
+            # Fallback to workflow emoji
+            from bots.models import WorkflowMetadata
+
+            try:
+                workflow_meta = WorkflowMetadata.objects.get(workflow=fn_sr.workflow)
+                icon = workflow_meta.emoji or None
+            except WorkflowMetadata.DoesNotExist:
+                icon = None
 
         if fn_sr.workflow == Workflow.FUNCTIONS:
             fn_vars = fn_sr.state.get("variables", {})
@@ -488,6 +500,7 @@ def _get_called_functions_items(
             inputs=inputs,
             return_value=return_value,
             is_running=bool(fn_sr.run_status),
+            icon=icon,
         )
 
 
@@ -538,6 +551,7 @@ def _get_external_tool_calls_items(
                 inputs=inputs,
                 return_value=None,
                 is_running=True,
+                icon=None,  # External tools don't have icons
             )
 
     return items_by_id.values()

@@ -112,6 +112,7 @@ from functions.models import FunctionTrigger
 from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
+    get_called_functions_items,
     render_called_functions_as_html,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
@@ -654,7 +655,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         prev_output_text: list[str] | None = None,
         tools_by_name: dict[str, BaseLLMTool] | None = None,
     ) -> typing.Iterator[str | None]:
-        yield f"Summarizing with {model.label}..."
+        yield ""
 
         audio_session_extra = None
         if model.llm_is_audio_model:
@@ -1345,14 +1346,21 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     None,
                     [
                         render_called_functions_as_html(
-                            saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                            get_called_functions_items(
+                                saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                            )
                         ),
                         render_called_functions_as_html(
-                            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
+                            get_called_functions_items(
+                                saved_run=self.current_sr,
+                                trigger=FunctionTrigger.prompt,
+                            )
                         ),
                         text,
                         render_called_functions_as_html(
-                            saved_run=self.current_sr, trigger=FunctionTrigger.post
+                            get_called_functions_items(
+                                saved_run=self.current_sr, trigger=FunctionTrigger.post
+                            )
                         ),
                     ],
                 )
