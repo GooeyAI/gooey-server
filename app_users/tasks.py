@@ -50,6 +50,4 @@ def save_stripe_default_payment_method(
             plan=PricingPlan.STARTER,
             provider=PaymentProvider.STRIPE,
             external_id=None,
-            amount=amount,
-            charged_amount=charged_amount,
         )
