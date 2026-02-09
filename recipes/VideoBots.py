@@ -691,7 +691,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
             tool_calls = choices[0].get("tool_calls")
             output_text = [
-                (prev_text + "\n\n" + entry["content"]).strip()
+                (prev_text + "\n\n" + entry["content"])
                 for prev_text, entry in zip_longest(
                     (prev_output_text or []), choices, fillvalue=""
                 )
@@ -745,6 +745,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
                 response.finish_reason = finish_reason
             else:
                 yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.label}..."
+
+        if response.output_text:
+            response.output_text = [text.strip() for text in response.output_text]
 
         if not tool_calls:
             return
