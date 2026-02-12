@@ -365,8 +365,8 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]
             )
         )
 
-    text = "\n\n".join(
-        s for elem in doc.contents() if isinstance(elem, str) and (s := elem.strip())
+    text = "".join(
+        s for elem in doc.contents() if isinstance(elem, str) and (s := elem)
     )
 
     thinking = "\n\n".join(elem.text for elem in (doc("think") or []) if elem.text)
