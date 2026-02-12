@@ -31,6 +31,7 @@ from openai.types.responses import (
 )
 
 from ai_models.models import AIModelSpec, ModelProvider
+from bots.models import Platform
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import audio_url_to_wav, get_google_auth_session
 from daras_ai_v2.custom_enum import GooeyEnum
@@ -40,6 +41,8 @@ from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
 from functions.recipe_functions import BaseLLMTool
+
+import gooey_gui as gui
 
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "
@@ -169,6 +172,16 @@ def run_language_model(
             raise UserError(f"Model {model} is deprecated.")
         return run_language_model(**(locals() | {"model": model.redirect_to.name}))
 
+    variables = gui.session_state.get("variables", {})
+    if variables and variables.get("platform") == Platform.WEB.name:
+        start_chunk_size = 0
+        stop_chunk_size = 200
+        step_chunk_size = 50
+    else:
+        start_chunk_size = 50
+        stop_chunk_size = 400
+        step_chunk_size = 300
+
     if model.llm_max_output_tokens:
         max_tokens = min(max_tokens, model.llm_max_output_tokens)
     if model.llm_is_chat_model:
@@ -220,6 +233,9 @@ def run_language_model(
             stream=stream and not response_format_type,
             audio_url=audio_url,
             audio_session_extra=audio_session_extra,
+            start_chunk_size=start_chunk_size,
+            stop_chunk_size=stop_chunk_size,
+            step_chunk_size=step_chunk_size,
         )
         if stream:
             return output_stream_generator(result)
@@ -342,6 +358,9 @@ def _run_chat_model(
     stream: bool = False,
     audio_url: str | None = None,
     audio_session_extra: dict | None = None,
+    start_chunk_size: int,
+    stop_chunk_size: int,
+    step_chunk_size: int,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     logger.info(
         f"{model.provider=} {model.model_id=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
@@ -393,6 +412,9 @@ def _run_chat_model(
                 response_format_type=response_format_type,
                 reasoning_effort=reasoning_effort,
                 stream=stream,
+                start_chunk_size=start_chunk_size,
+                stop_chunk_size=stop_chunk_size,
+                step_chunk_size=step_chunk_size,
             )
         case ModelProvider.openai_responses:
             return run_openai_responses(
@@ -404,6 +426,9 @@ def _run_chat_model(
                 response_format_type=response_format_type,
                 reasoning_effort=reasoning_effort,
                 stream=stream,
+                start_chunk_size=start_chunk_size,
+                stop_chunk_size=stop_chunk_size,
+                step_chunk_size=step_chunk_size,
             )
         case ModelProvider.google:
             if tools:
@@ -634,6 +659,9 @@ def run_openai_responses(
     response_format_type: ResponseFormatType | None = None,
     reasoning_effort: ReasoningEffort.api_choices | None = None,
     stream: bool = False,
+    start_chunk_size: int,
+    stop_chunk_size: int,
+    step_chunk_size: int,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
@@ -684,7 +712,14 @@ def run_openai_responses(
             ],
         )
         if isinstance(response, Stream):
-            return _stream_openai_responses(response, used_model, messages)
+            return _stream_openai_responses(
+                response,
+                used_model,
+                messages,
+                start_chunk_size=start_chunk_size,
+                stop_chunk_size=stop_chunk_size,
+                step_chunk_size=step_chunk_size,
+            )
         else:
             ret = []
             if response.output_text:
@@ -713,6 +748,9 @@ def run_openai_chat(
     response_format_type: ResponseFormatType | None = None,
     reasoning_effort: ReasoningEffort.api_choices | None = None,
     stream: bool = False,
+    start_chunk_size: int,
+    stop_chunk_size: int,
+    step_chunk_size: int,
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai import NOT_GIVEN
     from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
@@ -806,7 +844,14 @@ def run_openai_chat(
             ],
         )
         if stream:
-            return _stream_openai_chunked(completion.__stream__(), used_model, messages)
+            return _stream_openai_chunked(
+                completion.__stream__(),
+                used_model,
+                messages,
+                start_chunk_size=start_chunk_size,
+                stop_chunk_size=stop_chunk_size,
+                step_chunk_size=step_chunk_size,
+            )
 
     if not completion or not completion.choices:
         return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
@@ -876,9 +921,9 @@ def _stream_openai_chunked(
     used_model: str,
     messages: list[ConversationEntry],
     *,
-    start_chunk_size: int = 50,
-    stop_chunk_size: int = 400,
-    step_chunk_size: int = 300,
+    start_chunk_size: int,
+    stop_chunk_size: int,
+    step_chunk_size: int,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
     ret = []
     chunk_size = start_chunk_size
@@ -950,9 +995,9 @@ def _stream_openai_responses(
     used_model: str,
     messages: list[ConversationEntry],
     *,
-    start_chunk_size: int = 50,
-    stop_chunk_size: int = 400,
-    step_chunk_size: int = 300,
+    start_chunk_size: int,
+    stop_chunk_size: int,
+    step_chunk_size: int,
 ) -> typing.Generator[list[ConversationEntry], None, None]:
     entry: ConversationEntry = dict(role="assistant", content="", chunk="", metrics={})
     ret = [entry]
