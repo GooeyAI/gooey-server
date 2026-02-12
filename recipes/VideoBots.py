@@ -691,7 +691,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
             tool_calls = choices[0].get("tool_calls")
             output_text = [
-                (prev_text + "\n\n" + entry["content"])
+                "\n\n".join(filter(None, (prev_text, entry.get("content"))))
                 for prev_text, entry in zip_longest(
                     (prev_output_text or []), choices, fillvalue=""
                 )
