@@ -697,9 +697,3 @@ def render_workspace_edit_form(
         key="workspace-banner-url",
         value=workspace.banner_url,
     )
-
-
-def left_and_right(*, className: str = "", **props):
-    className += " d-flex flex-row justify-content-between align-items-center"
-    with gui.div(className=className, **props):
-        return gui.div(), gui.div()

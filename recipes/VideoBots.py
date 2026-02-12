@@ -1183,23 +1183,44 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         return ["input_prompt", "messages"]
 
     def render_run_preview_output(self, state: dict):
+        from daras_ai_v2.bots import parse_bot_html
+
         input_prompt = state.get("input_prompt")
         if input_prompt:
-            gui.write(
-                "**Prompt**\n```properties\n"
-                + truncate_text_words(input_prompt, maxlen=200)
-                + "\n```"
-            )
+            with (
+                gui.div(className="d-flex justify-content-end mb-1"),
+                gui.div(
+                    className="bg-light rounded-3 text-dark p-2",
+                    style=dict(maxWidth="85%"),
+                ),
+            ):
+                gui.write(
+                    truncate_text_words(input_prompt, maxlen=200),
+                    className="container-margin-reset",
+                )
 
-        gui.write("**Response**")
+        with gui.div(
+            className="border border-light rounded-3 p-2",
+            style=dict(maxWidth="85%"),
+        ):
+            output_video = state.get("output_video")
+            if output_video:
+                gui.video(output_video[0], autoplay=True)
 
-        output_video = state.get("output_video")
-        if output_video:
-            gui.video(output_video[0], autoplay=True)
-
-        output_text = state.get("output_text")
-        if output_text:
-            gui.write(output_text[0], line_clamp=5)
+            output_text = state.get("output_text")
+            if output_text:
+                _, text, _, _ = parse_bot_html(output_text[0])
+                with gui.styled("""
+                    & {
+                        max-height: 4.5em; /* ~3 lines with 1.5 line-height */
+                        overflow: hidden;
+                        display: -webkit-box;
+                        -webkit-line-clamp: 3;
+                        -webkit-box-orient: vertical;
+                        line-height: 1.5;
+                    }
+                """):
+                    gui.write(text, className="container-margin-reset")
 
     scroll_into_view = False
 
