@@ -396,7 +396,10 @@ def functions_input(
         with gui.div(className="d-flex align-items-center gap-3 mb-2"):
             gui.write("###### Functions", help=FUNCTIONS_HELP_TEXT)
             gui.session_state[f"--{key}:add"] = gui.button(
-                f"{icons.add} Add", type="tertiary", className="p-1 mb-2"
+                f"{icons.add} Add",
+                type="tertiary",
+                className="p-1 mb-2",
+                key=f"{key}:add",
             )
             gui.div(className="flex-grow-1")
             render_inbuilt_tools_selector()

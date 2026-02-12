@@ -58,7 +58,10 @@ def variables_input(
                     unsafe_allow_html=True,
                 )
                 pressed_add = allow_add and gui.button(
-                    f"{icons.add} Add", type="tertiary", className="p-1 mb-2"
+                    f"{icons.add} Add",
+                    type="tertiary",
+                    className="p-1 mb-2",
+                    key=f"{key}:add",
                 )
 
         list_key = key + ":list"
