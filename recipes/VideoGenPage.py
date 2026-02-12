@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import os
 import tempfile
@@ -176,6 +177,9 @@ class VideoGenPage(BasePage):
         if not output_videos:
             return
 
+        # Get the prompt from the inputs
+        prompt = state.get("inputs", {}).get("prompt", "")
+
         for model_name, video_url in output_videos.items():
             try:
                 model = self.available_models[model_name]
@@ -183,11 +187,19 @@ class VideoGenPage(BasePage):
                 continue
             if not video_url:
                 continue
+
+            # Render video first
             gui.video(
                 video_url,
                 autoplay=True,
                 show_download_button=show_download_button,
                 caption=model.label,
+            )
+
+        if prompt:
+            gui.write(
+                f'<i class="fa-regular fa-lightbulb-on" style="fontSize:16px"></i>&nbsp;{html.escape(prompt)}',
+                unsafe_allow_html=True,
             )
 
     def related_workflows(self) -> list:
