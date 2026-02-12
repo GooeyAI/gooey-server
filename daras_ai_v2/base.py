@@ -419,8 +419,15 @@ class BasePage:
                 with force_active_lg, gui.nav_item(url, active=tab == self.tab):
                     gui.html(tab.title)
 
-            self._render_saved_generated_timestamp()
+            if self.tab in {RecipeTabs.run, RecipeTabs.preview}:
+                self._render_saved_generated_timestamp()
+            elif self.tab in {RecipeTabs.history}:
+                self._render_history_filter_desktop()
+
         with gui.nav_tab_content():
+            # Render mobile history filter for history tab
+            if self.tab == RecipeTabs.history:
+                self._render_history_filter_mobile()
             self.render_selected_tab()
         # rendered at the end to indicate unpublished changes
         with header_placeholder:
@@ -539,17 +546,14 @@ class BasePage:
             gui.html("Unpublished changes")
 
     def _render_saved_generated_timestamp(self):
-        sr, pr = self.current_sr_pr
-        if not (
-            self.tab in {RecipeTabs.run, RecipeTabs.preview}
-            and (
-                self.get_run_state(gui.session_state)
-                in {RecipeRunState.completed, RecipeRunState.failed}
-            )
-        ):
+        if self.get_run_state(gui.session_state) not in {
+            RecipeRunState.completed,
+            RecipeRunState.failed,
+        }:
             # only render for completed/failed runs and on run/preview tab
             return
 
+        sr, pr = self.current_sr_pr
         if pr.saved_run_id == sr.id:
             dt = pr.updated_at
         else:
@@ -596,6 +600,81 @@ class BasePage:
                 gui.tag("span", className="text-muted d-inline-block"),
             ):
                 gui.html(icons.info)
+
+    def _render_history_filter_content(self):
+        """Common logic for rendering history filter - returns filter data or None if not applicable"""
+        if (
+            not self.request.user
+            or self.request.user.is_anonymous
+            or self.current_workspace.is_personal
+        ):
+            return None
+
+        # Get current filter parameter
+        for_param = self.request.query_params.get("for", "me")
+        show_all_history = for_param == "all"
+
+        # Get icons
+        user_photo = self.request.user.get_photo()
+        user_icon = f'<img src="{user_photo}" style="width: 20px; height: 20px; border-radius: 50%;" />'
+        workspace_icon = self.current_workspace.html_icon(size="20px")
+
+        # Render the filter buttons
+        with (
+            gui.styled("""
+              & .btn-outline-dark:hover { color: white !important; }
+            """),
+            gui.div(className="btn-group", role="group"),
+        ):
+            btn_class = "btn btn-sm btn-outline-dark"
+
+            # "Just mine" link
+            for_me_url = self.current_app_url(
+                tab=RecipeTabs.history,
+                query_params=self.request.query_params | {"for": "me"},
+            )
+            with gui.link(
+                to=for_me_url,
+                className=btn_class + (" active" if not show_all_history else ""),
+            ):
+                gui.html(f"{user_icon} Just mine")
+
+            # "All {workspace}" link
+            for_all_url = self.current_app_url(
+                tab=RecipeTabs.history,
+                query_params=self.request.query_params | {"for": "all"},
+            )
+            with gui.link(
+                to=for_all_url,
+                className=btn_class + (" active" if show_all_history else ""),
+            ):
+                gui.html(f"All {workspace_icon}")
+
+    def _render_history_filter_desktop(self):
+        """Desktop history filter - absolute positioned on the right (lg+ only)"""
+        with gui.div(
+            className="container-margin-reset d-none d-lg-block",
+            style={
+                "position": "absolute",
+                "top": "50%",
+                "right": "0",
+                "transform": "translateY(-50%)",
+                "fontSize": "smaller",
+                "fontWeight": "normal",
+            },
+        ):
+            self._render_history_filter_content()
+
+    def _render_history_filter_mobile(self):
+        """Mobile history filter - below nav tabs (lg and below)"""
+        with gui.div(
+            className="d-block d-lg-none mb-2",
+            style={
+                "fontSize": "smaller",
+                "fontWeight": "normal",
+            },
+        ):
+            self._render_history_filter_content()
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
@@ -2279,10 +2358,16 @@ class BasePage:
     def _history_tab(self):
         self.ensure_authentication(anon_ok=True)
 
+        # Filter by workspace
         qs = SavedRun.objects.filter(
-            workflow=self.workflow,
-            workspace=self.current_workspace,
+            workflow=self.workflow, workspace=self.current_workspace
         )
+
+        # Apply user filter if specified
+        for_param = self.request.query_params.get("for", "all")
+        if for_param == "me" and self.request.user:
+            qs = qs.filter(uid=self.request.user.uid)
+
         run_history, cursor = paginate_queryset(
             qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
         )
