@@ -650,6 +650,8 @@ class BasePage:
             ):
                 gui.html(f"All {workspace_icon}")
 
+        return show_all_history
+
     def _render_history_filter_desktop(self):
         """Desktop history filter - absolute positioned on the right (lg+ only)"""
         with gui.div(
@@ -2364,8 +2366,12 @@ class BasePage:
         )
 
         # Apply user filter if specified
-        for_param = self.request.query_params.get("for", "all")
-        if for_param == "me" and self.request.user:
+        for_param = self.request.query_params.get("for", "me")
+        if (
+            for_param != "all"
+            and self.request.user
+            and not self.current_workspace.is_personal
+        ):
             qs = qs.filter(uid=self.request.user.uid)
 
         run_history, cursor = paginate_queryset(
@@ -2393,13 +2399,17 @@ class BasePage:
         return str(furl(get_route_path(login), query_params=dict(next=next_url)))
 
     def _render_run_preview(self, saved_run: SavedRun):
+        from daras_ai_v2.billing import left_and_right
+
         published_run: PublishedRun | None = (
             saved_run.parent_version.published_run if saved_run.parent_version else None
         )
         is_latest_version = published_run and published_run.saved_run == saved_run
         tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
 
-        with gui.link(to=saved_run.get_app_url()):
+        with gui.link(
+            to=saved_run.get_app_url(), className="text-decoration-none text-reset"
+        ):
             with gui.div(className="mb-1", style={"fontSize": "0.9rem"}):
                 if is_latest_version:
                     gui.pill(
@@ -2409,21 +2419,30 @@ class BasePage:
                     )
             gui.write(f"#### {tb.title_with_prefix()}")
 
-        updated_at = saved_run.updated_at
-        if (
-            updated_at
-            and isinstance(updated_at, datetime.datetime)
-            and not saved_run.run_status
-        ):
-            gui.caption("Loading...", **render_local_dt_attrs(updated_at))
+            author, _ = AppUser.objects.get_or_create_from_uid(saved_run.uid)
+            updated_at = saved_run.updated_at
+            left, right = left_and_right(className="container-margin-reset")
+            with left:
+                render_author_from_user(author)
+            with right:
+                if (
+                    updated_at
+                    and isinstance(updated_at, datetime.datetime)
+                    and not saved_run.run_status
+                ):
+                    gui.caption(
+                        f"{icons.time} {get_relative_time(updated_at)}",
+                        unsafe_allow_html=True,
+                    )
 
-        if saved_run.run_status:
-            started_at_text(saved_run.created_at)
-            html_spinner(saved_run.run_status)
-        elif saved_run.error_msg:
-            gui.error(saved_run.error_msg, unsafe_allow_html=True)
-
-        return self.render_run_preview_output(saved_run.to_dict())
+            with gui.div(className="mt-2"):
+                if saved_run.run_status:
+                    started_at_text(saved_run.created_at)
+                    html_spinner(saved_run.run_status)
+                elif saved_run.error_msg:
+                    gui.error(saved_run.error_msg, unsafe_allow_html=True)
+                else:
+                    self.render_run_preview_output(saved_run.to_dict())
 
     def render_run_preview_output(self, state: dict):
         pass
