@@ -168,10 +168,12 @@ class VideoGenPage(BasePage):
             gui.session_state["audio_inputs"] = None
 
     def render_output(self):
-        self.render_run_preview_output(gui.session_state, show_download_button=True)
+        self.render_run_preview_output(
+            gui.session_state, show_download_button=True, show_prompt=False
+        )
 
     def render_run_preview_output(
-        self, state: dict, show_download_button: bool = False
+        self, state: dict, show_download_button: bool = False, show_prompt: bool = True
     ):
         output_videos = state.get("output_videos", {})
         if not output_videos:
@@ -193,10 +195,10 @@ class VideoGenPage(BasePage):
                 video_url,
                 autoplay=True,
                 show_download_button=show_download_button,
-                caption=model.label,
             )
+            gui.caption(model.label)
 
-        if prompt:
+        if show_prompt and prompt:
             gui.write(
                 f'<i class="fa-regular fa-lightbulb-on" style="fontSize:16px"></i>&nbsp;{html.escape(prompt)}',
                 unsafe_allow_html=True,
