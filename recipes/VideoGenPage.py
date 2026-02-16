@@ -200,7 +200,7 @@ class VideoGenPage(BasePage):
 
         if show_prompt and prompt:
             gui.write(
-                f'<i class="fa-regular fa-lightbulb-on" style="fontSize:16px"></i>&nbsp;{html.escape(prompt)}',
+                f'<i class="fa-regular fa-lightbulb-on" style="fontSize: 0.8rem; vertical-align: 0.05rem"></i>&nbsp;{html.escape(prompt)}',
                 unsafe_allow_html=True,
             )
 
