@@ -148,7 +148,7 @@ class Subscription(models.Model):
     def cancel(self):
         from payments.webhooks import set_workspace_subscription
 
-        if not self.is_paid():
+        if not (self.payment_provider and self.is_paid()):
             return
 
         match self.payment_provider:
