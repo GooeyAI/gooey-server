@@ -425,7 +425,7 @@ class BasePage:
 
             if self.tab in {RecipeTabs.run, RecipeTabs.preview}:
                 self._render_saved_generated_timestamp()
-            elif self.tab in {RecipeTabs.history}:
+            elif self.tab == RecipeTabs.history and self.is_logged_in():
                 render_history_filter_desktop(
                     self.request,
                     self.current_workspace,
@@ -434,7 +434,7 @@ class BasePage:
 
         with gui.nav_tab_content():
             # Render mobile history filter for history tab
-            if self.tab == RecipeTabs.history:
+            if self.tab == RecipeTabs.history and self.is_logged_in():
                 render_history_filter_mobile(
                     self.request,
                     self.current_workspace,
