@@ -39,7 +39,7 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
     update_gui_state_params = variables.get("update_gui_state_params")
     if update_gui_state_params:
         yield UpdateGuiStateLLMTool(
-            state=update_gui_state_params.get("state"),
+            builder_state=update_gui_state_params.get("state"),
             page_slug=update_gui_state_params.get("page_slug"),
         )
         yield RunJS()
@@ -128,18 +128,16 @@ You should build well-written queries, including keywords as well as the context
 
 
 class UpdateGuiStateLLMTool(BaseLLMTool):
-    def __init__(self, state, page_slug):
+    def __init__(self, builder_state: dict, page_slug: str):
         from daras_ai_v2.all_pages import normalize_slug, page_slug_map
 
-        self.state = state or {}
         try:
             page_cls = page_slug_map[normalize_slug(page_slug)]
         except KeyError:
-            request = self.state.get("request", self.state)
+            request = builder_state.get("request", builder_state)
             properties = dict(generate_tool_properties(request, {}))
         else:
-            schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
-            properties = schema["properties"]
+            properties = page_cls.get_update_gui_state_schema(builder_state)
 
         properties["-submit-workflow"] = {
             "type": "boolean",

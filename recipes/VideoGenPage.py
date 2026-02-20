@@ -31,6 +31,9 @@ from usage_costs.models import ModelSku
 from widgets.switch_with_section import switch_with_section
 
 
+SKIP_AUDIO_INPUT_FIELDS = ["video_url", "duration"]
+
+
 class VideoGenPage(BasePage):
     title = Workflow.VIDEO_GEN.label
     workflow = Workflow.VIDEO_GEN
@@ -244,6 +247,27 @@ class VideoGenPage(BasePage):
     def generate_audio_settings(self):
         render_audio_gen_form(self.available_audio_models)
 
+    @classmethod
+    def get_update_gui_state_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
+        properties = super().get_update_gui_state_schema(builder_state)
+        request = builder_state.get("request", builder_state)
+
+        selected_models = request.get("selected_models") or []
+        video_models = AIModelSpec.objects.filter(name__in=selected_models)
+        if inputs_schema := build_combined_input_schema(video_models):
+            properties["inputs"] = inputs_schema
+
+        selected_audio_model = request.get("selected_audio_model")
+        if selected_audio_model:
+            audio_models = AIModelSpec.objects.filter(name=selected_audio_model)
+            if audio_inputs_schema := build_combined_input_schema(
+                audio_models,
+                skip_fields=SKIP_AUDIO_INPUT_FIELDS,
+            ):
+                properties["audio_inputs"] = audio_inputs_schema
+
+        return properties
+
 
 def generate_video(
     model: AIModelSpec,
@@ -364,7 +388,7 @@ def render_audio_gen_form(available_audio_models: dict[str, AIModelSpec]):
             key="audio_inputs",
             available_models=available_audio_models,
             selected_models=[selected_audio_model],
-            skip_fields=["video_url", "duration"],
+            skip_fields=SKIP_AUDIO_INPUT_FIELDS,
         )
 
 
@@ -378,34 +402,23 @@ def render_fields(
         filter(None, (available_models.get(name) for name in selected_models))
     )
     if not models:
-        return {}
+        return
 
     try:
-        model_input_schemas = [
-            schema
-            for model in models
-            if (schema := extract_openapi_schema(model.schema, "request"))
-        ]
+        input_schema = build_combined_input_schema(models, skip_fields=skip_fields)
     except Exception as e:
         gui.error(f"Error getting input fields: {e}")
-        return {}
+        return
+    if not input_schema:
+        return
 
-    common_fields = set.intersection(
-        *(set(schema.get("properties", {})) for schema in model_input_schemas)
-    )
-
-    schema = model_input_schemas[0]
-    required_fields = set(schema.get("required", []))
-    ordered_fields = schema.get("x-fal-order-properties") or list(common_fields)
-    ordered_fields.sort(key=lambda x: x not in required_fields)
+    required_fields = set(input_schema.get("required", []))
+    ordered_fields = list(input_schema["properties"])
     old_inputs = gui.session_state.get(key) or {}
     new_inputs = {}
 
     for name in ordered_fields:
-        if name not in common_fields or name in skip_fields:
-            continue
-
-        field = model_input_schemas[0]["properties"][name]
+        field = input_schema["properties"][name]
         label = field.get("title") or name.title()
         if name in required_fields:
             label = "##### " + label
@@ -416,6 +429,41 @@ def render_fields(
         )
 
     gui.session_state[key] = new_inputs
+
+
+def build_combined_input_schema(
+    models: list[AIModelSpec], skip_fields: typing.Iterable[str] = ()
+) -> dict[str, typing.Any] | None:
+    model_input_schemas = [
+        schema
+        for model in models
+        if (schema := extract_openapi_schema(model.schema, "request"))
+    ]
+    if not model_input_schemas:
+        return None
+
+    common_fields = set.intersection(
+        *(set(schema.get("properties", {})) for schema in model_input_schemas)
+    )
+
+    schema = model_input_schemas[0]
+    required_fields = set(schema.get("required", []))
+    ordered_fields = schema.get("x-fal-order-properties") or list(common_fields)
+    ordered_fields.sort(key=lambda x: x not in required_fields)
+
+    properties = {}
+    required = []
+    for name in ordered_fields:
+        if name not in common_fields or name in skip_fields:
+            continue
+        properties[name] = schema["properties"][name]
+        if name in required_fields:
+            required.append(name)
+
+    ret = {"type": "object", "properties": properties}
+    if required:
+        ret["required"] = required
+    return ret
 
 
 def render_field(*, field: dict, name: str, label: str, value: typing.Any):

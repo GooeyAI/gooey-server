@@ -2518,6 +2518,12 @@ class BasePage:
         return []
 
     @classmethod
+    def get_update_gui_state_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
+        """Return top-level request properties for the builder's update_gui_state tool."""
+        schema = cls.RequestModel.model_json_schema(ref_template="{model}")
+        return schema["properties"]
+
+    @classmethod
     def get_example_request(
         cls,
         state: dict,
