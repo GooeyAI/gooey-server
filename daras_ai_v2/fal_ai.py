@@ -1,8 +1,10 @@
 import json
+import time
 import typing
 
 import requests
 from furl import furl
+from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
@@ -22,6 +24,7 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
     )
 
     max_retries = 3
+    retry_delay = 1.0
     for attempt in range(max_retries):
         try:
             for event_data in stream_sse_json(
@@ -40,6 +43,10 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
         except requests.exceptions.ChunkedEncodingError:
             if attempt >= max_retries - 1:
                 raise
+            logger.warning(
+                f"ChunkedEncodingError: [{attempt + 1}/{max_retries}] retrying in {retry_delay} seconds"
+            )
+            time.sleep(retry_delay)
 
 
 def stream_sse_json(response: requests.Response) -> typing.Iterator[dict]:
