@@ -25,6 +25,9 @@ from daras_ai_v2.variables_widget import render_prompt_vars
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
 
+if typing.TYPE_CHECKING:
+    import pandas as pd
+
 NROWS_CACHE_KEY = "__nrows"
 
 AggFunctionsList = [
@@ -179,6 +182,8 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
         )
 
         selected_model: str = "gpt_4_turbo"
+
+        array_columns: list[str] | None = Field(None)
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -352,13 +357,13 @@ def submit(
         response.final_prompts.append([])
         response.aggregations.append([])
         df = read_df_any(doc)
-        out_df_recs = []
-        for current_rec in df.to_dict(orient="records"):
-            out_df_recs.append(current_rec)
-            for ep_ix, ep in enumerate(request.eval_prompts):
+        for out_df_recs, current_rec, prompt_columns in iter_eval_groups(
+            df, request.array_columns
+        ):
+            for ep in request.eval_prompts:
                 prompt = render_prompt_vars(
                     ep["prompt"],
-                    gui.session_state | {"columns": current_rec},
+                    gui.session_state | {"columns": prompt_columns},
                 )
                 response.final_prompts[doc_ix].append(prompt)
                 futs.append(
@@ -376,6 +381,38 @@ def submit(
                     ),
                 )
     return futs
+
+
+def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
+    out_df_recs = []
+    prev_group_ix = None
+    prompt_columns = {}
+
+    for ix, row in enumerate(df.to_dict(orient="records")):
+        out_df_recs.append(row)
+        if not array_columns:
+            yield out_df_recs, row, row.copy()
+        else:
+            # start new group if any non-array columns are present
+            start_new_group = any(
+                str(row.get(col) or "").strip()
+                for col in df.columns
+                if col not in array_columns
+            )
+
+            if start_new_group:
+                if prev_group_ix is not None:
+                    yield out_df_recs, out_df_recs[prev_group_ix], prompt_columns
+                prev_group_ix = ix
+                prompt_columns = row.copy()
+                for col in array_columns:
+                    prompt_columns[col] = []
+
+            for col in array_columns:
+                val = row.get(col)
+                prompt_columns[col].append(val)
+    if prev_group_ix:
+        yield out_df_recs, out_df_recs[prev_group_ix], prompt_columns
 
 
 def _run_language_model(model: str, prompt: str, result: TaskResult):

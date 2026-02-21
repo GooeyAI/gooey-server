@@ -285,6 +285,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         import pandas as pd
 
         response.output_documents = []
+        array_columns = set()
 
         for doc_ix, doc in enumerate(request.documents):
             df = read_df_any(doc)
@@ -305,7 +306,7 @@ To understand what each field represents, check out our [API docs](https://api.g
 
                 used_col_names = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
-                    df, request, df_ix, arr_len
+                    df, request, df_ix, arr_len, array_columns
                 ):
                     progress = round(
                         (slice_ix + url_ix)
@@ -349,8 +350,10 @@ To understand what each field represents, check out our [API docs](https://api.g
                                         out_recs[rec_ix + arr_ix][f"{col}.{key}"] = str(
                                             val
                                         )
+                                        array_columns.add(f"{col}.{key}")
                                 else:
                                     out_recs[rec_ix + arr_ix][col] = str(item)
+                                    array_columns.add(col)
                         elif isinstance(out_val, dict):
                             for key, val in out_val.items():
                                 if isinstance(val, list):
@@ -381,7 +384,8 @@ To understand what each field represents, check out our [API docs](https://api.g
             page_cls, sr, pr = url_to_runs(url)
             yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).title_with_prefix()}..."
             request_body = page_cls.RequestModel(
-                documents=response.output_documents
+                documents=response.output_documents,
+                array_columns=array_columns or None,
             ).model_dump(exclude_unset=True)
             result, sr = sr.submit_api_call(
                 workspace=self.current_workspace,
@@ -490,7 +494,7 @@ To get started:
         )
 
 
-def build_requests_for_df(df, request, df_ix, arr_len):
+def build_requests_for_df(df, request, df_ix, arr_len, array_columns):
     for url_ix, url in enumerate(request.run_urls):
         page_cls, sr, pr = url_to_runs(url)
         schema = page_cls.RequestModel.model_json_schema()
@@ -498,9 +502,12 @@ def build_requests_for_df(df, request, df_ix, arr_len):
 
         request_body = {}
         for field, col in request.input_columns.items():
+            if col not in df.columns:
+                continue
             parts = field.split(".")
             field_props = properties.get(parts[0]) or properties.get(field)
             if is_arr(field_props):
+                array_columns.add(col)
                 arr = request_body.setdefault(parts[0], [])
                 for arr_ix in range(arr_len):
                     value = df.at[df_ix + arr_ix, col]
@@ -538,6 +545,8 @@ def slice_request_df(df, request):
         properties = schema["properties"]
 
         for field, col in request.input_columns.items():
+            if col not in df.columns:
+                continue
             if is_arr(properties.get(field.split(".")[0])):
                 arr_cols.add(col)
             else:
