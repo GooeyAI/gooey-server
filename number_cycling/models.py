@@ -10,13 +10,26 @@ from bots.models.bot_integration import (
 
 
 class SharedPhoneNumberQuerySet(models.QuerySet):
-    def any_active_number(self, platform: Platform) -> SharedPhoneNumber:
-        obj = self.filter(platform=platform.value, is_active=True).order_by("?").first()
+    def any_active_number(
+        self, platform: Platform, country_code: str = ""
+    ) -> SharedPhoneNumber:
+        qs = self.filter(platform=platform.value, is_active=True)
+        if country_code:
+            qs = qs.filter(country_code=country_code)
+        obj = qs.order_by("?").first()
         if not obj:
             raise SharedPhoneNumber.DoesNotExist(
                 f"Sorry, {platform.label} phone numbers are currently unavailable to assign. Please contact us or try again later."
             )
         return obj
+
+    def available_country_codes(self, platform: Platform) -> list[str]:
+        return list(
+            self.filter(platform=platform.value, is_active=True)
+            .exclude(country_code="")
+            .values_list("country_code", flat=True)
+            .distinct()
+        )
 
 
 class SharedPhoneNumber(models.Model):
@@ -53,6 +66,13 @@ class SharedPhoneNumber(models.Model):
         help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming (only for display)",
     )
 
+    country_code = models.CharField(
+        max_length=2,
+        blank=True,
+        default="",
+        help_text="ISO 3166-1 alpha-2 country code (e.g. 'US', 'IN')",
+    )
+
     is_active = models.BooleanField(
         default=True, help_text="Whether this phone number is available for assignment"
     )
@@ -72,7 +92,7 @@ class SharedPhoneNumber(models.Model):
         get_latest_by = "updated_at"
         indexes = [
             models.Index(fields=["-updated_at"]),
-            models.Index(fields=["platform", "is_active"]),
+            models.Index(fields=["platform", "is_active", "country_code"]),
         ]
 
     def __str__(self) -> str:

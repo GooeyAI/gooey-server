@@ -16,8 +16,8 @@ class SharedPhoneNumberAdmin(admin.ModelAdmin):
         "twilio_phone_number_sid",
         "notes",
     ]
-    list_display = ["__str__", "platform", "updated_at"]
-    list_filter = ["platform"]
+    list_display = ["__str__", "platform", "country_code", "is_active", "updated_at"]
+    list_filter = ["platform", "is_active", "country_code"]
     readonly_fields = [
         "view_users",
         "view_bots",
