@@ -1869,33 +1869,52 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
     ):
         from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
         from routers.facebook_api import wa_connect_url
+        from recipes.QRCodeGenerator import generate_qr_code
 
-        gui.markdown("#### Configure your Copilot")
-        gui.newline()
+        with gui.div(className="w-100 text-start"):
+            col1, col2 = gui.columns(2)
 
-        if len(integrations) > 1:
-            with gui.div(
-                style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}
-            ):
-                integrations_map = {i.id: i for i in integrations}
-                bi_id = gui.selectbox(
-                    label="",
-                    options=integrations_map.keys(),
-                    format_func=lambda bi_id: f"{Platform(integrations_map[bi_id].platform).get_icon()} &nbsp; {integrations_map[bi_id].name}",
-                    key="bi_id",
-                )
-                bi = integrations_map[bi_id]
-                old_bi_id = gui.session_state.get("old_bi_id", bi_id)
-                if bi_id != old_bi_id:
-                    raise gui.RedirectException(
-                        self.current_app_url(
-                            RecipeTabs.integrations,
-                            path_params=dict(integration_id=bi.api_integration_id()),
-                        )
+        with col1:
+            gui.markdown("#### Configure your Copilot")
+            gui.newline()
+
+            if len(integrations) > 1:
+                with gui.div(
+                    style={"width": "100%", "maxWidth": "500px", "textAlign": "left"}
+                ):
+                    integrations_map = {i.id: i for i in integrations}
+                    bi_id = gui.selectbox(
+                        label="",
+                        options=integrations_map.keys(),
+                        format_func=lambda bi_id: f"{Platform(integrations_map[bi_id].platform).get_icon()} &nbsp; {integrations_map[bi_id].name}",
+                        key="bi_id",
                     )
-                gui.session_state["old_bi_id"] = bi_id
-        else:
-            bi = integrations[0]
+                    bi = integrations_map[bi_id]
+                    old_bi_id = gui.session_state.get("old_bi_id", bi_id)
+                    if bi_id != old_bi_id:
+                        raise gui.RedirectException(
+                            self.current_app_url(
+                                RecipeTabs.integrations,
+                                path_params=dict(
+                                    integration_id=bi.api_integration_id()
+                                ),
+                            )
+                        )
+                    gui.session_state["old_bi_id"] = bi_id
+            else:
+                bi = integrations[0]
+
+        with col2:
+            test_link = bi.get_bot_test_link()
+            if bi.demo_qr_code_image:
+                img_src = bi.demo_qr_code_image
+            elif test_link:
+                img_src = generate_qr_code(test_link)
+            else:
+                img_src = None
+
+            if img_src is not None:
+                gui.image(img_src, style={"maxWidth": "125px", "maxHeight": "125px"})
 
         if bi.platform == Platform.WEB:
             web_widget_config(
@@ -1908,7 +1927,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
 
         icon = Platform(bi.platform).get_icon()
         with gui.div(className="w-100 text-start"):
-            test_link = bi.get_bot_test_link()
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 if bi.extension_number:
