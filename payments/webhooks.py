@@ -1,11 +1,13 @@
 from copy import copy
+from decimal import Decimal
 
+import sentry_sdk
 import stripe
 from django.db import transaction
 from loguru import logger
 
 from app_users.models import PaymentProvider, TransactionReason
-from daras_ai_v2 import paypal
+from daras_ai_v2 import paypal, settings
 from workspaces.models import Workspace
 from .models import Subscription
 from .plans import PricingPlan
@@ -95,9 +97,14 @@ class StripeWebhookHandler:
 
         kwargs = {}
         if invoice.subscription and invoice.subscription_details:
-            kwargs["plan"] = PricingPlan.get_by_key(
-                invoice.subscription_details.metadata.get("subscription_key")
-            ).db_value
+            try:
+                kwargs["plan"] = PricingPlan.get_by_key(
+                    invoice.subscription_details.metadata.get(
+                        settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD
+                    )
+                ).db_value
+            except KeyError as e:
+                sentry_sdk.capture_exception(e)
             match invoice.billing_reason:
                 case "subscription_create":
                     reason = TransactionReason.SUBSCRIPTION_CREATE
@@ -165,12 +172,16 @@ class StripeWebhookHandler:
             f"Stripe subscription {stripe_sub.id} is missing product"
         )
 
-        product = stripe.Product.retrieve(stripe_sub.plan.product)
-        plan = PricingPlan.get_by_stripe_product(product)
-        if not plan:
-            raise Exception(
-                f"PricingPlan not found for product {stripe_sub.plan.product}"
+        try:
+            plan = PricingPlan.get_by_key(
+                stripe_sub.metadata[settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD]
             )
+        except KeyError:
+            product = stripe.Product.retrieve(
+                stripe_sub.plan.product, expand=["default_price"]
+            )
+            plan = PricingPlan.get_by_stripe_product(product)
+            assert plan is not None, f"Plan for product {product.id} not found"
 
         if stripe_sub.status.lower() != "active":
             logger.info(
@@ -178,11 +189,16 @@ class StripeWebhookHandler:
             )
             return
 
+        amount = int(stripe_sub.quantity)
+        charged_amount = round(Decimal(stripe_sub.plan.amount_decimal) * amount)
+
         set_workspace_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             workspace=workspace,
             external_id=stripe_sub.id,
+            amount=amount,
+            charged_amount=charged_amount,
         )
 
     @classmethod
@@ -251,8 +267,8 @@ def set_workspace_subscription(
     plan: PricingPlan,
     provider: PaymentProvider | None,
     external_id: str | None,
-    amount: int | None = None,
-    charged_amount: int | None = None,
+    amount: int = 0,
+    charged_amount: int = 0,
     cancel_old: bool = True,
 ) -> Subscription:
     with transaction.atomic():
@@ -264,9 +280,11 @@ def set_workspace_subscription(
             new_sub = Subscription()
 
         new_sub.plan = plan.db_value
+        new_sub.amount = amount
+        new_sub.charged_amount = charged_amount
         new_sub.payment_provider = provider
         new_sub.external_id = external_id
-        new_sub.full_clean(amount=amount, charged_amount=charged_amount)
+        new_sub.full_clean()
         new_sub.save()
 
         if not old_sub:
