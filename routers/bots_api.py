@@ -31,6 +31,22 @@ api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT)
 MSG_ID_PREFIX = "web-"
 
 
+class ToolCallItem(BaseModel):
+    id: str | int = Field(description="The unique identifier for the tool call")
+    title: str = Field(description="The function name or tool title")
+    url: str = Field(
+        description="URL to the function execution details (empty for external tools)"
+    )
+    inputs: dict = Field(description="The parsed arguments passed to the function")
+    return_value: dict | str | None = Field(
+        description="The return value from the function execution, None if still running"
+    )
+    is_running: bool = Field(description="Whether the tool call is still executing")
+    icon: str | None = Field(
+        description="Icon for the tool call - either an emoji or URL. For gooey workflows, this is published_run.photo_url or workflow emoji fallback"
+    )
+
+
 class CreateStreamRequestBase(BaseModel):
     integration_id: str = Field(
         description="Your Integration ID as shown in the Copilot Deploy tab"
@@ -159,6 +175,10 @@ class MessagePart(BaseModel):
     video: str | None = None
     buttons: list[ReplyButton] | None = None
     documents: list[str] | None = None
+    tool_calls: list[ToolCallItem] | None = Field(
+        None,
+        description="Tool calls made by the assistant. Each item contains id, title (function name), url, inputs, return_value, and is_running status.",
+    )
 
 
 class FinalResponse(AsyncStatusResponseModelV3[VideoBotsPage.ResponseModel]):
@@ -374,6 +394,7 @@ class ApiInterface(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        tool_calls: list[dict] | None = None,
     ) -> str | None:
         response = MessagePart(
             status=self.recipe_run_state,
@@ -383,6 +404,7 @@ class ApiInterface(BotInterface):
             video=video and video[0],
             buttons=buttons,
             documents=documents,
+            tool_calls=tool_calls,
         )
         self.queue.put(response)
         return self.bot_message_id
