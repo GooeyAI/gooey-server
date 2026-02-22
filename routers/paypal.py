@@ -120,11 +120,13 @@ def create_subscription(request: Request, payload: dict = fastapi_request_json):
     workspace = get_current_workspace(request.user, request.session)
 
     lookup_key = SubscriptionPayload.model_validate(payload).lookup_key
-    plan = PricingPlan.get_by_key(lookup_key)
-    if plan is None or not plan.supports_paypal():
-        return JSONResponse(
-            {"error": "Invalid plan key or not supported by PayPal"}, status_code=400
-        )
+    try:
+        plan = PricingPlan.get_by_key(lookup_key)
+    except KeyError:
+        return JSONResponse({"error": "Invalid plan key"}, status_code=400)
+
+    if not plan.supports_paypal():
+        return JSONResponse({"error": "Plan does not support PayPal"}, status_code=400)
 
     if plan.deprecated:
         return JSONResponse({"error": "Deprecated plan"}, status_code=400)
