@@ -1,8 +1,10 @@
 import json
+import time
 import typing
 
 import requests
 from furl import furl
+from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
@@ -21,19 +23,30 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
         furl(result["status_url"]).add(path="stream", query_params=dict(logs="1")).url
     )
 
-    for event_data in stream_sse_json(
-        requests.get(status_url, headers=_fal_auth_headers(), stream=True)
-    ):
-        if event_data["status"] != "COMPLETED":
-            logs = event_data["logs"]
-            if not logs:
-                continue
-            yield "`" + logs[-1]["message"] + "`"
-        else:
-            repsonse_url = event_data["response_url"]
-            r = requests.get(repsonse_url, headers=_fal_auth_headers())
-            raise_for_status(r)
-            return r.json()
+    max_retries = 3
+    retry_delay = 1.0
+    for attempt in range(max_retries):
+        try:
+            for event_data in stream_sse_json(
+                requests.get(status_url, headers=_fal_auth_headers(), stream=True)
+            ):
+                if event_data["status"] != "COMPLETED":
+                    logs = event_data["logs"]
+                    if not logs:
+                        continue
+                    yield "`" + logs[-1]["message"] + "`"
+                else:
+                    response_url = event_data["response_url"]
+                    r = requests.get(response_url, headers=_fal_auth_headers())
+                    raise_for_status(r)
+                    return r.json()
+        except requests.exceptions.ChunkedEncodingError:
+            if attempt >= max_retries - 1:
+                raise
+            logger.warning(
+                f"ChunkedEncodingError: [{attempt + 1}/{max_retries}] retrying in {retry_delay} seconds"
+            )
+            time.sleep(retry_delay)
 
 
 def stream_sse_json(response: requests.Response) -> typing.Iterator[dict]:
