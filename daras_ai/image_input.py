@@ -2,10 +2,8 @@ import math
 import mimetypes
 import os
 import re
-import threading
 import typing
 import uuid
-from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -22,35 +20,6 @@ if typing.TYPE_CHECKING:
     from app_users.models import AppUser
     from workspaces.models import Workspace
     from files.models import UploadedFile
-
-
-_upload_context = threading.local()
-
-
-@contextmanager
-def uploaded_file_context(
-    *,
-    user: typing.Optional["AppUser"] = None,
-    workspace: typing.Optional["Workspace"] = None,
-):
-    prev_user = getattr(_upload_context, "user", None)
-    prev_workspace = getattr(_upload_context, "workspace", None)
-    _upload_context.user = user
-    _upload_context.workspace = workspace
-    try:
-        yield
-    finally:
-        _upload_context.user = prev_user
-        _upload_context.workspace = prev_workspace
-
-
-def get_uploaded_file_context() -> tuple[
-    typing.Optional["AppUser"], typing.Optional["Workspace"]
-]:
-    return (
-        getattr(_upload_context, "user", None),
-        getattr(_upload_context, "workspace", None),
-    )
 
 
 def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
@@ -174,11 +143,6 @@ def register_uploaded_blob(
                 workspace = saved_run.workspace
             if user is None and saved_run.uid:
                 user = AppUser.objects.filter(uid=saved_run.uid).first()
-    if user is None or workspace is None:
-        ctx_user, ctx_workspace = get_uploaded_file_context()
-        user = user or ctx_user
-        workspace = workspace or ctx_workspace
-
     if content_type is None:
         content_type = getattr(blob, "content_type", None)
     if total_bytes is None:

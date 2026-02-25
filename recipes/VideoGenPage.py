@@ -85,6 +85,8 @@ class VideoGenPage(BasePage):
                     audio_inputs=request.audio_inputs,
                     progress_q=progress_q,
                     output_videos=response.output_videos,
+                    user=self.request.user,
+                    workspace=self.current_workspace,
                 )
                 for model in models
             ]
@@ -276,9 +278,12 @@ def generate_video(
     audio_inputs: dict[str, typing.Any] | None,
     progress_q: Queue[tuple[str, str | None]],
     output_videos: dict[str, str],
+    *,
+    user=None,
+    workspace=None,
 ):
     # print(f"{model=} {inputs=} {audio_model=} {audio_inputs=}")
-    gen = generate_on_fal(model.model_id, inputs)
+    gen = generate_on_fal(model.model_id, inputs, user=user, workspace=workspace)
     try:
         while True:
             msg = next(gen)
@@ -299,7 +304,12 @@ def generate_video(
         if audio_model and audio_inputs:
             progress_q.put((model.model_id, f"Generating audio with {audio_model}..."))
             output_videos[model.name] = generate_audio(
-                video_url, inputs, audio_model, audio_inputs
+                video_url,
+                inputs,
+                audio_model,
+                audio_inputs,
+                user=user,
+                workspace=workspace,
             )
     finally:
         progress_q.put((model.model_id, None))
@@ -310,6 +320,9 @@ def generate_audio(
     inputs: dict,
     audio_model: AIModelSpec,
     audio_inputs: dict[str, typing.Any],
+    *,
+    user=None,
+    workspace=None,
 ) -> str:
     duration = float(ffprobe(video_url)["streams"][0]["duration"])
     duration_props = resolve_field_anyof(
@@ -327,7 +340,9 @@ def generate_audio(
     payload = {"video_url": video_url, "duration": duration} | audio_inputs
     if not payload.get("prompt"):
         payload["prompt"] = inputs.get("prompt")
-    res = yield_from(generate_on_fal(audio_model.model_id, payload))
+    res = yield_from(
+        generate_on_fal(audio_model.model_id, payload, user=user, workspace=workspace)
+    )
     record_cost_auto(audio_model.model_id, ModelSku.video_generation, 1)
     res_video = get_url_from_result(res.get("video"))
     res_audio = get_url_from_result(res.get("audio"))

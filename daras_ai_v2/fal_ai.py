@@ -12,8 +12,18 @@ from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+    from workspaces.models import Workspace
 
-def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None, dict]:
+
+def generate_on_fal(
+    model_id: str,
+    payload: dict,
+    *,
+    user: typing.Optional["AppUser"] = None,
+    workspace: typing.Optional["Workspace"] = None,
+) -> typing.Generator[str, None, dict]:
     r = requests.post(
         str(furl("https://queue.fal.run") / model_id),
         headers=_fal_auth_headers(),
@@ -38,7 +48,7 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
             repsonse_url = event_data["response_url"]
             r = requests.get(repsonse_url, headers=_fal_auth_headers())
             raise_for_status(r)
-            return _rewrite_fal_asset_urls(r.json())
+            return _rewrite_fal_asset_urls(r.json(), user=user, workspace=workspace)
 
 
 def stream_sse_json(response: requests.Response) -> typing.Iterator[dict]:
@@ -62,6 +72,8 @@ def _rewrite_fal_asset_urls(
     *,
     parent_key: str | None = None,
     url_cache: dict[str, str] | None = None,
+    user: typing.Optional["AppUser"] = None,
+    workspace: typing.Optional["Workspace"] = None,
 ) -> typing.Any:
     if url_cache is None:
         url_cache = {}
@@ -74,6 +86,8 @@ def _rewrite_fal_asset_urls(
                     child,
                     parent_key=key,
                     url_cache=url_cache,
+                    user=user,
+                    workspace=workspace,
                 )
 
             asset_url = out.get("url")
@@ -84,12 +98,18 @@ def _rewrite_fal_asset_urls(
                     or out.get("filename")
                     or _default_filename_for_fal_asset(parent_key, out),
                     url_cache=url_cache,
+                    user=user,
+                    workspace=workspace,
                 )
             return out
         case list():
             return [
                 _rewrite_fal_asset_urls(
-                    item, parent_key=parent_key, url_cache=url_cache
+                    item,
+                    parent_key=parent_key,
+                    url_cache=url_cache,
+                    user=user,
+                    workspace=workspace,
                 )
                 for item in value
             ]
@@ -118,6 +138,8 @@ def _reupload_fal_asset_url(
     *,
     preferred_filename: str | None,
     url_cache: dict[str, str],
+    user: typing.Optional["AppUser"] = None,
+    workspace: typing.Optional["Workspace"] = None,
 ) -> str:
     cached = url_cache.get(url)
     if cached:
@@ -135,7 +157,13 @@ def _reupload_fal_asset_url(
             filename += ext
 
     try:
-        uploaded_url = upload_file_from_bytes(filename, r.content, content_type)
+        uploaded_url = upload_file_from_bytes(
+            filename,
+            r.content,
+            content_type,
+            user=user,
+            workspace=workspace,
+        )
     except Exception:
         logger.exception("Failed to re-upload FAL asset URL {}", url)
         return url

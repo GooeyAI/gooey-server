@@ -37,7 +37,7 @@ from bots.models import (
     WorkflowAccessLevel,
 )
 from bots.models.published_run import Tag
-from daras_ai.image_input import truncate_text_words, uploaded_file_context
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import exceptions
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -1776,16 +1776,14 @@ class BasePage:
         # initialize request and response
         request = self.RequestModel.model_validate(state)
         response = self.ResponseModel.model_construct()
-        upload_workspace = self.request.user and self.current_workspace
 
         # run the recipe
-        with uploaded_file_context(user=self.request.user, workspace=upload_workspace):
-            try:
-                for val in self.run_v2(request, response):
-                    state.update(response.model_dump(exclude_unset=True))
-                    yield val
-            finally:
+        try:
+            for val in self.run_v2(request, response):
                 state.update(response.model_dump(exclude_unset=True))
+                yield val
+        finally:
+            state.update(response.model_dump(exclude_unset=True))
 
         # validate the response if successful
         self.ResponseModel.model_validate(response)
