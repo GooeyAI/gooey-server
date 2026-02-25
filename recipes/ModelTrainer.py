@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, Workflow
 from daras_ai.image_input import (
+    delete_uploaded_file_for_blob,
     gcs_blob_for,
     upload_gcs_blob_from_bytes,
 )
@@ -308,7 +309,8 @@ def zip_images(input_images: list[str], captions: dict[str, str] | None) -> str:
         upload_gcs_blob_from_bytes(blob, f.getvalue(), "application/zip")
         yield blob.public_url
     finally:
-        blob.delete()
+        if not delete_uploaded_file_for_blob(blob):
+            blob.delete()
 
 
 def render_flux_lora_fast_form(selected_model: str):
