@@ -2,6 +2,8 @@ from django.db import models
 from django.template.defaultfilters import filesizeformat
 from loguru import logger
 
+from bots.custom_fields import CustomURLField
+
 
 class FileMetadata(models.Model):
     name = models.TextField(default="", blank=True)
@@ -36,4 +38,53 @@ class FileMetadata(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["name", "etag", "mime_type", "total_bytes"]),
+        ]
+
+
+class UploadedFile(models.Model):
+    metadata = models.ForeignKey(
+        "files.FileMetadata",
+        on_delete=models.CASCADE,
+        related_name="uploaded_files",
+    )
+    f_url = CustomURLField(unique=True, verbose_name="File URL")
+    bucket_name = models.CharField(max_length=255)
+    object_name = models.TextField()
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.SET_NULL,
+        related_name="uploaded_files",
+        null=True,
+        blank=True,
+    )
+    user = models.ForeignKey(
+        "app_users.AppUser",
+        on_delete=models.SET_NULL,
+        related_name="uploaded_files",
+        null=True,
+        blank=True,
+    )
+    is_user_uploaded = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["workspace", "created_at"],
+                name="files_uploa_workspa_3d4b4a_idx",
+            ),
+            models.Index(
+                fields=["user", "created_at"],
+                name="files_uploa_user_id_7bdbf8_idx",
+            ),
+            models.Index(
+                fields=["created_at"],
+                name="files_uploa_created_5e3e16_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["bucket_name", "object_name"],
+                name="uploadedfile_bucket_object_unique",
+            ),
         ]

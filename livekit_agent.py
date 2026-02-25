@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app_users.models import AppUser
+
 __import__("gooeysite.wsgi")
 
 import asyncio
@@ -45,6 +47,8 @@ from bots.models.saved_run import SavedRun
 from daras_ai.image_input import (
     gcs_blob_for,
     gcs_bucket,
+    delete_uploaded_file_for_blob,
+    delete_uploaded_file_for_gcs_url,
     get_mimetype_from_response,
     upload_gcs_blob_from_bytes,
     upload_file_from_bytes,
@@ -305,7 +309,12 @@ def save_on_step(
         audio_path = session._recorder_io and session._recorder_io.output_path
         if audio_path:
             sr.state["output_audio"] = [
-                upload_file_from_bytes("call_recording.ogg", audio_path.read_bytes())
+                upload_file_from_bytes(
+                    "call_recording.ogg",
+                    audio_path.read_bytes(),
+                    workspace=sr.workspace,
+                    user=AppUser.objects.filter(uid=sr.uid).first(),
+                )
             ]
     else:
         sr.run_status = f"Calling with {llm_model.label}..."
@@ -644,7 +653,8 @@ def asr_step(request: VideoBotsPage.RequestModel, buffer: AudioBuffer) -> str:
             input_prompt=request.asr_prompt,
         )
     finally:
-        blob.delete()
+        if not delete_uploaded_file_for_blob(blob):
+            blob.delete()
 
     request.translation_model = request.translation_model or DEFAULT_TRANSLATION_MODEL
     if (
@@ -771,10 +781,11 @@ def tts_step(
         mime_type = get_mimetype_from_response(r)
     finally:
         if is_user_uploaded_url(audio_url):
-            blob = gcs_bucket().blob(
-                audio_url.split(settings.GS_BUCKET_NAME)[-1].strip("/")
-            )
-            blob.delete()
+            if not delete_uploaded_file_for_gcs_url(audio_url):
+                blob = gcs_bucket().blob(
+                    audio_url.split(settings.GS_BUCKET_NAME)[-1].strip("/")
+                )
+                blob.delete()
     return audio_wav_bytes, mime_type
 
 

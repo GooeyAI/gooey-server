@@ -2,20 +2,55 @@ import math
 import mimetypes
 import os
 import re
+import threading
 import typing
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
 import requests
 from PIL import Image, ImageOps
 from furl import furl
+from loguru import logger
 
 from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.exceptions import UserError
 
 if typing.TYPE_CHECKING:
     from google.cloud.storage import Blob, Bucket
+    from app_users.models import AppUser
+    from workspaces.models import Workspace
+    from files.models import UploadedFile
+
+
+_upload_context = threading.local()
+
+
+@contextmanager
+def uploaded_file_context(
+    *,
+    user: typing.Optional["AppUser"] = None,
+    workspace: typing.Optional["Workspace"] = None,
+):
+    prev_user = getattr(_upload_context, "user", None)
+    prev_workspace = getattr(_upload_context, "workspace", None)
+    _upload_context.user = user
+    _upload_context.workspace = workspace
+    try:
+        yield
+    finally:
+        _upload_context.user = prev_user
+        _upload_context.workspace = prev_workspace
+
+
+def get_uploaded_file_context() -> tuple[
+    typing.Optional["AppUser"], typing.Optional["Workspace"]
+]:
+    return (
+        getattr(_upload_context, "user", None),
+        getattr(_upload_context, "workspace", None),
+    )
 
 
 def resize_img_pad(img_bytes: bytes, size: tuple[int, int]) -> bytes:
@@ -60,9 +95,21 @@ def upload_file_from_bytes(
     filename: str,
     data: bytes,
     content_type: str = None,
+    *,
+    workspace: typing.Optional["Workspace"] = None,
+    user: typing.Optional["AppUser"] = None,
+    is_user_uploaded: bool = False,
 ) -> str:
     blob = gcs_blob_for(filename)
-    upload_gcs_blob_from_bytes(blob, data, content_type)
+    upload_gcs_blob_from_bytes(
+        blob,
+        data,
+        content_type,
+        filename=filename,
+        workspace=workspace,
+        user=user,
+        is_user_uploaded=is_user_uploaded,
+    )
     return blob.public_url
 
 
@@ -79,12 +126,148 @@ def upload_gcs_blob_from_bytes(
     blob: "Blob",
     data: bytes,
     content_type: str = None,
+    *,
+    filename: str | None = None,
+    workspace: typing.Optional["Workspace"] = None,
+    user: typing.Optional["AppUser"] = None,
+    is_user_uploaded: bool = False,
 ) -> str:
     if not content_type:
         content_type = mimetypes.guess_type(blob.path)[0]
     content_type = content_type or "application/octet-stream"
     blob.upload_from_string(data, content_type=content_type)
+    register_uploaded_blob(
+        blob,
+        filename=filename,
+        content_type=content_type,
+        total_bytes=len(data),
+        workspace=workspace,
+        user=user,
+        is_user_uploaded=is_user_uploaded,
+    )
     return blob.public_url
+
+
+def register_uploaded_blob(
+    blob: "Blob",
+    *,
+    filename: str | None = None,
+    content_type: str | None = None,
+    total_bytes: int | None = None,
+    workspace: typing.Optional["Workspace"] = None,
+    user: typing.Optional["AppUser"] = None,
+    is_user_uploaded: bool = False,
+) -> "UploadedFile":
+    from django.db import IntegrityError
+
+    from celeryapp.tasks import get_running_saved_run
+    from app_users.models import AppUser
+    from files.models import FileMetadata, UploadedFile
+
+    if not blob.name or not blob.bucket:
+        raise ValueError("Blob must have bucket and name set before registration.")
+
+    if user is None or workspace is None:
+        saved_run = get_running_saved_run()
+        if saved_run is not None:
+            if workspace is None:
+                workspace = saved_run.workspace
+            if user is None and saved_run.uid:
+                user = AppUser.objects.filter(uid=saved_run.uid).first()
+    if user is None or workspace is None:
+        ctx_user, ctx_workspace = get_uploaded_file_context()
+        user = user or ctx_user
+        workspace = workspace or ctx_workspace
+
+    if content_type is None:
+        content_type = getattr(blob, "content_type", None)
+    if total_bytes is None:
+        total_bytes = getattr(blob, "size", None)
+    etag = getattr(blob, "etag", None)
+
+    if (content_type is None) or (total_bytes is None) or (etag is None):
+        try:
+            blob.reload()
+        except Exception:
+            logger.debug("Failed to reload blob metadata for {}", blob.name)
+        content_type = content_type or getattr(blob, "content_type", None)
+        total_bytes = (
+            total_bytes if total_bytes is not None else getattr(blob, "size", None)
+        )
+        etag = etag or getattr(blob, "etag", None)
+
+    content_type = (
+        content_type or mimetypes.guess_type(blob.name)[0] or "application/octet-stream"
+    )
+    total_bytes = total_bytes or 0
+
+    bucket_name = blob.bucket.name
+    object_name = blob.name
+
+    existing = UploadedFile.objects.filter(
+        bucket_name=bucket_name, object_name=object_name
+    ).first()
+    if existing:
+        return existing
+
+    metadata = FileMetadata.objects.create(
+        name=filename or Path(blob.name).name,
+        etag=etag,
+        mime_type=content_type,
+        total_bytes=total_bytes,
+    )
+    try:
+        return UploadedFile.objects.create(
+            metadata=metadata,
+            f_url=blob.public_url,
+            bucket_name=bucket_name,
+            object_name=object_name,
+            workspace=workspace,
+            user=user,
+            is_user_uploaded=is_user_uploaded,
+        )
+    except IntegrityError:
+        metadata.delete()
+        return UploadedFile.objects.get(
+            bucket_name=bucket_name, object_name=object_name
+        )
+
+
+def get_uploaded_file_for_blob(blob: "Blob") -> typing.Optional["UploadedFile"]:
+    from files.models import UploadedFile
+
+    if not blob.name or not blob.bucket:
+        return None
+    return UploadedFile.objects.filter(
+        bucket_name=blob.bucket.name, object_name=blob.name
+    ).first()
+
+
+def delete_uploaded_file_for_blob(blob: "Blob") -> bool:
+    uploaded = get_uploaded_file_for_blob(blob)
+    if not uploaded:
+        return False
+    uploaded.delete()
+    return True
+
+
+def delete_uploaded_file_for_gcs_url(url: str) -> bool:
+    from files.models import UploadedFile
+
+    segments = [seg for seg in furl(url).path.segments if seg]
+    if not segments:
+        return False
+    bucket_name = segments[0]
+    object_name = "/".join(segments[1:])
+    if not object_name:
+        return False
+    uploaded = UploadedFile.objects.filter(
+        bucket_name=bucket_name, object_name=object_name
+    ).first()
+    if not uploaded:
+        return False
+    uploaded.delete()
+    return True
 
 
 def gcs_bucket() -> "Bucket":

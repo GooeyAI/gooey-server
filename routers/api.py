@@ -188,7 +188,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request_json: str = Form(alias="json"),
     ):
         # parse form data
-        page_request = _parse_form_data(request_model, form_data, page_request_json)
+        page_request = _parse_form_data(
+            request_model,
+            form_data,
+            page_request_json,
+            workspace=api_key.workspace,
+            user=api_key.created_by,
+        )
         # call regular json api
         return run_api_json(request, page_request=page_request, api_key=api_key)
 
@@ -241,7 +247,13 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         page_request_json: str = Form(alias="json"),
     ):
         # parse form data
-        page_request = _parse_form_data(request_model, form_data, page_request_json)
+        page_request = _parse_form_data(
+            request_model,
+            form_data,
+            page_request_json,
+            workspace=api_key.workspace,
+            user=api_key.created_by,
+        )
         # call regular json api
         return run_api_json_async(
             request, response=response, page_request=page_request, api_key=api_key
@@ -296,6 +308,9 @@ def _parse_form_data(
     request_model: typing.Type[BaseModel],
     form_data: FormData,
     page_request_json: str,
+    *,
+    workspace: Workspace | None,
+    user: AppUser | None,
 ):
     # load the json data
     try:
@@ -311,7 +326,13 @@ def _parse_form_data(
         if not (uf_list and isinstance(uf_list[0], UploadFile)):
             continue
         urls = [
-            upload_file_from_bytes(uf.filename, uf.file.read(), uf.content_type)
+            upload_file_from_bytes(
+                uf.filename,
+                uf.file.read(),
+                uf.content_type,
+                workspace=workspace,
+                user=user,
+            )
             for uf in uf_list
         ]
         try:
