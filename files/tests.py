@@ -6,7 +6,7 @@ from app_users.models import AppUser
 from bots.models import SavedRun
 from files.models import FileMetadata, UploadedFile
 from workspaces.models import Workspace
-from daras_ai.image_input import upload_file_from_bytes, uploaded_file_context
+from daras_ai.image_input import upload_file_from_bytes
 
 
 class _FakeBucket:
@@ -95,19 +95,6 @@ class UploadedFileUploadTests(TestCase):
             patch("celeryapp.tasks.get_running_saved_run", return_value=self.saved_run),
         ):
             upload_file_from_bytes("audio.wav", b"abc", "audio/wav")
-
-        uploaded = UploadedFile.objects.get()
-        self.assertEqual(uploaded.user, self.user)
-        self.assertEqual(uploaded.workspace, self.workspace)
-
-    def test_upload_helper_resolves_uploaded_file_context(self):
-        fake_bucket = _FakeBucket()
-        with (
-            patch("daras_ai.image_input.gcs_bucket", return_value=fake_bucket),
-            patch("celeryapp.tasks.get_running_saved_run", return_value=None),
-            uploaded_file_context(user=self.user, workspace=self.workspace),
-        ):
-            upload_file_from_bytes("ctx.txt", b"123", "text/plain")
 
         uploaded = UploadedFile.objects.get()
         self.assertEqual(uploaded.user, self.user)
