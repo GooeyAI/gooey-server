@@ -12,6 +12,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from bots.custom_fields import CustomURLField, StrippedTextField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings
+from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from handles.models import Handle
 from payments.plans import PricingPlan
 
@@ -80,6 +81,29 @@ def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, b
             except auth.UserNotFoundError:
                 pass
             raise
+
+
+def create_anonymous_app_user() -> "AppUser":
+    uid = auth.create_user().uid
+    return AppUser.objects.create(
+        uid=uid,
+        is_anonymous=True,
+        balance=settings.ANON_USER_FREE_CREDITS,
+    )
+
+
+def ensure_request_app_user(request) -> "AppUser":
+    if request.user:
+        return request.user
+
+    user = create_anonymous_app_user()
+    try:
+        request.user = user
+    except AttributeError:
+        # for fastapi Request object, which doesn't allow setting arbitrary attributes
+        pass
+    request.session[ANONYMOUS_USER_COOKIE] = dict(uid=user.uid)
+    return user
 
 
 class PaymentProvider(models.IntegerChoices):

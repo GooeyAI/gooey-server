@@ -20,7 +20,7 @@ from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import FileResponse, PlainTextResponse, Response
 
-from app_users.models import AppUser
+from app_users.models import AppUser, ensure_request_app_user
 from bots.models import BotIntegration, PublishedRun, Workflow
 from bots.models.convo_msg import Conversation, db_msgs_to_api_json
 from daras_ai.image_input import safe_filename, upload_file_from_bytes
@@ -49,7 +49,11 @@ from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
 from widgets.sidebar import sidebar_layout
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
-from workspaces.widgets import global_workspace_selector, workspace_selector_link
+from workspaces.widgets import (
+    global_workspace_selector,
+    set_current_workspace,
+    workspace_selector_link,
+)
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -219,8 +223,9 @@ async def file_upload_meta(body_json: dict = fastapi_request_json):
 
 
 @app.post("/__/file-upload/")
-def file_upload(form_data: FormData = fastapi_request_form):
+def file_upload(request: Request, form_data: FormData = fastapi_request_form):
     from wand.image import Image
+    from workspaces.widgets import SESSION_SELECTED_WORKSPACE
 
     file = form_data["file"]
     data = file.file.read()
@@ -261,7 +266,27 @@ def file_upload(form_data: FormData = fastapi_request_form):
             status_code=400,
         )
 
-    return {"url": upload_file_from_bytes(filename, data, content_type)}
+    user = ensure_request_app_user(request)
+    try:
+        workspace = next(
+            w
+            for w in user.cached_workspaces
+            if w.id == request.session[SESSION_SELECTED_WORKSPACE]
+        )
+    except (KeyError, StopIteration):
+        workspace = user.cached_workspaces[0]
+        set_current_workspace(request.session, int(workspace.id))
+
+    return {
+        "url": upload_file_from_bytes(
+            filename,
+            data,
+            content_type,
+            workspace=workspace,
+            user=user,
+            is_user_uploaded=True,
+        )
+    }
 
 
 @gui.route(app, "/GuiComponents/")

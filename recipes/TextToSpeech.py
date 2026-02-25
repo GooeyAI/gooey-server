@@ -4,10 +4,15 @@ import time
 
 import gooey_gui as gui
 import requests
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from bots.models import Workflow
-from daras_ai.image_input import upload_file_from_bytes, gcs_blob_for
+from daras_ai.image_input import (
+    gcs_blob_for,
+    register_uploaded_blob,
+    upload_file_from_bytes,
+)
 from daras_ai.text_format import unmarkdown
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
@@ -408,6 +413,15 @@ class TextToSpeechPage(BasePage):
                     run_mms_tts.remote(
                         language=language, text=text, upload_url=upload_url
                     )
+
+                try:
+                    register_uploaded_blob(
+                        blob,
+                        filename="mms_tts_gen.wav",
+                        content_type="audio/wav",
+                    )
+                except Exception:
+                    logger.exception("Failed to register MMS TTS upload")
 
                 state["audio_url"] = blob.public_url
 
