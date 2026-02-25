@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 with open("/app/input.json") as f:
-    variables, prefix_url, output_limit = json.load(f)
+    variables, prefix_url, output_limit, GOOEY_MEMORY = json.load(f)
 
 ret = main(**variables)
 
@@ -39,7 +39,9 @@ def json_encoder(obj):
 
 
 with open("/app/return_value.json", "wb") as f:
-    ret_json = json.dumps(ret, default=json_encoder).encode()
+    ret_json = json.dumps(
+        dict(retval=ret, gooey_memory=GOOEY_MEMORY), default=json_encoder
+    ).encode()
     if len(ret_json) > output_limit:
         raise ValueError(
             f"Return value is too large, must be less than {output_limit} bytes."

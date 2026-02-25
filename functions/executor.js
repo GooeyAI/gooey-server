@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  let { tag, code, variables, env } = await req.json();
+  let { tag, code, variables, env, gooey_memory } = await req.json();
   let { mockConsole, logs } = captureConsole(tag);
   let status, response;
 
@@ -17,6 +17,7 @@ Deno.serve(async (req) => {
       console: mockConsole,
       code,
       variables,
+      GOOEY_MEMORY: gooey_memory,
       process: { env },
     });
     if (retval instanceof Function) {
@@ -26,17 +27,17 @@ Deno.serve(async (req) => {
       retval = await retval;
     }
     status = 200;
-    response = { retval };
+    response = { retval, gooey_memory };
   } catch (e) {
     status = 207;
-    response = { error: toString(e), errorType: typeof e };
+    response = { error: toString(e), errorType: typeof e, gooey_memory };
   }
 
   let body = JSON.stringify({ ...response, logs });
   return new Response(body, { status });
 });
 
-function isolatedEval({ console, code, variables, process }) {
+function isolatedEval({ console, code, variables, GOOEY_MEMORY, process }) {
   // Hide global objects
   let Deno, global, self, globalThis, window;
   return eval(code);
