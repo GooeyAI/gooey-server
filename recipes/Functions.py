@@ -5,9 +5,10 @@ import tempfile
 import typing
 from enum import Enum
 
-from furl import furl
 import gooey_gui as gui
 import requests
+from django.utils import timezone
+from furl import furl
 from pydantic import BaseModel, Field
 
 from auth.token_authentication import generate_ephemeral_api_key
@@ -22,9 +23,10 @@ from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.pydantic_validation import PydanticEnumMixin
 from daras_ai_v2.variables_widget import variables_input
-from functions.models import CalledFunction, VariableSchema
+from functions.models import CalledFunction, FunctionScopes, VariableSchema
 from managed_secrets.models import ManagedSecret
 from managed_secrets.widgets import edit_secret_button_with_dialog
+from memory.models import MemoryEntry
 from workspaces.models import Workspace
 
 
@@ -97,6 +99,7 @@ class FunctionsPage(BasePage):
             title="GPU",
             description="GPU to be used for the code execution. Only available for Python.",
         )
+        memory_scope: str | None = Field(None)
 
     class ResponseModel(BaseModel):
         return_value: typing.Any | None = Field(
@@ -137,10 +140,14 @@ class FunctionsPage(BasePage):
         yield "Running your code..."
 
         variables = request.variables or {}
+        gooey_memory_before, memory_user_id = self._load_gooey_memory_for_scope(
+            request.memory_scope
+        )
+        gooey_memory_after = None
 
         match request.language:
             case CodeLanguages.python:
-                execute_python(
+                gooey_memory_after = execute_python(
                     workspace_id=self.current_workspace.id,
                     code=request.code,
                     variables=variables,
@@ -148,15 +155,22 @@ class FunctionsPage(BasePage):
                     response=response,
                     python_requirements=request.python_requirements,
                     gpu=request.gpu,
+                    gooey_memory=gooey_memory_before,
                 )
             case CodeLanguages.javascript:
-                execute_js(
+                gooey_memory_after = execute_js(
                     sr=self.current_sr,
                     code=request.code,
                     variables=variables,
                     env=env,
+                    gooey_memory=gooey_memory_before,
                     response=response,
                 )
+        self._apply_gooey_memory_updates(
+            memory_user_id=memory_user_id,
+            before=gooey_memory_before,
+            after=gooey_memory_after,
+        )
 
     def _load_secret(self, name: str) -> tuple[str, str]:
         try:
@@ -169,6 +183,65 @@ class FunctionsPage(BasePage):
             )
         secret.load_value()
         return secret.name, secret.value
+
+    def _load_gooey_memory_for_scope(
+        self, memory_scope: str | None
+    ) -> tuple[dict[str, typing.Any], str | None]:
+        if not memory_scope:
+            return {}, None
+
+        scope = FunctionScopes.get(memory_scope)
+        if not scope:
+            return {}, None
+
+        try:
+            user_id = FunctionScopes.get_user_id_for_scope(
+                scope=scope,
+                workspace=self.current_workspace,
+                user=self.request.user,
+                published_run=self.current_pr,
+            )
+        except UserError:
+            return {}, None
+
+        if not user_id:
+            return {}, None
+
+        snapshot = {
+            entry.key: entry.value
+            for entry in MemoryEntry.objects.filter(user_id=user_id).only(
+                "key", "value"
+            )
+        }
+        return snapshot, user_id
+
+    def _apply_gooey_memory_updates(
+        self,
+        *,
+        memory_user_id: str | None,
+        before: dict[str, typing.Any] | None,
+        after: dict[str, typing.Any] | None,
+    ) -> None:
+        if (
+            not memory_user_id
+            or not isinstance(after, dict)
+            or not isinstance(before, dict)
+        ):
+            return
+        for op, key in _diff_gooey_memory_keys(before, after):
+            match op:
+                case "delete":
+                    MemoryEntry.objects.filter(user_id=memory_user_id, key=key).delete()
+                case "upsert":
+                    MemoryEntry.objects.update_or_create(
+                        user_id=memory_user_id,
+                        key=key,
+                        defaults=dict(
+                            value=after[key],
+                            saved_run=self.current_sr,
+                            updated_at=timezone.now(),
+                        ),
+                    )
 
     def get_price_roundoff(self, state: dict) -> float:
         if CalledFunction.objects.filter(function_run=self.current_sr).exists():
@@ -287,8 +360,9 @@ def execute_python(
     response: "FunctionsPage.ResponseModel",
     python_requirements: str | None,
     gpu: str | None,
+    gooey_memory: dict[str, typing.Any] | None,
     output_limit: int = 256_000,
-):
+) -> dict[str, typing.Any] | None:
     import modal
 
     executor_code = (settings.BASE_DIR / "functions/executor.py").read_text()
@@ -304,7 +378,7 @@ def execute_python(
 
         input_json_path = os.path.join(tmpdir, "input.json")
         with open(input_json_path, "w") as f:
-            json.dump([variables, prefix_url, output_limit], f)
+            json.dump([variables, prefix_url, output_limit, gooey_memory], f)
 
         code_path = os.path.join(tmpdir, "code.py")
         with open(code_path, "w") as f:
@@ -359,15 +433,19 @@ def execute_python(
         ret_bytes = b"".join(vol.read_file("return_value.json"))
         if len(ret_bytes) > output_limit:  # limit to 256KB
             raise ValueError("Return value is too large, must be less than 256KB.")
-        response.return_value = json.loads(ret_bytes.decode())
+        ret = json.loads(ret_bytes.decode())
     except (FileNotFoundError, json.JSONDecodeError):
-        pass
+        gooey_memory_after = None
+    else:
+        response.return_value = ret["retval"]
+        gooey_memory_after = ret.get("gooey_memory")
 
     sb.terminate()
 
     update_gcs_content_types.delay(
         extract_gcs_urls(response.return_value, prefix_url, {})
     )
+    return gooey_memory_after
 
 
 def extract_gcs_urls(
@@ -400,8 +478,9 @@ def execute_js(
     code: str,
     variables: dict[str, typing.Any],
     env: dict[str, str] | None,
+    gooey_memory: dict[str, typing.Any] | None,
     response: "FunctionsPage.ResponseModel",
-):
+) -> dict[str, typing.Any] | None:
     tag = f"run_id={sr.run_id}&uid={sr.uid}"
 
     # this will run functions/executor.js in deno deploy
@@ -413,6 +492,7 @@ def execute_js(
             variables=variables,
             tag=tag,
             env=env,
+            gooey_memory=gooey_memory,
         ),
     )
     raise_for_status(r)
@@ -420,3 +500,19 @@ def execute_js(
     response.logs = data.get("logs")
     response.return_value = data.get("retval")
     response.error = data.get("error")
+    gooey_memory_after = data.get("gooey_memory")
+    return gooey_memory_after
+
+
+def _diff_gooey_memory_keys(
+    before: dict[str, typing.Any], after: dict[str, typing.Any]
+) -> typing.Iterable[tuple[str, str]]:
+    before_keys = set(before.keys())
+    after_keys = set(after.keys())
+    for key in before_keys - after_keys:
+        yield "delete", key
+    for key in after_keys - before_keys:
+        yield "upsert", key
+    for key in before_keys & after_keys:
+        if before[key] != after[key]:
+            yield "upsert", key

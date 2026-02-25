@@ -156,6 +156,9 @@ class WorkflowLLMTool(BaseLLMTool):
                     | system_vars_schema
                 ),
             )
+            memory_scope = self._get_gooey_memory_tool_scope_name()
+            if memory_scope:
+                request_body["memory_scope"] = memory_scope
         else:
             request_body = kwargs
 
@@ -209,6 +212,28 @@ class WorkflowLLMTool(BaseLLMTool):
             error=fn_sr.state.get("error"),
             logs=fn_sr.state.get("logs"),
         )
+
+    def _get_gooey_memory_tool_scope_name(self) -> str | None:
+        from functions.inbuilt_tools import (
+            GooeyMemoryLLMToolDelete,
+            GooeyMemoryLLMToolRead,
+            GooeyMemoryLLMToolWrite,
+        )
+
+        functions = self.state.get("functions") or []
+        memory_tool_names = {
+            GooeyMemoryLLMToolRead.name,
+            GooeyMemoryLLMToolWrite.name,
+            GooeyMemoryLLMToolDelete.name,
+        }
+        for function in functions:
+            url = function.get("url")
+            if not url:
+                continue
+            tool_slug = get_external_tool_slug_from_url(url)
+            if tool_slug in memory_tool_names:
+                return function.get("scope")
+        return None
 
     def _get_system_vars(self) -> tuple[dict, dict]:
         request = self.request_model.model_validate(self.state)
