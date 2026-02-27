@@ -120,6 +120,7 @@ class CompareText2ImgPage(BasePage):
             Each selected model costs 2 credits ($.02) / image except where noted.
 
             Nano Banana: 26 Cr
+            Nano Banana 2: 26 Cr (1k), 30 Cr (2k), 35 Cr (4k)
             Nano Banana Pro: 30 Cr (2k) or 40cr (4k)
             GPT Image 1.5: 26, 30 or 40 Cr (low, medium, high)
             Dalle-3: 15 Cr
@@ -307,6 +308,18 @@ class CompareText2ImgPage(BasePage):
                             total += 40
                         case _:
                             total += 30
+                case Text2ImgModels.nano_banana_2.name:
+                    match state.get("__pixels"):
+                        case "0.5K":
+                            total += 26
+                        case "1K":
+                            total += 26
+                        case "2K":
+                            total += 30
+                        case "4K":
+                            total += 35
+                        case _:
+                            total += 26
                 case _:
                     total += 2
         num_outputs = state.get("num_outputs") or 0
