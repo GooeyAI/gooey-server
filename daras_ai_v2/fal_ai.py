@@ -8,7 +8,7 @@ import requests
 from furl import furl
 from loguru import logger
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import get_mimetype_from_response, upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 
@@ -45,8 +45,8 @@ def generate_on_fal(
                 continue
             yield "`" + logs[-1]["message"] + "`"
         else:
-            repsonse_url = event_data["response_url"]
-            r = requests.get(repsonse_url, headers=_fal_auth_headers())
+            response_url = event_data["response_url"]
+            r = requests.get(response_url, headers=_fal_auth_headers())
             raise_for_status(r)
             return _rewrite_fal_asset_urls(r.json(), user=user, workspace=workspace)
 
@@ -64,7 +64,12 @@ def stream_sse_json(response: requests.Response) -> typing.Iterator[dict]:
 
 
 def _fal_auth_headers():
-    return {"Authorization": f"Key {settings.FAL_API_KEY}"}
+    return {
+        "Authorization": f"Key {settings.FAL_API_KEY}",
+        "X-Fal-Object-Lifecycle-Preference": json.dumps(
+            {"expiration_duration_seconds": 3600}
+        ),
+    }
 
 
 def _rewrite_fal_asset_urls(
@@ -149,7 +154,7 @@ def _reupload_fal_asset_url(
     raise_for_status(r)
 
     filename = preferred_filename or os.path.basename(urlparse(url).path) or "fal_asset"
-    content_type = r.headers.get("Content-Type", "").split(";")[0] or None
+    content_type = get_mimetype_from_response(r) or None
 
     # If FAL returns extensionless filenames, preserve a useful extension.
     if not os.path.splitext(filename)[1] and content_type:
