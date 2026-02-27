@@ -236,6 +236,8 @@ class Img2ImgPage(BasePage):
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
                 gpt_image_1_quality=request.gpt_image_1_quality,
+                user=self.request.user,
+                workspace=self.current_workspace,
             )
 
     def get_raw_price(self, state: dict) -> int:
