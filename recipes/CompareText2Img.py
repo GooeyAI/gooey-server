@@ -119,11 +119,11 @@ class CompareText2ImgPage(BasePage):
             """
             Each selected model costs 2 credits ($.02) / image except where noted.
 
-            Nano Banana: 26 Cr
-            Nano Banana 2: 26 Cr (1k), 30 Cr (2k), 35 Cr (4k)
-            Nano Banana Pro: 30 Cr (2k) or 40cr (4k)
-            GPT Image 1.5: 26, 30 or 40 Cr (low, medium, high)
-            Dalle-3: 15 Cr
+            • Nano Banana : 26 Cr
+            • Nano Banana Pro : 30 Cr (1K/2K) · 40 Cr (4K)
+            • Nano Banana 2 : 26 Cr (0.5K/1K) · 30 Cr (2K) · 35 Cr (4K)
+            • GPT Image 1.5 : 26 Cr (low) · 30 Cr (medium) · 40 Cr (high)
+            • Dalle-3 : 15 Cr
             """
         )
 
