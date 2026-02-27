@@ -275,6 +275,13 @@ def query_vespa(
 ) -> dict:
     if not file_ids:
         return {"root": {"children": []}}
+    if isinstance(keyword_query, list):
+        keyword_query = " ".join(keyword_query)
+
+    if not remove_control_characters(search_query) and not remove_control_characters(
+        keyword_query or ""
+    ):
+        return {"root": {"children": []}}
 
     yql = "select * from %(schema)s where file_id in (@fileIds) and " % dict(
         schema=settings.VESPA_SCHEMA
@@ -301,8 +308,6 @@ def query_vespa(
     body = {"yql": yql, "ranking": ranking, "hits": limit}
 
     if ranking in ("bm25", "fusion"):
-        if isinstance(keyword_query, list):
-            keyword_query = " ".join(keyword_query)
         body["bm25Query"] = remove_control_characters(keyword_query or search_query)
 
     logger.debug(
