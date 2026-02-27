@@ -9,7 +9,7 @@ import requests
 from furl import furl
 from loguru import logger
 
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import get_mimetype_from_response, upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 
@@ -163,7 +163,7 @@ def _reupload_fal_asset_url(
     raise_for_status(r)
 
     filename = preferred_filename or os.path.basename(urlparse(url).path) or "fal_asset"
-    content_type = r.headers.get("Content-Type", "").split(";")[0] or None
+    content_type = get_mimetype_from_response(r) or None
 
     # If FAL returns extensionless filenames, preserve a useful extension.
     if not os.path.splitext(filename)[1] and content_type:

@@ -219,6 +219,8 @@ class CompareText2ImgPage(BasePage):
                 negative_prompt=request.negative_prompt,
                 scheduler=request.scheduler,
                 loras=request.loras,
+                user=self.request.user,
+                workspace=self.current_workspace,
             )
 
             if request.edit_instruction:
