@@ -304,7 +304,9 @@ def query_vespa(
     if ranking in ("bm25", "fusion"):
         if isinstance(keyword_query, list):
             keyword_query = " ".join(keyword_query)
-        body["bm25Query"] = remove_control_characters(keyword_query) or search_query
+        body["bm25Query"] = (
+            remove_control_characters(keyword_query or "") or search_query
+        )
 
     logger.debug(
         "vespa query " + " ".join(repr(f"{k}={v}") for k, v in body.items()) + " ..."
