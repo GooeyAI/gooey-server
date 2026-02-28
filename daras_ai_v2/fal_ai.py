@@ -19,27 +19,34 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
     raise_for_status(r)
     result = r.json()
 
-    status_url = (
-        furl(result["status_url"]).add(path="stream", query_params=dict(logs="1")).url
-    )
+    yield from stream_fal_status_events(result["status_url"])
 
-    max_retries = 3
-    retry_delay = 1.0
+    r = requests.get(result["response_url"], headers=_fal_auth_headers())
+    raise_for_status(r)
+    return r.json()
+
+
+def stream_fal_status_events(
+    status_url: str,
+    *,
+    max_retries: int = 3,
+    retry_delay: float = 1.0,
+) -> typing.Iterator[str]:
+    stream_url = furl(status_url).add(path="stream", query_params=dict(logs="1")).url
+
     for attempt in range(max_retries):
         try:
-            for event_data in stream_sse_json(
-                requests.get(status_url, headers=_fal_auth_headers(), stream=True)
-            ):
-                if event_data["status"] != "COMPLETED":
-                    logs = event_data["logs"]
-                    if not logs:
-                        continue
-                    yield "`" + logs[-1]["message"] + "`"
-                else:
-                    response_url = event_data["response_url"]
-                    r = requests.get(response_url, headers=_fal_auth_headers())
-                    raise_for_status(r)
-                    return r.json()
+            response = requests.get(
+                stream_url, headers=_fal_auth_headers(), stream=True
+            )
+            raise_for_status(response)
+            for event_data in stream_sse_json(response):
+                if event_data["status"] == "COMPLETED":
+                    return
+                logs = event_data["logs"]
+                if not logs:
+                    continue
+                yield "`" + logs[-1]["message"] + "`"
         except requests.exceptions.ChunkedEncodingError:
             if attempt >= max_retries - 1:
                 raise
@@ -47,6 +54,8 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
                 f"ChunkedEncodingError: [{attempt + 1}/{max_retries}] retrying in {retry_delay} seconds"
             )
             time.sleep(retry_delay)
+        else:
+            return
 
 
 def stream_sse_json(response: requests.Response) -> typing.Iterator[dict]:
