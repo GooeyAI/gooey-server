@@ -52,7 +52,7 @@ def run_mistral_ocr_on_page(
     pages = data.get("pages")
     if not pages:
         return ""
-    return _page_to_text(pages[0])
+    return "content=" + _page_to_text(pages[0])
 
 
 def _page_to_text(page: dict) -> str:
