@@ -44,6 +44,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.mistral_ocr import run_mistral_ocr_on_page
 from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr, HttpUrlStr
 from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.settings import service_account_key_path
@@ -493,8 +494,16 @@ def process_source(
             )
         elif is_pdf:
             yield "Extracting PDF"
-            transcript = run_azure_doc_extract_on_page(
-                content_url, entry.get("page_num")
+            model_id = request.document_model
+            if model_id.startswith("mistral-"):
+                model_id = "mistral-ocr-latest"
+                extract_fn = run_mistral_ocr_on_page
+            else:
+                if model_id.startswith("azure-"):
+                    model_id = model_id.removeprefix("azure-")
+                extract_fn = run_azure_doc_extract_on_page
+            transcript = extract_fn(
+                content_url, entry.get("page_num"), model_id=model_id
             )
         else:
             raise NotImplementedError(
@@ -598,16 +607,15 @@ def get_spreadsheet_service():
 
 
 def document_intelligence_settings(title: str, help: str | None = None):
-    with gui.div(className="pt-2 ps-1"):
-        document_models = {}
-        if settings.AZURE_FORM_RECOGNIZER_KEY:
-            document_models |= azure_document_intelligence_models()
-        document_models |= {"mistral-ocr": "Mistral OCR"}
-        gui.selectbox(
-            title,
-            key="document_model",
-            help=help,
-            options=document_models,
-            format_func=lambda x: f"{document_models[x]} ({x})",
-        )
-        gui.newline()
+    document_models = {}
+    if settings.AZURE_FORM_RECOGNIZER_KEY:
+        document_models |= azure_document_intelligence_models()
+    document_models |= {"mistral-ocr": "Mistral OCR"}
+    gui.selectbox(
+        title,
+        key="document_model",
+        help=help,
+        options=document_models,
+        format_func=lambda x: f"{document_models[x]} ({x})",
+    )
+    gui.newline()
