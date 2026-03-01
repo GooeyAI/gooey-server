@@ -1255,6 +1255,12 @@ def get_openai_client(
             max_retries=0,
             base_url=str(furl(modal_fn.get_web_url()) / "v1"),
         )
+    elif model.startswith("mistral-"):
+        client = openai.OpenAI(
+            api_key=settings.MISTRAL_API_KEY,
+            max_retries=0,
+            base_url="https://api.mistral.ai/v1",
+        )
     else:
         client = openai.OpenAI(
             api_key=settings.OPENAI_API_KEY,

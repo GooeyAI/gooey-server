@@ -18,14 +18,16 @@ from aifail import retry_if
 auth_headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_FORM_RECOGNIZER_KEY}
 
 
-def azure_doc_extract_page_num(
-    url: str, page_num: int, model_id="prebuilt-layout"
+def run_azure_doc_extract_on_page(
+    url: str, page_num: int, model_id: str | None = None
 ) -> str:
     if page_num:
         params = dict(pages=str(page_num))
     else:
         params = None
-    pages = azure_doc_extract_pages(url, params=params, model_id=model_id)
+    pages = azure_doc_extract_pages(
+        url, params=params, model_id=model_id or "prebuilt-layout"
+    )
     if pages and pages[0]:
         return str(pages[0])
     else:
@@ -42,8 +44,11 @@ def azure_doc_extract_pages(
     ]
 
 
+model_order = {"prebuilt-layout": 1, "prebuilt-read": 0}
+
+
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
-def azure_form_recognizer_models() -> dict[str, str]:
+def azure_document_intelligence_models() -> dict[str, str]:
     r = requests.get(
         str(
             furl(settings.AZURE_FORM_RECOGNIZER_ENDPOINT)
@@ -53,7 +58,9 @@ def azure_form_recognizer_models() -> dict[str, str]:
         headers=auth_headers,
     )
     raise_for_status(r)
-    return {value["modelId"]: value["description"] for value in r.json()["value"]}
+    values = r.json()["value"]
+    values.sort(key=lambda x: model_order.get(x["modelId"], -1), reverse=True)
+    return {"azure-" + value["modelId"]: value["description"] for value in values}
 
 
 def azure_should_retry(e: Exception) -> bool:

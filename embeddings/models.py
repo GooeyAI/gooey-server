@@ -31,6 +31,7 @@ class EmbeddedFile(models.Model):
         choices=[(model.name, model.label) for model in EmbeddingModels],
         default=EmbeddingModels.openai_3_large.name,
     )
+    document_model = models.CharField(max_length=100, blank=True, default="")
 
     vespa_file_id = models.CharField(
         max_length=64,
@@ -60,6 +61,7 @@ class EmbeddedFile(models.Model):
                     "google_translate_target",
                     "selected_asr_model",
                     "embedding_model",
+                    "document_model",
                     "-updated_at",
                 ]
             ),
