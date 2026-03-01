@@ -20,7 +20,8 @@ from daras_ai_v2.asr import (
     run_translate,
 )
 from daras_ai_v2.azure_doc_extract import (
-    azure_doc_extract_page_num,
+    run_azure_doc_extract_on_page,
+    azure_document_intelligence_models,
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -28,6 +29,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     is_user_uploaded_url,
 )
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.functional import (
     apply_parallel,
     flatapply_parallel,
@@ -89,6 +91,12 @@ class DocExtractPage(BasePage):
 
         sheet_url: OptionalHttpUrlStr = None
 
+        selected_model: str | None = None
+        document_model: str | None = Field(
+            "azure-prebuilt-layout",
+            title="🩻 Document Intelligence Model",
+            description="Select a model to extract text from photos and documents.",
+        )
         selected_asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = (
             None
         )
@@ -105,8 +113,6 @@ class DocExtractPage(BasePage):
         )
 
         task_instructions: str | None = None
-
-        selected_model: str | None = None
 
     class RequestModel(LanguageModelSettings, TranslationOptions, RequestModelBase):
         pass
@@ -127,6 +133,7 @@ class DocExtractPage(BasePage):
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return [
             "selected_model",
+            "document_model",
             "language",
             "translation_model",
             "translation_target",
@@ -134,7 +141,11 @@ class DocExtractPage(BasePage):
 
     def render_form_v2(self):
         bulk_documents_uploader(
-            "#### 🤖 Youtube/PDF/Drive/Web URLs",
+            "##### 🤖 Youtube/PDF/Drive/Web URLs",
+        )
+        document_intelligence_settings(
+            title="##### " + field_title(DocExtractPage.RequestModel, "document_model"),
+            help=field_desc(DocExtractPage.RequestModel, "document_model"),
         )
         gui.text_input(
             "📊 Google Sheets URL _(optional)_",
@@ -242,6 +253,7 @@ def _doc_extract_and_upload(
         f_url=f_url,
         file_meta=file_meta,
         selected_asr_model=request.selected_asr_model,
+        document_model=request.document_model,
     )
     if isinstance(pages, pd.DataFrame):
         return upload_file_from_bytes(
@@ -481,7 +493,9 @@ def process_source(
             )
         elif is_pdf:
             yield "Extracting PDF"
-            transcript = azure_doc_extract_page_num(content_url, entry.get("page_num"))
+            transcript = run_azure_doc_extract_on_page(
+                content_url, entry.get("page_num")
+            )
         else:
             raise NotImplementedError(
                 f"Unsupported type {doc_meta and doc_meta.mime_type} for {webpage_url}"
@@ -581,3 +595,19 @@ def get_spreadsheet_service():
         service = build("sheets", "v4", credentials=creds)
         threadlocal.spreadsheets = service.spreadsheets()
         return threadlocal.spreadsheets
+
+
+def document_intelligence_settings(title: str, help: str | None = None):
+    with gui.div(className="pt-2 ps-1"):
+        document_models = {}
+        if settings.AZURE_FORM_RECOGNIZER_KEY:
+            document_models |= azure_document_intelligence_models()
+        document_models |= {"mistral-ocr": "Mistral OCR"}
+        gui.selectbox(
+            title,
+            key="document_model",
+            help=help,
+            options=document_models,
+            format_func=lambda x: f"{document_models[x]} ({x})",
+        )
+        gui.newline()

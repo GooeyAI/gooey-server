@@ -9,6 +9,7 @@ from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
 
+from ai_models.models import AIModelSpec
 from bots.models import (
     BotIntegration,
     Platform,
@@ -19,10 +20,6 @@ from bots.models import (
 )
 from celeryapp.tasks import send_integration_attempt_email
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2.exceptions import UserError
-from ai_models.models import AIModelSpec
-from functions.recipe_functions import BaseLLMTool
-from payments.plans import PricingPlan
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.asr import (
     AsrModels,
@@ -38,7 +35,6 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
-    azure_form_recognizer_models,
 )
 from daras_ai_v2.base import BasePage, RecipeRunState, RecipeTabs, StateKeys
 from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
@@ -61,6 +57,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 )
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
@@ -109,11 +106,14 @@ from daras_ai_v2.vector_search import (
 )
 from functions.inbuilt_tools import get_inbuilt_tools_from_state
 from functions.models import FunctionTrigger
+from functions.recipe_functions import BaseLLMTool
 from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
     render_called_functions_as_html,
 )
+from payments.plans import PricingPlan
+from recipes.DocExtract import document_intelligence_settings
 from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
@@ -123,9 +123,9 @@ from usage_costs.twilio_usage_cost import (
     get_non_ivr_price_credits,
     get_ivr_price_credits_and_seconds,
 )
-from widgets.switch_with_section import switch_with_section
 from widgets.demo_button import render_demo_buttons_header
 from widgets.prompt_library import render_prompt_library
+from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
 
 GRAYCOLOR = "#00000073"
@@ -230,8 +230,7 @@ class VideoBotsPage(BasePage):
         document_model: str | None = Field(
             None,
             title="🩻 Photo / Document Intelligence",
-            description="When your copilot users upload a photo or pdf, what kind of document are they mostly likely to upload? "
-            "(via [Azure](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/use-sdk-rest-api?view=doc-intel-3.1.0&tabs=linux&pivots=programming-language-rest-api))",
+            description="Which document intelligence model should be used to extract text from photos and documents?",
         )
 
         # doc search
@@ -452,6 +451,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     f_url=f_url,
                     file_meta=file_meta,
                     selected_asr_model=request.asr_model,
+                    document_model=request.document_model,
                 )
                 if isinstance(pages, pd.DataFrame):
                     ocr_texts.append(pages.to_csv(index=False))
@@ -1068,17 +1068,9 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
 
     def document_intelligence_settings(self):
         with gui.div(className="pt-2 ps-1"):
-            if settings.AZURE_FORM_RECOGNIZER_KEY:
-                doc_model_descriptions = azure_form_recognizer_models()
-            else:
-                doc_model_descriptions = {}
-            gui.selectbox(
-                f"{field_desc(self.RequestModel, 'document_model')}",
-                key="document_model",
-                options=doc_model_descriptions,
-                format_func=lambda x: f"{doc_model_descriptions[x]} ({x})",
+            document_intelligence_settings(
+                title=f"{field_desc(self.RequestModel, 'document_model')}",
             )
-            gui.newline()
 
     def validate_form_v2(self):
         input_glossary = gui.session_state.get("input_glossary_document", "")

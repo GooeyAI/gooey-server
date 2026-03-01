@@ -39,7 +39,7 @@ from daras_ai_v2.asr import (
 )
 from daras_ai_v2.azure_doc_extract import (
     THEAD,
-    azure_doc_extract_page_num,
+    run_azure_doc_extract_on_page,
     table_arr_to_prompt_chunked,
 )
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -65,6 +65,7 @@ from daras_ai_v2.onedrive_downloader import (
     onedrive_meta,
     onedrive_download,
 )
+from daras_ai_v2.mistral_ocr import run_mistral_ocr_on_page
 from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.scraping_proxy import (
     SCRAPING_PROXIES,
@@ -162,8 +163,9 @@ def get_top_k_references(
         page_cls, sr, pr = url_to_runs(request.doc_extract_url)
         selected_asr_model = sr.state.get("selected_asr_model")
         google_translate_target = sr.state.get("google_translate_target")
+        document_model = sr.state.get("document_model") or "azure-prebuilt-layout"
     else:
-        selected_asr_model = google_translate_target = None
+        selected_asr_model = google_translate_target = document_model = None
 
     embedding_model = EmbeddingModels.get(
         request.embedding_model,
@@ -180,6 +182,7 @@ def get_top_k_references(
         selected_asr_model=selected_asr_model,
         embedding_model=embedding_model,
         check_document_updates=request.check_document_updates,
+        document_model=document_model,
     )
 
     if args_to_create:
@@ -193,6 +196,7 @@ def get_top_k_references(
                 embedding_model=embedding_model,
                 is_user_url=is_user_url,
                 current_user=current_user,
+                document_model=document_model,
             ),
             args_to_create,
             max_workers=4,
@@ -571,6 +575,7 @@ def do_check_document_updates(
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
     check_document_updates: bool,
+    document_model: str | None,
 ) -> typing.Generator[
     str,
     None,
@@ -592,6 +597,7 @@ def do_check_document_updates(
             google_translate_target=google_translate_target or "",
             selected_asr_model=selected_asr_model or "",
             embedding_model=embedding_model.name,
+            document_model=document_model or "",
         )
         q |= Q(**lookup)
         lookups[f_url] = lookup
@@ -639,6 +645,7 @@ def create_embedded_file(
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
     is_user_url: bool,
+    document_model: str | None,
     current_user: AppUser,
 ) -> EmbeddedFile:
     """
@@ -671,6 +678,7 @@ def create_embedded_file(
                 selected_asr_model=selected_asr_model or "",
                 embedding_model=embedding_model,
                 is_user_url=is_user_url,
+                document_model=document_model,
             )
         with transaction.atomic():
             EmbeddedFile.objects.filter(Q(**lookup) | Q(vespa_file_id=file_id)).delete()
@@ -704,6 +712,7 @@ def create_embeddings_in_search_db(
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
     is_user_url: bool,
+    document_model: str | None,
 ) -> list[EmbeddingsReference]:
     refs = {}
     vespa = get_vespa_app()
@@ -716,6 +725,7 @@ def create_embeddings_in_search_db(
         selected_asr_model=selected_asr_model,
         embedding_model=embedding_model,
         is_user_url=is_user_url,
+        document_model=document_model,
     ):
         doc_id = file_id + "/" + _sha256(ref)
         db_ref = EmbeddingsReference(
@@ -770,6 +780,7 @@ def get_embeds_for_doc(
     google_translate_target: str | None,
     selected_asr_model: str | None,
     embedding_model: EmbeddingModels,
+    document_model: str | None,
     is_user_url: bool,
 ) -> typing.Iterator[tuple[SearchReference, np.ndarray]]:
     """
@@ -793,6 +804,7 @@ def get_embeds_for_doc(
         file_meta=file_meta,
         selected_asr_model=selected_asr_model,
         is_user_url=is_user_url,
+        document_model=document_model,
     )
     refs = pages_to_split_refs(
         pages=pages,
@@ -920,6 +932,7 @@ def doc_url_to_text_pages(
     file_meta: FileMetadata,
     selected_asr_model: str | None,
     is_user_url: bool = True,
+    document_model: str | None = None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     """
     Download document from url and convert to text pages.
@@ -938,6 +951,7 @@ def doc_url_to_text_pages(
         f_bytes=f_bytes,
         mime_type=mime_type,
         selected_asr_model=selected_asr_model,
+        document_model=document_model,
     )
 
 
@@ -995,6 +1009,7 @@ def any_bytes_to_text_pages_or_df(
     f_bytes: bytes,
     mime_type: str,
     selected_asr_model: str | None,
+    document_model: str | None = None,
 ) -> typing.Union[list[str], "pd.DataFrame"]:
     if mime_type.startswith("audio/") or mime_type.startswith("video/"):
         if is_gdrive_url(furl(f_url)) or is_yt_dlp_able_url(f_url):
@@ -1011,9 +1026,7 @@ def any_bytes_to_text_pages_or_df(
             f_name=f_name,
             f_bytes=f_bytes,
             mime_type=mime_type,
-            # for now, only use form recognizer if asr model is selected.
-            # We should later change the doc extract settings to include the form recognizer option
-            use_form_reco=bool(selected_asr_model),
+            document_model=document_model,
         )
     except UnsupportedDocumentError:
         pass
@@ -1056,13 +1069,15 @@ def pdf_or_tabular_bytes_to_text_pages_or_df(
     f_name: str,
     f_bytes: bytes,
     mime_type: str,
-    use_form_reco: bool,
-):
+    document_model: str | None = None,
+) -> typing.Union[list[str], "pd.DataFrame"]:
     import pandas as pd
 
     if mime_type == "application/pdf":
-        if use_form_reco:
-            df = pdf_to_form_reco_df(f_url, f_name, f_bytes, mime_type)
+        if document_model:
+            df = pdf_to_doc_extract_df(
+                f_url, f_name, f_bytes, mime_type, document_model
+            )
         else:
             return pdf_to_text_pages(f=io.BytesIO(f_bytes))
 
@@ -1134,23 +1149,33 @@ def pdf_to_text_pages(f: typing.BinaryIO) -> list[str]:
     return list(pdftotext.PDF(f))
 
 
-def pdf_to_form_reco_df(
+def pdf_to_doc_extract_df(
     f_url: str,
     f_name: str,
     f_bytes: bytes,
     mime_type: str,
+    model_id: str,
 ) -> "pd.DataFrame":
     import pandas as pd
 
     if is_gdrive_url(furl(f_url)):
         f_url = upload_file_from_bytes(f_name, f_bytes, content_type=mime_type)
+
+    if model_id.startswith("mistral-"):
+        model_id = "mistral-ocr-latest"
+        extract_fn = run_mistral_ocr_on_page
+    else:
+        if model_id.startswith("azure-"):
+            model_id = model_id.removeprefix("azure-")
+        extract_fn = run_azure_doc_extract_on_page
+
     num_pages = get_pdf_num_pages(f_bytes)
     return pd.DataFrame(
         map_parallel(
             lambda page_num: (
                 add_page_number_to_pdf(f_url, page_num).url,
                 f"{f_name}, page {page_num}",
-                azure_doc_extract_page_num(f_url, page_num),
+                extract_fn(f_url, page_num, model_id),
             ),
             range(1, num_pages + 1),
             max_workers=4,

@@ -13,6 +13,7 @@ from aifail import (
 from jinja2.lexer import whitespace_re
 from loguru import logger
 
+from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model import get_openai_client
 from daras_ai_v2.redis_cache import (
@@ -37,6 +38,11 @@ class EmbeddingModels(Enum):
     openai_ada_2 = EmbeddingModel(
         model_id=("openai-text-embedding-ada-002-prod-ca-1", "text-embedding-ada-002"),
         label="Text Embedding Ada 2 (OpenAI)",
+    )
+
+    mistral_embed = EmbeddingModel(
+        model_id="mistral-embed",
+        label="Mistral Embed (Mistral AI)",
     )
 
     e5_large_v2 = EmbeddingModel(
@@ -113,6 +119,13 @@ def create_embeddings_cached(
 def create_embeddings(texts: list[str], model: EmbeddingModels) -> np.ndarray:
     if "openai" in model.name:
         ret = _run_openai_embedding(texts=texts, model_id=model.model_id)
+    elif "mistral" in model.name:
+        ret = _run_openai_embedding(
+            texts=texts,
+            model_id=model.model_id,
+            base_url="https://api.mistral.ai/v1",
+            api_key=settings.MISTRAL_API_KEY,
+        )
     else:
         ret = _run_gpu_embedding(texts=texts, model_id=model.model_id)
 
@@ -157,6 +170,8 @@ def _run_openai_embedding(
     *,
     texts: list[str],
     model_id: typing.Iterable[str] | str,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> list[list[float]]:
     logger.info(f"{model_id=}, {len(texts)=}")
     if isinstance(model_id, str):
@@ -164,7 +179,9 @@ def _run_openai_embedding(
     res = try_all(
         *[
             partial(
-                get_openai_client(model_str).embeddings.create,
+                get_openai_client(
+                    model_str, base_url=base_url, api_key=api_key
+                ).embeddings.create,
                 model=model_str,
                 input=texts,
             )
