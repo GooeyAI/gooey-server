@@ -21,13 +21,12 @@ import sentry_sdk
 from django.db.models import Q, Sum
 from django.utils.text import slugify
 from fastapi import HTTPException
-from firebase_admin import auth
 from furl import furl
 from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
 
-from app_users.models import AppUser, AppUserTransaction
+from app_users.models import AppUser, AppUserTransaction, ensure_request_app_user
 from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
 from bots.models import (
     PublishedRun,
@@ -45,7 +44,6 @@ from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -2095,14 +2093,7 @@ class BasePage:
         self.clear_outputs()
 
         assert self.request, "request is not set for current session"
-        if self.request.user:
-            uid = self.request.user.uid
-        else:
-            uid = auth.create_user().uid
-            self.request.user = AppUser.objects.create(
-                uid=uid, is_anonymous=True, balance=settings.ANON_USER_FREE_CREDITS
-            )
-            self.request.session[ANONYMOUS_USER_COOKIE] = dict(uid=uid)
+        uid = ensure_request_app_user(self.request).uid
 
         if enable_rate_limits:
             ensure_rate_limits(self.workflow, self.request.user, self.current_workspace)

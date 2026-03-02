@@ -31,6 +31,10 @@ from usage_costs.models import ModelSku
 from widgets.switch_with_section import switch_with_section
 
 
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+    from workspaces.models import Workspace
+
 SKIP_AUDIO_INPUT_FIELDS = ["video_url", "duration"]
 
 
@@ -85,6 +89,8 @@ class VideoGenPage(BasePage):
                     audio_inputs=request.audio_inputs,
                     progress_q=progress_q,
                     output_videos=response.output_videos,
+                    user=self.request.user,
+                    workspace=self.current_workspace,
                 )
                 for model in models
             ]
@@ -276,9 +282,12 @@ def generate_video(
     audio_inputs: dict[str, typing.Any] | None,
     progress_q: Queue[tuple[str, str | None]],
     output_videos: dict[str, str],
+    *,
+    user: typing.Optional["AppUser"] = None,
+    workspace: typing.Optional["Workspace"] = None,
 ):
     # print(f"{model=} {inputs=} {audio_model=} {audio_inputs=}")
-    gen = generate_on_fal(model.model_id, inputs)
+    gen = generate_on_fal(model.model_id, inputs, user=user, workspace=workspace)
     try:
         while True:
             msg = next(gen)
@@ -299,7 +308,12 @@ def generate_video(
         if audio_model and audio_inputs:
             progress_q.put((model.model_id, f"Generating audio with {audio_model}..."))
             output_videos[model.name] = generate_audio(
-                video_url, inputs, audio_model, audio_inputs
+                video_url,
+                inputs,
+                audio_model,
+                audio_inputs,
+                user=user,
+                workspace=workspace,
             )
     finally:
         progress_q.put((model.model_id, None))
@@ -310,6 +324,9 @@ def generate_audio(
     inputs: dict,
     audio_model: AIModelSpec,
     audio_inputs: dict[str, typing.Any],
+    *,
+    user: typing.Optional["AppUser"] = None,
+    workspace: typing.Optional["Workspace"] = None,
 ) -> str:
     duration = float(ffprobe(video_url)["streams"][0]["duration"])
     duration_props = resolve_field_anyof(
@@ -327,7 +344,9 @@ def generate_audio(
     payload = {"video_url": video_url, "duration": duration} | audio_inputs
     if not payload.get("prompt"):
         payload["prompt"] = inputs.get("prompt")
-    res = yield_from(generate_on_fal(audio_model.model_id, payload))
+    res = yield_from(
+        generate_on_fal(audio_model.model_id, payload, user=user, workspace=workspace)
+    )
     record_cost_auto(audio_model.model_id, ModelSku.video_generation, 1)
     res_video = get_url_from_result(res.get("video"))
     res_audio = get_url_from_result(res.get("audio"))
@@ -337,7 +356,9 @@ def generate_audio(
     elif res_audio:
         audio_url = get_url_from_result(res_audio)
         filename = f"{audio_model.label}_merged.mp4"
-        return merge_audio_and_video(filename, audio_url, video_url)
+        return merge_audio_and_video(
+            filename, audio_url, video_url, user=user, workspace=workspace
+        )
     else:
         raise ValueError(f"No video/audio output from {audio_model.name}")
 
@@ -609,7 +630,14 @@ def get_url_from_result(result: dict | list | str | None) -> str | None:
             return result
 
 
-def merge_audio_and_video(filename: str, audio_url: str, video_url: str) -> str:
+def merge_audio_and_video(
+    filename: str,
+    audio_url: str,
+    video_url: str,
+    *,
+    user: typing.Optional["AppUser"] = None,
+    workspace: typing.Optional["Workspace"] = None,
+) -> str:
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "video.mp4")
         audio_path = os.path.join(tmpdir, "audio.wav")
@@ -640,4 +668,10 @@ def merge_audio_and_video(filename: str, audio_url: str, video_url: str) -> str:
         with open(output_path, "rb") as f:
             merged_video_bytes = f.read()
 
-        return upload_file_from_bytes(filename, merged_video_bytes, "video/mp4")
+        return upload_file_from_bytes(
+            filename,
+            merged_video_bytes,
+            "video/mp4",
+            user=user,
+            workspace=workspace,
+        )
