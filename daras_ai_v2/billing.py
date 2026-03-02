@@ -94,6 +94,18 @@ def _get_scheduled_team_downgrade_info(
     stripe_sub = stripe.Subscription.retrieve(
         subscription_model.external_id, expand=["schedule"]
     )
+
+    current_period_end = stripe_sub.get("current_period_end")
+    if not current_period_end:
+        return None
+    if stripe_sub.get("cancel_at_period_end"):
+        return dict(
+            cancel_at_period_end=True,
+            effective_date=datetime.fromtimestamp(current_period_end).strftime(
+                "%d %b %Y"
+            ),
+        )
+
     schedule = stripe_sub.get("schedule")
     if not schedule:
         return None
@@ -101,10 +113,6 @@ def _get_scheduled_team_downgrade_info(
         schedule = stripe.SubscriptionSchedule.retrieve(
             schedule, expand=["phases.items.price"]
         )
-
-    current_period_end = stripe_sub.get("current_period_end")
-    if not current_period_end:
-        return None
 
     for phase in schedule.get("phases", []):
         start_date = phase.get("start_date")
@@ -393,29 +401,34 @@ def render_current_plan(workspace: "Workspace"):
             cache=True,
         )
         if scheduled_downgrade:
-            target_seats = scheduled_downgrade["seats"]
+            target_seats = scheduled_downgrade.get("seats")
             target_credits = scheduled_downgrade.get("seat_monthly_credit_limit")
             total_monthly = scheduled_downgrade.get("total_monthly_charge")
-            if target_credits is not None and total_monthly is not None:
-                change_text = (
-                    f"{target_credits:,} credits / month × {target_seats} seats "
-                    f"(${total_monthly:,} / month)"
-                )
-            elif target_credits is not None:
-                change_text = (
-                    f"{target_credits:,} credits / month × {target_seats} seats"
-                )
-            elif total_monthly is not None:
-                change_text = (
-                    f"{scheduled_downgrade['seat_type_name']} × {target_seats} seats "
-                    f"(${total_monthly:,} / month)"
-                )
+            if scheduled_downgrade.get("cancel_at_period_end"):
+                change_text = f"{PricingPlan.STARTER.title} ($0 / month)"
+            elif target_seats is not None:
+                if target_credits is not None and total_monthly is not None:
+                    change_text = (
+                        f"{target_credits:,} credits / month × {target_seats} seats "
+                        f"(${total_monthly:,} / month)"
+                    )
+                elif target_credits is not None:
+                    change_text = (
+                        f"{target_credits:,} credits / month × {target_seats} seats"
+                    )
+                elif total_monthly is not None:
+                    change_text = (
+                        f"{scheduled_downgrade['seat_type_name']} × {target_seats} seats "
+                        f"(${total_monthly:,} / month)"
+                    )
+                else:
+                    change_text = (
+                        f"{scheduled_downgrade['plan_title']} "
+                        f"({scheduled_downgrade['seat_type_name']}) "
+                        f"× {target_seats} seats"
+                    )
             else:
-                change_text = (
-                    f"{scheduled_downgrade['plan_title']} "
-                    f"({scheduled_downgrade['seat_type_name']}) "
-                    f"× {target_seats} seats"
-                )
+                change_text = scheduled_downgrade["plan_title"]
 
             gui.caption(
                 f"Scheduled change to: **{change_text}**, "
@@ -1089,15 +1102,21 @@ def change_subscription(
     ):
         raise gui.RedirectException(get_app_route_url(account_route), status_code=303)
 
-    if new_plan == PricingPlan.STARTER:
-        workspace.subscription.cancel()
-        raise gui.RedirectException(
-            get_app_route_url(payment_processing_route), status_code=303
-        )
-
     match workspace.subscription.payment_provider:
         case PaymentProvider.STRIPE:
             if not new_plan.supports_stripe():
+                if new_plan == PricingPlan.STARTER:
+                    stripe_subscription = stripe.Subscription.retrieve(
+                        workspace.subscription.external_id
+                    )
+                    if not stripe_subscription.cancel_at_period_end:
+                        stripe.Subscription.modify(
+                            workspace.subscription.external_id,
+                            cancel_at_period_end=True,
+                        )
+                    raise gui.RedirectException(
+                        get_app_route_url(payment_processing_route), status_code=303
+                    )
                 gui.error(f"Stripe subscription not available for {new_plan}")
 
             subscription = stripe.Subscription.retrieve(
@@ -1175,6 +1194,13 @@ def change_subscription(
             )
 
         case PaymentProvider.PAYPAL:
+            if new_plan == PricingPlan.STARTER:
+                # PayPal cancellation at period end is not currently wired; keep existing behavior.
+                workspace.subscription.cancel()
+                raise gui.RedirectException(
+                    get_app_route_url(payment_processing_route), status_code=303
+                )
+
             if not new_plan.supports_paypal():
                 gui.error(f"Paypal subscription not available for {new_plan}")
 
