@@ -966,7 +966,11 @@ def _stream_openai_chunked(
 
             if delta.content:
                 # append the delta to the current chunk
-                entry["chunk"] += delta.content
+                chunk = delta.content
+                if isinstance(chunk, list):
+                    # damn you! mistral
+                    chunk = "".join(filter(None, map(_mistral_ref_chunk_to_str, chunk)))
+                entry["chunk"] += chunk
                 changed = is_llm_chunk_large_enough(entry, chunk_size)
             elif entry["chunk"]:
                 # content stream has ended, stream the chunk
