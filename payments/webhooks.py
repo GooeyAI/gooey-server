@@ -6,7 +6,7 @@ import stripe
 from django.db import transaction
 from loguru import logger
 
-from app_users.models import PaymentProvider, TransactionReason
+from app_users.models import AppUserTransaction, PaymentProvider, TransactionReason
 from daras_ai_v2 import paypal, settings
 from workspaces.models import Workspace
 from .models import Subscription
@@ -131,6 +131,13 @@ class StripeWebhookHandler:
             reason=reason,
             **kwargs,
         )
+        create_member_cycle_transactions(
+            workspace=workspace,
+            invoice_id=invoice.id,
+            reason=reason,
+            plan=kwargs.get("plan")
+            or (workspace.subscription and workspace.subscription.plan),
+        )
 
         save_stripe_default_payment_method.delay(
             payment_intent_id=invoice.payment_intent,
@@ -246,6 +253,56 @@ class StripeWebhookHandler:
                 dollar_amt=data["amount_due"] / 100,
                 subject="Payment failure on your Gooey.AI subscription",
             )
+
+
+def create_member_cycle_transactions(
+    *,
+    workspace: Workspace,
+    invoice_id: str,
+    reason: TransactionReason,
+    plan: int | None,
+):
+    # Seat-type based cycle accounting is TEAM-only and only for create/cycle events.
+    if reason not in (
+        TransactionReason.SUBSCRIPTION_CREATE,
+        TransactionReason.SUBSCRIPTION_CYCLE,
+    ):
+        return
+    if plan != PricingPlan.TEAM.db_value:
+        return
+
+    memberships = (
+        workspace.memberships.select_related("seat_type")
+        .filter(deleted__isnull=True, seat_type__isnull=False)
+        .only("id", "user_id", "seat_type__monthly_credit_limit")
+    )
+
+    for membership in memberships:
+        monthly_limit = membership.seat_type.monthly_credit_limit
+        if monthly_limit is None:
+            # Unlimited seats don't get cycle-credit ledger entries.
+            continue
+
+        with transaction.atomic():
+            _, created = AppUserTransaction.objects.get_or_create(
+                invoice_id=f"{invoice_id}:seat:{membership.user_id}",
+                defaults=dict(
+                    workspace=workspace,
+                    user_id=membership.user_id,
+                    amount=monthly_limit,
+                    charged_amount=0,
+                    payment_provider=None,
+                    reason=reason,
+                    plan=plan,
+                    end_balance=workspace.balance,
+                ),
+            )
+            if created:
+                workspace.add_member_balance(
+                    user_id=membership.user_id,
+                    amount=monthly_limit,
+                    check_team_plan=False,
+                )
 
 
 def add_balance_for_payment(

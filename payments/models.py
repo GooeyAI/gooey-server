@@ -11,8 +11,8 @@ from loguru import logger
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from workspaces.models import Workspace
-from .plans import PricingPlan, stripe_get_addon_product, PricingTier
+from workspaces.models import Workspace, WorkspaceSeatType
+from .plans import PricingPlan, stripe_get_addon_product
 
 
 class PaymentMethodSummary(typing.NamedTuple):
@@ -132,17 +132,30 @@ class Subscription(models.Model):
                 0.8 * self.monthly_spending_budget
             )
 
-    def get_tier(self) -> PricingTier | None:
-        if not (self.amount and self.charged_amount):
+    def get_seat_type(self):
+        if not self.has_workspace:
             return None
 
-        per_seat_credits = self.amount // max(1, self.seats)
-        per_seat_monthly_charge = round(self.charged_amount / 100) // max(1, self.seats)
-        return PricingTier(
-            per_seat_credits=per_seat_credits,
-            per_seat_monthly_charge=per_seat_monthly_charge,
-            seats=self.seats,
+        credits = self.amount // max(1, self.seats) if self.amount else None
+        monthly_charge = (
+            round(self.charged_amount / 100) // max(1, self.seats)
+            if self.charged_amount
+            else None
         )
+        qs = WorkspaceSeatType.objects.all()
+        if monthly_charge is not None and credits is not None:
+            if seat_type := qs.filter(
+                monthly_charge=monthly_charge,
+                monthly_credit_limit=credits,
+            ).first():
+                return seat_type
+        if monthly_charge is not None:
+            if seat_type := qs.filter(monthly_charge=monthly_charge).first():
+                return seat_type
+        return None
+
+    def get_tier(self):
+        return self.get_seat_type()
 
     @property
     def has_user(self) -> bool:
