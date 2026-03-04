@@ -565,7 +565,7 @@ def render_members_list(
                 gui.html("Name")
             if is_team_plan:
                 with gui.tag("th", scope="col"):
-                    gui.html("Cycle Usage")
+                    gui.html("Usage")
                 with gui.tag("th", scope="col"):
                     gui.html("Seat")
             with gui.tag("th", scope="col"):
