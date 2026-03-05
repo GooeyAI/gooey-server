@@ -91,12 +91,12 @@ from widgets.base_header import (
     render_header_title,
     render_help_button,
 )
-from widgets.publish_form import clear_publish_form
-from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.history_filer import (
     render_history_filter_desktop,
     render_history_filter_mobile,
 )
+from widgets.publish_form import clear_publish_form
+from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
@@ -1693,9 +1693,6 @@ class BasePage:
                 placeholder = gui.div()
                 render_called_functions(
                     saved_run=self.current_sr, trigger=FunctionTrigger.pre
-                )
-                render_called_functions(
-                    saved_run=self.current_sr, trigger=FunctionTrigger.prompt
                 )
                 try:
                     self.render_steps()

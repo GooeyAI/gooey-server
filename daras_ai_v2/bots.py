@@ -594,7 +594,7 @@ def _process_and_send_msg(
                 else:
                     next_chunk = text[last_idx:]
                     last_idx = len(text)
-                    if not (next_chunk or final_prompt):
+                    if not (next_chunk or prompt_chunks):
                         continue  # no chunk, wait for the next update
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
