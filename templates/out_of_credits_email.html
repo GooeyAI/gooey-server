@@ -1,0 +1,27 @@
+<p>
+    Hi {{ user.first_name() }},
+</p>
+
+<p>
+    We wanted to give you a heads-up: people are trying to reach your copilot
+    {% if integration_name %}
+        <a href="{{ integration_link }}">{{ integration_name }}</a>
+    {% else %}
+        <a href="{{ integration_link }}">here</a>
+    {% endif %}
+    right now, but we’re unable to respond because your workspace has run out of Gooey.AI credits.
+</p>
+
+<p>
+    <a href="{{ buy_credits_url }}">Buy Credits</a>
+</p>
+
+<p>
+    Thanks for using Gooey.AI. If you have any questions, we’re here to help.
+</p>
+
+<p>
+    Cheers, 
+    <br>
+    The Gooey.AI team
+</p>
