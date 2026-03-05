@@ -20,8 +20,12 @@ from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.base import BasePage, StateKeys
-from daras_ai_v2.exceptions import UserError
-from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
+from daras_ai_v2.exceptions import InsufficientCredits, UserError
+from daras_ai_v2.send_email import (
+    send_email_via_postmark,
+    send_low_balance_email,
+    send_out_of_credits_email,
+)
 from daras_ai_v2.settings import templates
 from gooeysite.bg_db_conn import db_middleware
 from payments.auto_recharge import (
@@ -160,6 +164,9 @@ def post_runner_tasks(saved_run_id: int):
     if should_attempt_auto_recharge(sr.workspace):
         run_auto_recharge_gracefully(sr.workspace)
 
+    if sr.is_api_call and sr.error_type == InsufficientCredits.__name__:
+        out_of_credits_email_check(sr=sr)
+
     run_low_balance_email_check(sr.workspace)
 
 
@@ -269,6 +276,37 @@ def send_email_on_completion(sr: SavedRun):
         ),
         message_stream="gooey-ai-workflows",
     )
+
+
+def out_of_credits_email_check(sr: SavedRun):
+    workspace = sr.workspace
+
+    if not settings.OUT_OF_CREDITS_EMAIL_ENABLED:
+        return
+
+    if not workspace.is_paying:
+        return
+
+    email_date_cutoff = timezone.now() - datetime.timedelta(
+        days=settings.OUT_OF_CREDITS_EMAIL_DAYS
+    )
+
+    if (
+        workspace.out_of_credits_email_sent_at
+        and workspace.out_of_credits_email_sent_at >= email_date_cutoff
+    ):
+        return
+
+    pr = sr.parent_published_run()
+    integration_name = (pr and pr.title) or ""
+
+    send_out_of_credits_email(
+        workspace=workspace,
+        integration_name=integration_name,
+        integration_link=sr.get_app_url(),
+    )
+    workspace.out_of_credits_email_sent_at = timezone.now()
+    workspace.save(update_fields=["out_of_credits_email_sent_at"])
 
 
 @app.task
