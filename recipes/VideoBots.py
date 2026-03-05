@@ -689,17 +689,21 @@ Translation Glossary for LLM Language (English) -> User Langauge
             if metrics:
                 response.metrics = metrics
 
-            tool_calls = choices[0].get("tool_calls")
             output_text = [
                 "\n\n".join(filter(None, (prev_text, entry.get("content"))))
                 for prev_text, entry in zip_longest(
                     (prev_output_text or []), choices, fillvalue=""
                 )
             ]
-
-            if tool_calls:
-                response.final_prompt[-1]["tool_calls"] = tool_calls
             response.final_prompt[-1]["content"] = choices[0]["content"] or ""
+
+            tool_calls = choices[0].get("tool_calls")
+            if tool_calls:
+                for call in tool_calls:
+                    tool = tools_by_name[call["function"]["name"]]
+                    call["label"] = tool.label
+                    call["icon"] = tool.get_icon()
+                response.final_prompt[-1]["tool_calls"] = tool_calls
 
             try:
                 response.raw_input_text = choices[0]["input_audio_transcript"]
@@ -762,8 +766,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     role="tool",
                     content=output,
                     tool_call_id=call["id"],
+                    run_url=tool.get_url(),
                 ),
             )
+
         yield from self.llm_loop(
             request=request,
             response=response,

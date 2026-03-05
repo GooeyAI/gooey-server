@@ -30,20 +30,23 @@ from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
 from daras_ai_v2.exceptions import UserError, raise_for_status
-from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from daras_ai_v2.language_model import (
+    CHATML_ROLE_USER,
+    CHATML_ROLE_ASSISTANT,
+    ConversationEntry,
+)
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
-from recipes.VideoBots import VideoBotsPage, ReplyButton
-from routers.api import submit_api_call
-from workspaces.models import Workspace
 from number_cycling.models import (
     SharedPhoneNumber,
     SharedPhoneNumberBotUser,
 )
 from number_cycling.utils import parse_extension_number
-
+from recipes.VideoBots import ReplyButton
+from routers.api import submit_api_call
+from workspaces.models import Workspace
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -237,6 +240,7 @@ class BotInterface:
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
         should_translate: bool = False,
+        prompt_chunks: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         """
         Send a message response to the user using the bot's platform API
@@ -266,6 +270,7 @@ class BotInterface:
                 buttons=buttons,
                 documents=documents,
                 update_msg_id=update_msg_id,
+                prompt_chunks=prompt_chunks,
             )
             # send feedback buttons as a separate message
             return self._send_msg(
@@ -282,6 +287,7 @@ class BotInterface:
                 buttons=buttons,
                 documents=documents,
                 update_msg_id=update_msg_id,
+                prompt_chunks=prompt_chunks,
             )
 
     def _send_msg(
@@ -293,6 +299,7 @@ class BotInterface:
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        prompt_chunks: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         raise NotImplementedError
 
@@ -321,7 +328,10 @@ class BotInterface:
         pass
 
     def send_run_status(
-        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+        self,
+        update_msg_id: str | None,
+        references: list[SearchReference] | None = None,
+        prompt_chunks: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         pass
 
@@ -531,6 +541,7 @@ def _process_and_send_msg(
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
     last_idx = 0  # this is the last index of the text sent to the user
+    prev_final_prompt = []  # this is the last final_prompt sent to the user
     if bot.streaming_enabled:
         # subscribe to the realtime channel for updates
         channel = bot.page_cls.realtime_channel_name(sr.run_id, sr.uid)
@@ -545,31 +556,52 @@ def _process_and_send_msg(
                     return  # abort
                 if bot.recipe_run_state != RecipeRunState.running:
                     break  # we're done running, stop streaming
+
+                final_prompt = state.get("final_prompt") or []
+                # send prompt chunks that are new (only tool calls for now, as content is sent via text field)
+                prompt_chunks = {
+                    idx: entry
+                    for idx, entry in enumerate(final_prompt)
+                    if (
+                        idx >= len(prev_final_prompt) or prev_final_prompt[idx] != entry
+                    )
+                    and isinstance(entry, dict)
+                    and (entry.get("tool_calls") or entry.get("role") == "tool")
+                }
+                prev_final_prompt = final_prompt
+
                 text = state.get("output_text") and state.get("output_text")[0]
                 if not text:
                     # if no text, send the run status as text
                     update_msg_id = bot.send_run_status(
-                        update_msg_id=update_msg_id, references=state.get("references")
+                        update_msg_id=update_msg_id,
+                        references=state.get("references"),
+                        prompt_chunks=prompt_chunks,
                     )
                     continue  # no text, wait for the next update
+
                 streaming_done = state.get("finish_reason")
+
                 # send the response to the user
                 if bot.can_update_message:
                     update_msg_id = bot.send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        prompt_chunks=prompt_chunks,
                     )
                     last_idx = len(text)
                 else:
                     next_chunk = text[last_idx:]
                     last_idx = len(text)
-                    if not next_chunk:
+                    if not (next_chunk or final_prompt):
                         continue  # no chunk, wait for the next update
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        prompt_chunks=prompt_chunks,
                     )
+
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
                     sent_msg_id = update_msg_id

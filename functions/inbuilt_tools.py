@@ -146,7 +146,7 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
 
         super().__init__(
             name="update_gui_state",
-            label="Update GUI State",
+            label="Update Workflow",
             description="Update the current GUI state.",
             properties=properties,
         )

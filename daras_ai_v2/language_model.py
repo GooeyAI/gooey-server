@@ -89,16 +89,31 @@ def calc_gpt_tokens(
     return default_length_function(combined)
 
 
-class ConversationEntry(typing_extensions.TypedDict, total=False):
+class FunctionParam(typing_extensions.TypedDict):
+    name: str
+    arguments: str
+
+
+class FunctionToolCallParam(typing_extensions.TypedDict):
+    id: str
+    type: typing.Literal["function"] | None
+    function: FunctionParam
+
+    label: typing_extensions.NotRequired[str | None]
+    url: typing_extensions.NotRequired[str | None]
+    icon: typing_extensions.NotRequired[str | None]
+
+
+class ConversationEntry(typing_extensions.TypedDict):
     role: typing.Literal["user", "system", "assistant", "tool"]
     content: str | list[ChatCompletionContentPartParam]
 
     chunk: typing_extensions.NotRequired[str]
 
-    tool_calls: typing_extensions.NotRequired[list[ChatCompletionMessageToolCallParam]]
+    tool_calls: typing_extensions.NotRequired[list[FunctionToolCallParam]]
     tool_call_id: typing_extensions.NotRequired[str]
 
-    display_name: typing_extensions.NotRequired[str]
+    run_url: typing_extensions.NotRequired[str]
 
 
 def remove_images_from_entry(entry: ConversationEntry) -> ConversationEntry | None:

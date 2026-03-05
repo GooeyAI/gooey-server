@@ -15,6 +15,7 @@ from celeryapp.tasks import err_msg_for_exc
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RecipeRunState, StateKeys
 from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed, parse_bot_html
+from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.redis_cache import get_redis_cache
 from daras_ai_v2.search_ref import SearchReference
 from recipes.VideoBots import VideoBotsPage, ReplyButton
@@ -159,6 +160,8 @@ class MessagePart(BaseModel):
     video: str | None = None
     buttons: list[ReplyButton] | None = None
     documents: list[str] | None = None
+
+    prompt_chunks: dict[int, dict] | None = None
 
 
 class FinalResponse(AsyncStatusResponseModelV3[VideoBotsPage.ResponseModel]):
@@ -351,7 +354,10 @@ class ApiInterface(BotInterface):
         self.queue.put(RunStart(**build_async_api_response(sr)))
 
     def send_run_status(
-        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+        self,
+        update_msg_id: str | None,
+        references: list[SearchReference] | None = None,
+        prompt_chunks: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         self.queue.put(
             MessagePart(
@@ -361,6 +367,7 @@ class ApiInterface(BotInterface):
                     #  avoid sending the entire snippet to save bandwidth
                     [r | dict(snippet="") for r in references] if references else None
                 ),
+                prompt_chunks=prompt_chunks or None,
             )
         )
         return None
@@ -374,6 +381,7 @@ class ApiInterface(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
+        prompt_chunks: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         response = MessagePart(
             status=self.recipe_run_state,
@@ -383,6 +391,7 @@ class ApiInterface(BotInterface):
             video=video and video[0],
             buttons=buttons,
             documents=documents,
+            prompt_chunks=prompt_chunks or None,
         )
         self.queue.put(response)
         return self.bot_message_id

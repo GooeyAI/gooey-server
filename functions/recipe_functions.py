@@ -27,6 +27,9 @@ before or after the workflow runs.
 
 
 class BaseLLMTool:
+    icon: str = ""
+    url: str = ""
+
     def __init__(
         self,
         name: str,
@@ -76,6 +79,12 @@ class BaseLLMTool:
 
     def call(self, *args, **kwargs) -> typing.Any:
         raise NotImplementedError
+
+    def get_icon(self) -> str:
+        return self.icon
+
+    def get_url(self) -> str:
+        return self.url
 
 
 class WorkflowLLMTool(BaseLLMTool):
@@ -169,6 +178,7 @@ class WorkflowLLMTool(BaseLLMTool):
             request_body=request_body,
             deduct_credits=False,
         )
+        self.fn_sr = fn_sr
 
         CalledFunction.objects.create(
             saved_run=self.saved_run,
@@ -251,6 +261,22 @@ class WorkflowLLMTool(BaseLLMTool):
         system_vars_schema = {var: {"role": "system"} for var in system_vars}
 
         return system_vars, system_vars_schema
+
+    def get_icon(self) -> str:
+        if self.fn_pr and self.fn_pr.photo_url:
+            return self.fn_pr.photo_url
+
+        # Fallback to workflow emoji
+        from bots.models import WorkflowMetadata
+
+        try:
+            workflow_meta = WorkflowMetadata.objects.get(workflow=self.fn_sr.workflow)
+            return workflow_meta.emoji
+        except WorkflowMetadata.DoesNotExist:
+            return ""
+
+    def get_url(self) -> str:
+        return self.fn_sr.get_app_url()
 
 
 def get_tool_from_call(
@@ -528,6 +554,7 @@ def _get_external_tool_calls_items(
     if not final_prompt or isinstance(final_prompt, str):
         return []
 
+    # de-duplicate workflow tools so they don't show up twice
     workflow_tools = {
         called_fn.tool_name for called_fn in called_functions if called_fn.tool_name
     }
