@@ -240,7 +240,7 @@ class BotInterface:
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
         should_translate: bool = False,
-        prompt_chunks: dict[int, ConversationEntry] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         """
         Send a message response to the user using the bot's platform API
@@ -270,7 +270,7 @@ class BotInterface:
                 buttons=buttons,
                 documents=documents,
                 update_msg_id=update_msg_id,
-                prompt_chunks=prompt_chunks,
+                prompt_delta=prompt_delta,
             )
             # send feedback buttons as a separate message
             return self._send_msg(
@@ -287,7 +287,7 @@ class BotInterface:
                 buttons=buttons,
                 documents=documents,
                 update_msg_id=update_msg_id,
-                prompt_chunks=prompt_chunks,
+                prompt_delta=prompt_delta,
             )
 
     def _send_msg(
@@ -299,7 +299,7 @@ class BotInterface:
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_chunks: dict[int, ConversationEntry] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         raise NotImplementedError
 
@@ -331,7 +331,7 @@ class BotInterface:
         self,
         update_msg_id: str | None,
         references: list[SearchReference] | None = None,
-        prompt_chunks: dict[int, ConversationEntry] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         pass
 
@@ -559,7 +559,7 @@ def _process_and_send_msg(
 
                 final_prompt = state.get("final_prompt") or []
                 # send prompt chunks that are new (only tool calls for now, as content is sent via text field)
-                prompt_chunks = {
+                prompt_delta = {
                     idx: entry
                     for idx, entry in enumerate(final_prompt)
                     if (
@@ -576,7 +576,7 @@ def _process_and_send_msg(
                     update_msg_id = bot.send_run_status(
                         update_msg_id=update_msg_id,
                         references=state.get("references"),
-                        prompt_chunks=prompt_chunks,
+                        prompt_delta=prompt_delta,
                     )
                     continue  # no text, wait for the next update
 
@@ -588,18 +588,18 @@ def _process_and_send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
-                        prompt_chunks=prompt_chunks,
+                        prompt_delta=prompt_delta,
                     )
                     last_idx = len(text)
                 else:
                     next_chunk = text[last_idx:]
                     last_idx = len(text)
-                    if not (next_chunk or prompt_chunks):
+                    if not (next_chunk or prompt_delta):
                         continue  # no chunk, wait for the next update
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
-                        prompt_chunks=prompt_chunks,
+                        prompt_delta=prompt_delta,
                     )
 
                 if streaming_done and not bot.can_update_message:

@@ -93,7 +93,7 @@ class TwilioSMS(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_chunks: dict[int, ConversationEntry] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         media = audio or video or documents
         if not (media or text):
@@ -234,7 +234,7 @@ class TwilioVoice(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_chunks: dict[int, ConversationEntry] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         assert not documents, "Twilio does not support sending documents via Voice"
         assert not video, "Twilio does not support sending videos via Voice"

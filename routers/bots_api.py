@@ -161,7 +161,7 @@ class MessagePart(BaseModel):
     buttons: list[ReplyButton] | None = None
     documents: list[str] | None = None
 
-    prompt_chunks: dict[int, dict] | None = None
+    prompt_delta: dict[int, dict] | None = None
 
 
 class FinalResponse(AsyncStatusResponseModelV3[VideoBotsPage.ResponseModel]):
@@ -357,7 +357,7 @@ class ApiInterface(BotInterface):
         self,
         update_msg_id: str | None,
         references: list[SearchReference] | None = None,
-        prompt_chunks: dict[int, ConversationEntry] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         self.queue.put(
             MessagePart(
@@ -367,7 +367,7 @@ class ApiInterface(BotInterface):
                     #  avoid sending the entire snippet to save bandwidth
                     [r | dict(snippet="") for r in references] if references else None
                 ),
-                prompt_chunks=prompt_chunks or None,
+                prompt_delta=prompt_delta or None,
             )
         )
         return None
@@ -381,7 +381,7 @@ class ApiInterface(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_chunks: dict[int, ConversationEntry] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         response = MessagePart(
             status=self.recipe_run_state,
@@ -391,7 +391,7 @@ class ApiInterface(BotInterface):
             video=video and video[0],
             buttons=buttons,
             documents=documents,
-            prompt_chunks=prompt_chunks or None,
+            prompt_delta=prompt_delta or None,
         )
         self.queue.put(response)
         return self.bot_message_id
