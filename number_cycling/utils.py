@@ -2,6 +2,7 @@ import random
 import re
 
 import hashids
+import phonenumbers
 from django.db import IntegrityError, transaction
 
 from bots.models.bot_integration import BotIntegration, Platform
@@ -13,17 +14,31 @@ import secrets
 EXTENSION_NUMBER_LENGTH = 5
 
 
+def country_code_label(country_code: str) -> str:
+    """Derive a display label from an ISO 3166-1 alpha-2 country code.
+
+    e.g. "US" → "🇺🇸 US +1", "IN" → "🇮🇳 IN +91"
+    """
+
+    flag = "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in country_code.upper())
+    dial_code = phonenumbers.country_code_for_region(country_code.upper())
+    return f"{flag} {country_code.upper()} +{dial_code}"
+
+
 def create_bot_integration_with_extension(
     name: str,
     created_by,
     workspace: Workspace,
     platform: Platform,
+    country_code: str = "",
 ) -> BotIntegration:
     if platform != Platform.TWILIO and platform != Platform.WHATSAPP:
         raise ValueError("Invalid platform")
 
     with transaction.atomic():
-        shared_phone_number = SharedPhoneNumber.objects.any_active_number(platform)
+        shared_phone_number = SharedPhoneNumber.objects.any_active_number(
+            platform, country_code=country_code
+        )
         for _ in range(10):
             try:
                 return BotIntegration.objects.create(
