@@ -638,11 +638,9 @@ def format_bot_error(bot: BotInterface, sr: SavedRun) -> str:
         and bot.platform == Platform.WHATSAPP
     ):
         integration_name = bot.bi.name
-        integration_link = sr.get_app_url()
         return (
-            f"💰 The owner of **{integration_name}** is out of Gooey.AI credits. "
-            "Please try your message again later.\n\n"
-            f"{integration_link}"
+            f"⚠️ **{integration_name}** has run out of Gooey.AI credits."
+            "Please try your message again later."
         )
     return ERROR_MSG.format(sr.error_msg or "")
 
