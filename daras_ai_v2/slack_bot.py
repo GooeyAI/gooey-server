@@ -16,6 +16,7 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.bots import BotInterface, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import fetch_parallel
+from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.text_splitter import text_splitter
 from recipes.VideoBots import ReplyButton
@@ -137,7 +138,10 @@ class SlackBot(BotInterface):
         )
 
     def send_run_status(
-        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+        self,
+        update_msg_id: str | None = None,
+        references: list[SearchReference] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         if not self.run_status:
             return update_msg_id

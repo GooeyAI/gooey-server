@@ -110,7 +110,6 @@ from functions.recipe_functions import BaseLLMTool
 from functions.recipe_functions import (
     get_tool_from_call,
     get_workflow_tools_from_state,
-    render_called_functions_as_html,
 )
 from payments.plans import PricingPlan
 from recipes.DocExtract import document_intelligence_settings
@@ -689,17 +688,21 @@ Translation Glossary for LLM Language (English) -> User Langauge
             if metrics:
                 response.metrics = metrics
 
-            tool_calls = choices[0].get("tool_calls")
             output_text = [
                 "\n\n".join(filter(None, (prev_text, entry.get("content"))))
                 for prev_text, entry in zip_longest(
                     (prev_output_text or []), choices, fillvalue=""
                 )
             ]
-
-            if tool_calls:
-                response.final_prompt[-1]["tool_calls"] = tool_calls
             response.final_prompt[-1]["content"] = choices[0]["content"] or ""
+
+            tool_calls = choices[0].get("tool_calls")
+            if tool_calls:
+                for call in tool_calls:
+                    tool = tools_by_name[call["function"]["name"]]
+                    call["label"] = tool.label
+                    call["icon"] = tool.get_icon()
+                response.final_prompt[-1]["tool_calls"] = tool_calls
 
             try:
                 response.raw_input_text = choices[0]["input_audio_transcript"]
@@ -762,8 +765,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     role="tool",
                     content=output,
                     tool_call_id=call["id"],
+                    run_url=tool.get_url(),
                 ),
             )
+
         yield from self.llm_loop(
             request=request,
             response=response,
@@ -1366,23 +1371,6 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 buttons = []
 
-            text = "\n\n".join(
-                filter(
-                    None,
-                    [
-                        render_called_functions_as_html(
-                            saved_run=self.current_sr, trigger=FunctionTrigger.pre
-                        ),
-                        render_called_functions_as_html(
-                            saved_run=self.current_sr, trigger=FunctionTrigger.prompt
-                        ),
-                        text,
-                        render_called_functions_as_html(
-                            saved_run=self.current_sr, trigger=FunctionTrigger.post
-                        ),
-                    ],
-                )
-            )
             messages.append(
                 dict(
                     role=CHATML_ROLE_ASSISTANT,
@@ -1396,6 +1384,7 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
                     output_audio=output_audio,
                     references=gui.session_state.get("references") or [],
                     buttons=buttons,
+                    final_prompt=gui.session_state.get("final_prompt"),
                 )
             )
 

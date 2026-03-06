@@ -10,7 +10,6 @@ from app_users.models import AppUser
 from daras_ai_v2 import icons
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
-from daras_ai_v2.settings import templates
 from functions.models import CalledFunction, FunctionScopes, FunctionTrigger
 from widgets.switch_with_section import switch_with_section
 
@@ -27,6 +26,9 @@ before or after the workflow runs.
 
 
 class BaseLLMTool:
+    icon: str = ""
+    url: str = ""
+
     def __init__(
         self,
         name: str,
@@ -76,6 +78,12 @@ class BaseLLMTool:
 
     def call(self, *args, **kwargs) -> typing.Any:
         raise NotImplementedError
+
+    def get_icon(self) -> str:
+        return self.icon
+
+    def get_url(self) -> str:
+        return self.url
 
 
 class WorkflowLLMTool(BaseLLMTool):
@@ -169,6 +177,7 @@ class WorkflowLLMTool(BaseLLMTool):
             request_body=request_body,
             deduct_credits=False,
         )
+        self.fn_sr = fn_sr
 
         CalledFunction.objects.create(
             saved_run=self.saved_run,
@@ -251,6 +260,22 @@ class WorkflowLLMTool(BaseLLMTool):
         system_vars_schema = {var: {"role": "system"} for var in system_vars}
 
         return system_vars, system_vars_schema
+
+    def get_icon(self) -> str:
+        if self.fn_pr and self.fn_pr.photo_url:
+            return self.fn_pr.photo_url
+
+        # Fallback to workflow emoji
+        from bots.models import WorkflowMetadata
+
+        try:
+            workflow_meta = WorkflowMetadata.objects.get(workflow=self.fn_sr.workflow)
+            return workflow_meta.emoji
+        except WorkflowMetadata.DoesNotExist:
+            return ""
+
+    def get_url(self) -> str:
+        return self.fn_sr.get_app_url()
 
 
 def get_tool_from_call(
@@ -442,133 +467,22 @@ def functions_input(
 
 
 def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
-    items = _get_called_functions_items(saved_run=saved_run, trigger=trigger)
-    if not items:
-        return
-    for item in items:
-        key = f"fn-call-details-{item['id']}"
-        with gui.expander(f"🛠️ Called `{item['title']}`", key=key):
-            if not gui.session_state.get(key):
-                continue
-            gui.html(
-                f'<i class="fa-regular fa-external-link-square"></i> '
-                f'<a target="_blank" href="{item["url"]}">'
-                "Inspect Function Call"
-                "</a>"
-            )
-
-            gui.write("**Inputs**")
-            gui.json(item["inputs"])
-
-            if item["return_value"] is not None:
-                gui.write("**Return value**")
-                gui.json(item["return_value"])
-
-
-def render_called_functions_as_html(
-    *, saved_run: SavedRun, trigger: FunctionTrigger
-) -> str:
-    """Return HTML for functions called for a given run and trigger using a template."""
-    context_items = list(
-        _get_called_functions_items(saved_run=saved_run, trigger=trigger)
-    )
-    if not context_items:
-        return ""
-    context = {"called_functions": context_items}
-    template = templates.get_template("functions/called_functions.html")
-    return template.render(context)
-
-
-def _get_called_functions_items(
-    *, saved_run: SavedRun, trigger: FunctionTrigger
-) -> typing.Iterable[dict]:
-    """Generate data for called functions for reuse across renderers."""
-    from bots.models import Workflow
-
     qs = saved_run.called_functions.filter(trigger=trigger.db_value)
-
-    if trigger == FunctionTrigger.prompt:
-        yield from _get_external_tool_calls_items(saved_run, called_functions=qs)
-
     for called_fn in qs:
         fn_sr = called_fn.function_run
-        page_cls = Workflow(fn_sr.workflow).page_cls
-
         pr = fn_sr.parent_published_run()
         title = pr and pr.title or "Function"
-
-        if fn_sr.workflow == Workflow.FUNCTIONS:
-            fn_vars = fn_sr.state.get("variables", {})
-            fn_vars_schema = fn_sr.state.get("variables_schema", {})
-            inputs = {
-                key: value
-                for key, value in fn_vars.items()
-                if fn_vars_schema.get(key, {}).get("role") != "system"
-            }
-        else:
-            inputs = page_cls.get_example_request(fn_sr.state)[1]
-        return_value = fn_sr.state.get("return_value")
-
-        yield dict(
-            id=called_fn.id,
-            title=title,
-            url=fn_sr.get_app_url(),
-            inputs=inputs,
-            return_value=return_value,
-            is_running=bool(fn_sr.run_status),
-        )
-
-
-def _get_external_tool_calls_items(
-    saved_run: SavedRun,
-    *,
-    called_functions: typing.Iterable[CalledFunction] = (),
-) -> typing.Iterable[dict]:
-    final_prompt = saved_run.state.get("final_prompt")
-    if not final_prompt or isinstance(final_prompt, str):
-        return []
-
-    workflow_tools = {
-        called_fn.tool_name for called_fn in called_functions if called_fn.tool_name
-    }
-
-    items_by_id = {}
-    for entry in final_prompt:
-        if entry.get("role") == "tool":
-            tool_call_id = entry["tool_call_id"]
-            try:
-                item = items_by_id[tool_call_id]
-            except KeyError:
-                continue
-            return_value = entry["content"]
-            try:
-                return_value = json.loads(return_value)
-            except json.JSONDecodeError:
-                pass
-            item["return_value"] = return_value
-            item["is_running"] = False
-
-        for tool_call in entry.get("tool_calls", []):
-            tool_call_id = tool_call["id"]
-            tool_name = tool_call["function"]["name"]
-            if tool_name in workflow_tools:
-                continue
-            inputs = tool_call["function"]["arguments"]
-            try:
-                inputs = json.loads(inputs)
-            except json.JSONDecodeError:
-                pass
-
-            items_by_id[tool_call_id] = dict(
-                id=tool_call_id,
-                title=tool_name,
-                url="",
-                inputs=inputs,
-                return_value=None,
-                is_running=True,
-            )
-
-    return items_by_id.values()
+        with gui.tag(
+            "a",
+            href=fn_sr.get_app_url(),
+            target="_blank",
+            className="text-decoration-none d-block mb-2",
+        ):
+            with gui.div(
+                className="border rounded-4 px-3 py-2 d-flex align-items-center justify-content-between bg-light container-margin-reset"
+            ):
+                gui.write(f"**{trigger.label} -** `{title}`")
+                gui.html("<i class='fa fa-external-link'></i>")
 
 
 def get_external_tool_slug_from_url(url: str) -> str | None:

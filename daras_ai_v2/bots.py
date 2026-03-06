@@ -30,20 +30,23 @@ from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
 from daras_ai_v2.exceptions import UserError, raise_for_status
-from daras_ai_v2.language_model import CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT
+from daras_ai_v2.language_model import (
+    CHATML_ROLE_USER,
+    CHATML_ROLE_ASSISTANT,
+    ConversationEntry,
+)
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
-from recipes.VideoBots import VideoBotsPage, ReplyButton
-from routers.api import submit_api_call
-from workspaces.models import Workspace
 from number_cycling.models import (
     SharedPhoneNumber,
     SharedPhoneNumberBotUser,
 )
 from number_cycling.utils import parse_extension_number
-
+from recipes.VideoBots import ReplyButton
+from routers.api import submit_api_call
+from workspaces.models import Workspace
 
 PAGE_NOT_CONNECTED_ERROR = (
     "💔 Looks like you haven't connected this page to a gooey.ai workflow. "
@@ -321,7 +324,10 @@ class BotInterface:
         pass
 
     def send_run_status(
-        self, update_msg_id: str | None, references: list[SearchReference] | None = None
+        self,
+        update_msg_id: str | None = None,
+        references: list[SearchReference] | None = None,
+        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         pass
 
@@ -531,6 +537,7 @@ def _process_and_send_msg(
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
     last_idx = 0  # this is the last index of the text sent to the user
+    prev_final_prompt = []  # this is the last final_prompt sent to the user
     if bot.streaming_enabled:
         # subscribe to the realtime channel for updates
         channel = bot.page_cls.realtime_channel_name(sr.run_id, sr.uid)
@@ -545,6 +552,16 @@ def _process_and_send_msg(
                     return  # abort
                 if bot.recipe_run_state != RecipeRunState.running:
                     break  # we're done running, stop streaming
+
+                final_prompt = state.get("final_prompt") or []
+                # send prompt chunks that are new (only tool calls for now, as content is sent via text field)
+                prompt_delta = compute_prompt_delta(final_prompt, prev_final_prompt)
+                if prompt_delta:
+                    update_msg_id = bot.send_run_status(
+                        update_msg_id=update_msg_id, prompt_delta=prompt_delta
+                    )
+                prev_final_prompt = final_prompt
+
                 text = state.get("output_text") and state.get("output_text")[0]
                 if not text:
                     # if no text, send the run status as text
@@ -630,6 +647,20 @@ def _process_and_send_msg(
         # bot output for human
         bot_msg_display_content=state.get("output_text") and state["output_text"][0],
     )
+
+
+def compute_prompt_delta(
+    final_prompt: list[ConversationEntry], prev_final_prompt: list[ConversationEntry]
+) -> dict[int, ConversationEntry]:
+    return {
+        idx: entry
+        for idx, entry in enumerate(final_prompt)
+        if (
+            (idx >= len(prev_final_prompt) or prev_final_prompt[idx] != entry)
+            and isinstance(entry, dict)
+            and (entry.get("tool_calls") or entry.get("role") == "tool")
+        )
+    }
 
 
 def build_system_vars(
