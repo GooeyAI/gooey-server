@@ -12,6 +12,7 @@ from daras_ai_v2.stable_diffusion import (
 # openai / google models that generally dont support controlnet, guidance scale, inference steps etc.
 PROPRIETARY_MODELS = {
     Text2ImgModels.nano_banana_pro.name,
+    Text2ImgModels.nano_banana_2.name,
     Text2ImgModels.nano_banana.name,
     Text2ImgModels.gpt_image_1.name,
     Text2ImgModels.gpt_image_1_5.name,
@@ -261,6 +262,13 @@ RESOLUTIONS: dict[str, dict[str, str]] = {
     "256p": {
         "256 x 256": "square",
     },
+    "0.5K": {
+        "960 x 540": "16:9",
+        "810 x 540": "3:2",
+        "720 x 540": "4:3",
+        "675 x 540": "5:4",
+        "540 x 540": "1:1",
+    },
     "512p": {
         "512 x 512": "square",
         "576 x 448": "A4",
@@ -313,6 +321,7 @@ LANDSCAPE = "Landscape"
 PORTRAIT = "Portrait"
 
 NANO_BANANA_RESOLUTIONS = ["1K", "2K", "4K"]
+NANO_BANANA_2_RESOLUTIONS = ["0.5K", "1K", "2K", "4K"]
 
 
 def output_resolution_setting(selected_models: set[str]):
@@ -345,6 +354,8 @@ def output_resolution_setting(selected_models: set[str]):
         Text2ImgModels.nano_banana_pro.name,
     }:
         pixel_options = NANO_BANANA_RESOLUTIONS
+    elif selected_models <= {Text2ImgModels.nano_banana_2.name}:
+        pixel_options = NANO_BANANA_2_RESOLUTIONS
     elif selected_models <= {Text2ImgModels.flux_1_dev.name}:
         pixel_options = ["1024p"]
     elif selected_models <= {Text2ImgModels.dall_e.name}:

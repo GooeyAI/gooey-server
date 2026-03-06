@@ -10,7 +10,12 @@ if typing.TYPE_CHECKING:
     from bots.models.saved_run import SavedRun
 
 
-def record_cost_auto(model: str, sku: ModelSku, quantity: int) -> UsageCost | None:
+def record_cost_auto(
+    model: str,
+    sku: ModelSku,
+    quantity: int,
+    unit_cost_multiplier: float = 1,
+) -> UsageCost | None:
     from celeryapp.tasks import get_running_saved_run
 
     sr = get_running_saved_run()
@@ -23,7 +28,7 @@ def record_cost_auto(model: str, sku: ModelSku, quantity: int) -> UsageCost | No
         sr=sr,
         pricing=pricing,
         quantity=quantity,
-        unit_cost=pricing.unit_cost,
+        unit_cost=float(pricing.unit_cost) * unit_cost_multiplier,
         unit_quantity=pricing.unit_quantity,
     )
 
