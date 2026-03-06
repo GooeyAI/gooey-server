@@ -29,6 +29,7 @@ from .tasks import send_added_to_workspace_email, send_invitation_email
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser, AppUserTransaction
+    from payments.models import SeatType
 
 
 DEFAULT_WORKSPACE_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/74a37c52-8260-11ee-a297-02420a0001ee/gooey.ai%20-%20A%20pop%20art%20illustration%20of%20robots%20taki...y%20Liechtenstein%20mint%20colour%20is%20main%20city%20Seattle.png"
@@ -281,7 +282,12 @@ class Workspace(SafeDeleteModel):
 
     @cached_property
     def used_seats(self) -> int:
-        return self.memberships.exclude(seat_type__monthly_charge=0).count()
+        if self.subscription and self.subscription.plan == PricingPlan.TEAM.db_value:
+            return self.memberships.filter(seat__seat_type__is_public=True).count()
+        else:
+            return self.memberships.exclude(
+                user__email__in=settings.ADMIN_EMAILS
+            ).count()
 
     @db_middleware
     @transaction.atomic
@@ -350,7 +356,6 @@ class Workspace(SafeDeleteModel):
         *,
         user_id: int | None,
         amount: int,
-        require_seat_type: bool = True,
         check_team_plan: bool = True,
     ) -> typing.Optional["WorkspaceMembership"]:
         if not user_id:
@@ -365,8 +370,6 @@ class Workspace(SafeDeleteModel):
             user_id=user_id,
             deleted__isnull=True,
         )
-        if require_seat_type:
-            qs = qs.filter(seat_type__isnull=False)
 
         membership = qs.first()
         if not membership:
@@ -530,14 +533,6 @@ class WorkspaceMembership(SafeDeleteModel):
     role = models.IntegerField(
         choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
     )
-    seat_type = models.ForeignKey(
-        "WorkspaceSeatType",
-        on_delete=models.SET_NULL,
-        related_name="memberships",
-        null=True,
-        blank=True,
-        default=None,
-    )
     balance = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)  # same as joining date
@@ -551,13 +546,7 @@ class WorkspaceMembership(SafeDeleteModel):
                 name="unique_workspace_user",
             )
         ]
-        indexes = [
-            models.Index(fields=["workspace", "role", "deleted"]),
-            models.Index(
-                fields=["workspace", "seat_type", "deleted"],
-                name="wsm_ws_seat_deleted_idx",
-            ),
-        ]
+        indexes = [models.Index(fields=["workspace", "role", "deleted"])]
 
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
@@ -608,61 +597,40 @@ class WorkspaceMembership(SafeDeleteModel):
         )
 
     @staticmethod
-    def get_or_create_gooey_admin_seat_type() -> "WorkspaceSeatType":
-        return WorkspaceSeatType.objects.get_or_create(
+    def get_or_create_gooey_admin_seat_type() -> "SeatType":
+        from payments.models import SeatType
+
+        return SeatType.objects.get_or_create(
             name="Gooey Admin",
             defaults=dict(
                 monthly_charge=0,
                 monthly_credit_limit=2_500,
-                daily_credit_limit=None,
+                is_public=False,
+                plan=PricingPlan.TEAM.db_value,
             ),
         )[0]
 
     @staticmethod
     def get_default_subscription_seat_type(
         workspace: "Workspace",
-    ) -> typing.Optional["WorkspaceSeatType"]:
+    ) -> typing.Optional["SeatType"]:
+        from payments.models import SeatType
+
         if not workspace.subscription:
             return None
         if seat_type := workspace.subscription.get_seat_type():
             return seat_type
 
+        plan = PricingPlan.from_sub(workspace.subscription)
         return (
-            WorkspaceSeatType.objects.exclude(name="Gooey Admin")
-            .filter(monthly_charge__gt=0)
+            SeatType.objects.filter(
+                is_public=True,
+                plan=plan.db_value,
+                monthly_charge__gt=0,
+            )
             .order_by("monthly_charge", "monthly_credit_limit", "id")
             .first()
         )
-
-
-class WorkspaceSeatType(models.Model):
-    name = models.CharField(max_length=100)
-    monthly_charge = models.PositiveIntegerField(default=0)
-    monthly_credit_limit = models.PositiveIntegerField(
-        null=True, blank=True, default=None
-    )
-    daily_credit_limit = models.PositiveIntegerField(
-        null=True, blank=True, default=None
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["name"], name="unique_workspace_seat_type_name"
-            )
-        ]
-        indexes = [
-            models.Index(
-                fields=["name"],
-                name="wsst_name_idx",
-            ),
-        ]
-
-    def __str__(self):
-        return self.name
 
 
 class WorkspaceInviteQuerySet(models.QuerySet):
@@ -834,61 +802,44 @@ class WorkspaceInvite(models.Model):
             )
 
         plan = PricingPlan.from_sub(self.workspace.subscription)
-        if invitee.email not in settings.ADMIN_EMAILS:
-            seat_type = (
-                self.workspace.subscription
-                and self.workspace.subscription.get_seat_type()
+        if plan == PricingPlan.TEAM and invitee.email not in settings.ADMIN_EMAILS:
+            # SELECT ... FOR UPDATE locks the seat row for the duration of this transaction
+            # Gives us time to accept the invitation, and then assign the seat
+            unused_seat = (
+                self.workspace.subscription.seats.select_for_update()
+                .filter(seat_type__is_public=True, assigned_to__isnull=True)
+                .first()
             )
-            seats = (
-                self.workspace.subscription and self.workspace.subscription.seats or 1
-            )
-            if (
-                plan == PricingPlan.TEAM
-                and seat_type
-                and seats <= self.workspace.used_seats
-            ):
+            if not unused_seat:
                 raise ValidationError(
                     "Your team has reached the maximum number of members allowed by your current plan. Please contact your workspace admin to upgrade your plan."
                 )
-
-        membership_defaults = dict(invite=self, role=self.role)
-        if plan == PricingPlan.TEAM:
-            if invitee.email in settings.ADMIN_EMAILS:
-                membership_defaults["seat_type"] = (
-                    WorkspaceMembership.get_or_create_gooey_admin_seat_type()
-                )
-            elif default_seat_type := (
-                WorkspaceMembership.get_default_subscription_seat_type(self.workspace)
-            ):
-                membership_defaults["seat_type"] = default_seat_type
+        else:
+            unused_seat = None
 
         membership, created = WorkspaceMembership.objects.get_or_create(
             workspace=self.workspace,
             user=invitee,
-            defaults=membership_defaults,
+            defaults=dict(invite=self, role=self.role),
         )
         if not created:
-            if plan == PricingPlan.TEAM and not membership.seat_type_id:
-                if invitee.email in settings.ADMIN_EMAILS:
-                    membership.seat_type = (
-                        WorkspaceMembership.get_or_create_gooey_admin_seat_type()
-                    )
-                else:
-                    membership.seat_type = (
-                        WorkspaceMembership.get_default_subscription_seat_type(
-                            self.workspace
-                        )
-                    )
-                if membership.seat_type_id:
-                    membership.save(update_fields=["seat_type", "updated_at"])
-            return membership, created
+            return membership, False
+
+        if plan == PricingPlan.TEAM and invitee.email in settings.ADMIN_EMAILS:
+            admin_seat_type = WorkspaceMembership.get_or_create_gooey_admin_seat_type()
+            self.workspace.subscription.seats.create(
+                seat_type=admin_seat_type, assigned_to=membership
+            )
+        elif unused_seat:
+            unused_seat.assigned_to = membership
+            unused_seat.save()
 
         self.updated_by = updated_by
         self.status = self.Status.ACCEPTED
         self.auto_accepted = auto_accepted
 
         self.full_clean()
-        self.save(update_fields=["status", "updated_by", "auto_accepted", "updated_at"])
+        self.save()
 
         return membership, created
 
