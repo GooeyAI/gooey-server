@@ -226,7 +226,7 @@ JsonTypes = typing.Literal["string", "number", "boolean", "array", "object"]
 
 class VariableSchema(TypedDict):
     type: NotRequired[JsonTypes]
-    role: NotRequired[typing.Literal["user", "system"]]
+    role: NotRequired[typing.Literal["user", "system", "prompt"]]
     description: NotRequired[str]
 
 

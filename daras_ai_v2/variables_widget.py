@@ -32,17 +32,7 @@ def variables_input(
         schema_key = key + "_schema"
         variables_schema = gui.session_state.get(schema_key) or {}
 
-        # find all variables in the prompts
-        env = jinja2.sandbox.SandboxedEnvironment()
-        template_var_names = set()
-        error = None
-        for k in template_keys:
-            try:
-                parsed = env.parse(gui.session_state.get(k, ""))
-            except jinja2.exceptions.TemplateSyntaxError as e:
-                error = e
-            else:
-                template_var_names |= jinja2.meta.find_undeclared_variables(parsed)
+        error, template_var_names = find_template_vars(template_keys)
 
         var_names = (
             (template_var_names | set(variables.keys()))
@@ -72,12 +62,12 @@ def variables_input(
             var_names, key=lambda x: variables_schema.get(x, {}).get("role") or ""
         )
         for var in var_names:
+            schema = variables_schema.get(var, {})
+            if var in template_var_names and var not in variables:
+                # mark new jinja template variables
+                schema["role"] = "prompt"
             list_items.append(
-                {
-                    "name": var,
-                    "value": variables.get(var),
-                    "schema": variables_schema.get(var, {}),
-                }
+                {"name": var, "value": variables.get(var), "schema": schema}
             )
 
         if pressed_add:
@@ -85,20 +75,18 @@ def variables_input(
                 0, {"name": "", "value": None, "schema": {}, "_edit": True}
             )
 
+        list_items = remove_stale_template_vars(list_items, template_var_names)
+
         # if the user clicks the button to clear system variables, remove all system variables
         if gui.session_state.pop(list_key + ":clear-system", None):
-            gui.session_state[list_key] = [
+            list_items = [
                 item
                 for item in list_items
                 if item.get("schema", {}).get("role") != "system"
             ]
 
-        list_items = list_view_editor(
-            key=list_key,
-            render_inputs=partial(
-                render_list_item, template_var_names=template_var_names
-            ),
-        )
+        gui.session_state[list_key] = list_items
+        list_items = list_view_editor(key=list_key, render_inputs=render_list_item)
 
         if error:
             gui.error(f"{type(error).__qualname__}: {error.message}")
@@ -121,9 +109,37 @@ def variables_input(
         }
 
 
-def render_list_item(
-    entry_key: str, del_key: str, item: dict, *, template_var_names: set
-):
+def find_template_vars(
+    template_keys: typing.Iterable[str],
+) -> tuple[jinja2.exceptions.TemplateSyntaxError | None, set[str]]:
+    env = jinja2.sandbox.SandboxedEnvironment()
+    template_var_names = set()
+    error = None
+    for k in template_keys:
+        try:
+            parsed = env.parse(gui.session_state.get(k, ""))
+        except jinja2.exceptions.TemplateSyntaxError as e:
+            error = e
+        else:
+            template_var_names |= jinja2.meta.find_undeclared_variables(parsed)
+    return error, template_var_names
+
+
+def remove_stale_template_vars(
+    list_items: list[dict], template_var_names: set[str]
+) -> list[dict]:
+    """If a prompt variable is no longer in the jinja template, remove it"""
+    return [
+        item
+        for item in list_items
+        if (
+            item.get("schema", {}).get("role") != "prompt"
+            or item.get("name") in template_var_names
+        )
+    ]
+
+
+def render_list_item(entry_key: str, del_key: str, item: dict):
     name = item.setdefault("name", "")
     value = item.setdefault("value")
 
@@ -131,7 +147,7 @@ def render_list_item(
     description = schema.get("description")
     value_type = schema.get("type") or get_json_type(value or "")
 
-    is_template_var = name in template_var_names
+    is_template_var = schema.get("role") == "prompt"
 
     dialog_ref = gui.use_alert_dialog(entry_key + ":edit-dialog")
     if gui.session_state.pop(dialog_ref.close_btn_key, None):
