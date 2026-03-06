@@ -1,14 +1,20 @@
 import html as html_lib
+from datetime import datetime
 from copy import copy
 
 from django.db import transaction
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
-from django.db.models import F
+from django.db.models import F, Sum
 from django.utils.translation import ngettext
 
-from app_users.models import AppUser
+from app_users.models import (
+    AppUser,
+    AppUserTransaction,
+    PaymentProvider,
+    TransactionReason,
+)
 from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
@@ -18,6 +24,7 @@ from daras_ai_v2.profiles import (
     update_handle,
 )
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
+from payments.models import SeatType
 from payments.plans import PricingPlan
 from .models import (
     Workspace,
@@ -151,7 +158,12 @@ def _handle_invite_accepted(
         )
         return
 
-    invite.accept(current_user, updated_by=current_user)
+    try:
+        invite.accept(current_user, updated_by=current_user)
+    except ValidationError as e:
+        gui.error("\n".join(e.messages))
+        return
+
     set_current_workspace(session, int(invite.workspace_id))
     raise gui.RedirectException(workspace_redirect_url)
 
@@ -164,10 +176,10 @@ def workspaces_page(user: AppUser, session: dict):
         raise gui.RedirectException(get_route_path(account_route))
 
     membership = workspace.memberships.get(user=user)
-    render_workspace_by_membership(membership)
+    render_workspace_by_membership(membership, session=session)
 
 
-def render_workspace_by_membership(membership: WorkspaceMembership):
+def render_workspace_by_membership(membership: WorkspaceMembership, *, session: dict):
     """
     membership object has all the information we need:
         - workspace
@@ -177,6 +189,10 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
     from routers.account import account_route
 
     workspace = membership.workspace
+    is_team_plan = (
+        bool(workspace.subscription)
+        and PricingPlan.from_sub(workspace.subscription) == PricingPlan.TEAM
+    )
 
     with gui.div(className="mt-3 d-block d-sm-flex justify-content-between"):
         col1 = gui.div(
@@ -220,20 +236,23 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
                         gui.write(pretty_handle_url, className="container-margin-reset")
                         render_profile_link_buttons(workspace.handle)
 
-                with gui.div(className="d-flex gap-3"):
-                    gui.html(
-                        f'<div><span class="text-muted">Credits:</span> {workspace.balance}</div>'
-                    )
-                    gui.html(
-                        f'<div><span class="text-muted">Plan:</span> {plan.title}</div>'
-                    )
-                    if membership.can_edit_workspace() and plan in (
-                        PricingPlan.STARTER,
-                        PricingPlan.CREATOR,
-                    ):
+                if not is_team_plan:
+                    with gui.div(className="d-flex gap-3"):
                         gui.html(
-                            f'<a class="link-primary" href="{get_route_path(account_route)}">Upgrade</a>'
+                            f'<div><span class="text-muted">Credits:</span> {workspace.balance}</div>'
                         )
+                        gui.html(
+                            f'<div><span class="text-muted">Plan:</span> {plan.title}</div>'
+                        )
+                        if membership.can_edit_workspace() and plan in (
+                            PricingPlan.STARTER,
+                            PricingPlan.CREATOR,
+                        ):
+                            gui.html(
+                                f'<a class="link-primary" href="{get_route_path(account_route)}">Upgrade</a>'
+                            )
+                if is_team_plan:
+                    render_team_member_cycle_summary(membership, session=session)
 
     if membership.can_edit_workspace():
         with col2, gui.div(className="text-center"):
@@ -244,7 +263,11 @@ def render_workspace_by_membership(membership: WorkspaceMembership):
     with gui.div(className="d-flex justify-content-between align-items-center"):
         gui.write("#### Members")
         member_invite_button_with_dialog(membership)
-    render_members_list(workspace=workspace, current_member=membership)
+    render_members_list(
+        workspace=workspace,
+        current_member=membership,
+        is_team_plan=is_team_plan,
+    )
 
     gui.newline()
 
@@ -289,6 +312,7 @@ def member_invite_button_with_dialog(
     close_on_confirm: bool = True,
     **props,
 ):
+    from routers.account import account_route
     from routers.workspace import validate_and_invite_from_emails_csv
 
     if not membership.can_invite():
@@ -302,11 +326,50 @@ def member_invite_button_with_dialog(
     if not ref.is_open:
         return
 
+    plan = PricingPlan.from_sub(membership.workspace.subscription)
+    if plan == PricingPlan.TEAM and membership.workspace.subscription:
+        available_seats = max(
+            1, membership.workspace.subscription.billed_seats().count()
+        )
+    elif plan == PricingPlan.STARTER:
+        available_seats = 1
+    else:
+        # enterprise or a legacy paid plan
+        available_seats = float("inf")
+
+    unused_seats = available_seats - membership.workspace.used_seats
+    if unused_seats <= 0:
+        with gui.alert_dialog(ref=ref, modal_title="#### Invite Members"):
+            gui.error(
+                f"""
+                You have used all your available seats ({available_seats}).
+                Please [upgrade your plan]({get_route_path(account_route)}) to invite more members
+                """
+            )
+        return
+
     with gui.confirm_dialog(
         ref=ref,
         modal_title="#### Invite Members",
         confirm_label=f"{icons.send} Send",
     ):
+        gui.write(f"**{membership.workspace.display_html()}**.", unsafe_allow_html=True)
+
+        plan = PricingPlan.from_sub(membership.workspace.subscription)
+        if unused_seats != float("inf"):
+            with gui.div(className="alert alert-info"):
+                gui.write(
+                    f"""
+                    You can invite **{unused_seats}** more {ngettext("member", "members", unused_seats)} based on your current subscription: **{plan.title} ({available_seats} seats)**.
+                    """
+                )
+                gui.write(
+                    f"""
+                    [Upgrade]({get_route_path(account_route)}) to add more seats.
+                    """,
+                    className="container-margin-reset",
+                )
+
         role, emails_csv = render_invite_creation_form(membership.workspace)
         if not ref.pressed_confirm:
             return
@@ -387,10 +450,9 @@ def clear_invite_creation_form():
         gui.session_state.pop(k, None)
 
 
-def render_invite_creation_form(workspace: Workspace) -> tuple[str, str]:
+def render_invite_creation_form(workspace: Workspace) -> tuple[int, str]:
     from routers.workspace import render_emails_csv_input
-
-    gui.write(f"Invite to **{workspace.display_name()}**.")
+    from routers.account import account_route
 
     emails_csv = render_emails_csv_input(key="invite-form-emails", max_emails=5)
 
@@ -482,11 +544,36 @@ def render_workspace_leave_dialog(
             )
 
 
-def render_members_list(workspace: Workspace, current_member: WorkspaceMembership):
+def render_members_list(
+    workspace: Workspace,
+    current_member: WorkspaceMembership,
+    *,
+    is_team_plan: bool,
+):
+    seat_types = {
+        seat_type.id: seat_type for seat_type in SeatType.objects.order_by("name", "id")
+    }
+
+    def _assigned_seat_type(membership: WorkspaceMembership) -> SeatType | None:
+        if hasattr(membership, "seat") and membership.seat.seat_type:
+            return membership.seat.seat_type
+        return None
+
+    def _seat_type_label(seat_type_id: int | None) -> str:
+        if seat_type_id is None:
+            return "Workspace Pool (Default)"
+        seat_type = seat_types.get(seat_type_id)
+        return seat_type and seat_type.name or "Unknown"
+
     with gui.div(className="table-responsive"), gui.tag("table", className="table"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
                 gui.html("Name")
+            if is_team_plan:
+                with gui.tag("th", scope="col"):
+                    gui.html("Usage")
+                with gui.tag("th", scope="col"):
+                    gui.html("Seat")
             with gui.tag("th", scope="col"):
                 gui.html("Role")
             with gui.tag("th", scope="col", className="text-nowrap"):
@@ -495,7 +582,11 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                 gui.html("")
 
         with gui.tag("tbody"):
-            for m in workspace.memberships.all().order_by("created_at"):
+            for m in (
+                workspace.memberships.select_related("user", "seat", "seat__seat_type")
+                .all()
+                .order_by("created_at")
+            ):
                 with gui.tag("tr", className="align-middle"):
                     with gui.tag("td"):
                         name = m.user.full_name(current_user=current_member.user)
@@ -504,12 +595,108 @@ def render_members_list(workspace: Workspace, current_member: WorkspaceMembershi
                                 gui.html(html_lib.escape(name))
                         else:
                             gui.html(html_lib.escape(name))
+                    if is_team_plan:
+                        with gui.tag("td", className="text-nowrap"):
+                            cycle_usage = get_member_cycle_usage(m)
+                            gui.html(html_lib.escape(cycle_usage))
+                        with gui.tag("td"):
+                            assigned_seat_type = _assigned_seat_type(m)
+                            gui.html(
+                                html_lib.escape(
+                                    _seat_type_label(
+                                        assigned_seat_type
+                                        and assigned_seat_type.id
+                                        or None
+                                    )
+                                )
+                            )
                     with gui.tag("td", className="text-nowrap"):
                         gui.html(WorkspaceRole.display_html(m.role))
                     with gui.tag("td"):
                         gui.html("...", **render_local_date_attrs(m.created_at))
                     with gui.tag("td", className="text-end"):
                         render_membership_actions(m, current_member=current_member)
+
+
+def get_member_cycle_usage(membership: WorkspaceMembership) -> str:
+    cycle_start = (
+        AppUserTransaction.objects.filter(
+            workspace=membership.workspace,
+            user=membership.user,
+            reason__in=[
+                TransactionReason.SUBSCRIPTION_CREATE,
+                TransactionReason.SUBSCRIPTION_CYCLE,
+            ],
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if cycle_start:
+        deductions_qs = membership.workspace.transactions.filter(
+            user=membership.user,
+            amount__lt=0,
+            created_at__gte=cycle_start.created_at,
+        )
+    else:
+        deductions_qs = membership.workspace.transactions.filter(
+            user=membership.user,
+            amount__lt=0,
+        )
+
+    used = int(abs(deductions_qs.aggregate(total=Sum("amount"))["total"] or 0))
+
+    if hasattr(membership, "seat") and membership.seat.seat_type:
+        limit = membership.seat.seat_type.monthly_credit_limit
+        return f"{used:,} / {limit:,}"
+    else:
+        return f"{used:,}"
+
+
+def render_team_member_cycle_summary(
+    membership: WorkspaceMembership,
+    *,
+    session: dict,
+):
+    from routers.account import account_route
+
+    usage = get_member_cycle_usage(membership)
+    next_invoice_ts = (
+        membership.workspace.subscription
+        and membership.workspace.subscription.payment_provider == PaymentProvider.STRIPE
+        and gui.run_in_thread(
+            membership.workspace.subscription.get_next_invoice_timestamp, cache=True
+        )
+    )
+    cycle_renews = (
+        datetime.fromtimestamp(next_invoice_ts).strftime("%d %b %Y")
+        if next_invoice_ts
+        else "—"
+    )
+    seat_name = (
+        hasattr(membership, "seat")
+        and membership.seat.seat_type
+        and membership.seat.seat_type.name
+        or "Unassigned"
+    )
+
+    with gui.div(className="d-flex gap-4 mt-2 flex-wrap"):
+        gui.html(
+            f'<div><span class="text-muted">Your credits used</span><br>{usage}</div>'
+        )
+        gui.html(
+            f'<div><span class="text-muted">Cycle renews</span><br>{html_lib.escape(cycle_renews)}</div>'
+        )
+        gui.html(
+            f'<div><span class="text-muted">Your Seat</span><br>{html_lib.escape(seat_name)}</div>'
+        )
+
+        if membership.role == WorkspaceRole.MEMBER:
+            if gui.button("Upgrade", className="my-0 py-1"):
+                personal_workspace = membership.user.get_or_create_personal_workspace()[
+                    0
+                ]
+                set_current_workspace(session, personal_workspace.id)
+                raise gui.RedirectException(get_route_path(account_route))
 
 
 def render_membership_actions(
@@ -595,7 +782,7 @@ def render_pending_invites_list(
                             )
                         )
                     with gui.tag("td"):
-                        last_invited_at = invite.last_email_sent_at or invite.created_at
+                        last_invited_at = invite.last_email_sent_at or invite.updated_at
                         gui.html(str(naturaltime(last_invited_at)))
                     with gui.tag("td", className="text-end"):
                         render_invitation_actions(invite, current_member=current_member)
