@@ -24,12 +24,12 @@ from daras_ai_v2.profiles import (
     update_handle,
 )
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
+from payments.models import SeatType
 from payments.plans import PricingPlan
 from .models import (
     Workspace,
     WorkspaceInvite,
     WorkspaceMembership,
-    WorkspaceSeatType,
     WorkspaceRole,
 )
 from .widgets import (
@@ -328,7 +328,9 @@ def member_invite_button_with_dialog(
 
     plan = PricingPlan.from_sub(membership.workspace.subscription)
     if plan == PricingPlan.TEAM and membership.workspace.subscription:
-        available_seats = membership.workspace.subscription.seats or 1
+        available_seats = max(
+            1, membership.workspace.subscription.billed_seats().count()
+        )
     elif plan == PricingPlan.STARTER:
         available_seats = 1
     else:
@@ -549,9 +551,13 @@ def render_members_list(
     is_team_plan: bool,
 ):
     seat_types = {
-        seat_type.id: seat_type
-        for seat_type in WorkspaceSeatType.objects.order_by("name", "id")
+        seat_type.id: seat_type for seat_type in SeatType.objects.order_by("name", "id")
     }
+
+    def _assigned_seat_type(membership: WorkspaceMembership) -> SeatType | None:
+        if hasattr(membership, "seat") and membership.seat.seat_type:
+            return membership.seat.seat_type
+        return None
 
     def _seat_type_label(seat_type_id: int | None) -> str:
         if seat_type_id is None:
@@ -577,7 +583,7 @@ def render_members_list(
 
         with gui.tag("tbody"):
             for m in (
-                workspace.memberships.select_related("user", "seat_type")
+                workspace.memberships.select_related("user", "seat", "seat__seat_type")
                 .all()
                 .order_by("created_at")
             ):
@@ -594,7 +600,16 @@ def render_members_list(
                             cycle_usage = get_member_cycle_usage(m)
                             gui.html(html_lib.escape(cycle_usage))
                         with gui.tag("td"):
-                            gui.html(html_lib.escape(_seat_type_label(m.seat_type_id)))
+                            assigned_seat_type = _assigned_seat_type(m)
+                            gui.html(
+                                html_lib.escape(
+                                    _seat_type_label(
+                                        assigned_seat_type
+                                        and assigned_seat_type.id
+                                        or None
+                                    )
+                                )
+                            )
                     with gui.tag("td", className="text-nowrap"):
                         gui.html(WorkspaceRole.display_html(m.role))
                     with gui.tag("td"):
@@ -604,9 +619,6 @@ def render_members_list(
 
 
 def get_member_cycle_usage(membership: WorkspaceMembership) -> str:
-    if not membership.seat_type:
-        return "—"
-
     cycle_start = (
         AppUserTransaction.objects.filter(
             workspace=membership.workspace,
@@ -632,8 +644,12 @@ def get_member_cycle_usage(membership: WorkspaceMembership) -> str:
         )
 
     used = int(abs(deductions_qs.aggregate(total=Sum("amount"))["total"] or 0))
-    limit = membership.seat_type.monthly_credit_limit
-    return f"{used:,} / {limit:,}"
+
+    if hasattr(membership, "seat") and membership.seat.seat_type:
+        limit = membership.seat.seat_type.monthly_credit_limit
+        return f"{used:,} / {limit:,}"
+    else:
+        return f"{used:,}"
 
 
 def render_team_member_cycle_summary(
@@ -656,7 +672,12 @@ def render_team_member_cycle_summary(
         if next_invoice_ts
         else "—"
     )
-    seat_name = membership.seat_type and membership.seat_type.name or "Unassigned"
+    seat_name = (
+        hasattr(membership, "seat")
+        and membership.seat.seat_type
+        and membership.seat.seat_type.name
+        or "Unassigned"
+    )
 
     with gui.div(className="d-flex gap-4 mt-2 flex-wrap"):
         gui.html(
