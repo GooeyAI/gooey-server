@@ -10,14 +10,15 @@ import stripe
 from daras_ai_v2 import paypal, settings
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
 
+if typing.TYPE_CHECKING:
+    from payments.models import SeatType, Subscription
+
+
 STRIPE_PRODUCT_NAMES = {
     "basic": "Gooey.AI Basic Plan",
     "premium": "Gooey.AI Premium Plan",
 }
 REVERSE_STRIPE_PRODUCT_NAMES = {v: k for k, v in STRIPE_PRODUCT_NAMES.items()}
-
-if typing.TYPE_CHECKING:
-    from payments.models import Subscription
 
 
 class PricingPlanData(typing.NamedTuple):
@@ -36,19 +37,38 @@ class PricingPlanData(typing.NamedTuple):
     pricing_caption: str | None = None
     full_width: bool = False
 
-    def get_pricing_title(self) -> str:
+    def get_pricing_title(
+        self, *, seat_type: SeatType | None = None, seat_count: int | None = None
+    ) -> str:
         if self.pricing_title is not None:
             return self.pricing_title
 
-        return f"${self.monthly_charge}/month"
+        if seat_type:
+            total_monthly_charge = seat_type.monthly_charge * (seat_count or 1)
+        else:
+            total_monthly_charge = self.monthly_charge
+
+        return f"${total_monthly_charge}/month"
 
     def get_pricing_caption(self) -> str:
         return self.pricing_caption or ""
 
-    def get_active_credits(self) -> int:
+    def get_active_credits(
+        self,
+        seat_type: typing.Optional["SeatType"] = None,
+        seat_count: int = 1,
+    ) -> int:
+        if seat_type:
+            return (seat_type.monthly_credit_limit or 0) * seat_count
         return self.credits
 
-    def get_active_monthly_charge(self) -> int:
+    def get_active_monthly_charge(
+        self,
+        seat_type: typing.Optional["SeatType"] = None,
+        seat_count: int = 1,
+    ) -> int:
+        if seat_type:
+            return seat_type.monthly_charge * seat_count
         return self.monthly_charge
 
 
