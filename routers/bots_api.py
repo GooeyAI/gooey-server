@@ -355,7 +355,7 @@ class ApiInterface(BotInterface):
 
     def send_run_status(
         self,
-        update_msg_id: str | None,
+        update_msg_id: str | None = None,
         references: list[SearchReference] | None = None,
         prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
@@ -381,7 +381,6 @@ class ApiInterface(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         response = MessagePart(
             status=self.recipe_run_state,
@@ -391,7 +390,6 @@ class ApiInterface(BotInterface):
             video=video and video[0],
             buttons=buttons,
             documents=documents,
-            prompt_delta=prompt_delta or None,
         )
         self.queue.put(response)
         return self.bot_message_id

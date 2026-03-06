@@ -11,7 +11,6 @@ from twilio.twiml import TwiML
 from twilio.twiml.voice_response import VoiceResponse
 
 from bots.models import BotIntegration, Platform, Conversation
-from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2 import settings
 from daras_ai_v2.bots import BotInterface, ReplyButton
 from daras_ai_v2.exceptions import UserError
@@ -93,7 +92,6 @@ class TwilioSMS(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         media = audio or video or documents
         if not (media or text):
@@ -234,7 +232,6 @@ class TwilioVoice(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         assert not documents, "Twilio does not support sending documents via Voice"
         assert not video, "Twilio does not support sending videos via Voice"

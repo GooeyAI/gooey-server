@@ -16,7 +16,6 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
 from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.exceptions import UserError, raise_for_status
-from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.text_splitter import text_splitter
 
@@ -132,7 +131,6 @@ class WhatsappBot(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         return self.send_msg_to(
             bot_number=self.bot_id,
@@ -515,7 +513,6 @@ class FacebookBot(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         text = text or "\u200b"  # handle empty text with zero-width space
         return send_fb_msg(

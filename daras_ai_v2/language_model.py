@@ -91,12 +91,12 @@ def calc_gpt_tokens(
 
 class FunctionParam(typing_extensions.TypedDict):
     name: str
-    arguments: str
+    arguments: typing_extensions.NotRequired[str | None]
 
 
 class FunctionToolCallParam(typing_extensions.TypedDict):
     id: str
-    type: typing.Literal["function"] | None
+    type: typing_extensions.NotRequired[typing.Literal["function"] | None]
     function: FunctionParam
 
     label: typing_extensions.NotRequired[str | None]

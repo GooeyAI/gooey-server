@@ -139,17 +139,13 @@ class SlackBot(BotInterface):
 
     def send_run_status(
         self,
-        update_msg_id: str | None,
+        update_msg_id: str | None = None,
         references: list[SearchReference] | None = None,
         prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         if not self.run_status:
             return update_msg_id
-        return self.send_msg(
-            text=self.run_status,
-            update_msg_id=update_msg_id,
-            prompt_delta=prompt_delta,
-        )
+        return self.send_msg(text=self.run_status, update_msg_id=update_msg_id)
 
     def _send_msg(
         self,
@@ -160,7 +156,6 @@ class SlackBot(BotInterface):
         buttons: list[ReplyButton] | None = None,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
-        prompt_delta: dict[int, ConversationEntry] | None = None,
     ) -> str | None:
         text = text or "\u200b"  # handle empty text with zero-width space
 
