@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from payments.models import SeatType
 from payments.plans import PricingPlan
-from workspaces.models import Workspace, WorkspaceSeatType
+from workspaces.models import Workspace
 
 GOOEY_ADMIN_SEAT_TYPE_NAME = "Gooey Admin"
 DEFAULT_PLAN_SEAT_TYPES: dict[PricingPlan, list[dict[str, int]]] = {
@@ -50,10 +51,12 @@ def _plan_for_workspace(workspace: Workspace) -> PricingPlan | None:
 
 def _resolve_subscription_workspace_seat_type(
     plan: PricingPlan, workspace: Workspace
-) -> WorkspaceSeatType:
+) -> SeatType:
     assert workspace.subscription is not None
 
-    candidate_qs = WorkspaceSeatType.objects.exclude(name=GOOEY_ADMIN_SEAT_TYPE_NAME)
+    candidate_qs = SeatType.objects.filter(plan=plan.db_value).exclude(
+        name=GOOEY_ADMIN_SEAT_TYPE_NAME
+    )
     current = workspace.subscription.get_seat_type()
     if current:
         match = candidate_qs.filter(
@@ -77,7 +80,7 @@ def _resolve_subscription_workspace_seat_type(
     fallback = candidate_qs.order_by("monthly_charge", "id").first()
     if fallback:
         return fallback
-    raise WorkspaceSeatType.DoesNotExist(
+    raise SeatType.DoesNotExist(
         f"No billable workspace seat type found for workspace_id={workspace.id}"
     )
 
@@ -88,13 +91,15 @@ def run(*_args):
     # seed global seat types (shared across workspaces)
     for plan, seat_types in DEFAULT_PLAN_SEAT_TYPES.items():
         for seat_type in seat_types:
-            _, created = WorkspaceSeatType.objects.update_or_create(
+            _, created = SeatType.objects.update_or_create(
                 name=_default_seat_type_name(
                     monthly_credit_limit=seat_type["monthly_credit_limit"]
                 ),
                 defaults=dict(
                     monthly_charge=seat_type["monthly_charge"],
                     monthly_credit_limit=seat_type["monthly_credit_limit"],
+                    is_public=True,
+                    plan=plan.db_value,
                 ),
             )
             if created:
@@ -114,12 +119,13 @@ def run(*_args):
                     workspaces_updated=stats.workspaces_updated,
                 )
 
-    _, admin_created = WorkspaceSeatType.objects.update_or_create(
+    _, admin_created = SeatType.objects.update_or_create(
         name=GOOEY_ADMIN_SEAT_TYPE_NAME,
         defaults=dict(
             monthly_charge=0,
             monthly_credit_limit=2_500,
-            daily_credit_limit=None,
+            is_public=False,
+            plan=PricingPlan.TEAM.db_value,
         ),
     )
     if admin_created:
@@ -160,7 +166,7 @@ def run(*_args):
             target = _resolve_subscription_workspace_seat_type(plan, workspace)
             seats = max(
                 1,
-                (workspace.subscription.seats or 0),
+                workspace.subscription.billed_seats().count(),
                 workspace.used_seats,
             )
             expected_amount = (target.monthly_credit_limit or 0) * seats
@@ -168,9 +174,6 @@ def run(*_args):
 
             update_fields = []
             sub = workspace.subscription
-            if sub.seats != seats:
-                sub.seats = seats
-                update_fields.append("seats")
             if sub.amount != expected_amount:
                 sub.amount = expected_amount
                 update_fields.append("amount")

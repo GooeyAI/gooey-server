@@ -11,7 +11,7 @@ from loguru import logger
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from workspaces.models import Workspace, WorkspaceSeatType
+from workspaces.models import Workspace, WorkspaceMembership
 from .plans import PricingPlan, stripe_get_addon_product
 
 
@@ -22,7 +22,10 @@ class PaymentMethodSummary(typing.NamedTuple):
     billing_email: str | None = None
 
 
-class SubscriptionQuerySet(models.QuerySet):
+class SubscriptionManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related("seats")
+
     def get_by_paypal_subscription_id(self, subscription_id: str) -> Subscription:
         return super().get(
             payment_provider=PaymentProvider.PAYPAL, external_id=subscription_id
@@ -81,12 +84,10 @@ class Subscription(models.Model):
     monthly_spending_notification_sent_at = models.DateTimeField(null=True, blank=True)
     monthly_budget_email_sent_at = models.DateTimeField(null=True, blank=True)
 
-    seats = models.PositiveIntegerField(default=0)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    objects = SubscriptionQuerySet.as_manager()
+    objects = SubscriptionManager()
 
     class Meta:
         unique_together = ["payment_provider", "external_id"]
@@ -112,6 +113,27 @@ class Subscription(models.Model):
             )
         return super().full_clean(*args, **kwargs)
 
+    def is_paid(self) -> bool:
+        return PricingPlan.from_sub(self) > PricingPlan.STARTER
+
+    @property
+    def has_user(self) -> bool:
+        try:
+            self.user
+        except Subscription.user.RelatedObjectDoesNotExist:
+            return False
+        else:
+            return True
+
+    @property
+    def has_workspace(self) -> bool:
+        try:
+            self.workspace
+        except Workspace.DoesNotExist:
+            return False
+        else:
+            return True
+
     def ensure_default_auto_recharge_params(self, *, amount: int, charged_amount: int):
         if amount <= 0 or charged_amount <= 0:
             return
@@ -132,51 +154,21 @@ class Subscription(models.Model):
                 0.8 * self.monthly_spending_budget
             )
 
-    def get_seat_type(self):
-        if not self.has_workspace:
-            return None
+    # seats
 
-        credits = self.amount // max(1, self.seats) if self.amount else None
-        monthly_charge = (
-            round(self.charged_amount / 100) // max(1, self.seats)
-            if self.charged_amount
-            else None
+    def billed_seats(self):
+        return self.seats.filter(seat_type__is_public=True)
+
+    def get_seat_type(self) -> SeatType | None:
+        seat = (
+            self.billed_seats()
+            .select_related("seat_type")
+            .order_by("seat_type__monthly_charge", "id")
+            .first()
         )
-        qs = WorkspaceSeatType.objects.all()
-        if monthly_charge is not None and credits is not None:
-            if seat_type := qs.filter(
-                monthly_charge=monthly_charge,
-                monthly_credit_limit=credits,
-            ).first():
-                return seat_type
-        if monthly_charge is not None:
-            if seat_type := qs.filter(monthly_charge=monthly_charge).first():
-                return seat_type
-        return None
+        return seat and seat.seat_type or None
 
-    def get_tier(self):
-        return self.get_seat_type()
-
-    @property
-    def has_user(self) -> bool:
-        try:
-            self.user
-        except Subscription.user.RelatedObjectDoesNotExist:
-            return False
-        else:
-            return True
-
-    def is_paid(self) -> bool:
-        return PricingPlan.from_sub(self) > PricingPlan.STARTER
-
-    @property
-    def has_workspace(self) -> bool:
-        try:
-            self.workspace
-        except Workspace.DoesNotExist:
-            return False
-        else:
-            return True
+    # stripe & paypal operations
 
     def cancel(self):
         from payments.webhooks import set_workspace_subscription
@@ -400,6 +392,8 @@ class Subscription(models.Model):
                     f"Can't get management URL for subscription with provider {self.payment_provider}"
                 )
 
+    # monthly notifications and budget checks
+
     def has_sent_monthly_spending_notification_this_month(self) -> bool:
         return self.monthly_spending_notification_sent_at and (
             self.monthly_spending_notification_sent_at.strftime("%B %Y")
@@ -421,6 +415,76 @@ class Subscription(models.Model):
             and self.workspace.get_dollars_spent_this_month()
             >= self.monthly_spending_notification_threshold
         )
+
+
+class SeatType(models.Model):
+    name = models.CharField(max_length=100)
+    monthly_charge = models.PositiveIntegerField(default=0)
+    monthly_credit_limit = models.PositiveIntegerField(default=0)
+
+    is_public = models.BooleanField(
+        default=False,
+        help_text="""
+            Whether this seat type is available for purchase by any workspace.
+            If True, this seat type will be shown in the billing page.
+        """,
+    )
+    plan = models.IntegerField(
+        choices=PricingPlan.db_choices(),
+        help_text="""
+            The pricing plan this seat type is associated with.
+            The seat type will only be available for selection under this plan.
+        """,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name"], name="unique_payment_seat_type_name"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["name"], name="seat_type_name_idx"),
+        ]
+
+
+class SubscriptionSeat(models.Model):
+    subscription = models.ForeignKey(
+        Subscription, related_name="seats", on_delete=models.CASCADE
+    )
+    seat_type = models.ForeignKey(
+        SeatType, related_name="seats", on_delete=models.PROTECT
+    )
+
+    assigned_to = models.OneToOneField(
+        WorkspaceMembership,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="seat",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subscription", "assigned_to"],
+                name="unique_subscription_seat_assignment",
+            )
+        ]
+
+    def __str__(self):
+        if self.assigned_to:
+            return (
+                f"{self.seat_type.name} (Assigned: {self.assigned_to.user.full_name()})"
+            )
+        else:
+            return f"{self.seat_type.name}"
 
 
 def nearest_choice(choices: list[int], value: float) -> int:

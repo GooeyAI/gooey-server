@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
 class WorkspaceMembershipInline(admin.TabularInline):
     model = models.WorkspaceMembership
     extra = 0
-    autocomplete_fields = ["user", "workspace", "seat_type"]
+    autocomplete_fields = ["user", "workspace"]
     readonly_fields = ["invite", "created_at", "updated_at"]
     ordering = ["-created_at"]
 
@@ -237,14 +237,15 @@ class WorkspaceMembershipAdmin(GooeySafeDeleteAdmin):
         "user",
         "workspace",
         "role",
-        "seat_type",
+        "seat",
         "balance",
         "created_at",
         "updated_at",
     ] + list(GooeySafeDeleteAdmin.list_display)
-    list_filter = ["role", "seat_type", SafeDeleteAdminFilter] + list(
+    list_filter = ["role", "seat__seat_type", SafeDeleteAdminFilter] + list(
         GooeySafeDeleteAdmin.list_filter
     )
+    search_fields = ["user__email", "user__display_name", "workspace__name"]
 
     def get_readonly_fields(
         self, request: "HttpRequest", obj: models.WorkspaceMembership | None = None
@@ -259,17 +260,3 @@ class WorkspaceMembershipAdmin(GooeySafeDeleteAdmin):
     def deleted_workspace(self, obj):
         workspace = models.Workspace.deleted_objects.get(pk=obj.workspace_id)
         return change_obj_url(workspace)
-
-
-@admin.register(models.WorkspaceSeatType)
-class WorkspaceSeatTypeAdmin(admin.ModelAdmin):
-    list_display = [
-        "name",
-        "monthly_charge",
-        "monthly_credit_limit",
-        "daily_credit_limit",
-        "created_at",
-        "updated_at",
-    ]
-    list_filter = ["created_at"]
-    search_fields = ["name"]
