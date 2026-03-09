@@ -2330,6 +2330,7 @@ class BasePage:
 
     def _render_run_preview(self, saved_run: SavedRun):
         from daras_ai_v2.billing import left_and_right
+        from widgets.saved_workflow import render_media_component
 
         published_run: PublishedRun | None = (
             saved_run.parent_version.published_run if saved_run.parent_version else None
@@ -2372,7 +2373,12 @@ class BasePage:
                 elif saved_run.error_msg:
                     gui.error(saved_run.error_msg, unsafe_allow_html=True)
                 else:
-                    self.render_run_preview_output(saved_run.to_dict())
+                    state = saved_run.to_dict()
+                    raw_url = self.preview_image(state)
+                    if raw_url:
+                        render_media_component(raw_url)
+                    else:
+                        self.render_run_preview_output(state)
 
     def render_run_preview_output(self, state: dict):
         pass
