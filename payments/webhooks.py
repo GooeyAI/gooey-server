@@ -122,7 +122,10 @@ class StripeWebhookHandler:
 
         amount = invoice.lines.data[0].quantity
         charged_amount = invoice.lines.data[0].amount
-        print(f"{charged_amount=}, {amount=}")
+        if charged_amount < 0:
+            # proration charge
+            return
+
         add_balance_for_payment(
             workspace=workspace,
             amount=amount,
@@ -203,6 +206,7 @@ class StripeWebhookHandler:
 
         # For TEAM plan, get seats from metadata or calculate from charged amount
         seat_count = 1
+        seat_type = None
         if plan == PricingPlan.TEAM:
             # Try to get seats from metadata first
             try:
@@ -222,6 +226,7 @@ class StripeWebhookHandler:
             external_id=stripe_sub.id,
             amount=amount,
             charged_amount=charged_amount,
+            seat_type=seat_type,
             seat_count=seat_count,
         )
 
@@ -367,7 +372,7 @@ def set_workspace_subscription(
             workspace.subscription = new_sub
             workspace.save(update_fields=["subscription"])
 
-        _sync_subscription_seats(
+        sync_subscription_seats(
             workspace=workspace,
             subscription=new_sub,
             plan=plan,
@@ -382,7 +387,7 @@ def set_workspace_subscription(
     return new_sub
 
 
-def _sync_subscription_seats(
+def sync_subscription_seats(
     *,
     workspace: Workspace,
     subscription: Subscription,

@@ -16,9 +16,13 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
-from payments.models import PaymentMethodSummary, SeatType, Subscription
+from payments.models import PaymentMethodSummary, SeatType
 from payments.plans import PricingPlan
-from payments.webhooks import StripeWebhookHandler, set_workspace_subscription
+from payments.webhooks import (
+    StripeWebhookHandler,
+    sync_subscription_seats,
+    set_workspace_subscription,
+)
 from scripts.migrate_existing_subscriptions import available_subscriptions
 from widgets.author import render_author_from_workspace
 from workspaces.models import Workspace
@@ -34,12 +38,6 @@ def _get_workspace_seat_options(plan: PricingPlan) -> dict[int, SeatType]:
         "monthly_charge"
     )
     return {seat_type.id: seat_type for seat_type in qs}
-
-
-def _apply_default_team_seat_type_to_members(
-    subscription: Subscription, seat_type: SeatType
-) -> None:
-    subscription.seats.filter(seat_type__is_public=True).update(seat_type=seat_type)
 
 
 def _get_scheduled_team_downgrade_info(
@@ -926,14 +924,7 @@ Your payment method will be charged ${new_monthly_charge:,} today and again ever
 
     if upgrade_dialog.pressed_confirm:
         try:
-            change_subscription(
-                workspace,
-                new_plan=plan,
-                new_selection=seat_selection,
-                # when upgrading, charge the full new amount today: https://docs.stripe.com/billing/subscriptions/billing-cycle#reset-the-billing-cycle-to-the-current-time
-                billing_cycle_anchor="now",
-                payment_behavior="error_if_incomplete",
-            )
+            change_subscription(workspace, new_plan=plan, new_selection=seat_selection)
         except (stripe.CardError, stripe.InvalidRequestError) as e:
             if isinstance(e, stripe.InvalidRequestError):
                 sentry_sdk.capture_exception(e)
@@ -1083,66 +1074,54 @@ def change_subscription(
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
     # Check if plan and seat selection are unchanged
-    current_seat_type = (
-        workspace.subscription and workspace.subscription.get_seat_type()
-    )
-    current_seats = (
-        workspace.subscription
-        and max(1, workspace.subscription.billed_seats().count())
-        or 1
-    )
-    if (
-        new_plan == current_plan
-        and workspace.subscription
-        and (
-            (not new_selection and not current_seat_type)
-            or (
-                new_selection
-                and current_seat_type == new_selection[0]
-                and current_seats == new_selection[1]
-            )
+    if workspace.subscription and current_plan in [
+        PricingPlan.TEAM,
+        PricingPlan.STANDARD,
+    ]:
+        current_selection = (
+            workspace.subscription.get_seat_type(),
+            workspace.subscription.billed_seats().count() or 1,
         )
-    ):
+    else:
+        current_selection = None
+
+    if new_plan == current_plan and current_selection == new_selection:
         raise gui.RedirectException(get_app_route_url(account_route), status_code=303)
+
+    if new_plan == PricingPlan.STARTER and workspace.subscription.is_paid():
+        workspace.subscription.cancel(immediately=False)
+        raise gui.RedirectException(
+            get_app_route_url(payment_processing_route), status_code=303
+        )
 
     match workspace.subscription.payment_provider:
         case PaymentProvider.STRIPE:
+            if not new_plan.supports_stripe():
+                gui.error(f"Stripe subscription not available for {new_plan}")
+
             subscription = stripe.Subscription.retrieve(
                 workspace.subscription.external_id,
                 expand=["items.data.price", "schedule"],
             )
-
-            if not new_plan.supports_stripe():
-                if new_plan == PricingPlan.STARTER:
-                    subscription = _clear_pending_stripe_subscription_changes(
-                        subscription
-                    )
-                    if not subscription.get("cancel_at_period_end"):
-                        stripe.Subscription.modify(
-                            workspace.subscription.external_id,
-                            cancel_at_period_end=True,
-                        )
-                    raise gui.RedirectException(
-                        get_app_route_url(payment_processing_route), status_code=303
-                    )
-                gui.error(f"Stripe subscription not available for {new_plan}")
-
             # New plan change should replace any previously scheduled cancel/downgrade.
             subscription = _clear_pending_stripe_subscription_changes(subscription)
 
-            if (
-                current_plan == PricingPlan.TEAM
-                and new_plan == PricingPlan.TEAM
-                and new_selection
-            ):
-                current_monthly_charge = round(
-                    (workspace.subscription.charged_amount or 0) / 100
+            current_monthly_charge = (workspace.subscription.charged_amount or 0) // 100
+            if new_selection:
+                new_seat_type, new_seat_count = new_selection
+            else:
+                new_seat_type, new_seat_count = None, 1
+            new_monthly_charge = new_plan.get_active_monthly_charge(
+                seat_type=new_seat_type, seat_count=new_seat_count
+            )
+
+            if current_plan == PricingPlan.TEAM and new_plan == PricingPlan.TEAM:
+                assert new_selection is not None, (
+                    "Seat selection must be provided when changing team plan"
                 )
-                new_monthly_charge = new_plan.get_active_monthly_charge(
-                    seat_type=new_selection[0],
-                    seat_count=new_selection[1],
-                )
+
                 if new_monthly_charge < current_monthly_charge:
+                    # downgrade within TEAM plan
                     _schedule_team_plan_change_next_cycle(
                         subscription=subscription,
                         new_plan=new_plan,
@@ -1151,16 +1130,17 @@ def change_subscription(
                     raise gui.RedirectException(
                         get_app_route_url(payment_processing_route), status_code=303
                     )
-                # Team seat upgrades are prorated immediately, but keep billing cycle.
-                kwargs.pop("billing_cycle_anchor", None)
-                kwargs["proration_behavior"] = "always_invoice"
 
-            # Build metadata with seat selection info
+                # for upgrades within a team plan
+                kwargs["payment_behavior"] = "error_if_incomplete"
+
+            kwargs["billing_cycle_anchor"] = "now"
+            kwargs["proration_behavior"] = "none"
+
             metadata = {
                 settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key,
-                "seats": str(new_selection[1]) if new_selection else "1",
+                "seats": str(new_seat_count),
             }
-            kwargs.setdefault("proration_behavior", "none")
 
             stripe.Subscription.modify(
                 subscription.id,
@@ -1168,12 +1148,10 @@ def change_subscription(
                     {"id": subscription["items"].data[0], "deleted": True},
                     new_plan.get_stripe_line_item(
                         credits=new_plan.get_active_credits(
-                            seat_type=new_selection and new_selection[0] or None,
-                            seat_count=new_selection and new_selection[1] or 1,
+                            seat_type=new_seat_type, seat_count=new_seat_count
                         ),
                         monthly_charge=new_plan.get_active_monthly_charge(
-                            seat_type=new_selection and new_selection[0] or None,
-                            seat_count=new_selection and new_selection[1] or 1,
+                            seat_type=new_seat_type, seat_count=new_seat_count
                         ),
                         product_name=(
                             new_selection
@@ -1195,28 +1173,28 @@ def change_subscription(
                     amount=new_plan.get_active_credits(
                         seat_type=new_selection[0], seat_count=new_selection[1]
                     ),
-                    charged_amount=new_plan.get_active_monthly_charge(
-                        seat_type=new_selection[0], seat_count=new_selection[1]
-                    )
-                    * 100,
+                    charged_amount=(
+                        new_plan.get_active_monthly_charge(
+                            seat_type=new_selection[0], seat_count=new_selection[1]
+                        )
+                        * 100
+                    ),
                     seat_count=new_selection[1],
                     seat_type=new_selection[0],
-                    cancel_old=False,
                 )
-                _apply_default_team_seat_type_to_members(db_sub, new_selection[0])
+                sync_subscription_seats(
+                    workspace=workspace,
+                    subscription=db_sub,
+                    plan=new_plan,
+                    seat_type=new_selection[0],
+                    seat_count=new_selection[1],
+                )
 
             raise gui.RedirectException(
                 get_app_route_url(payment_processing_route), status_code=303
             )
 
         case PaymentProvider.PAYPAL:
-            if new_plan == PricingPlan.STARTER:
-                # PayPal cancellation at period end is not currently wired; keep existing behavior.
-                workspace.subscription.cancel()
-                raise gui.RedirectException(
-                    get_app_route_url(payment_processing_route), status_code=303
-                )
-
             if not new_plan.supports_paypal():
                 gui.error(f"Paypal subscription not available for {new_plan}")
 

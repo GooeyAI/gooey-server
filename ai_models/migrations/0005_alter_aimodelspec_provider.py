@@ -6,20 +6,12 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("usage_costs", "0039_alter_modelpricing_model_name_and_more"),
+        ("ai_models", "0004_aimodelspec_api_key_aimodelspec_base_url_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name="modelpricing",
-            name="model_name",
-            field=models.CharField(
-                help_text="The name of the model. Must match the name of the AI Model",
-                max_length=255,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="modelpricing",
+            model_name="aimodelspec",
             name="provider",
             field=models.IntegerField(
                 choices=[
@@ -41,7 +33,8 @@ class Migration(migrations.Migration):
                     (15, "Modal"),
                     (5, "Azure Kubernetes Service"),
                 ],
-                help_text="The provider of the model. Only used for Display purposes.",
+                default=15,
+                help_text="The API provider for this model.",
             ),
         ),
     ]
