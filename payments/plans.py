@@ -407,10 +407,9 @@ class PricingPlan(PricingPlanData, Enum):
                 return plan
         raise KeyError(f"Invalid {cls.__name__} key: {key}")
 
-    def supports_stripe(self) -> bool:
-        return bool(self.monthly_charge)
+    # Stripe
 
-    def supports_paypal(self) -> bool:
+    def supports_stripe(self) -> bool:
         return bool(self.monthly_charge)
 
     def get_stripe_line_item(
@@ -443,15 +442,27 @@ class PricingPlan(PricingPlanData, Enum):
                 amount=monthly_charge,
             )
 
-    def get_paypal_plan(self) -> dict[str, Any]:
-        if not self.supports_paypal():
-            raise ValueError(f"Can't bill {self.title} via PayPal")
+    def get_stripe_line_item_for_seat(
+        self, *, seat_type: SeatType, seat_count: int
+    ) -> dict[str, Any]:
+        if not self.supports_stripe():
+            raise ValueError(f"Can't bill {self.title} via Stripe")
 
-        return make_paypal_recurring_plan(
-            plan_id=self.get_paypal_plan_id(),
-            credits=self.credits,
-            amount=self.monthly_charge,
-        )
+        return {
+            "price_data": {
+                "currency": "usd",
+                "unit_amount": seat_type.monthly_charge * 100,
+                "product": self.get_stripe_product_id(
+                    monthly_charge=seat_type.monthly_charge,
+                    product_name=f"{self.title} - {seat_type.name} Seat",
+                ),
+                "recurring": {"interval": "month"},
+                "metadata": {
+                    "seat_type_key": seat_type.key,
+                },
+            },
+            "quantity": seat_count,
+        }
 
     def get_stripe_product_id(
         self, *, monthly_charge: int | None = None, product_name: str | None = None
@@ -477,6 +488,21 @@ class PricingPlan(PricingPlanData, Enum):
             },
         )
         return product.id
+
+    # PayPal
+
+    def supports_paypal(self) -> bool:
+        return bool(self.monthly_charge)
+
+    def get_paypal_plan(self) -> dict[str, Any]:
+        if not self.supports_paypal():
+            raise ValueError(f"Can't bill {self.title} via PayPal")
+
+        return make_paypal_recurring_plan(
+            plan_id=self.get_paypal_plan_id(),
+            credits=self.credits,
+            amount=self.monthly_charge,
+        )
 
     def get_paypal_plan_id(self) -> str:
         product_id = paypal_get_or_create_default_product().id

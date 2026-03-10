@@ -170,14 +170,14 @@ class Subscription(models.Model):
 
     # stripe & paypal operations
 
-    def cancel(self):
+    def cancel(self, immediately: bool = True) -> None:
         from payments.webhooks import set_workspace_subscription
 
         if not (self.payment_provider and self.is_paid()):
             return
 
         match self.payment_provider:
-            case PaymentProvider.STRIPE:
+            case PaymentProvider.STRIPE if immediately:
                 try:
                     stripe.Subscription.cancel(self.external_id)
                 except stripe.error.InvalidRequestError as e:
@@ -192,6 +192,8 @@ class Subscription(models.Model):
                         )
                     else:
                         raise
+            case PaymentProvider.STRIPE if not immediately:
+                stripe.Subscription.modify(self.external_id, cancel_at_period_end=True)
             case PaymentProvider.PAYPAL:
                 paypal.Subscription.retrieve(self.external_id).cancel()
             case _:
@@ -422,6 +424,19 @@ class SeatType(models.Model):
     monthly_charge = models.PositiveIntegerField(default=0)
     monthly_credit_limit = models.PositiveIntegerField(default=0)
 
+    key = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="""
+            A unique identifier for this seat type. Should not be changed once set.
+
+            This is not displayed anywhere but used in the backend to calculate
+            and store billing with third-party APIs e.g. Stripe.
+            Recommended to use versioned strings (e.g. "2026/learner").
+        """,
+        editable=False,
+    )
+
     is_public = models.BooleanField(
         default=False,
         help_text="""
@@ -439,16 +454,6 @@ class SeatType(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["name"], name="unique_payment_seat_type_name"
-            )
-        ]
-        indexes = [
-            models.Index(fields=["name"], name="seat_type_name_idx"),
-        ]
 
 
 class SubscriptionSeat(models.Model):
