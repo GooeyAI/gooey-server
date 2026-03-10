@@ -1755,6 +1755,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
         gui.newline()
 
         pressed_platform = None
+        country_code = ""
         with (
             gui.tag("table", className="d-flex justify-content-center"),
             gui.tag("tbody"),
@@ -1769,7 +1770,10 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                         ):
                             pressed_platform = choice.platform
                     with gui.tag("td", className="ps-3"):
-                        gui.caption(choice.label)
+                        if choice.platform == Platform.TWILIO:
+                            country_code = render_twilio_label(choice.label)
+                        else:
+                            gui.caption(choice.label)
 
         if not can_edit:
             gui.caption(
@@ -1821,6 +1825,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                             created_by=self.request.user,
                             workspace=self.current_workspace,
                             platform=Platform.TWILIO,
+                            country_code=country_code,
                         )
                     except SharedPhoneNumber.DoesNotExist as e:
                         gui.caption(f"{e}", className="text-center text-danger")
@@ -2253,6 +2258,29 @@ class ConnectChoice(typing.NamedTuple):
     label: str
 
 
+def render_twilio_label(default_label: str = ""):
+    from number_cycling.models import SharedPhoneNumber
+    from number_cycling.utils import country_code_label
+
+    country_codes = SharedPhoneNumber.objects.available_country_codes(Platform.TWILIO)
+    if not country_codes:
+        gui.caption(default_label)
+        return ""
+
+    with gui.div(className="d-flex align-items-center flex-wrap gap-1 text-muted"):
+        gui.caption("Instantly get a")
+        selected_country_code = gui.selectbox(
+            label="",
+            options=country_codes,
+            format_func=country_code_label,
+            key="_shared_number_country",
+            label_visibility="collapsed",
+        )
+        gui.caption("number to call or text.")
+
+    return selected_country_code or ""
+
+
 connect_choices = [
     ConnectChoice(
         platform=Platform.WEB,
@@ -2265,6 +2293,11 @@ connect_choices = [
         label="Instantly connect WhatsApp via a test number, connect your own or buy a number on us. [Help Guide](https://gooey.ai/docs/)",
     ),
     ConnectChoice(
+        platform=Platform.TWILIO,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/b0830a1e-0b8c-11f1-a876-02420a000176/Adobe%20Express%20-%20file.png",
+        label="Call or text your copilot with a free test number (or buy one).",
+    ),
+    ConnectChoice(
         platform=Platform.SLACK,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ee8c5b1c-d6c8-11ee-b278-02420a000126/thumbs/image_400x400.png",
         label="Connect to a Slack Channel. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-slack)",
@@ -2273,10 +2306,5 @@ connect_choices = [
         platform=Platform.FACEBOOK,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9f201a92-1e9d-11ef-884b-02420a000134/thumbs/image_400x400.png",
         label="Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
-    ),
-    ConnectChoice(
-        platform=Platform.TWILIO,
-        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/362be24a-68a8-11f0-9cc7-02420a00014c/Screenshot%202025-06-25%20at%201.18.57PM.png",
-        label="Call or text your copilot with a free test number (or buy one).",
     ),
 ]
