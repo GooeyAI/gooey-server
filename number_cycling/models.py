@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import phonenumbers
+from django.core.exceptions import ValidationError
 from django.db import models
 import phonenumber_field.modelfields
 from bots.models.bot_integration import (
@@ -10,13 +12,27 @@ from bots.models.bot_integration import (
 
 
 class SharedPhoneNumberQuerySet(models.QuerySet):
-    def any_active_number(self, platform: Platform) -> SharedPhoneNumber:
-        obj = self.filter(platform=platform.value, is_active=True).order_by("?").first()
+    def any_active_number(
+        self, platform: Platform, country_code: str = ""
+    ) -> SharedPhoneNumber:
+        qs = self.filter(platform=platform.value, is_active=True)
+        if country_code:
+            qs = qs.filter(country_code=country_code)
+        obj = qs.order_by("?").first()
         if not obj:
             raise SharedPhoneNumber.DoesNotExist(
                 f"Sorry, {platform.label} phone numbers are currently unavailable to assign. Please contact us or try again later."
             )
         return obj
+
+    def available_country_codes(self, platform: Platform) -> list[str]:
+        return list(
+            self.filter(platform=platform.value, is_active=True)
+            .exclude(country_code="")
+            .values_list("country_code", flat=True)
+            .distinct()
+            .order_by("-country_code")
+        )
 
 
 class SharedPhoneNumber(models.Model):
@@ -53,6 +69,13 @@ class SharedPhoneNumber(models.Model):
         help_text="Twilio phone number sid as found on twilio.com/console/phone-numbers/incoming (only for display)",
     )
 
+    country_code = models.CharField(
+        max_length=2,
+        default="",
+        editable=False,
+        help_text="ISO 3166-1 alpha-2 country code (e.g. 'US', 'IN'), auto-derived from phone number.",
+    )
+
     is_active = models.BooleanField(
         default=True, help_text="Whether this phone number is available for assignment"
     )
@@ -72,8 +95,41 @@ class SharedPhoneNumber(models.Model):
         get_latest_by = "updated_at"
         indexes = [
             models.Index(fields=["-updated_at"]),
-            models.Index(fields=["platform", "is_active"]),
+            models.Index(fields=["platform", "is_active", "country_code"]),
         ]
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        self._validate_phone_number()
+        self.country_code = self._resolve_country_code()
+
+    def _validate_phone_number(self):
+        if self.platform == Platform.WHATSAPP:
+            phone = self.wa_phone_number
+        elif self.platform == Platform.TWILIO:
+            phone = self.twilio_phone_number
+        else:
+            raise ValidationError(
+                f"Unsupported platform: {Platform(self.platform).label}"
+            )
+        if not phone:
+            raise ValidationError(
+                f"{Platform(self.platform).label} phone number is required"
+            )
+
+    def _resolve_country_code(self) -> str:
+        if self.platform == Platform.WHATSAPP:
+            phone = self.wa_phone_number
+        else:
+            phone = self.twilio_phone_number
+        cc = phonenumbers.region_code_for_number(phone)
+        if not cc or len(cc) != 2:
+            raise ValidationError("Could not determine country from phone number")
+        return cc.upper()
 
     def __str__(self) -> str:
         return (
