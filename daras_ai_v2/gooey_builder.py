@@ -125,6 +125,7 @@ def render_gooey_builder_inline(
 
     config["mode"] = "inline"
     config["showRunLink"] = True
+    config["showToolCalls"] = True
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 

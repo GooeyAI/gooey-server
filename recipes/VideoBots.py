@@ -1457,6 +1457,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 enableAudioMessage=True,
                 enablePhotoUpload=True,
                 enableConversations=False,
+                showToolCalls=True,
                 branding=bot_branding,
                 fillParent=True,
                 secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
