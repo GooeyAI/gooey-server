@@ -82,7 +82,7 @@ def render_gooey_builder(
     with gui.div(className="w-100 h-100"):
         update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
         if update_gui_state:
-            create_new_run = update_gui_state.pop("create_new_run", False)
+            create_new_run = update_gui_state.pop("create_new_run", True)
             gui.session_state.update(update_gui_state)
             if create_new_run:
                 sr = page.create_and_validate_new_run(
