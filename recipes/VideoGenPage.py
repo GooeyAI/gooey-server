@@ -19,7 +19,7 @@ from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.exceptions import UserError, ffmpeg, ffprobe
+from daras_ai_v2.exceptions import PaymentRequired, UserError, ffmpeg, ffprobe
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.functional import get_initializer
 from daras_ai_v2.language_model_openai_realtime import yield_from
@@ -64,6 +64,12 @@ class VideoGenPage(BasePage):
         for model_name in request.selected_models:
             q |= Q(name__icontains=model_name)
         models = AIModelSpec.objects.filter(q)
+
+        paid_only_models = models.filter(paid_only=True)
+        if not self.current_workspace.is_paying and paid_only_models.exists():
+            raise PaymentRequired(
+                list(paid_only_models.values_list("label", flat=True))
+            )
 
         if request.selected_audio_model:
             audio_model = AIModelSpec.objects.get(name=request.selected_audio_model)
