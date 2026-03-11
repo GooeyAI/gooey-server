@@ -82,12 +82,14 @@ def render_gooey_builder(
     with gui.div(className="w-100 h-100"):
         update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
         if update_gui_state:
+            create_new_run = update_gui_state.pop("create_new_run", False)
             gui.session_state.update(update_gui_state)
-            sr = page.create_and_validate_new_run(
-                enable_rate_limits=True, run_status=None
-            )
-            if sr:
-                raise gui.RedirectException(sr.get_app_url())
+            if create_new_run:
+                sr = page.create_and_validate_new_run(
+                    enable_rate_limits=True, run_status=None
+                )
+                if sr:
+                    raise gui.RedirectException(sr.get_app_url())
 
         render_gooey_builder_inline(
             sidebar_key=sidebar_key,
