@@ -1,12 +1,17 @@
 import mimetypes
 import os
+import re
 import typing
 
 from furl import furl
 
+_THUMB_SIZE_RE = re.compile(r"^(.+)_(\d+x\d+)(\.[^.]+)$")
+
 PreviewSizes = typing.Literal[
     "400x400", "1170x1560", "40x40", "72x72", "80x80", "96x96"
 ]
+
+GCS_HOST = "storage.googleapis.com"
 
 DEFAULT_META_IMG = (
     # Small
@@ -26,16 +31,30 @@ def meta_preview_url(
         return fallback_img, False
 
     f = furl(file_url)
-    dir_segments = f.path.segments[:-1]
-    basename = f.path.segments[-1]
+    segments = f.path.segments
+    if not segments:
+        return file_url, False
+
+    if (f.host or "").lower() != GCS_HOST:
+        return file_url, False
+
+    if "thumbs" in segments:
+        # For image thumbs: rewrite size suffix if it doesn't match requested size
+        m = _THUMB_SIZE_RE.match(segments[-1])
+        if m and m.group(2) != size:
+            f.path.segments = segments[:-1] + [f"{m.group(1)}_{size}{m.group(3)}"]
+            return str(f), False
+        return file_url, False
+
+    dir_segments = segments[:-1]
+    basename = segments[-1]
     base, ext = os.path.splitext(basename)
     content_type = mimetypes.guess_type(basename)[0] or ""
 
     if content_type.startswith("video/"):
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
         return str(f), True
-    elif content_type in {"image/png", "image/jpeg", "image/tiff", "image/webp"}:
+    if content_type in {"image/png", "image/jpeg", "image/tiff", "image/webp"}:
         f.path.segments = dir_segments + ["thumbs", f"{base}_{size}{ext}"]
         return str(f), False
-    else:
-        return file_url, False
+    return file_url, False
