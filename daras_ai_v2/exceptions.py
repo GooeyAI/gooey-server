@@ -131,6 +131,24 @@ class ComposioAuthRequired(UserError):
         )
 
 
+class PaymentRequired(UserError):
+    def __init__(self, paid_only_models: list[str]):
+        message = f"Your workspace requested paid-only model access. Please upgrade to use these models: {', '.join(paid_only_models)}"
+        super().__init__(
+            message,
+            status_code=HTTP_402_PAYMENT_REQUIRED,
+            error_params=dict(paid_only_models=paid_only_models),
+        )
+
+    @staticmethod
+    def render(error_params: dict | None) -> str:
+        from daras_ai_v2.settings import templates
+
+        return templates.get_template("payment_required.html").render(
+            **(error_params or {})
+        )
+
+
 FFMPEG_ERR_MSG = (
     "Unsupported File Format\n\n"
     "We encountered an issue processing your file as it appears to be in a format not supported by our system or may be corrupted. "
