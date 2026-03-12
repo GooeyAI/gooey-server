@@ -3,13 +3,19 @@ from itertools import zip_longest
 from textwrap import dedent
 
 import gooey_gui as gui
+import requests
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.text import slugify
 from furl import furl
 
 from app_users.models import AppUser
-from bots.models import BotIntegration, BotIntegrationAnalysisRun, Platform
+from bots.models import (
+    BotIntegration,
+    BotIntegrationAnalysisRun,
+    Platform,
+    PublishedRun,
+)
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
@@ -551,6 +557,188 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             )
         else:
             bot_api_example_generator(bi.api_integration_id())
+
+
+def render_telegram_connect_dialog(
+    dialog: gui.ConfirmDialogRef,
+    *,
+    pr: PublishedRun,
+    run_title: str,
+    can_edit: bool,
+    user: AppUser,
+    workspace: Workspace,
+    is_admin: bool,
+    current_app_url: str,
+):
+    header, body, footer = gui.modal_scaffold()
+    bot_name = run_title.strip() or "My Bot"
+    bot_username = _telegram_bot_username(run_title)
+
+    with header:
+        gui.markdown("### Deploy to Telegram")
+
+    with body:
+        gui.markdown("**Step 1: Open BotFather**")
+        gui.html(
+            '<a class=" btn btn-theme btn-secondary w-100 mb-3" '
+            'href="https://t.me/BotFather" target="_blank">'
+            f"{icons.telegram} Open BotFather"
+            "</a>",
+        )
+        gui.markdown("**Step 2: Name your bot & add a username**")
+        gui.markdown("Send: *`/newbot`* to BotFather to get started")
+        _copiable_field("Bot name", bot_name)
+        _copiable_field("Bot username", bot_username)
+
+        gui.markdown("**Step 3: Paste in your bot’s token**")
+        bot_token = gui.text_input(
+            "Bot token",
+            key="telegram-bot-token",
+            placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsTUVwxYZ",
+        )
+        bot_token = (bot_token or "").strip() or None
+
+        if dialog.pressed_confirm and bot_token:
+            redirect_url = _connect_telegram_bot(
+                bot_token=bot_token,
+                pr=pr,
+                run_title=run_title,
+                can_edit=can_edit,
+                user=user,
+                workspace=workspace,
+                is_admin=is_admin,
+                current_app_url=current_app_url,
+            )
+            if redirect_url:
+                dialog.set_open(False)
+                raise gui.RedirectException(redirect_url)
+
+    with footer:
+        with gui.div(className="d-flex align-items-center gap-2 w-100"):
+            with gui.div(className="me-auto"):
+                gui.anchor(
+                    href="https://core.telegram.org/bots/features#botfather",
+                    label="Need help?",
+                    new_tab=True,
+                    type="link",
+                )
+            gui.button(
+                "Cancel",
+                key=dialog.close_btn_key,
+                type="tertiary",
+            )
+            gui.button(
+                "Connect",
+                key=dialog.confirm_btn_key,
+                type="primary",
+                disabled=not (bot_token or "").strip(),
+            )
+
+
+def _copiable_field(label: str, value: str):
+    with gui.div(className="mb-2"):
+        gui.html(f"<small class='text-muted'>{label}</small>")
+        with gui.div(className="d-flex align-items-center gap-2"):
+            gui.markdown(value)
+            copy_to_clipboard_button(
+                label=icons.copy_solid,
+                value=value,
+                type="link",
+            )
+
+
+def _telegram_bot_username(run_title: str) -> str:
+    slug = slugify(run_title).replace("-", " ")
+    if not slug.strip():
+        slug = "my bot"
+    words = slug.split()
+    camel = words[0].lower() + "".join(w.capitalize() for w in words[1:])
+    if camel.endswith("Bot") or camel.endswith("bot"):
+        return camel
+    return f"{camel}Bot"
+
+
+def _connect_telegram_bot(
+    *,
+    bot_token: str,
+    pr: PublishedRun,
+    run_title: str,
+    can_edit: bool,
+    user: AppUser,
+    workspace: Workspace,
+    is_admin: bool,
+    current_app_url: str,
+) -> str | None:
+    from bots.models import WorkflowAccessLevel
+    from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
+    from daras_ai_v2.fastapi_tricks import get_api_route_url
+    from daras_ai_v2.telegram_bot import (
+        get_telegram_bot_info,
+        set_telegram_webhook,
+    )
+    from celeryapp.tasks import send_integration_attempt_email
+    from routers.telegram_api import telegram_webhook
+
+    try:
+        bot_info = get_telegram_bot_info(bot_token)
+    except requests.exceptions.HTTPError as e:
+        gui.error(f"Invalid bot token: {e}")
+        return None
+
+    bot_id = str(bot_info["id"])
+    bot_username = bot_info.get("username", "")
+
+    if BotIntegration.objects.filter(telegram_bot_id=bot_id).exists():
+        gui.error(
+            "This Telegram bot is already connected to a Gooey.AI workflow. "
+            "Please disconnect it first or use a different bot.",
+        )
+        return None
+
+    if not can_edit:
+        run_title = f"{user and user.first_name_possesive()} {run_title}"
+        pr = pr.duplicate(
+            user=user,
+            workspace=workspace,
+            title=run_title,
+            notes=pr.notes,
+            public_access=WorkflowAccessLevel.VIEW_ONLY,
+        )
+
+    webhook_url = get_api_route_url(
+        telegram_webhook,
+        path_params=dict(bot_id=bot_id),
+    )
+    try:
+        set_telegram_webhook(
+            bot_token,
+            webhook_url,
+            secret_token=settings.TELEGRAM_WEBHOOK_SECRET,
+        )
+    except requests.exceptions.HTTPError as e:
+        gui.error(f"Failed to set webhook: {e}")
+        return None
+
+    bi = BotIntegration.objects.create(
+        name=run_title,
+        created_by=user,
+        workspace=workspace,
+        platform=Platform.TELEGRAM,
+        telegram_bot_token=bot_token,
+        telegram_bot_id=bot_id,
+        telegram_bot_username=bot_username,
+    )
+
+    redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
+
+    if not is_admin:
+        send_integration_attempt_email.delay(
+            user_id=user.id,
+            platform=Platform.TELEGRAM,
+            run_url=current_app_url,
+        )
+
+    return redirect_url
 
 
 def integration_details_generator(bi: BotIntegration, user: AppUser | None):

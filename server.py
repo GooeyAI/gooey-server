@@ -41,6 +41,7 @@ from routers import (
     broadcast_api,
     bots_api,
     twilio_api,
+    telegram_api,
     static_pages,
     onedrive_api,
     workspace,
@@ -71,6 +72,7 @@ app.include_router(url_shortener.app, include_in_schema=False)
 app.include_router(paypal.router, include_in_schema=False)
 app.include_router(stripe.router, include_in_schema=False)
 app.include_router(twilio_api.router, include_in_schema=False)
+app.include_router(telegram_api.router, include_in_schema=False)
 app.include_router(static_pages.app, include_in_schema=False)
 app.include_router(twilio_ws_api.app, include_in_schema=False)
 app.include_router(pycon.app, include_in_schema=False)
