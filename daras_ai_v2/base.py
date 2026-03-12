@@ -1184,6 +1184,10 @@ class BasePage:
     def get_recipe_title(cls) -> str:
         return cls.get_root_pr().title or cls.title or cls.workflow.label
 
+    @classmethod
+    def get_recipe_short_title(cls) -> str:
+        return f"{cls.workflow.emoji} {cls.workflow.short_title}"
+
     def get_explore_image(self) -> str:
         meta = self.workflow.get_or_create_metadata()
         img = meta.default_image or self.explore_image or ""
