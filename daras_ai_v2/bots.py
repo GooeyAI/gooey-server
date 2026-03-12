@@ -105,7 +105,7 @@ class BotInterface:
     bi: BotIntegration
     saved_run: SavedRun | None = None
     input_type: typing.Literal[
-        "text", "audio", "video", "image", "document", "interactive"
+        "text", "audio", "video", "image", "document", "interactive", "location"
     ]
     user_msg_id: str | None = None
     can_update_message: bool = False
@@ -714,6 +714,10 @@ def build_system_vars(
             variables["bot_twilio_phone_number"] = (
                 bi.twilio_phone_number and bi.twilio_phone_number.as_international
             )
+        case Platform.TELEGRAM:
+            variables["telegram_user_id"] = convo.telegram_user_id
+            variables["telegram_user_name"] = convo.telegram_user_name
+            variables["bot_telegram_username"] = bi.telegram_bot_username
 
     variables_schema = {var: {"role": "system"} for var in variables}
     return variables, variables_schema
