@@ -1746,6 +1746,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         from routers.facebook_api import wa_connect_url
         from number_cycling.utils import create_bot_integration_with_extension
         from number_cycling.models import SharedPhoneNumber
+        from daras_ai_v2.bot_integration_widgets import (
+            render_telegram_connect_dialog,
+        )
 
         gui.write(label, unsafe_allow_html=True, className="text-center")
 
@@ -1756,6 +1759,10 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 user=self.request.user,
                 pr=pr,
             )
+        )
+
+        telegram_dialog = gui.use_confirm_dialog(
+            key="telegram-connect", close_on_confirm=False
         )
 
         gui.newline()
@@ -1788,7 +1795,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             )
 
         if pressed_platform:
-            if not can_edit:
+            if not can_edit and pressed_platform != Platform.TELEGRAM:
                 run_title = f"{self.request.user and self.request.user.first_name_possesive()} {run_title}"
                 pr = pr.duplicate(
                     user=self.request.user,
@@ -1799,6 +1806,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 )
 
             match pressed_platform:
+                case Platform.TELEGRAM:
+                    telegram_dialog.set_open(True)
                 case Platform.WEB:
                     bi = BotIntegration.objects.create(
                         name=run_title,
@@ -1838,17 +1847,29 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                         return
 
                     redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)
-
                 case _:
                     raise ValueError(f"Unsupported platform: {pressed_platform}")
 
-            if not self.is_current_user_admin():
-                send_integration_attempt_email.delay(
-                    user_id=self.request.user.id,
-                    platform=pressed_platform,
-                    run_url=self.current_app_url() or "",
-                )
-            raise gui.RedirectException(redirect_url)
+            if pressed_platform != Platform.TELEGRAM:
+                if not self.is_current_user_admin():
+                    send_integration_attempt_email.delay(
+                        user_id=self.request.user.id,
+                        platform=pressed_platform,
+                        run_url=self.current_app_url() or "",
+                    )
+                raise gui.RedirectException(redirect_url)
+
+        if telegram_dialog.is_open:
+            render_telegram_connect_dialog(
+                telegram_dialog,
+                pr=pr,
+                run_title=run_title,
+                can_edit=can_edit,
+                user=self.request.user,
+                workspace=self.current_workspace,
+                is_admin=self.is_current_user_admin(),
+                current_app_url=self.current_app_url() or "",
+            )
 
         gui.newline()
         api_tab_url = self.current_app_url(RecipeTabs.run_as_api)
@@ -2312,5 +2333,10 @@ connect_choices = [
         platform=Platform.FACEBOOK,
         img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9f201a92-1e9d-11ef-884b-02420a000134/thumbs/image_400x400.png",
         label="Connect to a Facebook Page you own. [Help Guide](https://gooey.ai/docs/guides/copilot/deploy-to-facebook)",
+    ),
+    ConnectChoice(
+        platform=Platform.TELEGRAM,
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/dd142a5c-1de0-11f1-8def-02420a0001cf/telegram%20logo%20.png",
+        label="Connect to Telegram.",
     ),
 ]

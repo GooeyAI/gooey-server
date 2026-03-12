@@ -62,6 +62,7 @@ whatsapp = '<i class="fa-brands fa-whatsapp"></i>'
 fb_messenger = '<i class="fa-brands fa-facebook-messenger"></i>'
 slack = '<i class="fa-brands fa-slack"></i>'
 instagram = '<i class="fa-brands fa-instagram"></i>'
+telegram = '<i class="fa-brands fa-telegram"></i>'
 
 # cards
 card_icons = {

@@ -217,6 +217,19 @@ class Conversation(models.Model):
         help_text="User's web user id (mandatory if platform is WEB)",
     )
 
+    telegram_user_id = models.CharField(
+        max_length=256,
+        blank=True,
+        default=None,
+        null=True,
+        help_text="User's Telegram user ID (mandatory if platform is Telegram)",
+    )
+    telegram_user_name = models.TextField(
+        blank=True,
+        default="",
+        help_text="User's Telegram display name (only for display)",
+    )
+
     blocked_status = models.IntegerField(
         choices=ConvoBlockedStatus.choices,
         default=ConvoBlockedStatus.NORMAL,
@@ -240,6 +253,7 @@ class Conversation(models.Model):
         "web_user_id",
         "wa_phone_number",
         "twilio_phone_number",
+        "telegram_user_id",
     ]
 
     class Meta:
@@ -260,6 +274,7 @@ class Conversation(models.Model):
             models.Index(
                 fields=["bot_integration", "twilio_phone_number", "twilio_call_sid"]
             ),
+            models.Index(fields=["bot_integration", "telegram_user_id"]),
             models.Index(fields=["-created_at", "bot_integration"]),
         ]
 
@@ -286,6 +301,7 @@ class Conversation(models.Model):
             or " in #".join(
                 filter(None, [self.slack_user_name, self.slack_channel_name])
             )
+            or self.telegram_user_name
             or self.unique_user_id()
         )
 
