@@ -72,7 +72,6 @@ class SharedPhoneNumber(models.Model):
     country_code = models.CharField(
         max_length=2,
         default="",
-        editable=False,
         help_text="ISO 3166-1 alpha-2 country code (e.g. 'US', 'IN'), auto-derived from phone number.",
     )
 
@@ -105,7 +104,7 @@ class SharedPhoneNumber(models.Model):
     def clean(self):
         super().clean()
         self._validate_phone_number()
-        self.country_code = self._resolve_country_code()
+        self._resolve_country_code()
 
     def _validate_phone_number(self):
         if self.platform == Platform.WHATSAPP:
@@ -121,15 +120,15 @@ class SharedPhoneNumber(models.Model):
                 f"{Platform(self.platform).label} phone number is required"
             )
 
-    def _resolve_country_code(self) -> str:
+    def _resolve_country_code(self):
         if self.platform == Platform.WHATSAPP:
             phone = self.wa_phone_number
         else:
             phone = self.twilio_phone_number
         cc = phonenumbers.region_code_for_number(phone)
         if not cc or len(cc) != 2:
-            raise ValidationError("Could not determine country from phone number")
-        return cc.upper()
+            return
+        self.country_code = cc.upper()
 
     def __str__(self) -> str:
         return (
