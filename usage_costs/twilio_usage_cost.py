@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import typing
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
@@ -50,7 +51,7 @@ def record_twilio_voice_call_cost(data: dict):
 
 @transaction.atomic
 def create_usage_cost_and_deduct_credits(
-    sr: SavedRun, pricing: ModelPricing, quantity: int, unit_cost: float
+    sr: SavedRun, pricing: ModelPricing, quantity: int, unit_cost: Decimal
 ):
     usage_cost = create_usage_cost(
         sr=sr,
@@ -72,7 +73,7 @@ def create_usage_cost_and_deduct_credits(
     SavedRun.objects.filter(id=sr.id).update(price=F("price") + amount)
 
 
-def get_twilio_voice_unit_cost(call_sid: str) -> float:
+def get_twilio_voice_unit_cost(call_sid: str) -> Decimal:
     import twilio.rest
 
     client = twilio.rest.Client(
@@ -83,9 +84,9 @@ def get_twilio_voice_unit_cost(call_sid: str) -> float:
     call = client.calls(call_sid).fetch()
     number_pricing = client.pricing.v2.voice.numbers(call.to).fetch()
     if call.direction == "inbound":
-        return float(number_pricing.inbound_call_price["base_price"])
+        return Decimal(number_pricing.inbound_call_price["base_price"])
     else:
-        return float(number_pricing.outbound_call_prices[0]["base_price"])
+        return Decimal(number_pricing.outbound_call_prices[0]["base_price"])
 
 
 def get_ivr_price_credits_and_seconds(sr: SavedRun) -> tuple[int, float]:
