@@ -577,7 +577,7 @@ def render_telegram_connect_dialog(
 ):
     header, body, footer = gui.modal_scaffold()
     bot_name = run_title.strip() or "My Bot"
-    bot_username = _telegram_bot_username(run_title)
+    bot_username = _suggested_telegram_bot_username(run_title)
 
     with header:
         gui.markdown("### Deploy to Telegram")
@@ -592,8 +592,8 @@ def render_telegram_connect_dialog(
         )
         gui.markdown("**Step 2: Name your bot & add a username**")
         gui.markdown("Send: *`/newbot`* to BotFather to get started")
-        _copiable_field("Bot name", bot_name)
-        _copiable_field("Bot username", bot_username)
+        _copiable_field("Suggested bot name", bot_name)
+        _copiable_field("Suggested bot username", bot_username)
 
         gui.markdown("**Step 3: Paste in your bot’s token**")
         bot_token = gui.text_input(
@@ -652,12 +652,12 @@ def _copiable_field(label: str, value: str):
             )
 
 
-def _telegram_bot_username(run_title: str) -> str:
+def _suggested_telegram_bot_username(run_title: str) -> str:
     slug = slugify(run_title).replace("-", " ")
     if not slug.strip():
         slug = "my bot"
     words = slug.split()
-    camel = words[0].lower() + "".join(w.capitalize() for w in words[1:])
+    camel = "".join(w.capitalize() for w in words)
     if camel.endswith("Bot") or camel.endswith("bot"):
         return camel
     return f"{camel}Bot"
