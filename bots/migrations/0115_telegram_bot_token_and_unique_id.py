@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="botintegration",
-            name="telegram_bot_username",
+            name="telegram_bot_user_name",
             field=models.CharField(
                 blank=True,
                 default="",

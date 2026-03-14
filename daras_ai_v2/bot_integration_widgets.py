@@ -726,7 +726,7 @@ def _connect_telegram_bot(
         platform=Platform.TELEGRAM,
         telegram_bot_token=bot_token,
         telegram_bot_id=bot_id,
-        telegram_bot_username=bot_username,
+        telegram_bot_user_name=bot_username,
     )
 
     redirect_url = connect_bot_to_published_run(bi, pr, overwrite=True)

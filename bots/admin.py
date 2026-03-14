@@ -94,6 +94,11 @@ twilio_fields = [
     "twilio_waiting_text",
     "twilio_waiting_audio_url",
 ]
+telegram_fields = [
+    "telegram_bot_token",
+    "telegram_bot_id",
+    "telegram_bot_user_name",
+]
 
 
 class BotIntegrationAdminForm(forms.ModelForm):
@@ -110,6 +115,7 @@ class BotIntegrationAdminForm(forms.ModelForm):
                         + slack_fields
                         + web_fields
                         + twilio_fields
+                        + telegram_fields
                     ),
                     f"--show-on-{Platform.FACEBOOK}": ",".join(fb_fields),
                     f"--show-on-{Platform.INSTAGRAM}": ",".join(fb_fields + ig_fields),
@@ -117,6 +123,7 @@ class BotIntegrationAdminForm(forms.ModelForm):
                     f"--show-on-{Platform.SLACK}": ",".join(slack_fields),
                     f"--show-on-{Platform.WEB}": ",".join(web_fields),
                     f"--show-on-{Platform.TWILIO}": ",".join(twilio_fields),
+                    f"--show-on-{Platform.TELEGRAM}": ",".join(telegram_fields),
                 },
             ),
         }
@@ -219,6 +226,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
         "fb_page_access_token",
         "slack_access_token",
         "slack_channel_hook_url",
+        "telegram_bot_token",
         "view_analysis_results",
         "view_conversations",
         "view_messsages",
@@ -254,6 +262,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
                     *slack_fields,
                     *web_fields,
                     *twilio_fields,
+                    *telegram_fields,
                 ]
             },
         ),
