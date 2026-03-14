@@ -44,6 +44,7 @@ inpaint_model_ids = {
 
 class Text2ImgModels(Enum):
     nano_banana_pro = "Nano Banana Pro (Google)"
+    nano_banana_2 = "Nano Banana 2 (Google)"
     nano_banana = "Nano Banana (Google)"
 
     flux_1_dev = "FLUX.1 [dev]"
@@ -87,6 +88,7 @@ class Text2ImgModels(Enum):
 
 text2img_model_ids = {
     Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
+    Text2ImgModels.nano_banana_2: "fal-ai/nano-banana-2",
     Text2ImgModels.nano_banana: "fal-ai/nano-banana",
     Text2ImgModels.gpt_image_1: "gpt-image-1",
     Text2ImgModels.gpt_image_1_5: "gpt-image-1.5",
@@ -102,6 +104,7 @@ text2img_model_ids = {
 
 class Img2ImgModels(Enum):
     nano_banana_pro = "Nano Banana Pro (Google)"
+    nano_banana_2 = "Nano Banana 2 (Google)"
     nano_banana = "Nano Banana (Google)"
 
     flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
@@ -142,6 +145,7 @@ class Img2ImgModels(Enum):
     def _multi_image_models(cls):
         return {
             cls.nano_banana,
+            cls.nano_banana_2,
             cls.nano_banana_pro,
             cls.gpt_image_1,
             cls.gpt_image_1_5,
@@ -158,6 +162,7 @@ img2img_model_ids = {
     Img2ImgModels.gpt_image_1: "gpt-image-1",
     Img2ImgModels.gpt_image_1_5: "gpt-image-1.5",
     Img2ImgModels.nano_banana: "fal-ai/nano-banana/edit",
+    Img2ImgModels.nano_banana_2: "fal-ai/nano-banana-2/edit",
     Img2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro/edit",
 }
 
@@ -338,6 +343,7 @@ def text2img(
         Text2ImgModels.gpt_image_1,
         Text2ImgModels.gpt_image_1_5,
         Text2ImgModels.nano_banana,
+        Text2ImgModels.nano_banana_2,
         Text2ImgModels.nano_banana_pro,
     }:
         _resolution_check(width, height, max_size=(1024, 1024))
@@ -413,25 +419,30 @@ def text2img(
                     response_format="b64_json",
                 )
             out_imgs = [b64_img_decode(part.b64_json) for part in response.data]
-        case Text2ImgModels.nano_banana | Text2ImgModels.nano_banana_pro:
+        case (
+            Text2ImgModels.nano_banana
+            | Text2ImgModels.nano_banana_2
+            | Text2ImgModels.nano_banana_pro
+        ):
             from usage_costs.cost_utils import record_cost_auto
             from usage_costs.models import ModelSku
 
             payload = dict(
                 prompt=prompt, output_format="png", num_images=num_outputs
-            ) | resolve_nano_banana_resolution(width, height)
+            ) | resolve_nano_banana_resolution(width, height, model=model)
 
             output_images = yield from generate_fal_images(
                 model_id=text2img_model_ids[model],
                 payload=payload,
             )
 
-            if payload.get("resolution") == "4K":
-                num_outputs *= 2  # 2x price for 4K
+            resolution = payload.get("resolution")
+            multiplier = RESOLUTION_COST_MULTIPLIERS.get(model, {}).get(resolution, 1.0)
             record_cost_auto(
                 model=text2img_model_ids[model],
                 sku=ModelSku.output_image_tokens,
                 quantity=num_outputs,
+                unit_cost_multiplier=multiplier,
             )
 
             return output_images
@@ -462,11 +473,25 @@ def text2img(
     ]
 
 
-def resolve_nano_banana_resolution(width: int, height: int) -> dict:
+RESOLUTION_COST_MULTIPLIERS = {
+    Text2ImgModels.nano_banana_2: {"0.5K": 0.75, "2K": 1.5, "4K": 2.0},
+    Text2ImgModels.nano_banana_pro: {"4K": 2.0},
+}
+
+
+def resolve_nano_banana_resolution(
+    width: int, height: int, model: Text2ImgModels | None = None
+) -> dict:
     from daras_ai_v2.img_model_settings_widgets import (
         RESOLUTIONS,
+        NANO_BANANA_2_RESOLUTIONS,
         NANO_BANANA_RESOLUTIONS,
     )
+
+    if model == Text2ImgModels.nano_banana_2:
+        resolutions = NANO_BANANA_2_RESOLUTIONS
+    else:
+        resolutions = NANO_BANANA_RESOLUTIONS
 
     if width < height:
         res = f"{height} x {width}"
@@ -474,7 +499,7 @@ def resolve_nano_banana_resolution(width: int, height: int) -> dict:
     else:
         res = f"{width} x {height}"
         portrait = False
-    for pixels in NANO_BANANA_RESOLUTIONS:
+    for pixels in resolutions:
         try:
             aspect_ratio = RESOLUTIONS[pixels][res]
         except KeyError:
@@ -555,6 +580,7 @@ def img2img(
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.gpt_image_1_5.name,
         Img2ImgModels.nano_banana.name,
+        Img2ImgModels.nano_banana_2.name,
         Img2ImgModels.nano_banana_pro.name,
     ):
         raise UserError("Text prompt is required for this model")
@@ -627,7 +653,11 @@ def img2img(
                 resize_img_fit(b64_img_decode(part.b64_json), (width, height))
                 for part in response.data
             ]
-        case Img2ImgModels.nano_banana.name | Img2ImgModels.nano_banana_pro.name:
+        case (
+            Img2ImgModels.nano_banana.name
+            | Img2ImgModels.nano_banana_2.name
+            | Img2ImgModels.nano_banana_pro.name
+        ):
             payload = dict(
                 prompt=prompt,
                 image_urls=init_images,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing
+from decimal import Decimal
 
 from loguru import logger
 
@@ -10,7 +11,12 @@ if typing.TYPE_CHECKING:
     from bots.models.saved_run import SavedRun
 
 
-def record_cost_auto(model: str, sku: ModelSku, quantity: int) -> UsageCost | None:
+def record_cost_auto(
+    model: str,
+    sku: ModelSku,
+    quantity: int,
+    unit_cost_multiplier: float = 1,
+) -> UsageCost | None:
     from celeryapp.tasks import get_running_saved_run
 
     sr = get_running_saved_run()
@@ -19,11 +25,12 @@ def record_cost_auto(model: str, sku: ModelSku, quantity: int) -> UsageCost | No
     pricing = get_model_pricing(model, sku)
     if not pricing:
         return None
+    unit_cost = pricing.unit_cost * Decimal(str(unit_cost_multiplier))
     return create_usage_cost(
         sr=sr,
         pricing=pricing,
         quantity=quantity,
-        unit_cost=pricing.unit_cost,
+        unit_cost=unit_cost,
         unit_quantity=pricing.unit_quantity,
     )
 
@@ -42,7 +49,7 @@ def create_usage_cost(
     sr: SavedRun,
     pricing: ModelPricing,
     quantity: int,
-    unit_cost: float,
+    unit_cost: Decimal,
     unit_quantity: int,
 ) -> UsageCost:
     from usage_costs.models import UsageCost

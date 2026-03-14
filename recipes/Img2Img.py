@@ -256,6 +256,8 @@ class Img2ImgPage(BasePage):
                 unit_price = 26
             case Img2ImgModels.nano_banana_pro.name:
                 unit_price = 30
+            case Img2ImgModels.nano_banana_2.name:
+                unit_price = 26
             case _:
                 unit_price = 5
 
