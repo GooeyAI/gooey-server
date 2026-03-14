@@ -32,6 +32,7 @@ class Platform(models.IntegerChoices):
     SLACK = (4, "Slack")
     WEB = (5, "Web")
     TWILIO = (6, "Twilio")
+    TELEGRAM = (7, "Telegram")
 
     def get_icon(self):
         match self:
@@ -47,6 +48,8 @@ class Platform(models.IntegerChoices):
                 return icons.slack
             case Platform.TWILIO:
                 return icons.phone
+            case Platform.TELEGRAM:
+                return icons.telegram
             case _:
                 return f'<i class="fa-brands fa-{self.name.lower()}"></i>'
 
@@ -73,6 +76,8 @@ class Platform(models.IntegerChoices):
                 return "#c20286"
             case Platform.TWILIO:
                 return "#f22f46"
+            case Platform.TELEGRAM:
+                return "#0088CC"
 
 
 class BotIntegrationQuerySet(models.QuerySet):
@@ -413,6 +418,27 @@ class BotIntegration(models.Model):
         help_text="If set, the bot will start a new conversation for each call",
     )
 
+    telegram_bot_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Telegram bot token from @BotFather",
+        editable=False,
+    )
+    telegram_bot_id = models.CharField(
+        max_length=256,
+        blank=True,
+        default=None,
+        null=True,
+        unique=True,
+        help_text="Telegram bot user ID",
+    )
+    telegram_bot_user_name = models.CharField(
+        max_length=256,
+        blank=True,
+        default="",
+        help_text="Telegram bot @username (for display and deep links)",
+    )
+
     streaming_enabled = models.BooleanField(
         default=True,
         help_text="If set, the bot will stream messages to the frontend",
@@ -513,6 +539,7 @@ class BotIntegration(models.Model):
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
             or (self.twilio_phone_number and self.twilio_phone_number.as_international)
+            or (self.telegram_bot_user_name)
             or self.name
             or (
                 self.platform == Platform.WEB
@@ -554,6 +581,8 @@ class BotIntegration(models.Model):
             if self.extension_number:
                 return f"{tel_url.tostr()},{self.extension_number}"
             return tel_url.tostr()
+        elif self.telegram_bot_user_name:
+            return (furl("https://t.me/") / self.telegram_bot_user_name).tostr()
         else:
             return None
 
