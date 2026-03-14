@@ -717,7 +717,7 @@ def build_system_vars(
         case Platform.TELEGRAM:
             variables["telegram_user_id"] = convo.telegram_user_id
             variables["telegram_user_name"] = convo.telegram_user_name
-            variables["bot_telegram_username"] = bi.telegram_bot_username
+            variables["telegram_bot_user_name"] = bi.telegram_bot_user_name
 
     variables_schema = {var: {"role": "system"} for var in variables}
     return variables, variables_schema

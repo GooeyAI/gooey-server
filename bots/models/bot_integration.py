@@ -432,7 +432,7 @@ class BotIntegration(models.Model):
         unique=True,
         help_text="Telegram bot user ID",
     )
-    telegram_bot_username = models.CharField(
+    telegram_bot_user_name = models.CharField(
         max_length=256,
         blank=True,
         default="",
@@ -539,7 +539,7 @@ class BotIntegration(models.Model):
                 filter(None, [self.slack_team_name, self.slack_channel_name])
             )
             or (self.twilio_phone_number and self.twilio_phone_number.as_international)
-            or (self.telegram_bot_username)
+            or (self.telegram_bot_user_name)
             or self.name
             or (
                 self.platform == Platform.WEB
@@ -581,8 +581,8 @@ class BotIntegration(models.Model):
             if self.extension_number:
                 return f"{tel_url.tostr()},{self.extension_number}"
             return tel_url.tostr()
-        elif self.telegram_bot_username:
-            return (furl("https://t.me/") / self.telegram_bot_username).tostr()
+        elif self.telegram_bot_user_name:
+            return (furl("https://t.me/") / self.telegram_bot_user_name).tostr()
         else:
             return None
 
