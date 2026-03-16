@@ -38,14 +38,6 @@ def meta_preview_url(
     if (f.host or "").lower() != GCS_HOST:
         return file_url, False
 
-    if "thumbs" in segments:
-        # For image thumbs: rewrite size suffix if it doesn't match requested size
-        m = _THUMB_SIZE_RE.match(segments[-1])
-        if m and m.group(2) != size:
-            f.path.segments = segments[:-1] + [f"{m.group(1)}_{size}{m.group(3)}"]
-            return str(f), False
-        return file_url, False
-
     dir_segments = segments[:-1]
     basename = segments[-1]
     base, ext = os.path.splitext(basename)
