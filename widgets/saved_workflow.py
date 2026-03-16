@@ -318,7 +318,7 @@ def render_media_component(url: str):
         url = furl(url).add(fragment_args={"t": "0.001"}).url
         gui.html(
             f"""
-            <object data={preview_url!r} class="gui-video">
+            <object data={preview_url!r} class="gui-video w-100">
             <video src={url!r} class="gui-video" autoplay playsInline loop muted>
             </object>
             """
@@ -326,7 +326,7 @@ def render_media_component(url: str):
     else:
         gui.html(
             f"""
-            <object data={preview_url!r} class="gui-image">
+            <object data={preview_url!r} class="gui-image w-100">
             <img src={url!r} class="gui-image" autoplay playsInline loop muted>
             </object>
             """
