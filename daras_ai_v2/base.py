@@ -473,8 +473,10 @@ class BasePage:
             img_style["borderRadius"] = "12px"
 
         with gui.div(className="d-flex gap-4 w-100 mb-2"):
+
             pr_photo_url = (
-                pr.photo_url and meta_preview_url(pr.photo_url, size="96x96")[0]
+                pr.photo_url
+                and meta_preview_url(pr.photo_url, size="96x96", check_exists=True)[0]
             )
             if pr_photo_url:
                 with gui.div(className="d-none d-md-inline"):
