@@ -26,6 +26,7 @@ def meta_preview_url(
     file_url: str | None,
     fallback_img: str = DEFAULT_META_IMG,
     size: PreviewSizes = "400x400",
+    check_exists: bool = False,
 ) -> tuple[str | None, bool]:
     if not file_url:
         return fallback_img, False
@@ -45,8 +46,24 @@ def meta_preview_url(
 
     if content_type.startswith("video/"):
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
-        return str(f), True
+        thumb_url = str(f)
+        if check_exists and not _gcs_blob_exists(thumb_url):
+            return file_url, False
+        return thumb_url, True
     if content_type in {"image/png", "image/jpeg", "image/tiff", "image/webp"}:
         f.path.segments = dir_segments + ["thumbs", f"{base}_{size}{ext}"]
-        return str(f), False
+        thumb_url = str(f)
+        if check_exists and not _gcs_blob_exists(thumb_url):
+            return file_url, False
+        return thumb_url, False
     return file_url, False
+
+
+def _gcs_blob_exists(public_url: str) -> bool:
+    import requests
+
+    try:
+        r = requests.head(public_url, timeout=3)
+        return r.status_code == 200
+    except Exception:
+        return True  # fail open — assume exists to avoid hiding real thumbnails
