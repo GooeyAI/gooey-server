@@ -305,7 +305,12 @@ class Workspace(SafeDeleteModel):
         return self.add_balance_raw(amount, invoice_id, user=user, **kwargs)
 
     def add_balance_raw(
-        self, amount: int, invoice_id: str, *, user: AppUser | None = None, **kwargs
+        self,
+        amount: int,
+        invoice_id: str,
+        *,
+        user: AppUser | None = None,
+        **kwargs,
     ) -> "AppUserTransaction":
         from app_users.models import AppUserTransaction
 
@@ -324,10 +329,6 @@ class Workspace(SafeDeleteModel):
         workspace: Workspace = Workspace.objects.select_for_update().get(pk=self.pk)
         workspace.balance += amount
         workspace.save(update_fields=["balance"])
-        workspace.add_member_balance(
-            user_id=user and user.id,
-            amount=amount,
-        )
 
         if workspace.subscription:
             kwargs.setdefault("plan", workspace.subscription.plan)
@@ -348,36 +349,43 @@ class Workspace(SafeDeleteModel):
             try:
                 return AppUserTransaction.objects.get(invoice_id=invoice_id)
             except AppUserTransaction.DoesNotExist:
+                # ignore this error so that we raise the original IntegrityError
                 pass
             raise
 
-    def add_member_balance(
-        self,
-        *,
-        user_id: int | None,
-        amount: int,
-        check_team_plan: bool = True,
-    ) -> typing.Optional["WorkspaceMembership"]:
-        if not user_id:
-            return None
-        if check_team_plan and (
-            not self.subscription or self.subscription.plan != PricingPlan.TEAM.db_value
-        ):
+    @db_middleware
+    @transaction.atomic
+    def reset_member_balance(self, *, invoice_id: str) -> None:
+        from app_users.models import AppUserTransaction, TransactionReason
+
+        if not self.subscription or self.subscription.plan != PricingPlan.TEAM.db_value:
             return None
 
-        qs = WorkspaceMembership.objects.select_for_update().filter(
-            workspace=self,
-            user_id=user_id,
-            deleted__isnull=True,
+        txns_to_create = []
+        memberships = list(
+            WorkspaceMembership.objects.select_for_update()
+            .select_related("seat", "seat__seat_type")
+            .filter(workspace=self, deleted__isnull=True, seat__isnull=False)
         )
+        for membership in memberships:
+            old_balance = membership.balance
+            membership.balance = membership.seat.seat_type.monthly_credit_limit
+            txns_to_create.append(
+                AppUserTransaction(
+                    workspace=self,
+                    user=None,
+                    member=membership,
+                    amount=membership.balance - old_balance,  # reset to monthly limit
+                    end_balance=membership.balance,
+                    invoice_id=f"{invoice_id}/seat-{membership.seat.id}",
+                    charged_amount=0,  # credits were reset, not added to the workspace balance
+                    plan=self.subscription.plan,
+                    reason=TransactionReason.MEMBER_LIMIT_RESET,
+                )
+            )
 
-        membership = qs.first()
-        if not membership:
-            return None
-
-        membership.balance += amount
-        membership.save(update_fields=["balance", "updated_at"])
-        return membership
+        WorkspaceMembership.objects.bulk_update(memberships, ["balance"])
+        AppUserTransaction.objects.bulk_create(txns_to_create)
 
     def get_or_create_stripe_customer(self) -> stripe.Customer:
         customer = None
@@ -550,6 +558,51 @@ class WorkspaceMembership(SafeDeleteModel):
 
     def __str__(self):
         return f"{self.get_role_display()} - {self.user} ({self.workspace})"
+
+    @transaction.atomic
+    def add_balance(self, amount: int, invoice_id: str, **kwargs) -> AppUserTransaction:
+        from app_users.models import AppUserTransaction
+
+        # if an invoice entry exists
+        try:
+            # avoid updating twice for same invoice
+            return AppUserTransaction.objects.get(invoice_id=invoice_id)
+        except AppUserTransaction.DoesNotExist:
+            pass
+
+        # select_for_update() is very important here
+        # transaction.atomic alone is not enough!
+        # It won't lock this row for reads, and multiple threads can update the same row leading incorrect balance
+        #
+        # Also we're not using .update() here because it won't give back the updated end balance
+        member = (
+            WorkspaceMembership.objects.select_for_update()
+            .select_related("workspace", "user")
+            .get(pk=self.pk)
+        )
+        member.balance += amount
+        member.save(update_fields=["balance"])
+
+        if member.workspace.subscription:
+            kwargs.setdefault("plan", member.workspace.subscription.plan)
+
+        try:
+            return AppUserTransaction.objects.create(
+                workspace=member.workspace,
+                user=member.user,
+                member=member,
+                invoice_id=invoice_id,
+                amount=amount,
+                end_balance=member.balance,
+                **kwargs,
+            )
+        except IntegrityError:
+            try:
+                return AppUserTransaction.objects.get(invoice_id=invoice_id)
+            except AppUserTransaction.DoesNotExist:
+                # ignore this error so that we raise the original IntegrityError
+                pass
+            raise
 
     def clean(self) -> None:
         if self.workspace.is_personal and self.user_id != self.workspace.created_by_id:
@@ -786,6 +839,8 @@ class WorkspaceInvite(models.Model):
         """
         Raises: ValidationError
         """
+        from payments.webhooks import auto_assign_team_seats
+
         assert invitee.email and invitee.email.lower() == self.email.lower(), (
             "Email mismatch"
         )
@@ -801,22 +856,6 @@ class WorkspaceInvite(models.Model):
                 "This invitation has expired. Please ask your team admin to send a new one."
             )
 
-        plan = PricingPlan.from_sub(self.workspace.subscription)
-        if plan == PricingPlan.TEAM and invitee.email not in settings.ADMIN_EMAILS:
-            # SELECT ... FOR UPDATE locks the seat row for the duration of this transaction
-            # Gives us time to accept the invitation, and then assign the seat
-            unused_seat = (
-                self.workspace.subscription.seats.select_for_update()
-                .filter(seat_type__is_public=True, assigned_to__isnull=True)
-                .first()
-            )
-            if not unused_seat:
-                raise ValidationError(
-                    "Your team has reached the maximum number of members allowed by your current plan. Please contact your workspace admin to upgrade your plan."
-                )
-        else:
-            unused_seat = None
-
         membership, created = WorkspaceMembership.objects.get_or_create(
             workspace=self.workspace,
             user=invitee,
@@ -825,14 +864,9 @@ class WorkspaceInvite(models.Model):
         if not created:
             return membership, False
 
-        if plan == PricingPlan.TEAM and invitee.email in settings.ADMIN_EMAILS:
-            admin_seat_type = WorkspaceMembership.get_or_create_gooey_admin_seat_type()
-            self.workspace.subscription.seats.create(
-                seat_type=admin_seat_type, assigned_to=membership
-            )
-        elif unused_seat:
-            unused_seat.assigned_to = membership
-            unused_seat.save()
+        plan = PricingPlan.from_sub(self.workspace.subscription)
+        if plan == PricingPlan.TEAM:
+            auto_assign_team_seats(self.workspace)
 
         self.updated_by = updated_by
         self.status = self.Status.ACCEPTED

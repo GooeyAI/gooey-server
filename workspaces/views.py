@@ -561,7 +561,7 @@ def render_members_list(
 
     def _seat_type_label(seat_type_id: int | None) -> str:
         if seat_type_id is None:
-            return "Workspace Pool (Default)"
+            return "Unassigned"
         seat_type = seat_types.get(seat_type_id)
         return seat_type and seat_type.name or "Unknown"
 
@@ -619,37 +619,12 @@ def render_members_list(
 
 
 def get_member_cycle_usage(membership: WorkspaceMembership) -> str:
-    cycle_start = (
-        AppUserTransaction.objects.filter(
-            workspace=membership.workspace,
-            user=membership.user,
-            reason__in=[
-                TransactionReason.SUBSCRIPTION_CREATE,
-                TransactionReason.SUBSCRIPTION_CYCLE,
-            ],
-        )
-        .order_by("-created_at")
-        .first()
-    )
-    if cycle_start:
-        deductions_qs = membership.workspace.transactions.filter(
-            user=membership.user,
-            amount__lt=0,
-            created_at__gte=cycle_start.created_at,
-        )
-    else:
-        deductions_qs = membership.workspace.transactions.filter(
-            user=membership.user,
-            amount__lt=0,
-        )
+    if not hasattr(membership, "seat"):
+        return "-"
 
-    used = int(abs(deductions_qs.aggregate(total=Sum("amount"))["total"] or 0))
-
-    if hasattr(membership, "seat") and membership.seat.seat_type:
-        limit = membership.seat.seat_type.monthly_credit_limit
-        return f"{used:,} / {limit:,}"
-    else:
-        return f"{used:,}"
+    limit = membership.seat.seat_type.monthly_credit_limit
+    usage = limit - membership.balance
+    return f"{usage:,} / {limit:,}"
 
 
 def render_team_member_cycle_summary(
@@ -660,12 +635,8 @@ def render_team_member_cycle_summary(
     from routers.account import account_route
 
     usage = get_member_cycle_usage(membership)
-    next_invoice_ts = (
-        membership.workspace.subscription
-        and membership.workspace.subscription.payment_provider == PaymentProvider.STRIPE
-        and gui.run_in_thread(
-            membership.workspace.subscription.get_next_invoice_timestamp, cache=True
-        )
+    next_invoice_ts = gui.run_in_thread(
+        membership.workspace.subscription.get_next_invoice_timestamp, cache=True
     )
     cycle_renews = (
         datetime.fromtimestamp(next_invoice_ts).strftime("%d %b %Y")

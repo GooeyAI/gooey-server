@@ -104,13 +104,19 @@ class Subscription(models.Model):
         return ret
 
     def full_clean(self, *args, **kwargs):
+        plan = PricingPlan.from_sub(self)
+
+        if plan == PricingPlan.TEAM and self.auto_recharge_enabled:
+            # disable auto-recharge on TEAM plan
+            self.auto_recharge_enabled = False
+
         if self.auto_recharge_enabled:
-            plan = PricingPlan.from_sub(self)
             amount = self.amount or plan.credits
             charged_amount = self.charged_amount or (plan.monthly_charge * 100)
             self.ensure_default_auto_recharge_params(
                 amount=amount, charged_amount=charged_amount
             )
+
         return super().full_clean(*args, **kwargs)
 
     def is_paid(self) -> bool:
@@ -184,9 +190,9 @@ class Subscription(models.Model):
                     if e.code == "resource_missing":
                         # already cancelled
                         set_workspace_subscription(
-                            workspace=self.workspace,
-                            plan=PricingPlan.STARTER,
                             provider=PaymentProvider.STRIPE,
+                            plan=PricingPlan.STARTER,
+                            workspace=self.workspace,
                             external_id=None,
                             cancel_old=False,
                         )

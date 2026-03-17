@@ -14,8 +14,6 @@ def save_stripe_default_payment_method(
     *,
     payment_intent_id: str,
     workspace_id: int,
-    amount: int,
-    charged_amount: int,
     reason: TransactionReason,
 ):
     pi = stripe.PaymentIntent.retrieve(payment_intent_id, expand=["payment_method"])
