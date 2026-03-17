@@ -270,6 +270,7 @@ class TransactionReason(models.IntegerChoices):
     SUBSCRIPTION_CREATE = 4, "Sub-Create"
     SUBSCRIPTION_CYCLE = 5, "Sub-Cycle"
     SUBSCRIPTION_UPDATE = 6, "Sub-Update"
+    MEMBER_LIMIT_RESET = 8, "Sub-Limit-Reset"
 
     AUTO_RECHARGE = 7, "Auto-Recharge"
 
@@ -287,6 +288,16 @@ class AppUserTransaction(models.Model):
         null=True,
         default=None,
         blank=True,
+        help_text="The user who initiated this transaction",
+    )
+    member = models.ForeignKey(
+        "workspaces.WorkspaceMembership",
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        null=True,
+        default=None,
+        blank=True,
+        help_text="The workspace member whose balance was updated by this transaction.",
     )
     invoice_id = models.CharField(
         max_length=255,
@@ -375,6 +386,11 @@ class AppUserTransaction(models.Model):
                 ret = "Subscription payment"
                 if self.plan:
                     ret += f": {PricingPlan.from_db_value(self.plan).title}"
+                return ret
+            case TransactionReason.MEMBER_LIMIT_RESET:
+                ret = "Member Limit Reset"
+                if self.member:
+                    ret += f": {self.member.user.full_name()}"
                 return ret
             case TransactionReason.AUTO_RECHARGE:
                 return "Auto recharge"

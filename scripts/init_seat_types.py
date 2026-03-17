@@ -18,9 +18,9 @@ DEFAULT_PLAN_SEAT_TYPES: dict[PricingPlan, list[dict[str, int]]] = {
         {"monthly_charge": 400, "monthly_credit_limit": 44_000},
     ],
     PricingPlan.TEAM: [
-        {"monthly_charge": 40, "monthly_credit_limit": 2_500},
-        {"monthly_charge": 60, "monthly_credit_limit": 5_000},
-        {"monthly_charge": 110, "monthly_credit_limit": 9_000},
+        {"name": "Starter", "monthly_charge": 40, "monthly_credit_limit": 2_500},
+        {"name": "Learner", "monthly_charge": 60, "monthly_credit_limit": 5_000},
+        {"name": "Researcher", "monthly_charge": 110, "monthly_credit_limit": 9_000},
         {"monthly_charge": 200, "monthly_credit_limit": 20_000},
         {"monthly_charge": 300, "monthly_credit_limit": 32_000},
         {"monthly_charge": 400, "monthly_credit_limit": 44_000},
@@ -46,13 +46,20 @@ def run(*_args):
     # seed global seat types (shared across workspaces)
     for plan, seat_types in DEFAULT_PLAN_SEAT_TYPES.items():
         for seat_type in seat_types:
+            key = seat_type.get(
+                "key", f"{current_year}/{plan.key}/{seat_type['monthly_credit_limit']}"
+            )
+            name = seat_type.get(
+                "name",
+                _default_seat_type_name(
+                    monthly_credit_limit=seat_type["monthly_credit_limit"]
+                ),
+            )
             _, created = SeatType.objects.update_or_create(
-                key=f"{current_year}/{plan.db_value}/{seat_type['monthly_credit_limit']}",
+                key=key,
                 plan=plan.db_value,
                 defaults=dict(
-                    name=_default_seat_type_name(
-                        monthly_credit_limit=seat_type["monthly_credit_limit"]
-                    ),
+                    name=name,
                     monthly_charge=seat_type["monthly_charge"],
                     monthly_credit_limit=seat_type["monthly_credit_limit"],
                     is_public=True,
@@ -71,7 +78,7 @@ def run(*_args):
 
     _, admin_created = SeatType.objects.update_or_create(
         name=GOOEY_ADMIN_SEAT_TYPE_NAME,
-        key=f"{current_year}/gooey-admin",
+        key=f"{current_year}/{PricingPlan.TEAM.key}/gooey-admin",
         defaults=dict(
             monthly_charge=0,
             monthly_credit_limit=2_500,

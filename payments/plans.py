@@ -413,17 +413,29 @@ class PricingPlan(PricingPlanData, Enum):
         return bool(self.monthly_charge)
 
     def get_stripe_line_item(
-        self,
-        *,
-        credits: int | None = None,
-        monthly_charge: int | None = None,
-        product_name: str | None = None,
+        self, *, seat_type: SeatType | None = None, seat_count: int = 1
     ) -> dict[str, Any]:
         if not self.supports_stripe():
             raise ValueError(f"Can't bill {self.title} via Stripe")
 
-        credits = credits or self.get_active_credits()
-        monthly_charge = monthly_charge or self.get_active_monthly_charge()
+        if self == PricingPlan.TEAM and seat_type:
+            return {
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": seat_type.monthly_charge * 100,
+                    "product": self.get_stripe_product_id(
+                        product_name=f"{self.title} - {seat_type.name} Seat",
+                        seat_type=seat_type,
+                    ),
+                    "recurring": {"interval": "month"},
+                },
+                "quantity": seat_count,
+            }
+
+        credits = self.get_active_credits(seat_type=seat_type, seat_count=seat_count)
+        monthly_charge = self.get_active_monthly_charge(
+            seat_type=seat_type, seat_count=seat_count
+        )
 
         if self.key in STRIPE_PRODUCT_NAMES:
             # via product_name
@@ -434,47 +446,29 @@ class PricingPlan(PricingPlanData, Enum):
             )
         else:
             return make_stripe_recurring_plan(
-                product_id=self.get_stripe_product_id(
-                    monthly_charge=monthly_charge,
-                    product_name=product_name,
-                ),
+                product_id=self.get_stripe_product_id(),
                 credits=credits,
                 amount=monthly_charge,
             )
 
-    def get_stripe_line_item_for_seat(
-        self, *, seat_type: SeatType, seat_count: int
-    ) -> dict[str, Any]:
-        if not self.supports_stripe():
-            raise ValueError(f"Can't bill {self.title} via Stripe")
-
-        return {
-            "price_data": {
-                "currency": "usd",
-                "unit_amount": seat_type.monthly_charge * 100,
-                "product": self.get_stripe_product_id(
-                    monthly_charge=seat_type.monthly_charge,
-                    product_name=f"{self.title} - {seat_type.name} Seat",
-                ),
-                "recurring": {"interval": "month"},
-                "metadata": {
-                    "seat_type_key": seat_type.key,
-                },
-            },
-            "quantity": seat_count,
-        }
-
     def get_stripe_product_id(
-        self, *, monthly_charge: int | None = None, product_name: str | None = None
+        self,
+        *,
+        product_name: str | None = None,
+        seat_type: SeatType | None = None,
     ) -> str:
-        monthly_charge = monthly_charge or self.get_active_monthly_charge()
+        monthly_charge = self.get_active_monthly_charge(seat_type=seat_type)
         product_name = product_name or self.title
+
+        metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: self.key}
+        if seat_type:
+            metadata[settings.STRIPE_ITEM_SEAT_TYPE_METADATA_FIELD] = seat_type.key
 
         for product in stripe.Product.list(expand=["data.default_price"]).data:
             if (
                 product.default_price
                 and product.default_price.unit_amount == monthly_charge * 100
-                and product.name == product_name
+                and product.metadata == metadata
             ):  # cents
                 return product.id
 
@@ -486,6 +480,7 @@ class PricingPlan(PricingPlanData, Enum):
                 "unit_amount": monthly_charge * 100,
                 "recurring": {"interval": "month"},
             },
+            metadata=metadata,
         )
         return product.id
 
