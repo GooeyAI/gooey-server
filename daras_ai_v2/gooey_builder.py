@@ -79,10 +79,6 @@ def render_gooey_builder(
     if not can_launch_gooey_builder(request, current_workspace):
         return
 
-    pr = page.current_pr
-    sr = page.current_sr
-    saved_run_url = None if pr.saved_run == sr else sr.get_app_url()
-
     with gui.div(className="w-100 h-100"):
         update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
         if update_gui_state:
@@ -115,12 +111,12 @@ def render_gooey_builder(
                     description=page.current_pr.notes,
                 ),
             ),
-            saved_run_url=saved_run_url,
+            sr=page.current_sr,
         )
 
 
 def render_gooey_builder_inline(
-    *, sidebar_key: str, page_slug: str, builder_state: dict, saved_run_url: str | None
+    *, sidebar_key: str, page_slug: str, builder_state: dict, sr: SavedRun | None
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
@@ -140,10 +136,10 @@ def render_gooey_builder_inline(
     # will be added later in the js code
     variables = dict(
         update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
-        saved_run_url=saved_run_url,
+        saved_run_url=sr.get_app_url(),
     )
 
-    conversation_data = get_gooey_builder_conversation(bi, saved_run_url)
+    conversation_data = get_gooey_builder_conversation(bi, sr)
     if conversation_data:
         config["conversationData"] = conversation_data
 
@@ -203,34 +199,38 @@ def can_launch_gooey_builder(
 
 
 def get_gooey_builder_conversation(
-    bot_builder_integration: BotIntegration, saved_run_url: str | None
+    bot_builder_integration: BotIntegration, sr: SavedRun | None
 ) -> dict | None:
-    if not saved_run_url:
+    if not sr:
         return
 
-    from bots.models.convo_msg import Message, db_msgs_to_api_json
+    from bots.models.convo_msg import db_msgs_to_api_json, Conversation
     from routers.bots_api import api_hashids
 
-    gooey_builder_run_ref = (
-        SavedRun.objects.filter(
-            parent_version__published_run=bot_builder_integration.published_run,
-            state__variables__saved_run_url=saved_run_url,
+    def get_gooey_builder_run_ref(saved_run_url: str) -> SavedRun | None:
+        return (
+            SavedRun.objects.filter(
+                parent_version__published_run=bot_builder_integration.published_run,
+                state__variables__saved_run_url=saved_run_url,
+            )
+            .order_by("-created_at")
+            .first()
         )
-        .order_by("-created_at")
-        .first()
-    )
+
+    gooey_builder_run_ref = get_gooey_builder_run_ref(sr.get_app_url())
+    if not gooey_builder_run_ref and sr.parent_id:
+        # If the current run is a child run, try to find the parent run
+        gooey_builder_run_ref = get_gooey_builder_run_ref(sr.parent.get_app_url())
+
     if not gooey_builder_run_ref:
         return
 
-    message = (
-        Message.objects.filter(saved_run=gooey_builder_run_ref)
-        .order_by("-created_at")
-        .first()
-    )
-    if not message:
+    conversation = Conversation.objects.filter(
+        messages__saved_run=gooey_builder_run_ref
+    ).first()
+    if not conversation:
         return
 
-    conversation = message.conversation
     messages = list(db_msgs_to_api_json(conversation.last_n_msgs()))
     return dict(
         id=api_hashids.encode(conversation.id),
