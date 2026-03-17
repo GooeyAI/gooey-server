@@ -617,7 +617,7 @@ def render_telegram_connect_dialog(
         with gui.div(className="d-flex align-items-center gap-2 w-100"):
             with gui.div(className="me-auto"):
                 gui.anchor(
-                    href="https://core.telegram.org/bots/features#botfather",
+                    href="https://docs.gooey.ai/telegram-help",
                     label="Need help?",
                     new_tab=True,
                     type="link",
