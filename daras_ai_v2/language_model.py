@@ -5,6 +5,7 @@ import json
 import mimetypes
 import re
 import typing
+from copy import deepcopy
 from functools import wraps
 from time import time
 
@@ -36,6 +37,7 @@ from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_byt
 from daras_ai_v2.asr import audio_url_to_wav, get_google_auth_session
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status, UserError
+from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
@@ -885,37 +887,50 @@ def _get_responses_create(
     def wrapper():
         # Convert messages format to responses API input format
         messages = kwargs.pop("messages", [])
-        input_messages = []
-        for msg in messages:
-            if msg["role"] == "assistant" and "tool_calls" in msg:
-                # function calls
-                for tool_call in msg["tool_calls"]:
-                    input_messages.append(
-                        {
-                            "type": "function_call",
-                            "call_id": tool_call.get("id", ""),
-                            "name": tool_call["function"]["name"],
-                            "arguments": tool_call["function"]["arguments"],
-                        }
-                    )
-            elif msg["role"] == "tool":
-                # function call output
-                input_messages.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": msg["tool_call_id"],
-                        "output": msg["content"],
-                    }
-                )
-            else:
-                input_messages.append({"role": msg["role"], "content": msg["content"]})
-
+        input_messages = flatten(
+            chat_completion_msg_to_responses_input_msg(msg) for msg in messages
+        )
         response = client.responses.create(
             model=model, input=input_messages, stream=stream, **kwargs
         )
         return response, model
 
     return wrapper
+
+
+def chat_completion_msg_to_responses_input_msg(msg: dict) -> list[dict]:
+    if msg["role"] == "assistant" and "tool_calls" in msg:
+        # function calls
+        return [
+            {
+                "type": "function_call",
+                "call_id": tool_call.get("id", ""),
+                "name": tool_call["function"]["name"],
+                "arguments": tool_call["function"]["arguments"],
+            }
+            for tool_call in msg["tool_calls"]
+        ]
+
+    if msg["role"] == "tool":
+        # function call output
+        return [
+            {
+                "type": "function_call_output",
+                "call_id": msg["tool_call_id"],
+                "output": msg["content"],
+            }
+        ]
+    content = deepcopy(msg["content"])
+    if isinstance(content, list):
+        for part in content:
+            match part.get("type"):
+                case "image_url":
+                    part["type"] = "input_image"
+                    part["image_url"] = part["image_url"]["url"]
+                case "text":
+                    part["type"] = "input_text"
+
+    return [{"role": msg["role"], "content": content}]
 
 
 def _get_chat_completions_create(
