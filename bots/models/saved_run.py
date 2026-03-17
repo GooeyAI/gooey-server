@@ -135,6 +135,16 @@ class SavedRun(models.Model):
     )
     user_message_id = models.TextField(null=True, blank=True, default=None)
 
+    gooey_builder_conversation = models.ForeignKey(
+        "bots.Conversation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        related_name="builder_created_runs",
+        help_text="The Gooey Builder conversation that triggered this run.",
+    )
+
     objects = SavedRunQuerySet.as_manager()
 
     class Meta:
