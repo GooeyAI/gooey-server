@@ -136,8 +136,9 @@ def render_gooey_builder_inline(
     # will be added later in the js code
     variables = dict(
         update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
-        saved_run_url=sr.get_app_url(),
     )
+    if sr:
+        variables["saved_run_url"] = sr.get_app_url()
 
     conversation_data = get_gooey_builder_conversation(bi, sr)
     if conversation_data:
