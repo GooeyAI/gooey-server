@@ -71,6 +71,7 @@ class SharedPhoneNumber(models.Model):
 
     country_code = models.CharField(
         max_length=2,
+        blank=True,
         default="",
         help_text="ISO 3166-1 alpha-2 country code (e.g. 'US', 'IN'), auto-derived from phone number.",
     )
