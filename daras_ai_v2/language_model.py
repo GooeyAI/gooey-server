@@ -190,7 +190,10 @@ def run_language_model(
         return run_language_model(**(locals() | {"model": model.redirect_to.name}))
 
     variables = gui.session_state.get("variables", {})
-    if variables and variables.get("platform") == Platform.WEB.name:
+    if variables and variables.get("platform") in {
+        Platform.WEB.name,
+        Platform.TELEGRAM.name,
+    }:
         start_chunk_size = 0
         stop_chunk_size = 200
         step_chunk_size = 50
