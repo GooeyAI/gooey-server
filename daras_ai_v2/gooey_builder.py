@@ -90,13 +90,17 @@ def render_gooey_builder(
                     enable_rate_limits=True, run_status=None
                 )
                 if sr:
-                    conversation_id = gui.session_state.get(
+                    conversation_hashid = gui.session_state.get(
                         "__gooey_builder_conversation_id"
                     )
-                    if conversation_id:
-                        conversation_id = api_hashids.decode(conversation_id)[0]
-                        sr.gooey_builder_conversation_id = conversation_id
-                        sr.save(update_fields=["gooey_builder_conversation"])
+                    if conversation_hashid:
+                        try:
+                            sr.gooey_builder_conversation_id = api_hashids.decode(
+                                conversation_hashid
+                            )[0]
+                            sr.save(update_fields=["gooey_builder_conversation"])
+                        except IndexError:
+                            pass
                     raise gui.RedirectException(sr.get_app_url())
 
         render_gooey_builder_inline(
@@ -126,6 +130,8 @@ def render_gooey_builder(
 def render_gooey_builder_inline(
     *, sidebar_key: str, page_slug: str, builder_state: dict, sr: SavedRun | None
 ):
+    from routers.bots_api import api_hashids
+
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
 
@@ -150,7 +156,9 @@ def render_gooey_builder_inline(
     if conversation_data:
         config["conversationData"] = conversation_data
     if conversation_id:
-        gui.session_state["__gooey_builder_conversation_id"] = conversation_id
+        gui.session_state["__gooey_builder_conversation_id"] = api_hashids.encode(
+            conversation_id
+        )
     else:
         gui.session_state.pop("__gooey_builder_conversation_id", None)
 
