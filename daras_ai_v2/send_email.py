@@ -71,6 +71,33 @@ def send_low_balance_email(
         )
 
 
+def send_out_of_credits_email(
+    *,
+    workspace: "Workspace",
+    integration_name: str,
+    integration_link: str,
+):
+    from routers.account import account_route
+
+    logger.info(f"Sending out-of-credits email...")
+
+    recipients = "support@gooey.ai, devs@gooey.ai"
+    for user in workspace.get_owners():
+        html_body = templates.get_template("out_of_credits_email.html").render(
+            user=user,
+            integration_name=integration_name,
+            integration_link=integration_link,
+            buy_credits_url=get_app_route_url(account_route),
+        )
+        send_email_via_postmark(
+            from_address=settings.SUPPORT_EMAIL,
+            to_address=user.email or recipients,
+            bcc=recipients,
+            subject=f"{integration_name} can't respond due to lack of Gooey.AI credits",
+            html_body=html_body,
+        )
+
+
 is_running_pytest = "pytest" in sys.modules
 pytest_outbox = []
 
