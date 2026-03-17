@@ -67,6 +67,7 @@ class AIModelSpec(models.Model):
         help_text="The API provider for this model.",
         default=ModelProvider.modal,
     )
+    paid_only = models.BooleanField(default=False)
     is_deprecated = models.BooleanField(default=False)
     redirect_to = models.ForeignKey(
         "ai_models.AIModelSpec",
