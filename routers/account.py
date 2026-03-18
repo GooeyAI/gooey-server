@@ -63,7 +63,7 @@ def payment_processing_route(
                     className="gooey-spinner me-4",
                     style=dict(height="3rem", width="3rem"),
                 )
-                gui.write("# Processing payment...")
+                gui.write("# Processing...")
 
             if subtext:
                 gui.caption(subtext)
