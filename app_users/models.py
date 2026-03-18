@@ -271,6 +271,7 @@ class TransactionReason(models.IntegerChoices):
     SUBSCRIPTION_CYCLE = 5, "Sub-Cycle"
     SUBSCRIPTION_UPDATE = 6, "Sub-Update"
     MEMBER_LIMIT_RESET = 8, "Sub-Limit-Reset"
+    MEMBER_SEAT_CHANGE = 9, "Sub-Seat-Change"
 
     AUTO_RECHARGE = 7, "Auto-Recharge"
 
@@ -389,6 +390,11 @@ class AppUserTransaction(models.Model):
                 return ret
             case TransactionReason.MEMBER_LIMIT_RESET:
                 ret = "Member Limit Reset"
+                if self.member:
+                    ret += f": {self.member.user.full_name()}"
+                return ret
+            case TransactionReason.MEMBER_SEAT_CHANGE:
+                ret = "Member Seat Change"
                 if self.member:
                     ret += f": {self.member.user.full_name()}"
                 return ret
