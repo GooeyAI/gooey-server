@@ -1669,7 +1669,11 @@ def render_billing_history(
         else:
             # non-admins: should only see their own transactions
             txns = txns.filter(
-                member=membership, reason=TransactionReason.MEMBER_LIMIT_RESET
+                member=membership,
+                reason__in=[
+                    TransactionReason.MEMBER_LIMIT_RESET,
+                    TransactionReason.MEMBER_SEAT_CHANGE,
+                ],
             )
 
     if not txns:
@@ -1691,6 +1695,18 @@ def render_billing_history(
                         "Credits": f"Reset to {txn.end_balance:,}",
                         "Amount": "-",
                         "Balance": f"{txn.end_balance:,}",
+                    }
+                )
+            elif txn.reason == TransactionReason.MEMBER_SEAT_CHANGE:
+                if txn.amount > 0:
+                    verb = "increased"
+                else:
+                    verb = "decreased"
+                record.update(
+                    {
+                        "Credits": f"Limit {verb}",
+                        "Amount": "-",
+                        "Balance": "-",
                     }
                 )
             else:

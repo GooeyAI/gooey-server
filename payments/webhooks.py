@@ -1,16 +1,16 @@
 from copy import copy
 from decimal import Decimal
+import uuid
 
 import sentry_sdk
 import stripe
-from django.core.exceptions import ValidationError
 from django.db import transaction
 from loguru import logger
 
 from app_users.models import PaymentProvider, TransactionReason
 from daras_ai_v2 import paypal, settings
 from gooeysite.bg_db_conn import db_middleware
-from workspaces.models import Workspace, WorkspaceMembership
+from workspaces.models import Workspace
 from .models import SeatType, Subscription, SubscriptionSeat
 from .plans import PricingPlan
 from .tasks import (
@@ -141,17 +141,20 @@ class StripeWebhookHandler:
             **kwargs,
         )
 
-        if reason in [
-            TransactionReason.SUBSCRIPTION_CREATE,
+        if reason in TransactionReason.SUBSCRIPTION_CYCLE:
+            # reset for all members:
+            workspace.reset_member_balance(invoice_id=invoice.id)
+        elif reason in [
             TransactionReason.SUBSCRIPTION_UPDATE,
+            TransactionReason.SUBSCRIPTION_CREATE,
         ]:
             set_subscription_seats_from_stripe_sub(
                 workspace.subscription,
-                stripe_sub=stripe.Subscription.retrieve(invoice.subscription),
+                stripe_sub=stripe.Subscription.retrieve(
+                    invoice.subscription, expand=["items"]
+                ),
                 invoice_id=invoice.id,
             )
-        elif reason == TransactionReason.SUBSCRIPTION_CYCLE:
-            workspace.reset_member_balance(invoice_id=invoice.id)
 
         save_stripe_default_payment_method.delay(
             payment_intent_id=invoice.payment_intent,
@@ -214,7 +217,7 @@ class StripeWebhookHandler:
             Decimal(stripe_sub.plan.amount_decimal) * stripe_sub.quantity
         )
 
-        db_sub = set_workspace_subscription(
+        set_workspace_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             workspace=workspace,
@@ -222,7 +225,11 @@ class StripeWebhookHandler:
             amount=amount,
             charged_amount=charged_amount,
         )
-        set_subscription_seats_from_stripe_sub(db_sub, stripe_sub=stripe_sub)
+        set_subscription_seats_from_stripe_sub(
+            workspace.subscription,
+            stripe_sub=stripe_sub,
+            invoice_id=str(uuid.uuid4()),
+        )
 
     @classmethod
     def handle_subscription_cancelled(cls, workspace: Workspace):
@@ -232,7 +239,9 @@ class StripeWebhookHandler:
             workspace=workspace,
             external_id=None,
         )
-        set_subscription_seats_from_stripe_sub(db_sub, stripe_sub=None)
+        set_subscription_seats_from_stripe_sub(
+            db_sub, stripe_sub=None, invoice_id=str(uuid.uuid4())
+        )
 
     @classmethod
     def handle_invoice_failed(cls, workspace: Workspace, data: dict):
@@ -329,7 +338,7 @@ def set_workspace_subscription(
 def set_subscription_seats_from_stripe_sub(
     db_sub: Subscription,
     stripe_sub: stripe.Subscription | None,
-    invoice_id: str | None = None,
+    invoice_id: str,
 ):
     plan = PricingPlan.from_sub(db_sub)
     if plan not in [PricingPlan.STANDARD, PricingPlan.TEAM] or not stripe_sub:
@@ -355,10 +364,6 @@ def set_subscription_seats_from_stripe_sub(
         db_sub.billed_seats().select_related("seat_type").order_by("-assigned_to").all()
     )
 
-    seats_to_update = []
-    seats_to_delete = []
-    members_to_update = []
-
     for seat in current_seats:
         if count := new_seat_counts.pop(seat.seat_type.key, 0):
             # same as current seat
@@ -370,19 +375,25 @@ def set_subscription_seats_from_stripe_sub(
 
             old_seat_type = seat.seat_type
             seat.seat_type = seat_types_by_key[key]
-            seats_to_update.append(seat)
+            seat.save(update_fields=["seat_type"])
 
-            if seat.assigned_to_id:
-                # adjust the user's balance according to the difference in credit limit between the old and new seat types
-                seat.assigned_to.balance += max(
+            if seat.seat_type.monthly_credit_limit > old_seat_type.monthly_credit_limit:
+                to_add = (
                     seat.seat_type.monthly_credit_limit
-                    - old_seat_type.monthly_credit_limit,
-                    0,
+                    - old_seat_type.monthly_credit_limit
                 )
-                members_to_update.append(seat.assigned_to)
+            else:
+                # set balance to seat.seat_type.monthly_credit_limit
+                to_add = seat.seat_type.monthly_credit_limit - seat.assigned_to.balance
+
+            seat.assigned_to.add_balance(
+                amount=to_add,
+                invoice_id=f"{invoice_id}/{seat.id}",
+                reason=TransactionReason.MEMBER_SEAT_CHANGE,
+                plan=db_sub.plan,
+            )
         else:
-            # this seat is to be deleted
-            seats_to_delete.append(seat)
+            seat.delete()
 
     seats_to_create = []
     for seat_type_key, new_count in new_seat_counts.items():
@@ -392,13 +403,7 @@ def set_subscription_seats_from_stripe_sub(
             )
             for _ in range(new_count)
         ]
-
     SubscriptionSeat.objects.bulk_create(seats_to_create)
-    SubscriptionSeat.objects.bulk_update(seats_to_update, ["seat_type"])
-    WorkspaceMembership.objects.bulk_update(members_to_update, ["balance"])
-    SubscriptionSeat.objects.filter(
-        id__in=[seat.id for seat in seats_to_delete]
-    ).delete()
 
     auto_assign_team_seats(db_sub.workspace, invoice_id=invoice_id)
 
@@ -435,18 +440,12 @@ def auto_assign_team_seats(workspace: Workspace, invoice_id: str | None = None):
     if not unassigned_seats and not members_without_seat:
         return
 
-    if len(members_without_seat) > len(unassigned_seats):
-        raise ValidationError(
-            "Your team has reached the maximum number of members allowed by your current plan. Please contact your workspace admin to upgrade your plan."
-        )
-
     for seat, member in zip(unassigned_seats, members_without_seat):
         seat.assigned_to = member
         seat.save(update_fields=["assigned_to"])
         if invoice_id:
             member.add_balance(
                 amount=seat.seat_type.monthly_credit_limit - member.balance,
-                charged_amount=0,
                 invoice_id=f"{invoice_id}/{seat.id}",
                 reason=TransactionReason.MEMBER_LIMIT_RESET,
                 plan=workspace.subscription.plan,
