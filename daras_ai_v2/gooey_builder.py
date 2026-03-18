@@ -5,7 +5,7 @@ import typing
 import gooey_gui as gui
 from starlette.requests import Request
 
-from bots.models import BotIntegration, SavedRun
+from bots.models import BotIntegration, Conversation, SavedRun
 from daras_ai_v2 import settings
 from workspaces.models import Workspace
 
@@ -143,6 +143,7 @@ def render_gooey_builder_inline(
     config["mode"] = "inline"
     config["showRunLink"] = True
     config["showToolCalls"] = True
+    config["enableLastConversation"] = False
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 
