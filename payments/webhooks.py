@@ -141,7 +141,7 @@ class StripeWebhookHandler:
             **kwargs,
         )
 
-        if reason in TransactionReason.SUBSCRIPTION_CYCLE:
+        if reason == TransactionReason.SUBSCRIPTION_CYCLE:
             # reset for all members:
             workspace.reset_member_balance(invoice_id=invoice.id)
         elif reason in [
@@ -371,27 +371,35 @@ def set_subscription_seats_from_stripe_sub(
         elif new_seat_counts:
             # reassign this seat to the new seat type
             key, count = new_seat_counts.popitem()
-            new_seat_counts[key] = count - 1
+            count -= 1
+            if count > 0:
+                new_seat_counts[key] = count
 
             old_seat_type = seat.seat_type
             seat.seat_type = seat_types_by_key[key]
             seat.save(update_fields=["seat_type"])
 
-            if seat.seat_type.monthly_credit_limit > old_seat_type.monthly_credit_limit:
-                to_add = (
+            if seat.assigned_to_id:
+                if (
                     seat.seat_type.monthly_credit_limit
-                    - old_seat_type.monthly_credit_limit
-                )
-            else:
-                # set balance to seat.seat_type.monthly_credit_limit
-                to_add = seat.seat_type.monthly_credit_limit - seat.assigned_to.balance
+                    > old_seat_type.monthly_credit_limit
+                ):
+                    to_add = (
+                        seat.seat_type.monthly_credit_limit
+                        - old_seat_type.monthly_credit_limit
+                    )
+                else:
+                    # set balance to seat.seat_type.monthly_credit_limit
+                    to_add = (
+                        seat.seat_type.monthly_credit_limit - seat.assigned_to.balance
+                    )
 
-            seat.assigned_to.add_balance(
-                amount=to_add,
-                invoice_id=f"{invoice_id}/{seat.id}",
-                reason=TransactionReason.MEMBER_SEAT_CHANGE,
-                plan=db_sub.plan,
-            )
+                seat.assigned_to.add_balance(
+                    amount=to_add,
+                    invoice_id=f"{invoice_id}/{seat.id}",
+                    reason=TransactionReason.MEMBER_SEAT_CHANGE,
+                    plan=db_sub.plan,
+                )
         else:
             seat.delete()
 
@@ -447,6 +455,6 @@ def auto_assign_team_seats(workspace: Workspace, invoice_id: str | None = None):
             member.add_balance(
                 amount=seat.seat_type.monthly_credit_limit - member.balance,
                 invoice_id=f"{invoice_id}/{seat.id}",
-                reason=TransactionReason.MEMBER_LIMIT_RESET,
+                reason=TransactionReason.MEMBER_SEAT_CHANGE,
                 plan=workspace.subscription.plan,
             )
