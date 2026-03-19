@@ -1698,13 +1698,9 @@ def render_billing_history(
                     }
                 )
             elif txn.reason == TransactionReason.MEMBER_SEAT_CHANGE:
-                if txn.amount > 0:
-                    verb = "increased"
-                else:
-                    verb = "decreased"
                 record.update(
                     {
-                        "Credits": f"Limit {verb}",
+                        "Credits": "Limit updated",
                         "Amount": "-",
                         "Balance": "-",
                     }
