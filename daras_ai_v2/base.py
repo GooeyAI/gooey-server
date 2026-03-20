@@ -473,20 +473,24 @@ class BasePage:
             img_style["borderRadius"] = "12px"
 
         with gui.div(className="d-flex gap-4 w-100 mb-2"):
-            if pr.photo_url:
+            pr_photo_url = (
+                pr.photo_url
+                and meta_preview_url(pr.photo_url, size="96x96", check_exists=True)[0]
+            )
+            if pr_photo_url:
                 with gui.div(className="d-none d-md-inline"):
                     gui.image(
-                        src=pr.photo_url,
+                        src=pr_photo_url,
                         style=img_style | dict(width="96px", height="96px"),
                     )
 
             # desktop image and title, social buttons, extra and breadcrumbs
             with gui.div(className="w-100 d-flex flex-column gap-2"):
                 with gui.div(className="d-flex align-items-start w-100 my-auto"):
-                    if pr.photo_url:
+                    if pr_photo_url:
                         with gui.div(className="d-inline d-md-none me-2"):
                             gui.image(
-                                src=pr.photo_url,
+                                src=pr_photo_url,
                                 style=img_style | dict(width="56px", height="56px"),
                             )
 
@@ -2332,6 +2336,7 @@ class BasePage:
 
     def _render_run_preview(self, saved_run: SavedRun):
         from daras_ai_v2.billing import left_and_right
+        from widgets.saved_workflow import render_media_component
 
         published_run: PublishedRun | None = (
             saved_run.parent_version.published_run if saved_run.parent_version else None
@@ -2374,7 +2379,12 @@ class BasePage:
                 elif saved_run.error_msg:
                     gui.error(saved_run.error_msg, unsafe_allow_html=True)
                 else:
-                    self.render_run_preview_output(saved_run.to_dict())
+                    state = saved_run.to_dict()
+                    raw_url = self.preview_image(state)
+                    if raw_url:
+                        render_media_component(raw_url)
+                    else:
+                        self.render_run_preview_output(state)
 
     def render_run_preview_output(self, state: dict):
         pass

@@ -4,9 +4,12 @@ import typing
 
 from furl import furl
 
+
 PreviewSizes = typing.Literal[
     "400x400", "1170x1560", "40x40", "72x72", "80x80", "96x96"
 ]
+
+GCS_HOST = "storage.googleapis.com"
 
 DEFAULT_META_IMG = (
     # Small
@@ -21,21 +24,46 @@ def meta_preview_url(
     file_url: str | None,
     fallback_img: str = DEFAULT_META_IMG,
     size: PreviewSizes = "400x400",
+    check_exists: bool = False,
 ) -> tuple[str | None, bool]:
     if not file_url:
         return fallback_img, False
 
     f = furl(file_url)
-    dir_segments = f.path.segments[:-1]
-    basename = f.path.segments[-1]
+    segments = f.path.segments
+    if not segments:
+        return file_url, False
+
+    if (f.host or "").lower() != GCS_HOST:
+        return file_url, False
+
+    dir_segments = segments[:-1]
+    basename = segments[-1]
     base, ext = os.path.splitext(basename)
     content_type = mimetypes.guess_type(basename)[0] or ""
 
     if content_type.startswith("video/"):
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
-        return str(f), True
-    elif content_type in {"image/png", "image/jpeg", "image/tiff", "image/webp"}:
+        thumb_url = str(f)
+        if check_exists and not _gcs_blob_exists(thumb_url):
+            return file_url, False
+        return thumb_url, True
+    if content_type in {"image/png", "image/jpeg", "image/tiff", "image/webp"}:
         f.path.segments = dir_segments + ["thumbs", f"{base}_{size}{ext}"]
-        return str(f), False
-    else:
-        return file_url, False
+        thumb_url = str(f)
+        if check_exists and not _gcs_blob_exists(thumb_url):
+            return file_url, False
+        return thumb_url, False
+    return file_url, False
+
+
+def _gcs_blob_exists(public_url: str) -> bool:
+    from daras_ai.image_input import gcs_bucket
+
+    f = furl(public_url)
+    # path segments: [bucket-name, ...blob-path-parts]
+    blob_name = "/".join(f.path.segments[1:])
+    try:
+        return gcs_bucket().blob(blob_name).exists()
+    except Exception:
+        return True  # fail open — assume exists to avoid hiding real thumbnails

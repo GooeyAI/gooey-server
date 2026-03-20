@@ -309,21 +309,25 @@ def render_workflow_media(output_url: str, published_run: PublishedRun):
     if not output_url:
         return
     with placeholder:
-        preview_url, is_video = meta_preview_url(output_url)
-        if is_video:
-            output_url = furl(output_url).add(fragment_args={"t": "0.001"}).url
-            gui.html(
-                f"""
-                <object data={preview_url!r} class="gui-video">
-                <video src={output_url!r} class="gui-video" autoplay playsInline loop muted>
-                </object>
-                """
-            )
-        else:
-            gui.html(
-                f"""
-                <object data={preview_url!r} class="gui-image">
-                <img src={output_url!r} class="gui-image" autoplay playsInline loop muted>
-                </object>
-                """
-            )
+        render_media_component(output_url)
+
+
+def render_media_component(url: str):
+    preview_url, is_video = meta_preview_url(url)
+    if is_video:
+        url = furl(url).add(fragment_args={"t": "0.001"}).url
+        gui.html(
+            f"""
+            <object data={preview_url!r} class="gui-video w-100">
+            <video src={url!r} class="gui-video" autoplay playsInline loop muted>
+            </object>
+            """
+        )
+    else:
+        gui.html(
+            f"""
+            <object data={preview_url!r} class="gui-image w-100">
+            <img src={url!r} class="gui-image" autoplay playsInline loop muted>
+            </object>
+            """
+        )
