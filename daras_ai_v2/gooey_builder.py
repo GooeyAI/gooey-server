@@ -5,7 +5,7 @@ import typing
 import gooey_gui as gui
 from starlette.requests import Request
 
-from bots.models import BotIntegration, Conversation, SavedRun
+from bots.models import BotIntegration, SavedRun
 from daras_ai_v2 import settings
 from workspaces.models import Workspace
 
@@ -75,7 +75,6 @@ def render_gooey_builder(
     current_workspace: Workspace | None,
 ):
     from daras_ai_v2.base import StateKeys, extract_model_fields
-    from routers.bots_api import api_hashids
 
     if not can_launch_gooey_builder(request, current_workspace):
         return
@@ -84,23 +83,20 @@ def render_gooey_builder(
         update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
         if update_gui_state:
             create_new_run = update_gui_state.pop("create_new_run", True)
+            last_message_id = update_gui_state.pop("last_message_id", None)
             gui.session_state.update(update_gui_state)
             if create_new_run:
                 sr = page.create_and_validate_new_run(
                     enable_rate_limits=True, run_status=None
                 )
                 if sr:
-                    conversation_hashid = gui.session_state.get(
-                        "__gooey_builder_conversation_id"
-                    )
-                    if conversation_hashid:
-                        try:
-                            sr.gooey_builder_conversation_id = api_hashids.decode(
-                                conversation_hashid
-                            )[0]
-                            sr.save(update_fields=["gooey_builder_conversation"])
-                        except IndexError:
-                            pass
+                    if last_message_id:
+                        from routers.bots_api import MSG_ID_PREFIX
+
+                        sr.gooey_builder_last_message_id = (
+                            MSG_ID_PREFIX + last_message_id
+                        )
+                        sr.save(update_fields=["gooey_builder_last_message_id"])
                     raise gui.RedirectException(sr.get_app_url())
 
         render_gooey_builder_inline(
@@ -130,8 +126,6 @@ def render_gooey_builder(
 def render_gooey_builder_inline(
     *, sidebar_key: str, page_slug: str, builder_state: dict, sr: SavedRun | None
 ):
-    from routers.bots_api import api_hashids
-
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
 
@@ -153,15 +147,9 @@ def render_gooey_builder_inline(
         update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
     )
 
-    conversation_data, conversation_id = get_gooey_builder_conversation(bi, sr)
+    conversation_data = get_gooey_builder_conversation(bi, sr)
     if conversation_data:
         config["conversationData"] = conversation_data
-    if conversation_id:
-        gui.session_state["__gooey_builder_conversation_id"] = api_hashids.encode(
-            conversation_id
-        )
-    else:
-        gui.session_state.pop("__gooey_builder_conversation_id", None)
 
     gui.html(
         # language=html
@@ -220,26 +208,35 @@ def can_launch_gooey_builder(
 
 def get_gooey_builder_conversation(
     bot_builder_integration: BotIntegration, sr: SavedRun | None
-) -> tuple[dict | None, int | None]:
+) -> dict | None:
     """
-    Returns (conversation_data, conversation_db_id) for the builder conversation
-    associated with the given SavedRun, or (None, None) if not found.
+    Returns conversation_data for the builder conversation associated with the given
+    SavedRun (messages up to gooey_builder_last_message_id), or None if not found.
     """
     if not sr:
-        return None, None
+        return None
 
-    from bots.models.convo_msg import db_msgs_to_api_json
+    from bots.models.convo_msg import Message, db_msgs_to_api_json
     from routers.bots_api import api_hashids
 
-    conversation = sr.gooey_builder_conversation
-    if not conversation:
-        return None, None
+    last_message = None
+    if sr.gooey_builder_last_message_id:
+        last_message = Message.objects.filter(
+            platform_msg_id=sr.gooey_builder_last_message_id
+        ).first()
+    if not last_message:
+        return None
 
-    messages = list(db_msgs_to_api_json(conversation.last_n_msgs()))
+    conversation = last_message.conversation
+    msgs_qs = conversation.messages.filter(id__lte=last_message.id)
+    messages = list(
+        db_msgs_to_api_json(msgs_qs.last_n_msgs(reset_at=conversation.reset_at))
+    )
     return dict(
         id=api_hashids.encode(conversation.id),
         bot_id=api_hashids.encode(bot_builder_integration.id),
         timestamp=conversation.created_at.isoformat(),
         user_id=conversation.web_user_id,
         messages=messages,
-    ), conversation.id
+        last_message_id=last_message.platform_msg_id,
+    )
