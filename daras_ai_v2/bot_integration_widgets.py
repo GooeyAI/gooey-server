@@ -452,6 +452,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
                 enableConversations=True,
                 enableSourcePreview=True,
                 enableShareConversation=False,
+                showToolCalls=False,
                 branding=(
                     dict(showPoweredByGooey=True)
                     | bi.web_config_extras.get("branding", {})
@@ -483,6 +484,10 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             )
             config["enableSourcePreview"] = gui.checkbox(
                 "Preview Links & Sources", value=config["enableSourcePreview"]
+            )
+            config["showToolCalls"] = gui.checkbox(
+                "Show Function Call Details",
+                value=config["showToolCalls"],
             )
 
         with gui.expander("Embed Settings"):
