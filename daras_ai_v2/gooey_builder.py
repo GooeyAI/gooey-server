@@ -5,7 +5,7 @@ import typing
 import gooey_gui as gui
 from starlette.requests import Request
 
-from bots.models import BotIntegration
+from bots.models import BotIntegration, SavedRun, db_msgs_to_api_json
 from daras_ai_v2 import settings
 from workspaces.models import Workspace
 
@@ -79,18 +79,9 @@ def render_gooey_builder(
     if not can_launch_gooey_builder(request, current_workspace):
         return
 
-    with gui.div(className="w-100 h-100"):
-        update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
-        if update_gui_state:
-            create_new_run = update_gui_state.pop("create_new_run", True)
-            gui.session_state.update(update_gui_state)
-            if create_new_run:
-                sr = page.create_and_validate_new_run(
-                    enable_rate_limits=True, run_status=None
-                )
-                if sr:
-                    raise gui.RedirectException(sr.get_app_url())
+    handle_update_gui_state(page)
 
+    with gui.div(className="w-100 h-100"):
         render_gooey_builder_inline(
             sidebar_key=sidebar_key,
             page_slug=page.slug_versions[-1],
@@ -111,11 +102,39 @@ def render_gooey_builder(
                     description=page.current_pr.notes,
                 ),
             ),
+            sr=page.current_sr,
         )
 
 
+def handle_update_gui_state(page: BasePage):
+    from daras_ai_v2.workflow_url_input import url_to_runs
+
+    update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
+    if not update_gui_state:
+        return
+
+    create_new_run: bool = update_gui_state.pop("create_new_run", True)
+    gooey_builder_web_url: str | None = update_gui_state.pop(
+        "gooey_builder_web_url", None
+    )
+
+    gui.session_state.update(update_gui_state)
+
+    if not create_new_run:
+        return
+    sr = page.create_and_validate_new_run(enable_rate_limits=True, run_status=None)
+    if not sr:
+        return
+
+    if gooey_builder_web_url:
+        sr.parent_builder_saved_run = url_to_runs(gooey_builder_web_url)[1]
+        sr.save(update_fields=["parent_builder_saved_run"])
+
+    raise gui.RedirectException(sr.get_app_url())
+
+
 def render_gooey_builder_inline(
-    *, sidebar_key: str, page_slug: str, builder_state: dict
+    *, sidebar_key: str, page_slug: str, builder_state: dict, sr: SavedRun
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
@@ -137,6 +156,10 @@ def render_gooey_builder_inline(
         update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
     )
 
+    conversation_data = get_gooey_builder_conversation(bi, sr)
+    if conversation_data:
+        config["conversationData"] = conversation_data
+
     gui.html(
         # language=html
         f"""
@@ -150,8 +173,9 @@ def render_gooey_builder_inline(
 async function onload() {
     await window.waitUntilHydrated;
     if (typeof GooeyEmbed === "undefined" ||
-        document.getElementById("gooey-builder-embed")?.children.length)
+        document.getElementById("gooey-builder-embed")?.children.length) {
         return;
+    }
     
     // this is a trick to update the variables after the widget is already mounted
     GooeyEmbed.setGooeyBuilderVariables = (value) => {
@@ -161,7 +185,10 @@ async function onload() {
     config.onClose = function() {
         window.dispatchEvent(new CustomEvent(`${sidebar_key}:close`))
     };
-    GooeyEmbed.mount(config);
+    
+    GooeyEmbed.gooeyBuilderControl = {};
+    
+    GooeyEmbed.mount(config, GooeyEmbed.gooeyBuilderControl);
 }
 
 const script = document.getElementById("gooey-builder-embed-script");
@@ -172,6 +199,9 @@ window.addEventListener("hydrated", onload);
 // if the widget is already mounted, update the variables
 if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.setGooeyBuilderVariables) {
     GooeyEmbed.setGooeyBuilderVariables(variables);
+    if (config.conversationData) {
+        GooeyEmbed.gooeyBuilderControl.setMessages?.(config.conversationData.messages);
+    }
 }
         """,
         config=config,
@@ -190,3 +220,34 @@ def can_launch_gooey_builder(
     if request.user.is_admin():
         return True
     return current_workspace and current_workspace.enable_bot_builder
+
+
+def get_gooey_builder_conversation(
+    bot_builder_integration: BotIntegration, sr: SavedRun
+) -> dict | None:
+    """
+    Returns conversation_data for the builder conversation associated with the given
+    SavedRun (messages up to gooey_builder_last_message_id), or None if not found.
+    """
+    if not sr.parent_builder_saved_run:
+        return None
+
+    from bots.models.convo_msg import Message
+    from routers.bots_api import api_hashids
+
+    try:
+        last_message = Message.objects.get(saved_run=sr.parent_builder_saved_run)
+    except Message.DoesNotExist:
+        return None
+    conversation = last_message.conversation
+    msgs_qs = conversation.messages.filter(created_at__lte=last_message.created_at)
+    messages = list(
+        db_msgs_to_api_json(msgs_qs.last_n_msgs(reset_at=conversation.reset_at))
+    )
+    return dict(
+        id=api_hashids.encode(conversation.id),
+        bot_id=api_hashids.encode(bot_builder_integration.id),
+        timestamp=conversation.created_at.isoformat(),
+        user_id=conversation.web_user_id,
+        messages=messages,
+    )

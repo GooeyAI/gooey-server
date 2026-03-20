@@ -1371,6 +1371,12 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 buttons = []
 
+            child_builder_run = self.current_sr.child_builder_saved_runs.first()
+            if child_builder_run:
+                text += (
+                    f"\n\n[View Updated Workflow]({child_builder_run.get_app_url()})"
+                )
+
             messages.append(
                 dict(
                     role=CHATML_ROLE_ASSISTANT,
@@ -1435,7 +1441,7 @@ async function loadGooeyEmbed() {
           document.getElementById("onNewConversation").click();
         },
     };
-    GooeyEmbed.controller = controller;
+    GooeyEmbed.copilotPreviewControl = controller;
     GooeyEmbed.mount(config, controller);
 }
 
@@ -1445,9 +1451,9 @@ loadGooeyEmbed();
 window.addEventListener("hydrated", loadGooeyEmbed);
 
 // once the widget is already mounted, update the messages and branding to latest
-if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
-    GooeyEmbed.controller.setMessages?.(messages);
-    GooeyEmbed.controller.updateConfig?.({ branding: config.branding });
+if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
+    GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
+    GooeyEmbed.copilotPreviewControl.updateConfig?.({ branding: config.branding });
 }
             """,
             config=dict(
@@ -1460,6 +1466,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.controller) {
                 showToolCalls=True,
                 branding=bot_branding,
                 fillParent=True,
+                enableSourcePreview=False,
                 secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
             ),
             messages=messages,
