@@ -43,7 +43,7 @@ class Img2ImgPage(BasePage):
     }
 
     class RequestModel(BasePage.RequestModel):
-        input_image: HttpUrlStr | list[HttpUrlStr] | None = None
+        input_image: HttpUrlStr | list[HttpUrlStr]
         text_prompt: str | None = None
 
         selected_model: typing.Literal[tuple(e.name for e in Img2ImgModels)] | None = (
@@ -78,7 +78,7 @@ class Img2ImgPage(BasePage):
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:
-        return ["text_prompt"]
+        return ["input_image", "text_prompt"]
 
     def related_workflows(self) -> list:
         from recipes.QRCodeGenerator import QRCodeGeneratorPage
