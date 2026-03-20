@@ -1,11 +1,9 @@
 import mimetypes
 import os
-import re
 import typing
 
 from furl import furl
 
-_THUMB_SIZE_RE = re.compile(r"^(.+)_(\d+x\d+)(\.[^.]+)$")
 
 PreviewSizes = typing.Literal[
     "400x400", "1170x1560", "40x40", "72x72", "80x80", "96x96"
@@ -60,10 +58,12 @@ def meta_preview_url(
 
 
 def _gcs_blob_exists(public_url: str) -> bool:
-    import requests
+    from daras_ai.image_input import gcs_bucket
 
+    f = furl(public_url)
+    # path segments: [bucket-name, ...blob-path-parts]
+    blob_name = "/".join(f.path.segments[1:])
     try:
-        r = requests.head(public_url, timeout=3)
-        return r.status_code == 200
+        return gcs_bucket().blob(blob_name).exists()
     except Exception:
         return True  # fail open — assume exists to avoid hiding real thumbnails
