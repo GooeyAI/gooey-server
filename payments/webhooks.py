@@ -1,13 +1,17 @@
 from copy import copy
+from decimal import Decimal
+import uuid
 
+import sentry_sdk
 import stripe
 from django.db import transaction
 from loguru import logger
 
 from app_users.models import PaymentProvider, TransactionReason
-from daras_ai_v2 import paypal
+from daras_ai_v2 import paypal, settings
+from gooeysite.bg_db_conn import db_middleware
 from workspaces.models import Workspace
-from .models import Subscription
+from .models import SeatType, Subscription, SubscriptionSeat
 from .plans import PricingPlan
 from .tasks import (
     send_monthly_spending_notification_email,
@@ -95,9 +99,14 @@ class StripeWebhookHandler:
 
         kwargs = {}
         if invoice.subscription and invoice.subscription_details:
-            kwargs["plan"] = PricingPlan.get_by_key(
-                invoice.subscription_details.metadata.get("subscription_key")
-            ).db_value
+            try:
+                kwargs["plan"] = PricingPlan.get_by_key(
+                    invoice.subscription_details.metadata.get(
+                        settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD
+                    )
+                ).db_value
+            except KeyError as e:
+                sentry_sdk.capture_exception(e)
             match invoice.billing_reason:
                 case "subscription_create":
                     reason = TransactionReason.SUBSCRIPTION_CREATE
@@ -112,8 +121,16 @@ class StripeWebhookHandler:
         else:
             reason = TransactionReason.ADDON
 
-        amount = invoice.lines.data[0].quantity
-        charged_amount = invoice.lines.data[0].amount
+        if (
+            PricingPlan.from_sub(workspace.subscription) == PricingPlan.TEAM
+            and invoice.subscription
+        ):
+            amount = 0
+            charged_amount = round(Decimal(invoice.amount_paid))
+        else:
+            amount = invoice.lines.data[0].quantity
+            charged_amount = invoice.lines.data[0].amount
+
         add_balance_for_payment(
             workspace=workspace,
             amount=amount,
@@ -124,11 +141,24 @@ class StripeWebhookHandler:
             **kwargs,
         )
 
+        if reason == TransactionReason.SUBSCRIPTION_CYCLE:
+            # reset for all members:
+            workspace.reset_member_balance(invoice_id=invoice.id)
+        elif reason in [
+            TransactionReason.SUBSCRIPTION_UPDATE,
+            TransactionReason.SUBSCRIPTION_CREATE,
+        ]:
+            set_subscription_seats_from_stripe_sub(
+                workspace.subscription,
+                stripe_sub=stripe.Subscription.retrieve(
+                    invoice.subscription, expand=["items"]
+                ),
+                invoice_id=invoice.id,
+            )
+
         save_stripe_default_payment_method.delay(
             payment_intent_id=invoice.payment_intent,
             workspace_id=workspace.id,
-            amount=amount,
-            charged_amount=charged_amount,
             reason=reason,
         )
 
@@ -165,12 +195,16 @@ class StripeWebhookHandler:
             f"Stripe subscription {stripe_sub.id} is missing product"
         )
 
-        product = stripe.Product.retrieve(stripe_sub.plan.product)
-        plan = PricingPlan.get_by_stripe_product(product)
-        if not plan:
-            raise Exception(
-                f"PricingPlan not found for product {stripe_sub.plan.product}"
+        try:
+            plan = PricingPlan.get_by_key(
+                stripe_sub.metadata[settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD]
             )
+        except KeyError:
+            product = stripe.Product.retrieve(
+                stripe_sub.plan.product, expand=["default_price"]
+            )
+            plan = PricingPlan.get_by_stripe_product(product)
+            assert plan is not None, f"Plan for product {product.id} not found"
 
         if stripe_sub.status.lower() != "active":
             logger.info(
@@ -178,20 +212,35 @@ class StripeWebhookHandler:
             )
             return
 
+        amount = int(stripe_sub.quantity)
+        charged_amount = round(
+            Decimal(stripe_sub.plan.amount_decimal) * stripe_sub.quantity
+        )
+
         set_workspace_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             workspace=workspace,
             external_id=stripe_sub.id,
+            amount=amount,
+            charged_amount=charged_amount,
+        )
+        set_subscription_seats_from_stripe_sub(
+            workspace.subscription,
+            stripe_sub=stripe_sub,
+            invoice_id=str(uuid.uuid4()),
         )
 
     @classmethod
     def handle_subscription_cancelled(cls, workspace: Workspace):
-        set_workspace_subscription(
-            workspace=workspace,
+        db_sub = set_workspace_subscription(
+            provider=cls.PROVIDER,
             plan=PricingPlan.STARTER,
-            provider=PaymentProvider.STRIPE,
+            workspace=workspace,
             external_id=None,
+        )
+        set_subscription_seats_from_stripe_sub(
+            db_sub, stripe_sub=None, invoice_id=str(uuid.uuid4())
         )
 
     @classmethod
@@ -217,6 +266,7 @@ class StripeWebhookHandler:
             )
 
 
+@transaction.atomic
 def add_balance_for_payment(
     *,
     workspace: Workspace,
@@ -226,7 +276,7 @@ def add_balance_for_payment(
     charged_amount: int,
     **kwargs,
 ):
-    workspace.add_balance(
+    workspace.add_balance_raw(
         amount=amount,
         invoice_id=invoice_id,
         charged_amount=charged_amount,
@@ -251,8 +301,8 @@ def set_workspace_subscription(
     plan: PricingPlan,
     provider: PaymentProvider | None,
     external_id: str | None,
-    amount: int | None = None,
-    charged_amount: int | None = None,
+    amount: int = 0,
+    charged_amount: int = 0,
     cancel_old: bool = True,
 ) -> Subscription:
     with transaction.atomic():
@@ -264,9 +314,11 @@ def set_workspace_subscription(
             new_sub = Subscription()
 
         new_sub.plan = plan.db_value
+        new_sub.amount = amount
+        new_sub.charged_amount = charged_amount
         new_sub.payment_provider = provider
         new_sub.external_id = external_id
-        new_sub.full_clean(amount=amount, charged_amount=charged_amount)
+        new_sub.full_clean()
         new_sub.save()
 
         if not old_sub:
@@ -275,6 +327,134 @@ def set_workspace_subscription(
 
     # cancel previous subscription if it's not the same as the new one
     if cancel_old and old_sub and old_sub.external_id != external_id:
+        old_sub.billed_seats().all().delete()
         old_sub.cancel()
 
     return new_sub
+
+
+@db_middleware
+@transaction.atomic
+def set_subscription_seats_from_stripe_sub(
+    db_sub: Subscription,
+    stripe_sub: stripe.Subscription | None,
+    invoice_id: str,
+):
+    plan = PricingPlan.from_sub(db_sub)
+    if plan not in [PricingPlan.STANDARD, PricingPlan.TEAM] or not stripe_sub:
+        # if the plan doesn't have seats, delete all existing seats
+        db_sub.seats.all().delete()
+        return
+
+    new_seat_counts: dict[str, int] = {}
+    for item in stripe_sub["items"].data:
+        if isinstance(item.price.product, str):
+            product = stripe.Product.retrieve(item.price.product)
+        else:
+            product = item.price.product
+        if key := product.metadata.get(settings.STRIPE_ITEM_SEAT_TYPE_METADATA_FIELD):
+            new_seat_counts[key] = item.quantity
+        else:
+            logger.warning(
+                f"Stripe subscription item {item.id} is missing seat type metadata. Skipping seat update for this item."
+            )
+
+    seat_types_by_key = {st.key: st for st in SeatType.objects.filter(is_public=True)}
+    current_seats = (
+        db_sub.billed_seats().select_related("seat_type").order_by("-assigned_to").all()
+    )
+
+    for seat in current_seats:
+        if count := new_seat_counts.pop(seat.seat_type.key, 0):
+            # same as current seat
+            new_seat_counts[seat.seat_type.key] = count - 1
+        elif new_seat_counts:
+            # reassign this seat to the new seat type
+            key, count = new_seat_counts.popitem()
+            count -= 1
+            if count > 0:
+                new_seat_counts[key] = count
+
+            old_seat_type = seat.seat_type
+            seat.seat_type = seat_types_by_key[key]
+            seat.save(update_fields=["seat_type"])
+
+            if seat.assigned_to_id:
+                if (
+                    seat.seat_type.monthly_credit_limit
+                    > old_seat_type.monthly_credit_limit
+                ):
+                    to_add = (
+                        seat.seat_type.monthly_credit_limit
+                        - old_seat_type.monthly_credit_limit
+                    )
+                else:
+                    # set balance to seat.seat_type.monthly_credit_limit
+                    to_add = (
+                        seat.seat_type.monthly_credit_limit - seat.assigned_to.balance
+                    )
+
+                seat.assigned_to.add_balance(
+                    amount=to_add,
+                    invoice_id=f"{invoice_id}/{seat.id}",
+                    reason=TransactionReason.MEMBER_SEAT_CHANGE,
+                    plan=db_sub.plan,
+                )
+        else:
+            seat.delete()
+
+    seats_to_create = []
+    for seat_type_key, new_count in new_seat_counts.items():
+        seats_to_create += [
+            SubscriptionSeat(
+                subscription=db_sub, seat_type=seat_types_by_key[seat_type_key]
+            )
+            for _ in range(new_count)
+        ]
+    SubscriptionSeat.objects.bulk_create(seats_to_create)
+
+    auto_assign_team_seats(db_sub.workspace, invoice_id=invoice_id)
+
+
+def auto_assign_team_seats(workspace: Workspace, invoice_id: str | None = None):
+    memberships = {
+        m.id: m
+        for m in (
+            workspace.memberships.select_related("user")
+            .select_for_update()
+            .filter(deleted__isnull=True)
+            .order_by("-created_at")
+            .all()
+        )
+    }
+    workspace_seats = (
+        workspace.subscription.billed_seats()
+        .select_related("seat_type")
+        .select_for_update()
+        .order_by("-seat_type__monthly_credit_limit")
+        .all()
+    )
+
+    members_with_seat = set(
+        seat.assigned_to_id
+        for seat in workspace_seats
+        if seat.assigned_to_id is not None
+    )
+    members_without_seat = [
+        m for m_id, m in memberships.items() if m_id not in members_with_seat
+    ]
+    unassigned_seats = [seat for seat in workspace_seats if seat.assigned_to_id is None]
+
+    if not unassigned_seats and not members_without_seat:
+        return
+
+    for seat, member in zip(unassigned_seats, members_without_seat):
+        seat.assigned_to = member
+        seat.save(update_fields=["assigned_to"])
+        if invoice_id:
+            member.add_balance(
+                amount=seat.seat_type.monthly_credit_limit - member.balance,
+                invoice_id=f"{invoice_id}/{seat.id}",
+                reason=TransactionReason.MEMBER_SEAT_CHANGE,
+                plan=workspace.subscription.plan,
+            )

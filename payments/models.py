@@ -11,7 +11,7 @@ from loguru import logger
 from app_users.models import PaymentProvider
 from daras_ai_v2 import paypal, settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceMembership
 from .plans import PricingPlan, stripe_get_addon_product
 
 
@@ -22,7 +22,10 @@ class PaymentMethodSummary(typing.NamedTuple):
     billing_email: str | None = None
 
 
-class SubscriptionQuerySet(models.QuerySet):
+class SubscriptionManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related("seats")
+
     def get_by_paypal_subscription_id(self, subscription_id: str) -> Subscription:
         return super().get(
             payment_provider=PaymentProvider.PAYPAL, external_id=subscription_id
@@ -36,6 +39,19 @@ class SubscriptionQuerySet(models.QuerySet):
 
 class Subscription(models.Model):
     plan = models.IntegerField(choices=PricingPlan.db_choices())
+
+    amount = models.IntegerField(
+        help_text="The amount (Gooey credits) added/deducted in this transaction.<br>"
+        "Positive for credits added, negative for credits deducted.",
+        default=0,
+    )
+    charged_amount = models.PositiveIntegerField(
+        help_text="The charged dollar amount in the currency’s smallest unit.<br>"
+        "E.g. for 10 USD, this would be of 1000 (that is, 1000 cents).<br>"
+        "<a href='https://stripe.com/docs/currencies'>Learn More</a>",
+        default=0,
+    )
+
     payment_provider = models.IntegerField(
         choices=PaymentProvider.choices, blank=True, null=True, default=None
     )
@@ -71,7 +87,7 @@ class Subscription(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    objects = SubscriptionQuerySet.as_manager()
+    objects = SubscriptionManager()
 
     class Meta:
         unique_together = ["payment_provider", "external_id"]
@@ -87,22 +103,42 @@ class Subscription(models.Model):
             ret = f"Auto | {ret}"
         return ret
 
-    def full_clean(
-        self,
-        amount: int | None = None,
-        charged_amount: int | None = None,
-        *args,
-        **kwargs,
-    ):
+    def full_clean(self, *args, **kwargs):
+        plan = PricingPlan.from_sub(self)
+
+        if plan == PricingPlan.TEAM and self.auto_recharge_enabled:
+            # disable auto-recharge on TEAM plan
+            self.auto_recharge_enabled = False
+
         if self.auto_recharge_enabled:
-            if amount is None:
-                amount = PricingPlan.from_sub(self).credits
-            if charged_amount is None:
-                charged_amount = PricingPlan.from_sub(self).monthly_charge * 100
+            amount = self.amount or plan.credits
+            charged_amount = self.charged_amount or (plan.monthly_charge * 100)
             self.ensure_default_auto_recharge_params(
                 amount=amount, charged_amount=charged_amount
             )
+
         return super().full_clean(*args, **kwargs)
+
+    def is_paid(self) -> bool:
+        return PricingPlan.from_sub(self) > PricingPlan.STARTER
+
+    @property
+    def has_user(self) -> bool:
+        try:
+            self.user
+        except Subscription.user.RelatedObjectDoesNotExist:
+            return False
+        else:
+            return True
+
+    @property
+    def has_workspace(self) -> bool:
+        try:
+            self.workspace
+        except Workspace.DoesNotExist:
+            return False
+        else:
+            return True
 
     def ensure_default_auto_recharge_params(self, *, amount: int, charged_amount: int):
         if amount <= 0 or charged_amount <= 0:
@@ -124,49 +160,46 @@ class Subscription(models.Model):
                 0.8 * self.monthly_spending_budget
             )
 
-    @property
-    def has_user(self) -> bool:
-        try:
-            self.user
-        except Subscription.user.RelatedObjectDoesNotExist:
-            return False
-        else:
-            return True
+    # seats
 
-    def is_paid(self) -> bool:
-        return PricingPlan.from_sub(self) > PricingPlan.STARTER
+    def billed_seats(self):
+        return self.seats.filter(seat_type__is_public=True)
 
-    @property
-    def has_workspace(self) -> bool:
-        try:
-            self.workspace
-        except Workspace.DoesNotExist:
-            return False
-        else:
-            return True
+    def get_seat_type(self) -> SeatType | None:
+        seat = (
+            self.billed_seats()
+            .select_related("seat_type")
+            .order_by("seat_type__monthly_charge", "id")
+            .first()
+        )
+        return seat and seat.seat_type or None
 
-    def cancel(self):
+    # stripe & paypal operations
+
+    def cancel(self, immediately: bool = True) -> None:
         from payments.webhooks import set_workspace_subscription
 
         if not (self.payment_provider and self.is_paid()):
             return
 
         match self.payment_provider:
-            case PaymentProvider.STRIPE:
+            case PaymentProvider.STRIPE if immediately:
                 try:
                     stripe.Subscription.cancel(self.external_id)
                 except stripe.error.InvalidRequestError as e:
                     if e.code == "resource_missing":
                         # already cancelled
                         set_workspace_subscription(
-                            workspace=self.workspace,
-                            plan=PricingPlan.STARTER,
                             provider=PaymentProvider.STRIPE,
+                            plan=PricingPlan.STARTER,
+                            workspace=self.workspace,
                             external_id=None,
                             cancel_old=False,
                         )
                     else:
                         raise
+            case PaymentProvider.STRIPE if not immediately:
+                stripe.Subscription.modify(self.external_id, cancel_at_period_end=True)
             case PaymentProvider.PAYPAL:
                 paypal.Subscription.retrieve(self.external_id).cancel()
             case _:
@@ -367,6 +400,8 @@ class Subscription(models.Model):
                     f"Can't get management URL for subscription with provider {self.payment_provider}"
                 )
 
+    # monthly notifications and budget checks
+
     def has_sent_monthly_spending_notification_this_month(self) -> bool:
         return self.monthly_spending_notification_sent_at and (
             self.monthly_spending_notification_sent_at.strftime("%B %Y")
@@ -388,6 +423,79 @@ class Subscription(models.Model):
             and self.workspace.get_dollars_spent_this_month()
             >= self.monthly_spending_notification_threshold
         )
+
+
+class SeatType(models.Model):
+    name = models.CharField(max_length=100)
+    monthly_charge = models.PositiveIntegerField(default=0)
+    monthly_credit_limit = models.PositiveIntegerField(default=0)
+
+    key = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="""
+            A unique identifier for this seat type. Should not be changed once set.
+
+            This is not displayed anywhere but used in the backend to calculate
+            and store billing with third-party APIs e.g. Stripe.
+            Recommended to use versioned strings (e.g. "2026/learner").
+        """,
+        editable=False,
+    )
+
+    is_public = models.BooleanField(
+        default=False,
+        help_text="""
+            Whether this seat type is available for purchase by any workspace.
+            If True, this seat type will be shown in the billing page.
+        """,
+    )
+    plan = models.IntegerField(
+        choices=PricingPlan.db_choices(),
+        help_text="""
+            The pricing plan this seat type is associated with.
+            The seat type will only be available for selection under this plan.
+        """,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class SubscriptionSeat(models.Model):
+    subscription = models.ForeignKey(
+        Subscription, related_name="seats", on_delete=models.CASCADE
+    )
+    seat_type = models.ForeignKey(
+        SeatType, related_name="seats", on_delete=models.PROTECT
+    )
+
+    assigned_to = models.OneToOneField(
+        WorkspaceMembership,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="seat",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subscription", "assigned_to"],
+                name="unique_subscription_seat_assignment",
+            )
+        ]
+
+    def __str__(self):
+        if self.assigned_to:
+            return (
+                f"{self.seat_type.name} (Assigned: {self.assigned_to.user.full_name()})"
+            )
+        else:
+            return f"{self.seat_type.name}"
 
 
 def nearest_choice(choices: list[int], value: float) -> int:
