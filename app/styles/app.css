@@ -1,3 +1,8 @@
+img {
+  max-width: 100%;
+  height: auto;
+}
+
 .gui-img {
   width: 100%;
   max-width: 450px;
