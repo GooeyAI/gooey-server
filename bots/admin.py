@@ -456,7 +456,7 @@ class SavedRunAdmin(admin.ModelAdmin):
         "platform",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
-    autocomplete_fields = ["parent_version", "workspace"]
+    autocomplete_fields = ["parent_version", "workspace", "parent_builder_saved_run"]
 
     readonly_fields = [
         "open_in_gooey",
@@ -470,6 +470,8 @@ class SavedRunAdmin(admin.ModelAdmin):
         "updated_at",
         "run_time",
         "is_api_call",
+        "parent_builder_saved_run",
+        "view_bot_message",
     ]
 
     actions = [export_to_csv, export_to_excel, "rerun_tasks"]
@@ -521,6 +523,10 @@ class SavedRunAdmin(admin.ModelAdmin):
         return list_related_html_url(
             saved_run.usage_costs, extra_label=f"${total_cost.normalize()}"
         )
+
+    @admin.display(description="View Bot Message")
+    def view_bot_message(self, saved_run: SavedRun):
+        return change_obj_url(saved_run.messages.first())
 
     @admin.action(description="Re-Run Tasks")
     def rerun_tasks(self, request, queryset):

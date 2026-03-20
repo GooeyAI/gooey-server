@@ -135,11 +135,14 @@ class SavedRun(models.Model):
     )
     user_message_id = models.TextField(null=True, blank=True, default=None)
 
-    gooey_builder_last_message_id = models.TextField(
+    parent_builder_saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="child_builder_saved_runs",
         null=True,
         blank=True,
         default=None,
-        help_text="platform_msg_id of the last builder Message at the point this run was created",
+        help_text="The Parent Gooey Builder SavedRun that created this run",
     )
 
     objects = SavedRunQuerySet.as_manager()
