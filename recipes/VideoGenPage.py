@@ -62,7 +62,7 @@ class VideoGenPage(BasePage):
 
         q = Q()
         for model_name in request.selected_models:
-            q |= Q(name__icontains=model_name)
+            q |= Q(name__iexact=model_name)
         models = AIModelSpec.objects.filter(q)
 
         paid_only_models = models.filter(paid_only=True)
