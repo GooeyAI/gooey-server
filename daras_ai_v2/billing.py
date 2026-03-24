@@ -634,8 +634,9 @@ def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelec
             label="Monthly credits per member",
             options=seat_options,
             format_func=lambda seat_id: (
-                f"{seat_options[seat_id].monthly_credit_limit or 0:,} credits/month"
-                f" for ${seat_options[seat_id].monthly_charge}/seat"
+                f"{seat_options[seat_id].name}"
+                f" • Up to {seat_options[seat_id].monthly_credit_limit or 0:,} Cr / month"
+                f" • ${seat_options[seat_id].monthly_charge}"
             ),
             key=f"seat-type-select-{plan.key}",
             value=(current_seat_type and current_seat_type.id),
