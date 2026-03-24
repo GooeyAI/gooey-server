@@ -236,10 +236,10 @@ class PricingPlan(PricingPlanData, Enum):
         is_personal=True,
     )
 
-    STANDARD = PricingPlanData(
+    PRO = PricingPlanData(
         db_value=8,
-        key="standard_2025",
-        title="Standard",
+        key="pro_2026",
+        title="Pro",
         description="More credits for power users",
         monthly_charge=25,
         credits=2_000,

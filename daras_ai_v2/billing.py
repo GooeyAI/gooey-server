@@ -520,9 +520,9 @@ def _render_all_plans_team(
 ):
     current_plan = PricingPlan.from_sub(workspace.subscription)
     team_plans = [p for p in PricingPlan if not p.deprecated and not p.is_personal]
-    # keep STANDARD visible if the workspace is currently on it (legacy)
-    if current_plan == PricingPlan.STANDARD:
-        team_plans = [PricingPlan.STANDARD] + team_plans
+    # keep PRO visible if the workspace is currently on it (legacy)
+    if current_plan == PricingPlan.PRO:
+        team_plans = [PricingPlan.PRO] + team_plans
     _render_plan_grid(team_plans, workspace, user, session, selected_payment_provider)
 
 
@@ -592,7 +592,7 @@ def _render_plan_pricing(
 
     if payment_provider == PaymentProvider.STRIPE and plan in [
         PricingPlan.TEAM,
-        PricingPlan.STANDARD,
+        PricingPlan.PRO,
     ]:
         seat_selection = _render_seat_selection(plan=plan, workspace=workspace)
     else:
@@ -687,7 +687,7 @@ def _render_plan_action_button(
     )
 
     if plan == current_plan and (
-        plan not in [PricingPlan.TEAM, PricingPlan.STANDARD]
+        plan not in [PricingPlan.TEAM, PricingPlan.PRO]
         or (
             workspace.subscription
             and seat_selection
@@ -786,14 +786,14 @@ def render_change_subscription_button(
     seat_selection: SeatSelection | None = None,
 ):
     # subscription exists, show upgrade/downgrade button
-    if plan in [PricingPlan.TEAM, PricingPlan.STANDARD]:
+    if plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         assert seat_selection is not None
         seat_type, seat_count = seat_selection
     else:
         seat_type, seat_count = None, 1
 
     current_plan = PricingPlan.from_sub(workspace.subscription)
-    if current_plan in [PricingPlan.TEAM, PricingPlan.STANDARD]:
+    if current_plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         current_seat_type = workspace.subscription.get_seat_type()
         current_seat_count = max(1, workspace.subscription.billed_seats().count())
     else:
@@ -894,8 +894,8 @@ def _render_upgrade_subscription_button(
         key=f"upgrade-workspace-{workspace.id}-plan-{plan.key}-{current_seat_type}"
     )
 
-    # Standard plan is only for personal workspaces, skip workspace creation popup
-    if workspace.is_personal and plan != PricingPlan.STANDARD:
+    # Pro plan is only for personal workspaces, skip workspace creation popup
+    if workspace.is_personal and plan != PricingPlan.PRO:
         if gui.button(
             "Create Team",
             type="primary",
@@ -989,8 +989,8 @@ def _render_create_subscription_button(
     payment_provider: PaymentProvider,
     seat_selection: SeatSelection | None = None,
 ):
-    # Standard plan is only for personal workspaces, skip workspace creation popup
-    if workspace.is_personal and plan != PricingPlan.STANDARD:
+    # Pro plan is only for personal workspaces, skip workspace creation popup
+    if workspace.is_personal and plan != PricingPlan.PRO:
         if gui.button(
             "Create Team",
             type="primary",
@@ -1141,7 +1141,7 @@ def change_subscription(
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
     # Check if plan and seat selection are unchanged
-    if current_plan in [PricingPlan.TEAM, PricingPlan.STANDARD]:
+    if current_plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         current_selection = (
             workspace.subscription.get_seat_type(),
             workspace.subscription.billed_seats().count() or 1,
