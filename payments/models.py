@@ -461,6 +461,9 @@ class SeatType(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"{self.name} | {self.monthly_credit_limit:,}Cr for ${self.monthly_charge:,}/month (Plan: {self.get_plan_display()})"
+
 
 class SubscriptionSeat(models.Model):
     subscription = models.ForeignKey(

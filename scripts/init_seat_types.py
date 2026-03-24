@@ -19,11 +19,8 @@ DEFAULT_PLAN_SEAT_TYPES: dict[PricingPlan, list[dict[str, int]]] = {
     ],
     PricingPlan.TEAM: [
         {"name": "Starter", "monthly_charge": 40, "monthly_credit_limit": 2_500},
-        {"name": "Learner", "monthly_charge": 60, "monthly_credit_limit": 5_000},
-        {"name": "Researcher", "monthly_charge": 110, "monthly_credit_limit": 9_000},
-        {"monthly_charge": 200, "monthly_credit_limit": 20_000},
-        {"monthly_charge": 300, "monthly_credit_limit": 32_000},
-        {"monthly_charge": 400, "monthly_credit_limit": 44_000},
+        {"name": "Advanced", "monthly_charge": 100, "monthly_credit_limit": 7_500},
+        {"name": "Researcher", "monthly_charge": 200, "monthly_credit_limit": 20_000},
     ],
 }
 
