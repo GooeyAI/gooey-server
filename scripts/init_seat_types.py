@@ -9,7 +9,7 @@ from payments.plans import PricingPlan
 
 GOOEY_ADMIN_SEAT_TYPE_NAME = "Gooey Admin"
 DEFAULT_PLAN_SEAT_TYPES: dict[PricingPlan, list[dict[str, int]]] = {
-    PricingPlan.STANDARD: [
+    PricingPlan.PRO: [
         {"monthly_charge": 25, "monthly_credit_limit": 2_000},
         {"monthly_charge": 50, "monthly_credit_limit": 4_200},
         {"monthly_charge": 100, "monthly_credit_limit": 9_000},
