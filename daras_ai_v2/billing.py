@@ -35,7 +35,7 @@ from workspaces.models import Workspace, WorkspaceRole
 from workspaces.widgets import open_create_workspace_popup_js, set_current_workspace
 
 
-rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
+rounded_border = "w-100 border shadow-sm rounded p-3"
 SeatSelection = tuple[SeatType, int]
 
 
@@ -343,7 +343,7 @@ def render_current_plan(workspace: Workspace):
         # ROW 1: Plan title and next invoice date
         left, right = left_and_right()
         with left:
-            gui.write(f"#### Gooey.AI {plan.title}")
+            gui.write(f"#### Plan: {plan.title}")
 
             if provider:
                 gui.write(
@@ -383,9 +383,7 @@ def render_current_plan(workspace: Workspace):
 
         with right, gui.div(className="text-end"):
             if seat_count > 1:
-                gui.write(
-                    f"# {seat_count} seats & {credits:,} credits", className="no-margin"
-                )
+                gui.write(f"# {seat_count} seats", className="no-margin")
             else:
                 gui.write(f"# {credits:,} credits", className="no-margin")
 
@@ -398,12 +396,13 @@ def render_current_plan(workspace: Workspace):
                     )
                 else:
                     text += f"{credits:,} credits"
-                gui.caption(text)
+                gui.caption(text, className="text-muted container-margin-reset")
 
         scheduled_downgrade = gui.run_in_thread(
             _get_scheduled_team_downgrade_info,
             args=[workspace.subscription],
             cache=True,
+            placeholder=None,
         )
         if scheduled_downgrade:
             target_seats = scheduled_downgrade.get("seats")
@@ -435,10 +434,13 @@ def render_current_plan(workspace: Workspace):
             else:
                 change_text = scheduled_downgrade["plan_title"]
 
-            gui.caption(
-                f"Scheduled change to: **{change_text}**, "
-                f"effective **{scheduled_downgrade['effective_date']}**."
-            )
+            with gui.div(className="mt-2 alert alert-warning mb-0"):
+                gui.write(
+                    f"{icons.alert} Scheduled change to: **{change_text}**, "
+                    f"effective **{scheduled_downgrade['effective_date']}**.",
+                    unsafe_allow_html=True,
+                    className="container-margin-reset",
+                )
 
 
 def render_credit_balance(workspace: Workspace):

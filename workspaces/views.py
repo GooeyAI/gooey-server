@@ -38,7 +38,7 @@ from .widgets import (
     set_current_workspace,
 )
 
-rounded_border = "w-100 border shadow-sm rounded py-4 px-3"
+rounded_border = "w-100 border shadow-sm rounded p-3"
 
 
 def invitation_page(
