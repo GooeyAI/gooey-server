@@ -78,7 +78,7 @@ class Img2ImgPage(BasePage):
 
     @classmethod
     def get_example_preferred_fields(self, state: dict) -> list[str]:
-        return ["text_prompt"]
+        return ["input_image", "text_prompt"]
 
     def related_workflows(self) -> list:
         from recipes.QRCodeGenerator import QRCodeGeneratorPage
