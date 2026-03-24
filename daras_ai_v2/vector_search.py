@@ -284,7 +284,7 @@ def query_vespa(
     yql = "select * from %(schema)s where file_id in (@fileIds) and " % dict(
         schema=settings.VESPA_SCHEMA
     )
-    bm25_yql = "( {targetHits: %(hits)i} userInput(@bm25Query) )"
+    bm25_yql = "( {targetHits: %(hits)i, allowEmpty: true} userInput(@bm25Query) )"
     semantic_yql = "( {targetHits: %(hits)i, distanceThreshold: %(threshold)f} nearestNeighbor(embedding, queryEmbedding) )"
 
     if semantic_weight == 0.0:
