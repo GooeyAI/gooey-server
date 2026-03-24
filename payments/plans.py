@@ -28,6 +28,7 @@ class PricingPlanData(typing.NamedTuple):
     description: str
     monthly_charge: int
     credits: int
+    is_personal: bool
     long_description: str = ""
     footer: str = ""
     deprecated: bool = False
@@ -35,7 +36,6 @@ class PricingPlanData(typing.NamedTuple):
 
     pricing_title: str | None = None
     pricing_caption: str | None = None
-    full_width: bool = False
 
     def get_pricing_title(
         self, *, seat_type: SeatType | None = None, seat_count: int | None = None
@@ -82,6 +82,7 @@ class PricingPlan(PricingPlanData, Enum):
         credits=1_500,
         monthly_charge=10,
         deprecated=True,
+        is_personal=True,
     )
     PREMIUM = PricingPlanData(
         db_value=2,
@@ -92,6 +93,7 @@ class PricingPlan(PricingPlanData, Enum):
         monthly_charge=50,
         deprecated=True,
         pricing_caption="10,000 Credits / month + Bots",
+        is_personal=True,
     )
     CREATOR = PricingPlanData(
         db_value=4,
@@ -123,6 +125,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         deprecated=True,
+        is_personal=True,
     )
     BUSINESS_2024 = PricingPlanData(
         db_value=5,
@@ -153,6 +156,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         deprecated=True,
+        is_personal=False,
     )
     BUSINESS_2025 = PricingPlanData(
         db_value=7,
@@ -191,6 +195,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         deprecated=True,
+        is_personal=False,
     )
 
     # -- active
@@ -228,6 +233,7 @@ class PricingPlan(PricingPlanData, Enum):
         ),
         pricing_title="$0",
         pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS} credits to start.",
+        is_personal=True,
     )
 
     STANDARD = PricingPlanData(
@@ -257,6 +263,7 @@ class PricingPlan(PricingPlanData, Enum):
           <li>Premium support via Discord</li>
         </ul>
         """,
+        is_personal=True,
     )
 
     TEAM = PricingPlanData(
@@ -268,7 +275,6 @@ class PricingPlan(PricingPlanData, Enum):
         credits=2_500,
         long_description=dedent(
             """
-            #### All Free Features +
             <ul class="text-muted">
               <li>Private Team Workspace</li>
               <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
@@ -291,6 +297,7 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
+        is_personal=False,
     )
 
     ENTERPRISE = PricingPlanData(
@@ -302,37 +309,35 @@ class PricingPlan(PricingPlanData, Enum):
         credits=999_999,
         pricing_title="Custom",
         pricing_caption="Typically $25,000 - $500,000 annually",
-        full_width=True,
         long_description=dedent(
             """
-            <div class="row row-cols-1 row-cols-md-2">
-                <div class="col">
-                  <ul class="text-muted">
-                    <li>Unlimited Workspaces for private collaboration among teams and clients</li>
-                    <li>Strategic AI consulting including:</li>
-                    <li>Rock-bottom, full-transparency, no mark-up token pricing</li>
-                    <li>Ongoing cost optimization + evals across all AI model providers</li>
-                    <li>Tailored onboarding and training</li>
-                    <li>Workflow performance evaluation</li>
-                    <li>Bespoke Workflows & features</li>
-                  </ul>
-                </div>
-                <div class="col">
-                  <ul class="text-muted">
-                    <li>Dedicated numbers for WhatsApp, Voice + SMS AI Agents</li>
-                    <li>Impact + ROI dashboards for your org based on industry best practices</li>
-                    <li>Export usage to your own BI platforms</li>
-                    <li>Integrations with your internal systems</li>
-                    <li>Host & integrate your fine-tuned model on Gooey.AI infrastructure</li>
-                    <li>Use your own keys for OpenAI, Azure, and others</li>
-                    <li>On-prem deployments</li>
-                    <li>Custom inference queues and rate limits</li>
-                  </ul>
-                </div>
-            </div>
+            #### Everything in Free +
+            <ul class="text-muted">
+              <li>Pooled Credits, Submission Rates and Concurrency</li>
+              <li>Single sign-on (SSO) &amp; Oauth login</li>
+              <li>Zero Data Retention</li>
+              <li>Unlimited Workspaces for private collaboration among teams and clients</li>
+              <li>Strategic AI consulting including:
+                <ul>
+                  <li>Rock-bottom, full-transparency, no mark-up token pricing</li>
+                  <li>Ongoing cost optimization + evals across all AI model providers</li>
+                  <li>Tailored onboarding and training</li>
+                </ul>
+              </li>
+              <li>Bespoke Workflows &amp; features</li>
+              <li>Dedicated numbers for WhatsApp, Voice + SMS AI Agents</li>
+              <li>Impact + ROI dashboards for your org based on industry best practices</li>
+              <li>Export usage to your own BI platforms</li>
+              <li>Integrations with your internal systems</li>
+              <li>Host + Integrate your fine-tuned model in Gooey.AI infra</li>
+              <li>Use your own keys for OpenAI, Azure, and others</li>
+              <li>On-prem deployments</li>
+              <li>Custom inference queues and rate limits</li>
+            </ul>
             """
         ),
         contact_us_link=settings.CONTACT_URL,
+        is_personal=False,
     )
 
     def __ge__(self, other: PricingPlan) -> bool:
