@@ -2,11 +2,12 @@ import typing
 from datetime import datetime
 from functools import partial
 
-from django.db.models import Q
 import gooey_gui as gui
 import sentry_sdk
 import stripe
+from django.contrib.humanize.templatetags.humanize import ordinal
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils.translation import ngettext
 from loguru import logger
 
@@ -928,8 +929,14 @@ def _render_upgrade_subscription_button(
                 workspace, plan, seat_selection
             )
 
+        next_invoice_ts = gui.run_in_thread(
+            workspace.subscription.get_next_invoice_timestamp, cache=True
+        )
         modal_content = get_order_summary_content(
-            plan, seat_selection, prorated_today=prorated_today
+            plan,
+            seat_selection,
+            prorated_today=prorated_today,
+            next_invoice_ts=next_invoice_ts,
         )
         confirm_label = "Upgrade"
         modal_title = "#### Order Summary"
@@ -1033,6 +1040,7 @@ def get_order_summary_content(
     plan: PricingPlan,
     seat_selection: SeatSelection,
     prorated_today: int | None = None,
+    next_invoice_ts: int | None = None,
 ) -> str:
     from routers.account import members_route
 
@@ -1056,9 +1064,14 @@ def get_order_summary_content(
     plan_tier_title = f"{plan.title} {seat_type.monthly_charge} Plan "
 
     if prorated_today is not None:
+        if next_invoice_ts:
+            effective_date = datetime.fromtimestamp(next_invoice_ts).strftime("%d")
+            effective_date_text = f"on the {ordinal(effective_date)} of"
+        else:
+            effective_date_text = ""
         charge_line = (
             f"Your payment method will be charged **${prorated_today:,}** today "
-            f"(prorated) and **${total_charge:,}** every month until you cancel."
+            f"(prorated) and **${total_charge:,}** {effective_date_text} every month until you cancel."
         )
     else:
         charge_line = (
