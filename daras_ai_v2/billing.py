@@ -453,37 +453,17 @@ def render_credit_balance(workspace: Workspace):
 def render_all_plans(
     workspace: Workspace, user: AppUser, session: dict
 ) -> PaymentProvider:
-    current_plan = PricingPlan.from_sub(workspace.subscription)
-
-    all_plans = [plan for plan in PricingPlan if not plan.deprecated]
-    if not workspace.is_personal and current_plan != PricingPlan.STANDARD:
-        all_plans.remove(PricingPlan.STANDARD)
-    grid_plans = [plan for plan in all_plans if not plan.full_width]
-    full_width_plans = [plan for plan in all_plans if plan.full_width]
-
-    gui.write("## Plans")
-    plans_div = gui.div(className="mb-1")
-
     if workspace.subscription and workspace.subscription.payment_provider:
         selected_payment_provider = workspace.subscription.payment_provider
     else:
         selected_payment_provider = PaymentProvider.STRIPE
 
-    with plans_div:
-        with gui.div(className="mb-1"):
-            partial_fn = partial(
-                _render_plan_compact,
-                workspace=workspace,
-                user=user,
-                session=session,
-                selected_payment_provider=selected_payment_provider,
-            )
-            grid_layout(len(grid_plans), grid_plans, partial_fn, separator=False)
-        for plan in full_width_plans:
-            with gui.div(className="mb-1"):
-                _render_plan_full_width(
-                    plan, workspace, user, session, selected_payment_provider
-                )
+    gui.write("## Plans")
+
+    if workspace.is_personal:
+        _render_all_plans_personal(workspace, user, session, selected_payment_provider)
+    else:
+        _render_all_plans_team(workspace, user, session, selected_payment_provider)
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(
@@ -493,55 +473,60 @@ def render_all_plans(
     return selected_payment_provider
 
 
-def _render_plan_full_width(
-    plan: PricingPlan,
+def _render_plan_grid(
+    plans: list[PricingPlan],
+    workspace: Workspace,
+    user: AppUser,
+    session: dict,
+    selected_payment_provider: PaymentProvider,
+):
+    partial_fn = partial(
+        _render_plan,
+        workspace=workspace,
+        user=user,
+        session=session,
+        selected_payment_provider=selected_payment_provider,
+    )
+    with gui.div(className="mb-1"):
+        grid_layout(min(len(plans), 3), plans, partial_fn, separator=False)
+
+
+def _render_all_plans_personal(
+    workspace: Workspace,
+    user: AppUser,
+    session: dict,
+    selected_payment_provider: PaymentProvider,
+):
+    personal_plans = [p for p in PricingPlan if not p.deprecated and p.is_personal]
+    team_plans = [p for p in PricingPlan if not p.deprecated and not p.is_personal]
+
+    personal_tab, team_tab = gui.tabs(["Individual", "Team and Enterprise"])
+
+    with personal_tab:
+        _render_plan_grid(
+            personal_plans, workspace, user, session, selected_payment_provider
+        )
+    with team_tab:
+        _render_plan_grid(
+            team_plans, workspace, user, session, selected_payment_provider
+        )
+
+
+def _render_all_plans_team(
     workspace: Workspace,
     user: AppUser,
     session: dict,
     selected_payment_provider: PaymentProvider,
 ):
     current_plan = PricingPlan.from_sub(workspace.subscription)
-
-    if plan == current_plan:
-        extra_class = "border-dark"
-    else:
-        extra_class = "bg-light"
-    with (
-        gui.div(className="d-flex flex-column h-100"),
-        gui.div(className=f"{rounded_border} mb-2 {extra_class}"),
-    ):
-        _render_plan_heading(plan)
-        with gui.div(className="row-lg d-flex flex-column flex-lg-row flex-grow-1"):
-            with gui.div(
-                className="col-lg-4 d-flex flex-column justify-content-between"
-            ):
-                with gui.div(className="mb-3"):
-                    seat_selection = _render_plan_pricing(
-                        plan, selected_payment_provider, workspace
-                    )
-                with gui.div(className="d-none d-lg-flex flex-column"):
-                    _render_plan_action_button(
-                        workspace=workspace,
-                        plan=plan,
-                        payment_provider=selected_payment_provider,
-                        user=user,
-                        session=session,
-                        seat_selection=seat_selection,
-                    )
-            with gui.div(className="col-lg-8"):
-                _render_plan_details(plan)
-        with gui.div(className="d-flex d-lg-none flex-column my-3"):
-            _render_plan_action_button(
-                workspace=workspace,
-                plan=plan,
-                payment_provider=selected_payment_provider,
-                user=user,
-                session=session,
-                seat_selection=seat_selection,
-            )
+    team_plans = [p for p in PricingPlan if not p.deprecated and not p.is_personal]
+    # keep STANDARD visible if the workspace is currently on it (legacy)
+    if current_plan == PricingPlan.STANDARD:
+        team_plans = [PricingPlan.STANDARD] + team_plans
+    _render_plan_grid(team_plans, workspace, user, session, selected_payment_provider)
 
 
-def _render_plan_compact(
+def _render_plan(
     plan: PricingPlan,
     workspace: Workspace,
     user: AppUser,
