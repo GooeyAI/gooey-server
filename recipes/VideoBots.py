@@ -1426,6 +1426,10 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             """
 async function loadGooeyEmbed() {
     await window.waitUntilHydrated;
+    let embedTarget = document.getElementById("gooey-embed");
+    if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
+        return;
+    }
     let controller = {
         messages,
         onSendMessage: (payload) => {
