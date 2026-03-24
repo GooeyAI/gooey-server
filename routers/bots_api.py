@@ -14,8 +14,15 @@ from bots.models import Platform, Conversation, BotIntegration, Message, SavedRu
 from celeryapp.tasks import err_msg_for_exc
 from daras_ai_v2 import settings
 from daras_ai_v2.base import RecipeRunState, StateKeys
-from daras_ai_v2.bots import BotInterface, msg_handler, ButtonPressed, parse_bot_html
+from daras_ai_v2.bots import (
+    BotInterface,
+    msg_handler,
+    ButtonPressed,
+    parse_bot_html,
+    save_msg_pair_to_db,
+)
 from daras_ai_v2.language_model import ConversationEntry
+from daras_ai_v2.language_model import get_entry_images, get_entry_text
 from daras_ai_v2.redis_cache import get_redis_cache
 from daras_ai_v2.search_ref import SearchReference
 from recipes.VideoBots import VideoBotsPage, ReplyButton
@@ -266,10 +273,7 @@ class ApiInterface(BotInterface):
                         detail="User ID mismatch. The provided user ID does not match the user ID associated with this conversation.",
                     )
         else:
-            self.convo = Conversation.objects.create(
-                bot_integration_id=self.bot_id,
-                web_user_id=request.user_id or str(uuid.uuid4()),
-            )
+            self.init_conversation(request)
 
         if (
             request.user_message_id
@@ -319,6 +323,30 @@ class ApiInterface(BotInterface):
             )
 
         super().__init__()
+
+    def init_conversation(self, request: CreateStreamRequest):
+        self.convo = Conversation.objects.create(
+            bot_integration_id=self.bot_id,
+            web_user_id=request.user_id or str(uuid.uuid4()),
+        )
+        if not request.messages:
+            return
+        for user_msg, bot_msg in zip(request.messages[::2], request.messages[1::2]):
+            if not (
+                isinstance(user_msg, dict)
+                and user_msg.get("role") == "user"
+                and isinstance(bot_msg, dict)
+                and bot_msg.get("role") == "assistant"
+            ):
+                continue
+            save_msg_pair_to_db(
+                convo=self.convo,
+                input_images=get_entry_images(user_msg),
+                user_msg_content=get_entry_text(user_msg),
+                user_msg_display_content=get_entry_text(user_msg),
+                bot_msg_content=get_entry_text(bot_msg),
+                bot_msg_display_content=get_entry_text(bot_msg),
+            )
 
     def runner(self):
         try:

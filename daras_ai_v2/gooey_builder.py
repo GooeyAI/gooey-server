@@ -7,6 +7,7 @@ from starlette.requests import Request
 
 from bots.models import BotIntegration, SavedRun, db_msgs_to_api_json
 from daras_ai_v2 import settings
+from daras_ai_v2.web_widget_embed import load_web_widget_lib
 from workspaces.models import Workspace
 
 if typing.TYPE_CHECKING:
@@ -156,58 +157,22 @@ def render_gooey_builder_inline(
         update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
     )
 
-    conversation_data = get_gooey_builder_conversation(bi, sr)
-    if conversation_data:
-        config["conversationData"] = conversation_data
+    conversation_data = get_conversation_data_for_saved_run(bi, sr)
 
-    gui.html(
-        # language=html
-        f"""
-<div id="gooey-builder-embed" style="height: 100%"></div>
-<script id="gooey-builder-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
-        """
-    )
+    gui.div(style=dict(height="100%"), id="gooey-builder-embed")
+    load_web_widget_lib()
     gui.js(
-        # language=javascript
-        """
-async function onload() {
-    await window.waitUntilHydrated;
-    if (typeof GooeyEmbed === "undefined" ||
-        document.getElementById("gooey-builder-embed")?.children.length) {
-        return;
-    }
-    
-    // this is a trick to update the variables after the widget is already mounted
-    GooeyEmbed.setGooeyBuilderVariables = (value) => {
-        config.payload.variables = value;
-    };
-    GooeyEmbed.setGooeyBuilderVariables(variables);
-    config.onClose = function() {
-        window.dispatchEvent(new CustomEvent(`${sidebar_key}:close`))
-    };
-    
-    GooeyEmbed.gooeyBuilderControl = {};
-    
-    GooeyEmbed.mount(config, GooeyEmbed.gooeyBuilderControl);
-}
-
-const script = document.getElementById("gooey-builder-embed-script");
-if (script) script.onload = onload;
-onload();
-window.addEventListener("hydrated", onload);
-
-// if the widget is already mounted, update the variables
-if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.setGooeyBuilderVariables) {
-    GooeyEmbed.setGooeyBuilderVariables(variables);
-    if (config.conversationData) {
-        GooeyEmbed.gooeyBuilderControl.setMessages?.(config.conversationData.messages);
-    }
-}
-        """,
+        GOOEY_BUILDER_INLINE_JS,
         config=config,
         variables=variables,
         sidebar_key=sidebar_key,
+        conversation_data=conversation_data,
     )
+
+
+GOOEY_BUILDER_INLINE_JS = (
+    settings.BASE_DIR / "static/js/gooey_builder_inline_embed.js"
+).read_text()
 
 
 def can_launch_gooey_builder(
@@ -222,7 +187,7 @@ def can_launch_gooey_builder(
     return current_workspace and current_workspace.enable_bot_builder
 
 
-def get_gooey_builder_conversation(
+def get_conversation_data_for_saved_run(
     bot_builder_integration: BotIntegration, sr: SavedRun
 ) -> dict | None:
     """
@@ -239,15 +204,20 @@ def get_gooey_builder_conversation(
         last_message = Message.objects.get(saved_run=sr.parent_builder_saved_run)
     except Message.DoesNotExist:
         return None
+
     conversation = last_message.conversation
     msgs_qs = conversation.messages.filter(created_at__lte=last_message.created_at)
     messages = list(
         db_msgs_to_api_json(msgs_qs.last_n_msgs(reset_at=conversation.reset_at))
     )
-    return dict(
-        id=api_hashids.encode(conversation.id),
+    data = dict(
         bot_id=api_hashids.encode(bot_builder_integration.id),
-        timestamp=conversation.created_at.isoformat(),
         user_id=conversation.web_user_id,
+        timestamp=conversation.created_at.isoformat(),
         messages=messages,
     )
+    # only send the conversation id for a full conversation,
+    # for partial messages start a new conversation
+    if last_message == conversation.messages.latest():
+        data["id"] = api_hashids.encode(conversation.id)
+    return data

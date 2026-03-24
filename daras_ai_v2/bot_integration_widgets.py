@@ -15,6 +15,7 @@ from daras_ai_v2.api_examples_widget import bot_api_example_generator
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.functional import flatten
+from daras_ai_v2.web_widget_embed import load_web_widget_lib
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from functions.inbuilt_tools import FeedbackCollectionLLMTool
 from recipes.BulkRunner import list_view_editor
@@ -527,13 +528,12 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             api_tab = f"{icons.api} API"
             selected = gui.horizontal_radio("", [web_preview_tab, api_tab])
         if selected == web_preview_tab:
-            gui.html(
-                # language=html
-                f"""
-                <div id="gooey-embed" class="border rounded p-1" style="height:80vh"></div>
-                <script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
-                """
+            gui.div(
+                className="border rounded p-1",
+                style=dict(height="80vh"),
+                id="gooey-embed",
             )
+            load_web_widget_lib()
             gui.js(
                 # language=javascript
                 """

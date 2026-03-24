@@ -91,6 +91,7 @@ from daras_ai_v2.search_ref import (
     apply_response_formattings_suffix,
     parse_refs,
 )
+from daras_ai_v2.web_widget_embed import load_web_widget_lib
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -1413,22 +1414,16 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
         if self.current_pr.photo_url:
             bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
-        gui.html(
-            # language=html
-            f"""
-<div id="gooey-embed" className="border rounded py-1 mb-3 bg-white" style="height: calc(100vh - 1rem)"></div>
-<script id="gooey-embed-script" src="{settings.WEB_WIDGET_LIB}"></script>
-            """
+        gui.div(
+            className="border rounded py-1 mb-3 bg-white",
+            style=dict(height="calc(100vh - 1rem)"),
+            id="gooey-embed",
         )
+        load_web_widget_lib()
         gui.js(
-            # language=javascript
             """
 async function loadGooeyEmbed() {
     await window.waitUntilHydrated;
-    let embedTarget = document.getElementById("gooey-embed");
-    if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
-        return;
-    }
     let controller = {
         messages,
         onSendMessage: (payload) => {
