@@ -1372,11 +1372,13 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
             else:
                 buttons = []
 
-            # child_builder_run = self.current_sr.child_builder_saved_runs.first()
-            # if child_builder_run:
-            #     text += (
-            #         f"\n\n[View Updated Workflow]({child_builder_run.get_app_url()})"
-            #     )
+            child_builder_run = (
+                self.current_sr.child_builder_saved_runs.order_by().first()
+            )
+            if child_builder_run:
+                text += (
+                    f"\n\n[View Updated Workflow]({child_builder_run.get_app_url()})"
+                )
 
             messages.append(
                 dict(
