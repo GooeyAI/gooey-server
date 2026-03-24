@@ -13,6 +13,7 @@ elif [ "$RUN_DJANGO" ]; then
   ./manage.py runscript init_ivr_pricing
   ./manage.py runscript init_image_generation_pricing
   ./manage.py runscript init_tags
+  ./manage.py runscript init_seat_types
   SENTRY_ENVIRONMENT="django" exec gunicorn gooeysite.wsgi --bind 0.0.0.0:8000 --threads "${MAX_THREADS:-1}" --access-logfile -
 elif [ "$RUN_STREAMLIT" ]; then
   SENTRY_ENVIRONMENT="streamlit" exec streamlit run Home.py --server.address=0.0.0.0 --server.port=8000
