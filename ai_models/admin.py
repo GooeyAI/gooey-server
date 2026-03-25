@@ -54,6 +54,7 @@ class AIModelSpecAdmin(admin.ModelAdmin):
         "label",
         "model_id",
         "category",
+        "priority",
         "paid_only",
         "is_deprecated",
         "redirect_to",
@@ -89,6 +90,7 @@ class AIModelSpecAdmin(admin.ModelAdmin):
                     "name",
                     "label",
                     "model_id",
+                    "priority",
                     "schema",
                     "pricing",
                 ]
