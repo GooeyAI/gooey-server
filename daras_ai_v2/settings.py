@@ -470,6 +470,7 @@ ELEVEN_LABS_API_KEY = config("ELEVEN_LABS_API_KEY", "")
 
 GHANA_NLP_SUBKEY = config("GHANA_NLP_SUBKEY", "")
 LELAPA_API_KEY = config("LELAPA_API_KEY", "")
+INTRON_API_KEY = config("INTRON_API_KEY", "")
 
 VESPA_URL = config("VESPA_URL", "http://localhost:8085")
 VESPA_CONFIG_SERVER_URL = config("VESPA_CONFIG_SERVER_URL", "http://localhost:19071")
