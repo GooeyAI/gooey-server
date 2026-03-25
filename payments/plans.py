@@ -28,7 +28,6 @@ class PricingPlanData(typing.NamedTuple):
     description: str
     monthly_charge: int
     credits: int
-    is_personal: bool
     long_description: str = ""
     footer: str = ""
     deprecated: bool = False
@@ -82,7 +81,6 @@ class PricingPlan(PricingPlanData, Enum):
         credits=1_500,
         monthly_charge=10,
         deprecated=True,
-        is_personal=True,
     )
     PREMIUM = PricingPlanData(
         db_value=2,
@@ -93,7 +91,6 @@ class PricingPlan(PricingPlanData, Enum):
         monthly_charge=50,
         deprecated=True,
         pricing_caption="10,000 Credits / month + Bots",
-        is_personal=True,
     )
     CREATOR = PricingPlanData(
         db_value=4,
@@ -125,7 +122,6 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         deprecated=True,
-        is_personal=True,
     )
     BUSINESS_2024 = PricingPlanData(
         db_value=5,
@@ -156,7 +152,6 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         deprecated=True,
-        is_personal=False,
     )
     BUSINESS_2025 = PricingPlanData(
         db_value=7,
@@ -195,7 +190,6 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         deprecated=True,
-        is_personal=False,
     )
 
     # -- active
@@ -233,7 +227,6 @@ class PricingPlan(PricingPlanData, Enum):
         ),
         pricing_title="$0",
         pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS} credits to start.",
-        is_personal=True,
     )
 
     PRO = PricingPlanData(
@@ -263,7 +256,6 @@ class PricingPlan(PricingPlanData, Enum):
           <li>Premium support via Discord</li>
         </ul>
         """,
-        is_personal=True,
     )
 
     TEAM = PricingPlanData(
@@ -297,7 +289,6 @@ class PricingPlan(PricingPlanData, Enum):
             </ul>
             """
         ),
-        is_personal=False,
     )
 
     ENTERPRISE = PricingPlanData(
@@ -337,7 +328,6 @@ class PricingPlan(PricingPlanData, Enum):
             """
         ),
         contact_us_link=settings.CONTACT_URL,
-        is_personal=False,
     )
 
     def __ge__(self, other: PricingPlan) -> bool:
