@@ -4,6 +4,7 @@ import multiprocessing
 import os.path
 import tempfile
 import threading
+import time
 import typing
 from enum import Enum
 from functools import lru_cache
@@ -266,6 +267,11 @@ GHANA_NLP_ASR_V2_SUPPORTED = {
 # https://docs.lelapa.ai/getting-started/language-support
 LELAPA_ASR_SUPPORTED = {"eng", "afr", "zul", "sot", "fra"}
 LELAPA_MT_SUPPORTED = {"nso_Latn", "afr_Latn", "sot_Latn", "ssw_Latn", "tso_Latn", "tsn_Latn", "xho_Latn", "zul_Latn", "eng_Latn", "swh_Latn", "sna_Latn", "yor_Latn", "hau_Latn"}  # fmt: skip
+INTRON_SUPPORTED = {
+    "af", "ak", "am", "ar", "bem", "bg", "cs", "da", "de", "el", "en", "es", "et", "ff", "fi", "fr", "gaa", "ha",
+    "hr", "hu", "ig", "it", "lg", "lt", "lv", "mt", "nl", "nso", "nyn", "om", "pcm", "pl", "pt", "ro", "ru", "rw",
+    "sk", "sl", "sn", "st", "sv", "sw", "tn", "tw", "uk", "wo", "xh", "yo", "zu",
+}  # fmt: skip
 
 # Meta Omnilingual ASR - supports 1600+ languages in flores200 format (e.g., "eng_Latn")
 # https://github.com/facebookresearch/omnilingual-asr/blob/main/src/omnilingual_asr/models/wav2vec2_llama/lang_ids.py
@@ -288,6 +294,7 @@ class AsrModels(Enum):
     deepgram = "Deepgram"
     azure = "Azure Speech"
     elevenlabs = "ElevenLabs Scribe v1"
+    intron = "Intron Voice API"
     seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
     meta_omnilingual_asr_llm_7b = "Omnilingual ASR LLM (Meta)"
@@ -314,6 +321,7 @@ class AsrModels(Enum):
         return self not in {
             self.azure,
             self.gcp_v1,
+            self.intron,
             self.mms_1b_all,
             self.seamless_m4t_v2,
             self.ghana_nlp_asr_v2,
@@ -397,6 +405,7 @@ asr_supported_languages = {
     AsrModels.usm: CHIRP_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
     AsrModels.elevenlabs: ELEVENLABS_SUPPORTED,
+    AsrModels.intron: INTRON_SUPPORTED,
     AsrModels.seamless_m4t_v2: SEAMLESS_v2_ASR_SUPPORTED,
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
@@ -1047,6 +1056,53 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     return response.json()
 
 
+def intron_asr(audio_url: str, language: str | None = None) -> dict:
+    if not settings.INTRON_API_KEY:
+        raise UserError("Intron ASR is not configured: missing INTRON_API_KEY")
+
+    intron_base_url = furl("https://infer.voice.intron.io")
+    audio_r = requests.get(audio_url)
+    raise_for_status(audio_r, is_user_url=True)
+
+    data = {"audio_file_name": "audio.wav"}
+    if language:
+        data["use_language_asr_input"] = language
+    content_type = audio_r.headers.get("content-type") or "application/octet-stream"
+    upload_url = str(intron_base_url / "file/v1/upload/sync")
+
+    response = requests.post(
+        upload_url,
+        headers={"Authorization": f"Bearer {settings.INTRON_API_KEY}"},
+        data=data,
+        files={"audio_file_blob": ("audio.wav", audio_r.content, content_type)},
+    )
+    raise_for_status(response)
+
+    response_data = response.json().get("data") or {}
+    file_id = response_data.get("file_id")
+    if response_data.get("audio_transcript", "").strip() or not file_id:
+        return response_data
+
+    deadline = time.monotonic() + (15 * 60)
+    while time.monotonic() < deadline:
+        status_url = str(intron_base_url / "file/v1/status" / file_id)
+        response = requests.get(
+            status_url,
+            headers={"Authorization": f"Bearer {settings.INTRON_API_KEY}"},
+        )
+        raise_for_status(response)
+        status_data = response.json().get("data") or {}
+        if status_data.get("audio_transcript", "").strip():
+            return status_data
+        if status_data.get("processing_status") == "FILE_TRANSCRIBED":
+            return status_data
+        time.sleep(1)
+
+    raise TimeoutError(
+        "Intron ASR timed out while waiting for the transcription to complete."
+    )
+
+
 def run_asr(
     audio_url: str,
     selected_model: str,
@@ -1095,6 +1151,9 @@ def run_asr(
             }
             chunks.append(chunk)
         data = {"text": result["text"], "chunks": chunks}
+    elif selected_model == AsrModels.intron:
+        result = intron_asr(audio_url, language)
+        data = {"text": result.get("audio_transcript", "").strip()}
     elif selected_model == AsrModels.whisper_large_v3:
         import replicate
 
