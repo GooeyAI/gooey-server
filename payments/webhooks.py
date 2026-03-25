@@ -333,6 +333,24 @@ def set_workspace_subscription(
     return new_sub
 
 
+def get_seat_counts_from_stripe_sub(
+    stripe_sub: stripe.Subscription,
+) -> dict[str, int]:
+    seat_counts: dict[str, int] = {}
+    for item in stripe_sub["items"].data:
+        if isinstance(item.price.product, str):
+            product = stripe.Product.retrieve(item.price.product)
+        else:
+            product = item.price.product
+        if key := product.metadata.get(settings.STRIPE_ITEM_SEAT_TYPE_METADATA_FIELD):
+            seat_counts[key] = item.quantity
+        else:
+            logger.warning(
+                f"Stripe subscription item {item.id} is missing seat type metadata. Skipping seat count for this item."
+            )
+    return seat_counts
+
+
 @db_middleware
 @transaction.atomic
 def set_subscription_seats_from_stripe_sub(
@@ -346,20 +364,8 @@ def set_subscription_seats_from_stripe_sub(
         db_sub.seats.all().delete()
         return
 
-    new_seat_counts: dict[str, int] = {}
-    for item in stripe_sub["items"].data:
-        if isinstance(item.price.product, str):
-            product = stripe.Product.retrieve(item.price.product)
-        else:
-            product = item.price.product
-        if key := product.metadata.get(settings.STRIPE_ITEM_SEAT_TYPE_METADATA_FIELD):
-            new_seat_counts[key] = item.quantity
-        else:
-            logger.warning(
-                f"Stripe subscription item {item.id} is missing seat type metadata. Skipping seat update for this item."
-            )
-
     seat_types_by_key = {st.key: st for st in SeatType.objects.filter(is_public=True)}
+    new_seat_counts = get_seat_counts_from_stripe_sub(stripe_sub)
     current_seats = (
         db_sub.billed_seats().select_related("seat_type").order_by("-assigned_to").all()
     )

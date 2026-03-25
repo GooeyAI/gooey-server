@@ -23,7 +23,7 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
-from payments.models import PaymentMethodSummary, SeatType
+from payments.models import PaymentMethodSummary, SeatType, Subscription
 from payments.plans import PricingPlan
 from payments.webhooks import (
     StripeWebhookHandler,
@@ -99,7 +99,8 @@ def _get_scheduled_team_downgrade_info(
         return None
     if stripe_sub.get("cancel_at_period_end"):
         return dict(
-            cancel_at_period_end=True,
+            plan_title=PricingPlan.STARTER.title,
+            plan_db_value=PricingPlan.STARTER.db_value,
             effective_date=datetime.fromtimestamp(current_period_end).strftime(
                 "%d %b %Y"
             ),
@@ -108,6 +109,7 @@ def _get_scheduled_team_downgrade_info(
     schedule = stripe_sub.get("schedule")
     if not schedule:
         return None
+
     if isinstance(schedule, str):
         schedule = stripe.SubscriptionSchedule.retrieve(
             schedule, expand=["phases.items.price.product"]
@@ -122,83 +124,43 @@ def _get_scheduled_team_downgrade_info(
         if not phase_items:
             continue
 
-        item = phase_items[0]
-        price = item.get("price")
-        quantity = item.get("quantity") or 0
-        try:
-            quantity_int = int(quantity)
-        except (TypeError, ValueError):
-            quantity_int = 0
-
-        # Resolve price object
-        if isinstance(price, dict):
-            price_obj = price
-        elif isinstance(price, str):
-            price_obj = stripe.Price.retrieve(price, expand=["product"])
-        else:
-            price_obj = None
-
-        # Resolve product from price
-        product = None
-        if price_obj:
-            raw_product = price_obj.get("product")
-            if isinstance(raw_product, dict):
-                product = raw_product
-            elif isinstance(raw_product, str):
-                product = stripe.Product.retrieve(raw_product)
-
-        # Get plan key: prefer phase metadata, fall back to product metadata
-        phase_metadata = phase.get("metadata") or {}
-        plan_key = phase_metadata.get(settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD)
-        seat_type_key = None
-        if isinstance(product, dict):
-            product_metadata = product.get("metadata") or {}
-            if not plan_key:
-                plan_key = product_metadata.get(
-                    settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD
-                )
-            seat_type_key = product_metadata.get(
-                settings.STRIPE_ITEM_SEAT_TYPE_METADATA_FIELD
-            )
-
+        plan_key = phase.get("metadata", {}).get(
+            settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD, None
+        )
         if not plan_key:
             continue
-        try:
-            plan = PricingPlan.get_by_key(plan_key)
-        except KeyError:
-            continue
 
-        # Calculate total monthly charge from price unit_amount × quantity
-        total_monthly_charge = None
-        if price_obj and quantity_int:
-            unit_amount = price_obj.get("unit_amount")
-            if unit_amount is None and price_obj.get("unit_amount_decimal") is not None:
-                unit_amount = int(float(price_obj["unit_amount_decimal"]))
-            if unit_amount is not None:
-                total_monthly_charge = int(round((unit_amount * quantity_int) / 100))
+        plan = PricingPlan.get_by_key(plan_key)
+        total_charge_cents = 0
+        credits = 0
+        seat_counts = {}
 
-        # Look up seat type from DB to get name and credit limit
-        seat_type_obj = None
-        if seat_type_key:
-            try:
-                seat_type_obj = SeatType.objects.get(key=seat_type_key)
-            except SeatType.DoesNotExist:
-                pass
+        for item in phase_items:
+            item = phase_items[0]
+            price = item.get("price")
+            quantity = int(item.get("quantity") or 0)
 
-        return dict(
-            plan_title=plan.title,
-            plan_db_value=plan.db_value,
-            seat_type_name=seat_type_obj.name if seat_type_obj else None,
-            seat_monthly_credit_limit=(
-                seat_type_obj.monthly_credit_limit if seat_type_obj else None
-            ),
-            seat_monthly_charge=(
-                seat_type_obj.monthly_charge if seat_type_obj else None
-            ),
-            total_monthly_charge=total_monthly_charge,
-            seats=quantity_int,
-            effective_date=datetime.fromtimestamp(start_date).strftime("%d %b %Y"),
-        )
+            if plan == PricingPlan.TEAM and price and price.product:
+                seat_type_key = price.product.get("metadata", {}).get(
+                    settings.STRIPE_ITEM_SEAT_TYPE_METADATA_FIELD
+                )
+                seat_counts.setdefault(seat_type_key, 0)
+                seat_counts[seat_type_key] += quantity
+            else:
+                credits += quantity
+
+            total_charge_cents += int(
+                float(price.get("unit_amount_decimal")) * quantity
+            )
+
+            return dict(
+                plan_title=plan.title,
+                plan_db_value=plan.db_value,
+                total_monthly_charge=total_charge_cents // 100,
+                credits=credits,
+                seat_counts=seat_counts,
+                effective_date=datetime.fromtimestamp(start_date).strftime("%d %b %Y"),
+            )
 
     return None
 
@@ -325,14 +287,12 @@ def render_payments_setup():
 
 def render_current_plan(workspace: Workspace):
     plan = PricingPlan.from_sub(workspace.subscription)
-    seat_type = workspace.subscription and workspace.subscription.get_seat_type()
-    seat_count = (
-        workspace.subscription and workspace.subscription.billed_seats().count() or 1
+    assert plan is not PricingPlan.ENTERPRISE
+
+    monthly_charge = (
+        workspace.subscription and workspace.subscription.charged_amount // 100
     )
-    monthly_charge = plan.get_active_monthly_charge(
-        seat_type=seat_type, seat_count=seat_count
-    )
-    credits = plan.get_active_credits(seat_type=seat_type, seat_count=seat_count)
+    # credits = workspace.subscription and workspace.subscription.amount
 
     if workspace.subscription.payment_provider:
         provider = PaymentProvider(workspace.subscription.payment_provider)
@@ -350,97 +310,118 @@ def render_current_plan(workspace: Workspace):
                     f"[{icons.edit} Manage Subscription](#payment-information)",
                     unsafe_allow_html=True,
                 )
-        with right, gui.div(className="d-flex align-items-center gap-1"):
-            if provider and (
-                next_invoice_ts := gui.run_in_thread(
-                    workspace.subscription.get_next_invoice_timestamp, cache=True
-                )
-            ):
-                gui.html("Next invoice on ")
-                with gui.tag("span", className="badge rounded-pill text-bg-dark"):
-                    gui.html(
-                        "...",
-                        **render_local_date_attrs(
-                            next_invoice_ts,
-                            date_options={"day": "numeric", "month": "long"},
-                        ),
-                    )
 
-        if plan is PricingPlan.ENTERPRISE:
-            # charge details are not relevant for Enterprise customers
-            return
+        with right, gui.div(className="d-flex align-items-center gap-1"):
+            if provider:
+                if next_invoice_ts := gui.run_in_thread(
+                    workspace.subscription.get_next_invoice_timestamp, cache=True
+                ):
+                    gui.html("Next invoice on ")
+                    with gui.tag("span", className="badge rounded-pill text-bg-dark"):
+                        gui.html(
+                            "...",
+                            **render_local_date_attrs(
+                                next_invoice_ts,
+                                date_options={"day": "numeric", "month": "long"},
+                            ),
+                        )
 
         # ROW 2: Plan pricing details
         left, right = left_and_right(className="mt-5")
         with left:
-            gui.write(f"# ${monthly_charge:,}/month", className="no-margin")
-            if monthly_charge:
-                if provider:
-                    provider_text = f" **via {provider.label}**"
-                else:
-                    provider_text = ""
-                gui.caption("per month" + provider_text)
+            if plan.pricing_title:
+                gui.write(plan.pricing_title, className="no-margin")
+            else:
+                gui.write(f"# ${monthly_charge:,}/month", className="no-margin")
+
+            if monthly_charge and provider:
+                gui.caption(
+                    f" via **{provider.label}**", className="text-muted no-margin"
+                )
 
         with right, gui.div(className="text-end"):
-            if seat_count > 1:
-                gui.write(f"# {seat_count} seats", className="no-margin")
+            if plan == PricingPlan.TEAM:
+                _render_seat_info_for_team_subscription(workspace.subscription)
             else:
+                credits = (
+                    workspace.subscription
+                    and workspace.subscription.amount
+                    or plan.credits
+                )
                 gui.write(f"# {credits:,} credits", className="no-margin")
 
-            if monthly_charge:
-                text = f"**${monthly_charge:,}** monthly renewal for "
-                if seat_type and seat_count > 1:
-                    text += (
-                        f"{seat_count} seats with "
-                        f"{seat_type.monthly_credit_limit or 0:,} credits each"
+                if monthly_charge:
+                    gui.caption(
+                        f"**${monthly_charge:,}** monthly renewal for {credits:,} credits"
                     )
-                else:
-                    text += f"{credits:,} credits"
-                gui.caption(text, className="text-muted container-margin-reset")
 
         scheduled_downgrade = gui.run_in_thread(
             _get_scheduled_team_downgrade_info,
             args=[workspace.subscription],
             cache=True,
-            placeholder=None,
+            placeholder="",
         )
         if scheduled_downgrade:
-            target_seats = scheduled_downgrade.get("seats")
-            target_credits = scheduled_downgrade.get("seat_monthly_credit_limit")
-            total_monthly = scheduled_downgrade.get("total_monthly_charge")
-            if scheduled_downgrade.get("cancel_at_period_end"):
-                change_text = f"{PricingPlan.STARTER.title} ($0 / month)"
-            elif target_seats is not None:
-                if target_credits is not None and total_monthly is not None:
-                    change_text = (
-                        f"{target_credits:,} credits / month × {target_seats} seats "
-                        f"(${total_monthly:,} / month)"
-                    )
-                elif target_credits is not None:
-                    change_text = (
-                        f"{target_credits:,} credits / month × {target_seats} seats"
-                    )
-                elif total_monthly is not None:
-                    change_text = (
-                        f"{scheduled_downgrade['seat_type_name']} × {target_seats} seats "
-                        f"(${total_monthly:,} / month)"
-                    )
-                else:
-                    change_text = (
-                        f"{scheduled_downgrade['plan_title']} "
-                        f"({scheduled_downgrade['seat_type_name']}) "
-                        f"× {target_seats} seats"
-                    )
+            next_plan = PricingPlan.from_db_value(scheduled_downgrade["plan_db_value"])
+            effective_date = scheduled_downgrade["effective_date"]
+
+            if next_plan == PricingPlan.STARTER:
+                change_text = f"Your plan will be cancelled on {effective_date}."
+            elif next_plan == PricingPlan.TEAM:
+                seat_counts = scheduled_downgrade["seat_counts"]
+                seat_type_objs = {
+                    st.key: st
+                    for st in SeatType.objects.filter(key__in=seat_counts.keys())
+                }
+                parts = [
+                    f"{count} {seat_type_objs[key].name} seat{'s' if count != 1 else ''} "
+                    f"(with up to {seat_type_objs[key].monthly_credit_limit:,} credits/seat/month)"
+                    for key, count in seat_counts.items()
+                    if key in seat_type_objs
+                ]
+                total_monthly = scheduled_downgrade["total_monthly_charge"]
+                change_text = (
+                    f"Your plan will change to {' + '.join(parts)} "
+                    f"on {effective_date} "
+                    f"with a new total price of ${total_monthly:,}/month."
+                )
             else:
-                change_text = scheduled_downgrade["plan_title"]
+                total_monthly = scheduled_downgrade["total_monthly_charge"]
+                change_text = (
+                    f"Your plan will change to **{next_plan.title}** "
+                    f"(with {next_plan.credits:,} pooled credits/month) "
+                    f"on {effective_date} "
+                    f"with a new total price of ${total_monthly:,}/month."
+                )
 
             with gui.div(className="mt-2 alert alert-warning mb-0"):
                 gui.write(
-                    f"{icons.alert} Scheduled change to: **{change_text}**, "
-                    f"effective **{scheduled_downgrade['effective_date']}**.",
+                    f"{icons.alert} {change_text}",
                     unsafe_allow_html=True,
                     className="container-margin-reset",
                 )
+
+
+def _render_seat_info_for_team_subscription(subscription: Subscription):
+    seats = subscription.seats.select_related("seat_type").all()
+    seat_counts = {}
+    for seat in seats:
+        seat_counts[seat.seat_type] = seat_counts.get(seat.seat_type, 0) + 1
+
+    seat_title = " + ".join(
+        f"{count} {seat_type.name}" for seat_type, count in seat_counts.items()
+    )
+    gui.write(
+        f"# {seat_title} seats",
+        className="no-margin",
+        unsafe_allow_html=True,
+    )
+
+    seat_descriptions = "\n".join(
+        f"Up to {seat_type.monthly_credit_limit:,} credits/month for **${seat_type.monthly_charge}** per {seat_type.name} seat"
+        for seat_type in seat_counts.keys()
+    )
+    gui.caption(seat_descriptions, className="text-muted no-margin")
 
 
 def render_credit_balance(workspace: Workspace):
@@ -497,18 +478,28 @@ def _render_all_plans_personal(
     session: dict,
     selected_payment_provider: PaymentProvider,
 ):
-    personal_plans = [p for p in PricingPlan if not p.deprecated and p.is_personal]
-    team_plans = [p for p in PricingPlan if not p.deprecated and not p.is_personal]
+    team_plans = [PricingPlan.TEAM, PricingPlan.ENTERPRISE]
+    personal_plans = [
+        p for p in PricingPlan if not p.deprecated and p not in team_plans
+    ]
 
     personal_tab, team_tab = gui.tabs(["Individual", "Team and Enterprise"])
 
     with personal_tab:
         _render_plan_grid(
-            personal_plans, workspace, user, session, selected_payment_provider
+            personal_plans,
+            workspace=workspace,
+            user=user,
+            session=session,
+            selected_payment_provider=selected_payment_provider,
         )
     with team_tab:
         _render_plan_grid(
-            team_plans, workspace, user, session, selected_payment_provider
+            team_plans,
+            workspace=workspace,
+            user=user,
+            session=session,
+            selected_payment_provider=selected_payment_provider,
         )
 
 
@@ -518,12 +509,14 @@ def _render_all_plans_team(
     session: dict,
     selected_payment_provider: PaymentProvider,
 ):
-    current_plan = PricingPlan.from_sub(workspace.subscription)
-    team_plans = [p for p in PricingPlan if not p.deprecated and not p.is_personal]
-    # keep PRO visible if the workspace is currently on it (legacy)
-    if current_plan == PricingPlan.PRO:
-        team_plans = [PricingPlan.PRO] + team_plans
-    _render_plan_grid(team_plans, workspace, user, session, selected_payment_provider)
+    team_plans = [PricingPlan.TEAM, PricingPlan.ENTERPRISE]
+    _render_plan_grid(
+        team_plans,
+        workspace=workspace,
+        user=user,
+        session=session,
+        selected_payment_provider=selected_payment_provider,
+    )
 
 
 def _render_plan(
@@ -614,6 +607,17 @@ def _render_plan_pricing(
     return seat_selection
 
 
+def _render_seat_type_option(seat_type: SeatType, plan: PricingPlan) -> str:
+    if plan == PricingPlan.PRO:
+        return f"{seat_type.monthly_credit_limit:,} credits/month • ${seat_type.monthly_charge:,}"
+    else:
+        return (
+            f"{seat_type.name}"
+            f" • Up to {seat_type.monthly_credit_limit or 0:,} Cr / month"
+            f" • ${seat_type.monthly_charge}"
+        )
+
+
 def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelection:
     if (
         workspace.subscription
@@ -633,10 +637,8 @@ def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelec
         seat_type_id = gui.selectbox(
             label="Monthly credits per member",
             options=seat_options,
-            format_func=lambda seat_id: (
-                f"{seat_options[seat_id].name}"
-                f" • Up to {seat_options[seat_id].monthly_credit_limit or 0:,} Cr / month"
-                f" • ${seat_options[seat_id].monthly_charge}"
+            format_func=lambda seat_id: _render_seat_type_option(
+                seat_options[seat_id], plan=plan
             ),
             key=f"seat-type-select-{plan.key}",
             value=(current_seat_type and current_seat_type.id),
@@ -854,8 +856,14 @@ def _render_downgrade_subscription_button(
     )
 
     ref = gui.use_confirm_dialog(key=f"--modal-{plan.key}")
-    next_invoice_ts = gui.run_in_thread(
-        workspace.subscription.get_next_invoice_timestamp, cache=True
+    next_invoice_ts = (
+        workspace.subscription
+        and workspace.subscription.is_paid()
+        and gui.run_in_thread(
+            workspace.subscription.get_next_invoice_timestamp,
+            cache=True,
+            placeholder="",
+        )
     )
     if next_invoice_ts:
         effective_date = datetime.fromtimestamp(next_invoice_ts).strftime("%d %b %Y")
