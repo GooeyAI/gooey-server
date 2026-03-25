@@ -411,7 +411,7 @@ def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
             for col in array_columns:
                 val = row.get(col)
                 prompt_columns[col].append(val)
-    if prev_group_ix:
+    if prev_group_ix is not None:
         yield out_df_recs, out_df_recs[prev_group_ix], prompt_columns
 
 
