@@ -1,5 +1,4 @@
 import requests
-from loguru import logger
 from bots.models import BotIntegration, Conversation, Platform
 from daras_ai.image_input import get_mimetype_from_response, upload_file_from_bytes
 from daras_ai_v2.asr import audio_bytes_to_wav
@@ -13,6 +12,12 @@ from recipes.VideoBots import ReplyButton
 TELEGRAM_MAX_MSG_LENGTH = 4096
 TELEGRAM_MAX_CALLBACK_DATA = 64
 TELEGRAM_API_BASE = "https://api.telegram.org"
+TELEGRAM_DEFAULT_COMMANDS = [
+    {
+        "command": "new",
+        "description": "Start a new conversation",
+    }
+]
 
 
 class TelegramBot(BotInterface):
@@ -234,13 +239,6 @@ def _detect_input_type(message: dict) -> str:
     return "text"
 
 
-def _tg_api_call(bot_token: str, method: str, data: dict) -> dict:
-    url = f"{TELEGRAM_API_BASE}/bot{bot_token}/{method}"
-    r = requests.post(url, json=data)
-    raise_for_status(r)
-    return r.json().get("result", {})
-
-
 def _send_text_message(
     bot_token: str,
     *,
@@ -338,3 +336,22 @@ def set_telegram_webhook(
         data["secret_token"] = secret_token
     result = _tg_api_call(bot_token, "setWebhook", data)
     return result
+
+
+def set_telegram_commands(
+    bot_token: str,
+    commands: list[dict[str, str]] | None = None,
+) -> dict:
+    data = dict(commands=commands or TELEGRAM_DEFAULT_COMMANDS)
+    result = _tg_api_call(bot_token, "setMyCommands", data)
+    return result
+
+
+def _tg_api_call(bot_token: str, method: str, data: dict) -> dict:
+    print(f"tg_api_call: {data=}")
+    url = f"{TELEGRAM_API_BASE}/bot{bot_token}/{method}"
+    r = requests.post(url, json=data)
+    raise_for_status(r)
+    res = r.json()
+    print(f"tg_api_call: {r.status_code=} {res=}")
+    return res.get("result", {})

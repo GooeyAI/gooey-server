@@ -679,6 +679,7 @@ def _connect_telegram_bot(
     from daras_ai_v2.fastapi_tricks import get_api_route_url
     from daras_ai_v2.telegram_bot import (
         get_telegram_bot_info,
+        set_telegram_commands,
         set_telegram_webhook,
     )
     from celeryapp.tasks import send_integration_attempt_email
@@ -722,6 +723,12 @@ def _connect_telegram_bot(
         )
     except requests.exceptions.HTTPError as e:
         gui.error(f"Failed to set webhook: {e}")
+        return None
+
+    try:
+        set_telegram_commands(bot_token)
+    except requests.exceptions.HTTPError as e:
+        gui.error(f"Failed to register Telegram commands: {e}")
         return None
 
     bi = BotIntegration.objects.create(
