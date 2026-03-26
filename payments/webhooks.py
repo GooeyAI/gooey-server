@@ -228,7 +228,7 @@ class StripeWebhookHandler:
         set_subscription_seats_from_stripe_sub(
             workspace.subscription,
             stripe_sub=stripe_sub,
-            invoice_id=str(uuid.uuid4()),
+            invoice_id=f"{stripe_sub.id}:update_{uuid.uuid4()}",
         )
 
     @classmethod
@@ -359,7 +359,7 @@ def set_subscription_seats_from_stripe_sub(
     invoice_id: str,
 ):
     plan = PricingPlan.from_sub(db_sub)
-    if plan not in [PricingPlan.PRO, PricingPlan.TEAM] or not stripe_sub:
+    if plan not in [PricingPlan.TEAM] or not stripe_sub:
         # if the plan doesn't have seats, delete all existing seats
         db_sub.seats.all().delete()
         return

@@ -653,7 +653,7 @@ def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelec
         with col2:
             count = gui.selectbox(
                 label="Seats",
-                options=[1, 2, 3, 4, 5, 10, 15, 20, 25, 50],
+                options=[2, 3, 4, 5, 10, 15, 20, 25, 50],
                 key=f"seats-select-{plan.key}-{workspace.id}",
                 value=(
                     workspace.subscription

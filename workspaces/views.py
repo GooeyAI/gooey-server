@@ -6,15 +6,10 @@ from django.db import transaction
 import gooey_gui as gui
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
-from django.db.models import F, Sum
+from django.db.models import F
 from django.utils.translation import ngettext
 
-from app_users.models import (
-    AppUser,
-    AppUserTransaction,
-    PaymentProvider,
-    TransactionReason,
-)
+from app_users.models import AppUser
 from daras_ai_v2 import icons, settings, urls
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
@@ -597,8 +592,7 @@ def render_members_list(
                             gui.html(html_lib.escape(name))
                     if is_team_plan:
                         with gui.tag("td", className="text-nowrap"):
-                            cycle_usage = get_member_cycle_usage(m)
-                            gui.html(html_lib.escape(cycle_usage))
+                            gui.html(get_member_cycle_usage_html(m))
                         with gui.tag("td"):
                             assigned_seat_type = _assigned_seat_type(m)
                             gui.html(
@@ -618,13 +612,17 @@ def render_members_list(
                         render_membership_actions(m, current_member=current_member)
 
 
-def get_member_cycle_usage(membership: WorkspaceMembership) -> str:
+def get_member_cycle_usage_html(membership: WorkspaceMembership) -> str:
     if not hasattr(membership, "seat"):
         return "-"
 
     limit = membership.seat.seat_type.monthly_credit_limit
     usage = limit - membership.balance
-    return f"{usage:,} / {limit:,}"
+
+    if limit > 1_000:
+        limit = f"{limit / 1_000:.1f}K"
+
+    return f'{usage}<span class="text-muted">/{limit}</span>'
 
 
 def render_team_member_cycle_summary(
@@ -634,7 +632,7 @@ def render_team_member_cycle_summary(
 ):
     from routers.account import account_route
 
-    usage = get_member_cycle_usage(membership)
+    usage = get_member_cycle_usage_html(membership)
     next_invoice_ts = gui.run_in_thread(
         membership.workspace.subscription.get_next_invoice_timestamp, cache=True
     )
@@ -650,24 +648,29 @@ def render_team_member_cycle_summary(
         or "Unassigned"
     )
 
-    with gui.div(className="d-flex gap-4 mt-2 flex-wrap"):
-        gui.html(
-            f'<div><span class="text-muted">Your credits used</span><br>{usage}</div>'
-        )
-        gui.html(
-            f'<div><span class="text-muted">Cycle renews</span><br>{html_lib.escape(cycle_renews)}</div>'
-        )
-        gui.html(
-            f'<div><span class="text-muted">Your Seat</span><br>{html_lib.escape(seat_name)}</div>'
-        )
+    with gui.div(
+        className="d-flex align-items-center gap-4 mt-2 flex-wrap container-margin-reset"
+    ):
+        with gui.div():
+            gui.caption("Your Credits used")
+            gui.html(usage)
+        with gui.div():
+            gui.caption("Cycle renews")
+            gui.html(html_lib.escape(cycle_renews))
+        with gui.div():
+            gui.caption("Your Seat")
+            gui.html(html_lib.escape(seat_name))
 
         if membership.role == WorkspaceRole.MEMBER:
-            if gui.button("Upgrade", className="my-0 py-1"):
-                personal_workspace = membership.user.get_or_create_personal_workspace()[
-                    0
-                ]
-                set_current_workspace(session, personal_workspace.id)
-                raise gui.RedirectException(get_route_path(account_route))
+            with gui.div():
+                if gui.button(
+                    "Buy more on Personal",
+                    type="primary",
+                    className="my-0 py-1",
+                ):
+                    personal_ws, _ = membership.user.get_or_create_personal_workspace()
+                    set_current_workspace(session, personal_ws.id)
+                    raise gui.RedirectException(get_route_path(account_route))
 
 
 def render_membership_actions(
