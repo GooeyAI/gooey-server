@@ -1,10 +1,11 @@
 from django.contrib import admin
 from django.db import models
 
-from ai_models.models import AIModelSpec
+from ai_models.models import AIModelCreator, AIModelSpec
 from gooeysite.custom_widgets import JSONEditorWidget
 from usage_costs.admin import ModelPricingAdmin
 from django import forms
+from django.utils.safestring import mark_safe
 
 
 llm_fields = [
@@ -45,6 +46,20 @@ class AIModelSpecForm(forms.ModelForm):
         ]
 
 
+@admin.register(AIModelCreator)
+class AIModelCreatorAdmin(admin.ModelAdmin):
+    list_display = ["name", "photo", "website_url", "photo_url"]
+    search_fields = ["name", "website_url", "photo_url"]
+    readonly_fields = ["photo"]
+    fields = ["name", "website_url", "photo_url", "photo"]
+
+    @admin.display(description="Photo")
+    def photo(self, obj):
+        if not obj:
+            return ""
+        return mark_safe(obj.html_icon(size="1.5rem"))
+
+
 @admin.register(AIModelSpec)
 class AIModelSpecAdmin(admin.ModelAdmin):
     form = AIModelSpecForm
@@ -52,6 +67,7 @@ class AIModelSpecAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "label",
+        "creator",
         "model_id",
         "category",
         "priority",
@@ -64,6 +80,7 @@ class AIModelSpecAdmin(admin.ModelAdmin):
 
     list_filter = [
         "category",
+        "creator",
         "provider",
         "paid_only",
         "is_deprecated",
@@ -71,10 +88,10 @@ class AIModelSpecAdmin(admin.ModelAdmin):
         "updated_at",
     ]
 
-    search_fields = ["name", "label", "model_id", "category"] + [
+    search_fields = ["name", "label", "model_id", "category", "creator__name"] + [
         f"pricing__{field}" for field in ModelPricingAdmin.search_fields
     ]
-    autocomplete_fields = ["pricing", "redirect_to"]
+    autocomplete_fields = ["creator", "pricing", "redirect_to"]
 
     readonly_fields = [
         "created_at",
@@ -89,6 +106,7 @@ class AIModelSpecAdmin(admin.ModelAdmin):
                     "category",
                     "name",
                     "label",
+                    "creator",
                     "model_id",
                     "priority",
                     "schema",

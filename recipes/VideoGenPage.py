@@ -361,7 +361,7 @@ def render_video_gen_form(available_models: dict[str, AIModelSpec]):
     selected_models = gui.multiselect(
         label="###### Video Models",
         options=list(available_models.keys()),
-        format_func=lambda x: available_models[x].label,
+        format_func=lambda x: available_models[x].display_html(),
         key="selected_models",
         allow_none=True,
     )
@@ -386,7 +386,7 @@ def render_audio_gen_form(available_audio_models: dict[str, AIModelSpec]):
         selected_audio_model = gui.selectbox(
             label="###### Sound generation model",
             options=list(available_audio_models.keys()),
-            format_func=lambda x: available_audio_models[x].label,
+            format_func=lambda x: available_audio_models[x].display_html(),
             key="selected_audio_model",
             allow_none=False,
             disabled=not available_audio_models

@@ -58,13 +58,12 @@ class CompareLLMPage(BasePage):
             help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
-        options = dict(
-            AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm)
-            .exclude_deprecated(
-                selected_models=gui.session_state.get("selected_models")
-            )
-            .values_list("name", "label")
+        llm_models = AIModelSpec.objects.filter(
+            category=AIModelSpec.Categories.llm,
+        ).exclude_deprecated(
+            selected_models=gui.session_state.get("selected_models"),
         )
+        options = {model.name: model.display_html() for model in llm_models}
         gui.multiselect(
             label="#### 🧠 Language Models",
             key="selected_models",
