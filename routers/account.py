@@ -79,9 +79,7 @@ def payment_processing_route(
         redirectUrl=get_route_path(account_route),
     )
 
-    return dict(
-        meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")
-    )
+    return dict(meta=raw_build_meta_tags(url=str(request.url), title="Processing..."))
 
 
 @gui.route(app, "/account")

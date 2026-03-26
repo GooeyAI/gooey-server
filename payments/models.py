@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import typing
+from functools import cache
 
 import stripe
 from django.db import models
@@ -165,14 +166,27 @@ class Subscription(models.Model):
     def billed_seats(self):
         return self.seats.filter(seat_type__is_public=True)
 
+    @cache
     def get_seat_type(self) -> SeatType | None:
-        seat = (
-            self.billed_seats()
-            .select_related("seat_type")
-            .order_by("seat_type__monthly_charge", "id")
-            .first()
-        )
-        return seat and seat.seat_type or None
+        plan = PricingPlan.from_sub(self)
+        if plan == PricingPlan.TEAM:
+            seat = (
+                self.billed_seats()
+                .select_related("seat_type")
+                .order_by("seat_type__monthly_charge", "id")
+                .first()
+            )
+            return seat and seat.seat_type or None
+        elif plan == PricingPlan.PRO:
+            return (
+                SeatType.objects.filter(
+                    plan=plan.db_value, monthly_charge=self.charged_amount // 100
+                )
+                .order_by("-is_public")
+                .first()
+            )
+        else:
+            return None
 
     # stripe & paypal operations
 
