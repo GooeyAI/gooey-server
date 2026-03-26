@@ -56,10 +56,14 @@ def language_model_selector(
     label_visibility: str = "visible",
     key: str = "selected_model",
 ):
-    llm_models = AIModelSpec.objects.filter(
-        category=AIModelSpec.Categories.llm,
-    ).exclude_deprecated(
-        selected_models=gui.session_state.get(key),
+    llm_models = (
+        AIModelSpec.objects.filter(
+            category=AIModelSpec.Categories.llm,
+        )
+        .select_related("creator")
+        .exclude_deprecated(
+            selected_models=gui.session_state.get(key),
+        )
     )
     options = {model.name: model.display_html() for model in llm_models}
     return gui.selectbox(
