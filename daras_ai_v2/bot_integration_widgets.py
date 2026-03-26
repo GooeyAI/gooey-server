@@ -586,7 +586,7 @@ def render_telegram_connect_dialog(
         gui.markdown("**Step 1: Open BotFather**")
         gui.html(
             '<a class=" btn btn-theme btn-secondary w-100 mb-3" '
-            'href="https://t.me/BotFather" target="_blank">'
+            'href="https://t.me/BotFather?text=/newbot" target="_blank">'
             f"{icons.telegram} Open BotFather"
             "</a>",
         )
