@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type {
   CSSObjectWithLabel,
+  MultiValueGenericProps,
   OptionProps,
   SingleValueProps,
   PlaceholderProps,
@@ -101,7 +102,13 @@ export default function GooeySelect({
           <Select
             value={selectValue[0]?.value ? selectValue : null}
             onChange={onSelectChange}
-            components={{ Option, SingleValue, Placeholder, Menu }}
+            components={{
+              Option,
+              SingleValue,
+              MultiValueLabel,
+              Placeholder,
+              Menu,
+            }}
             styles={{
               ...Object.fromEntries(
                 Object.entries(styles ?? {}).map(([key, style]) => {
@@ -159,6 +166,20 @@ const SingleValue = ({ children, ...props }: SingleValueProps) => (
       />
     ) : null}
   </components.SingleValue>
+);
+
+const MultiValueLabel = ({
+  children,
+  ...props
+}: MultiValueGenericProps<any>) => (
+  <components.MultiValueLabel {...props}>
+    {children ? (
+      <RenderedMarkdown
+        body={children.toString()}
+        className="container-margin-reset"
+      />
+    ) : null}
+  </components.MultiValueLabel>
 );
 
 const Placeholder = (props: PlaceholderProps) => {
