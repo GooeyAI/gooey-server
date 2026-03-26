@@ -545,26 +545,14 @@ def render_members_list(
     *,
     is_team_plan: bool,
 ):
-    seat_types = {
-        seat_type.id: seat_type for seat_type in SeatType.objects.order_by("name", "id")
-    }
-
-    def _assigned_seat_type(membership: WorkspaceMembership) -> SeatType | None:
-        if hasattr(membership, "seat") and membership.seat.seat_type:
-            return membership.seat.seat_type
-        return None
-
-    def _seat_type_label(seat_type_id: int | None) -> str:
-        if seat_type_id is None:
-            return "Unassigned"
-        seat_type = seat_types.get(seat_type_id)
-        return seat_type and seat_type.name or "Unknown"
-
     with gui.div(className="table-responsive"), gui.tag("table", className="table"):
         with gui.tag("thead"), gui.tag("tr"):
             with gui.tag("th", scope="col"):
                 gui.html("Name")
-            if is_team_plan:
+            if is_team_plan and current_member.role in (
+                WorkspaceRole.OWNER,
+                WorkspaceRole.ADMIN,
+            ):
                 with gui.tag("th", scope="col"):
                     gui.html("Usage")
                 with gui.tag("th", scope="col"):
@@ -590,20 +578,15 @@ def render_members_list(
                                 gui.html(html_lib.escape(name))
                         else:
                             gui.html(html_lib.escape(name))
-                    if is_team_plan:
+                    if is_team_plan and current_member.role in (
+                        WorkspaceRole.OWNER,
+                        WorkspaceRole.ADMIN,
+                    ):
                         with gui.tag("td", className="text-nowrap"):
                             gui.html(get_member_cycle_usage_html(m))
                         with gui.tag("td"):
-                            assigned_seat_type = _assigned_seat_type(m)
-                            gui.html(
-                                html_lib.escape(
-                                    _seat_type_label(
-                                        assigned_seat_type
-                                        and assigned_seat_type.id
-                                        or None
-                                    )
-                                )
-                            )
+                            seat_type = hasattr(m, "seat") and m.seat.seat_type or None
+                            gui.html(seat_type and seat_type.name or "Unassigned")
                     with gui.tag("td", className="text-nowrap"):
                         gui.html(WorkspaceRole.display_html(m.role))
                     with gui.tag("td"):
