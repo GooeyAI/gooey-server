@@ -190,11 +190,6 @@ class StripeWebhookHandler:
     ):
         logger.info(f"Stripe subscription updated: {stripe_sub.id}")
 
-        assert stripe_sub.plan, f"Stripe subscription {stripe_sub.id} is missing plan"
-        assert stripe_sub.plan.product, (
-            f"Stripe subscription {stripe_sub.id} is missing product"
-        )
-
         try:
             plan = PricingPlan.get_by_key(
                 stripe_sub.metadata[settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD]
@@ -212,21 +207,23 @@ class StripeWebhookHandler:
             )
             return
 
-        amount = int(stripe_sub.quantity)
-        charged_amount = round(
-            Decimal(stripe_sub.plan.amount_decimal) * stripe_sub.quantity
-        )
+        quantity = 0
+        charged_amount = 0
 
-        set_workspace_subscription(
+        for item in stripe_sub["items"].data:
+            quantity += item.quantity
+            charged_amount += item.price.unit_amount * item.quantity
+
+        db_sub = set_workspace_subscription(
             provider=cls.PROVIDER,
             plan=plan,
             workspace=workspace,
             external_id=stripe_sub.id,
-            amount=amount,
+            amount=quantity,
             charged_amount=charged_amount,
         )
         set_subscription_seats_from_stripe_sub(
-            workspace.subscription,
+            db_sub,
             stripe_sub=stripe_sub,
             invoice_id=f"{stripe_sub.id}:update_{uuid.uuid4()}",
         )
