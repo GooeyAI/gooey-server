@@ -234,11 +234,12 @@ Here's what you uploaded:
             with col2:
                 del_button(del_key)
 
-        options = dict(
-            AIModelSpec.objects.filter(llm_supports_json=True)
-            .exclude_deprecated(selected_models=gui.session_state.get("selected_model"))
-            .values_list("name", "label")
+        llm_models = AIModelSpec.objects.filter(
+            llm_supports_json=True,
+        ).exclude_deprecated(
+            selected_models=gui.session_state.get("selected_model"),
         )
+        options = {model.name: model.display_html() for model in llm_models}
         gui.selectbox(
             "##### Language Model",
             options=options,

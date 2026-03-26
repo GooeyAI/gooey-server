@@ -1,7 +1,33 @@
+import html
+
 from django.db import models
 from django.db.models import Q
 
 from bots.custom_fields import CustomURLField
+from daras_ai_v2.meta_preview_url import meta_preview_url
+
+
+class AIModelCreator(models.Model):
+    name = models.TextField(unique=True)
+    photo_url = CustomURLField(blank=True, default="")
+    website_url = CustomURLField(blank=True, default="")
+
+    def __str__(self):
+        return self.name
+
+    def html_icon(self, size: str | None = None) -> str:
+        if not self.photo_url:
+            return ""
+        size = size or "1.1rem"
+        photo_url = self.thumbnail_photo_url()
+        return f'<img src="{photo_url}" alt="{html.escape(self.name)}" style="height: {size}; width: {size};">'
+
+    def thumbnail_photo_url(self, size: str = "40x40") -> str:
+        return meta_preview_url(
+            self.photo_url,
+            fallback_img=self.photo_url,
+            size=size,
+        )[0]
 
 
 class ModelProvider(models.IntegerChoices):
@@ -54,6 +80,14 @@ class AIModelSpec(models.Model):
     )
     label = models.TextField(
         help_text="The label of the model to be used in the UI.",
+    )
+    creator = models.ForeignKey(
+        "ai_models.AIModelCreator",
+        on_delete=models.SET_NULL,
+        related_name="ai_model_specs",
+        null=True,
+        blank=True,
+        default=None,
     )
     model_id = models.TextField(
         help_text="The internal API provider / huggingface model id.",
@@ -125,6 +159,18 @@ class AIModelSpec(models.Model):
 
     class Meta:
         verbose_name = "AI Model Spec"
+
+    def display_html(self, icon_size: str | None = None) -> str:
+        if not self.creator:
+            return self.label
+        creator_icon = self.creator.html_icon(size=icon_size)
+        if not creator_icon:
+            return self.label
+        return (
+            '<span style="display: inline-flex; align-items: center; gap: 0.55rem; vertical-align: -5px;">'
+            f"{creator_icon}<span>{self.label}</span>"
+            "</span>"
+        )
 
     def __str__(self):
         return f"{self.label} ({self.model_id})"
