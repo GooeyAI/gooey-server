@@ -381,24 +381,21 @@ def set_subscription_seats_from_stripe_sub(
             if count > 0:
                 new_seat_counts[key] = count
 
-            old_seat_type = seat.seat_type
+            old_limit = seat.seat_type.monthly_credit_limit
             seat.seat_type = seat_types_by_key[key]
             seat.save(update_fields=["seat_type"])
 
             if seat.assigned_to_id:
-                if (
-                    seat.seat_type.monthly_credit_limit
-                    > old_seat_type.monthly_credit_limit
-                ):
-                    to_add = (
-                        seat.seat_type.monthly_credit_limit
-                        - old_seat_type.monthly_credit_limit
-                    )
+                new_limit = seat.seat_type.monthly_credit_limit
+                if seat.assigned_to.balance <= old_limit <= new_limit:
+                    # seat type has been upgraded or has same credit limit
+                    # `balance <= old limit` checks that we are in a valid state
+                    to_add = new_limit - old_limit
                 else:
-                    # set balance to seat.seat_type.monthly_credit_limit
-                    to_add = (
-                        seat.seat_type.monthly_credit_limit - seat.assigned_to.balance
-                    )
+                    # seat type has been downgraded
+                    # or user's balance was in invalid state (> old limit)
+                    # balance + (new_limit - balance) = new_limit
+                    to_add = new_limit - seat.assigned_to.balance
 
                 seat.assigned_to.add_balance(
                     amount=to_add,
