@@ -127,13 +127,14 @@ class VideoGenPage(BasePage):
 
     def render(self):
         video_models = sorted(
-            AIModelSpec.objects.filter(
-                category=AIModelSpec.Categories.video
-            ).exclude_deprecated(
+            AIModelSpec.objects.filter(category=AIModelSpec.Categories.video)
+            .select_related("creator")
+            .exclude_deprecated(
                 selected_models=gui.session_state.get("selected_models")
             ),
             key=lambda model: (-model.priority, model.label.lower()),
         )
+
         self.available_models = CaseInsensitiveDict(
             {model.name: model for model in video_models}
         )
@@ -142,7 +143,9 @@ class VideoGenPage(BasePage):
                 model.name: model
                 for model in AIModelSpec.objects.filter(
                     category=AIModelSpec.Categories.audio
-                ).exclude_deprecated(
+                )
+                .select_related("creator")
+                .exclude_deprecated(
                     selected_models=gui.session_state.get("selected_audio_model")
                 )
             }
