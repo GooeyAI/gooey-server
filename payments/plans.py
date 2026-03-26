@@ -212,8 +212,6 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Broad selection of <a href="/text-to-speech/">Text to Speech voices</a> for <a href="/lipsync/">Lipsync</a> and <a href="/copilot/">Copilot</a></li>
               <li>Access top image generation models</li>
               <li>Deploy Workflows via the Web, WhatsApp, SMS/Voice, Slack or FB</li>
-              <li>Use-case specific, Workflow <a href="/bulk/">Evaluation</a> to optimize model and component selection.</li>
-              <li><a href="https://docs.gooey.ai/api-reference/getting-started">API access</a></li>
             </ul>
             """
         ),
@@ -233,7 +231,7 @@ class PricingPlan(PricingPlanData, Enum):
         db_value=8,
         key="pro_2026",
         title="Pro",
-        description="More credits for power users",
+        description="More for power users",
         monthly_charge=25,
         credits=2_000,
         long_description=dedent(
@@ -241,19 +239,20 @@ class PricingPlan(PricingPlanData, Enum):
             #### Everything in Free +
             <ul class="text-muted">
               <li>Private Workflows</li>
-              <li>Access frontier video & animation models</li>
-              <li>Up to 44,000 Cr / month</li>
+              <li>Access to frontier video & animation models</li>
               <li>Increased file upload limit</li>
               <li>Higher rate limits</li>
               <li>Execute any code via JS / Python <a href="/functions/">functions</a></li>
               <li>SOC2 Type II + GDPR Compliance</li>
+              <li><a href="https://docs.gooey.ai/api-reference/getting-started">API access</a> to every workflow</li>
+              <li>No model training</li>
             </ul>
             """
         ),
         footer="""
         <ul class="text-muted">
-          <li>Commercial license for images & videos</li>
-          <li>Premium support via Discord</li>
+          <li>Commercial license for images, QR Codes, and videos</li>
+          <li>Premium Support via dedicated Discord Channel</li>
         </ul>
         """,
     )
@@ -262,22 +261,25 @@ class PricingPlan(PricingPlanData, Enum):
         db_value=9,
         key="team_2025",
         title="Team",
-        description="AI Teams that collaborate together can change the world.",
+        description="Predictable pricing per seat.",
         monthly_charge=40,
         credits=2_500,
         long_description=dedent(
             """
+            #### All Pro Features +
             <ul class="text-muted">
               <li>Private Team Workspace</li>
+              <li>Central billing and administration</li>
+              <li>HIPAA, SOC2 Type II, and GDPR compliance</li>
               <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
-              <li>API Secrets to securely access any system</li>
+              <li>API Secrets to securely access any system (Researcher & above)</li>
               <li>Bring your own WhatsApp number</li>
               <li>Embed copilots in your own App</li>
               <li>Impact and usage <a href="https://gooey.ai/copilot/base-copilot-w-search-rag-code-execution-v1xm6uhp/integrations/PnM/stats/?view=Daily&details=Conversations&start_date=2025-11-09&end_date=2025-11-25&sort_by=Last+Sent">dashboards</a></li>
               <li>Role Based Management</li>
               <li>Centralized billing</li>
-              <li>Pooled Credits, Submission Rates and Concurrency</li>
               <li>Version History on Workflows</li>
+              <li>Use-case specific, Workflow <a href="https://gooey.ai/bulk">Evaluation</a> to optimize model and component selection.</li>
             </ul>
             """
         ),
@@ -295,14 +297,14 @@ class PricingPlan(PricingPlanData, Enum):
         db_value=6,
         key="enterprise",
         title="Enterprise",
-        description="For organizations ready for transformation with Gooey.AI as the foundation of their AI strategy.",
+        description="Pooled Usage. For organizations ready for transformation with Gooey.AI as the foundation of their AI strategy.",
         monthly_charge=0,
         credits=999_999,
         pricing_title="Custom",
         pricing_caption="Typically $25,000 - $500,000 annually",
         long_description=dedent(
             """
-            #### Everything in Free +
+            #### All Team Features +
             <ul class="text-muted">
               <li>Pooled Credits, Submission Rates and Concurrency</li>
               <li>Single sign-on (SSO) &amp; Oauth login</li>
