@@ -1,17 +1,21 @@
+import secrets
 import requests
 from bots.models import BotIntegration, Conversation, Platform
 from daras_ai.image_input import get_mimetype_from_response, upload_file_from_bytes
 from daras_ai_v2.asr import audio_bytes_to_wav
+from daras_ai_v2.base import RecipeRunState
 from daras_ai_v2.bots import BotInterface, BotIntegrationLookupFailed, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.text_splitter import text_splitter
+from furl import furl
 from recipes.VideoBots import ReplyButton
 
 TELEGRAM_MAX_MSG_LENGTH = 4096
 TELEGRAM_MAX_CALLBACK_DATA = 64
 TELEGRAM_API_BASE = "https://api.telegram.org"
+TELEGRAM_DRAFT_MSG_ID = "draft"
 TELEGRAM_DEFAULT_COMMANDS = [
     {
         "command": "new",
@@ -24,10 +28,13 @@ class TelegramBot(BotInterface):
     platform = Platform.TELEGRAM
     can_update_message = True
 
+    _is_private_chat: bool = False
+
     def __init__(self, *, bot_id: str, data: dict):
         if "callback_query" in data:
             callback = data["callback_query"]
             self._chat_id = str(callback["message"]["chat"]["id"])
+            self._is_private_chat = callback["message"]["chat"]["type"] == "private"
             self._callback_query_id = callback["id"]
             self._callback_data = callback["data"]
             self._callback_context_msg_id = str(callback["message"]["message_id"])
@@ -39,6 +46,7 @@ class TelegramBot(BotInterface):
         elif "message" in data:
             message = data["message"]
             self._chat_id = str(message["chat"]["id"])
+            self._is_private_chat = message["chat"]["type"] == "private"
             self._callback_query_id = None
             self._from_user = message["from"]
             self.user_msg_id = str(message["message_id"])
@@ -67,20 +75,25 @@ class TelegramBot(BotInterface):
             defaults=dict(telegram_user_name=user_name),
         )[0]
 
-        if not self.convo.telegram_user_name and user_name:
+        if self.convo.telegram_user_name != user_name:
             Conversation.objects.filter(pk=self.convo.pk).update(
                 telegram_user_name=user_name,
             )
+            self.convo.telegram_user_name = user_name
 
+        self._stream_draft_id: int | None = None
         super().__init__()
 
     def get_input_text(self) -> str | None:
         return self._text
 
     def get_input_audio(self) -> str | None:
-        voice = self._message.get("voice")
-        audio = self._message.get("audio")
-        file_obj = voice or audio
+        file_obj = (
+            self._message.get("voice")
+            or self._message.get("audio")
+            or self._message.get("video")
+            or self._message.get("video_note")
+        )
         if not file_obj:
             return None
         file_id = file_obj["file_id"]
@@ -188,6 +201,28 @@ class TelegramBot(BotInterface):
             return update_msg_id
 
         text = text or "\u200b"
+
+        use_draft_msg = (
+            self.recipe_run_state == RecipeRunState.running
+            and self._is_private_chat
+            and self.streaming_enabled
+            and not reply_markup
+            and not (audio or video or documents)
+        )
+        if use_draft_msg:
+            if self._stream_draft_id is None:
+                self._stream_draft_id = secrets.randbelow(90_000) + 1
+            _send_message_draft(
+                self._bot_token,
+                chat_id=self._chat_id,
+                draft_id=self._stream_draft_id,
+                text=text[:TELEGRAM_MAX_MSG_LENGTH],
+            )
+            return TELEGRAM_DRAFT_MSG_ID
+
+        if update_msg_id == TELEGRAM_DRAFT_MSG_ID:
+            update_msg_id = None
+
         splits = text_splitter(
             text, chunk_size=TELEGRAM_MAX_MSG_LENGTH, length_function=len
         )
@@ -196,7 +231,12 @@ class TelegramBot(BotInterface):
         for i, doc in enumerate(splits):
             is_last = i == len(splits) - 1
             chunk_markup = reply_markup if is_last else None
-            if msg_id and self.can_update_message:
+            if (
+                i == 0
+                and msg_id
+                and self.can_update_message
+                and len(doc.text) <= TELEGRAM_MAX_MSG_LENGTH
+            ):
                 msg_id = _edit_message(
                     self._bot_token,
                     chat_id=self._chat_id,
@@ -204,6 +244,8 @@ class TelegramBot(BotInterface):
                     text=doc.text,
                     reply_markup=chunk_markup,
                 )
+                if len(splits) > 1:
+                    self.can_update_message = False
             else:
                 msg_id = _send_text_message(
                     self._bot_token,
@@ -246,7 +288,7 @@ def _send_text_message(
     text: str,
     reply_markup: dict | None = None,
 ) -> str | None:
-    data = dict(chat_id=chat_id, text=text, parse_mode="HTML")
+    data = dict(chat_id=chat_id, text=text, parse_mode="MarkdownV2")
     if reply_markup:
         data["reply_markup"] = reply_markup
     try:
@@ -269,7 +311,7 @@ def _edit_message(
         chat_id=chat_id,
         message_id=message_id,
         text=text,
-        parse_mode="HTML",
+        parse_mode="MarkdownV2",
     )
     if reply_markup:
         data["reply_markup"] = reply_markup
@@ -286,6 +328,20 @@ def _edit_message(
                 return message_id
             raise
     return str(result.get("message_id", message_id))
+
+
+def _send_message_draft(
+    bot_token: str,
+    *,
+    chat_id: str,
+    draft_id: int,
+    text: str,
+) -> None:
+    _tg_api_call(
+        bot_token,
+        "sendMessageDraft",
+        data=dict(chat_id=chat_id, draft_id=draft_id, text=text),
+    )
 
 
 def _build_inline_keyboard(
@@ -315,7 +371,9 @@ def _build_inline_keyboard(
 def _download_telegram_file(bot_token: str, file_id: str) -> tuple[bytes, str]:
     result = _tg_api_call(bot_token, "getFile", data=dict(file_id=file_id))
     file_path = result["file_path"]
-    download_url = f"{TELEGRAM_API_BASE}/file/bot{bot_token}/{file_path}"
+    download_url = (
+        furl(TELEGRAM_API_BASE) / "file" / f"bot{bot_token}" / file_path
+    ).url
     r = requests.get(download_url)
     raise_for_status(r)
     mime_type = get_mimetype_from_response(r)
@@ -349,7 +407,7 @@ def set_telegram_commands(
 
 def _tg_api_call(bot_token: str, method: str, data: dict) -> dict:
     print(f"tg_api_call: {data=}")
-    url = f"{TELEGRAM_API_BASE}/bot{bot_token}/{method}"
+    url = (furl(TELEGRAM_API_BASE) / f"bot{bot_token}" / method).url
     r = requests.post(url, json=data)
     raise_for_status(r)
     res = r.json()
