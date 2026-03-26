@@ -352,7 +352,8 @@ def render_current_plan(workspace: Workspace):
 
                 if monthly_charge:
                     gui.caption(
-                        f"**${monthly_charge:,}** monthly renewal for {credits:,} credits"
+                        f"**${monthly_charge:,}** monthly renewal for {credits:,} credits",
+                        className="text-muted no-margin",
                     )
 
         scheduled_downgrade = gui.run_in_thread(
@@ -435,7 +436,9 @@ def render_all_plans(
     workspace: Workspace, user: AppUser, session: dict
 ) -> PaymentProvider:
     if workspace.subscription and workspace.subscription.payment_provider:
-        selected_payment_provider = workspace.subscription.payment_provider
+        selected_payment_provider = PaymentProvider(
+            workspace.subscription.payment_provider
+        )
     else:
         selected_payment_provider = PaymentProvider.STRIPE
 
