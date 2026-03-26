@@ -42,12 +42,17 @@ class Subscription(models.Model):
     plan = models.IntegerField(choices=PricingPlan.db_choices())
 
     amount = models.IntegerField(
-        help_text="The amount (Gooey credits) added/deducted in this transaction.<br>"
-        "Positive for credits added, negative for credits deducted.",
+        help_text=(
+            """
+            For non-Team plans, this is the number of credits added for each cycle in
+            this subscription.<br/>
+            For Team plan, this is the number of seats bought in this subscription.<br>
+            """
+        ),
         default=0,
     )
     charged_amount = models.PositiveIntegerField(
-        help_text="The charged dollar amount in the currency’s smallest unit.<br>"
+        help_text="The charged dollar amount in the currency's smallest unit.<br>"
         "E.g. for 10 USD, this would be of 1000 (that is, 1000 cents).<br>"
         "<a href='https://stripe.com/docs/currencies'>Learn More</a>",
         default=0,
