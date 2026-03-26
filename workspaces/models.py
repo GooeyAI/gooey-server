@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import typing
+import uuid
 from datetime import timedelta
 from functools import cached_property
 
@@ -866,7 +867,10 @@ class WorkspaceInvite(models.Model):
 
         plan = PricingPlan.from_sub(self.workspace.subscription)
         if plan == PricingPlan.TEAM:
-            auto_assign_team_seats(self.workspace)
+            auto_assign_team_seats(
+                self.workspace,
+                invoice_id=f"{self.workspace.subscription.external_id}:invite_{self.id}:{uuid.uuid4()}",
+            )
 
         self.updated_by = updated_by
         self.status = self.Status.ACCEPTED
