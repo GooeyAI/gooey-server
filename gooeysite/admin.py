@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.admin.utils import unquote
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.http import Http404
 from django.shortcuts import redirect
@@ -27,6 +28,8 @@ class DuplicateObjectAdminMixin:
         obj = self.get_object(request, unquote(object_id))
         if obj is None:
             raise Http404
+        if not self.has_duplicate_source_permission(request, obj):
+            raise PermissionDenied
         if not self.has_add_permission(request):
             raise Http404
         add_url = reverse(
@@ -43,9 +46,16 @@ class DuplicateObjectAdminMixin:
         obj = self.get_object(request, unquote(object_id))
         if obj is None:
             return initial
+        if not self.has_duplicate_source_permission(request, obj):
+            raise PermissionDenied
 
         initial.update(self.get_duplicate_initial_data(obj))
         return initial
+
+    def has_duplicate_source_permission(self, request, obj):
+        return self.has_view_permission(request, obj) or self.has_change_permission(
+            request, obj
+        )
 
     def get_duplicate_initial_data(self, obj):
         initial = {}
