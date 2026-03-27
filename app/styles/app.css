@@ -373,21 +373,20 @@ button .gui-html-container,
 }
 
 .gooey-sidebar-resizer {
-  width: 2px;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4px;
   cursor: col-resize;
-  background: #f3f4f6;
-  transition: background-color 120ms ease, box-shadow 120ms ease;
-  box-shadow:
-    inset -1px 0 0 rgba(0, 0, 0, 0.06),
-    2px 0 8px rgba(15, 23, 42, 0.18);
+  z-index: 2;
+  background: transparent;
+  transition: background-color 150ms ease;
 }
 
-.gooey-sidebar-resizer:hover {
-  background: #dbe4f0;
-  box-shadow:
-    inset -1px 0 0 rgba(0, 0, 0, 0.12),
-    2px 0 10px rgba(15, 23, 42, 0.22);
+.gooey-sidebar-resizer:hover,
+body.gooey-sidebar-resizing .gooey-sidebar-resizer {
+  background: rgba(15, 23, 42, 0.12);
 }
 
 body.gooey-sidebar-resizing,

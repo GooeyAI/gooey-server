@@ -105,14 +105,14 @@ export default function GooeySidebar({
           onChange={onChange}
           state={state}
         />
+        <SidebarResizer
+          enabled={enableResize}
+          isOpen={isOpen}
+          minWidth={340}
+          maxWidth={800}
+          onWidthChange={setSidebarWidth}
+        />
       </div>
-      <SidebarResizer
-        enabled={enableResize}
-        isOpen={isOpen}
-        minWidth={340}
-        maxWidth={800}
-        onWidthChange={setSidebarWidth}
-      />
       <div className={`d-flex flex-grow-1 mw-100`}>
         <div className={pageClassName}>
           <RenderedChildren

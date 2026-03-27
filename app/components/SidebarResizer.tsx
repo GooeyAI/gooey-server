@@ -44,9 +44,9 @@ export default function SidebarResizer({
 
     function handleMouseDown(event: React.MouseEvent<HTMLDivElement>) {
         event.preventDefault();
-        // On the first drag widthRef is null — read current rendered width from the DOM.
+        // On the first drag widthRef is null — read the sidebar's current rendered width.
         if (widthRef.current === null) {
-            widthRef.current = (event.currentTarget.previousElementSibling as HTMLElement)?.offsetWidth ?? minWidth;
+            widthRef.current = (event.currentTarget.parentElement as HTMLElement)?.offsetWidth ?? minWidth;
         }
         dragRef.current = { active: true, startX: event.clientX, startWidth: widthRef.current };
         document.body.classList.add("gooey-sidebar-resizing");
