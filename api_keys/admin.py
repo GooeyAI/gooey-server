@@ -1,12 +1,13 @@
 from django.contrib import admin
 
 from app_users.admin import AppUserAdmin
+from gooeysite.admin import GooeyModelAdmin
 from workspaces.admin import WorkspaceAdmin
 from .models import ApiKey
 
 
 @admin.register(ApiKey)
-class ApiKeyAdmin(admin.ModelAdmin):
+class ApiKeyAdmin(GooeyModelAdmin):
     list_display = ("preview", "workspace", "created_by", "created_at")
     search_fields = (
         ["preview", "workspace__name"]

@@ -8,6 +8,7 @@ from django.utils.safestring import mark_safe
 from app_users.admin import AppUserAdmin
 from bots.admin import SavedRunAdmin
 from bots.admin_links import list_related_html_url
+from gooeysite.admin import GooeyModelAdmin
 from gooeysite.custom_actions import export_to_csv, export_to_excel
 from gooeysite.custom_filters import (
     json_field_nested_lookup_keys,
@@ -35,7 +36,7 @@ EXCLUDE_KEYS = {
 
 
 @admin.register(models.ShortenedURL)
-class ShortenedURLAdmin(admin.ModelAdmin):
+class ShortenedURLAdmin(GooeyModelAdmin):
     autocomplete_fields = ["user"]
     list_filter = [
         "clicks",
@@ -129,7 +130,7 @@ def jsonfieldlistfilter(field: str):
 
 
 @admin.register(models.VisitorClickInfo)
-class VisitorClickInfoAdmin(admin.ModelAdmin):
+class VisitorClickInfoAdmin(GooeyModelAdmin):
     list_filter = [
         "created_at",
     ] + [jsonfieldlistfilter(name) for name in JSON_FIELDS]

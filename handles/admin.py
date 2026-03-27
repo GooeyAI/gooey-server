@@ -1,11 +1,12 @@
 from django.contrib import admin
 
+from gooeysite.admin import GooeyModelAdmin
 from workspaces.admin import WorkspaceAdmin
 from .models import Handle
 
 
 @admin.register(Handle)
-class HandleAdmin(admin.ModelAdmin):
+class HandleAdmin(GooeyModelAdmin):
     search_fields = ["name", "redirect_url"] + [
         f"workspace__{field}" for field in WorkspaceAdmin.search_fields
     ]

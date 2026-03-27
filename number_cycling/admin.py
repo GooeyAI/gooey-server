@@ -4,11 +4,12 @@ from django.contrib import admin
 from bots.admin import BotIntegrationAdmin
 from bots.admin_links import list_related_html_url
 from bots.models import BotIntegration
+from gooeysite.admin import GooeyModelAdmin
 from number_cycling.models import SharedPhoneNumber, SharedPhoneNumberBotUser
 
 
 @admin.register(SharedPhoneNumber)
-class SharedPhoneNumberAdmin(admin.ModelAdmin):
+class SharedPhoneNumberAdmin(GooeyModelAdmin):
     search_fields = [
         "wa_phone_number",
         "wa_phone_number_id",
@@ -35,7 +36,7 @@ class SharedPhoneNumberAdmin(admin.ModelAdmin):
 
 
 @admin.register(SharedPhoneNumberBotUser)
-class SharedPhoneNumberBotUserAdmin(admin.ModelAdmin):
+class SharedPhoneNumberBotUserAdmin(GooeyModelAdmin):
     autocomplete_fields = ["shared_phone_number", "bot_integration"]
     readonly_fields = [
         "created_at",

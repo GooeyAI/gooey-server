@@ -1,12 +1,13 @@
 from django.contrib import admin
 
 from django.db import models
+from gooeysite.admin import GooeyModelAdmin
 from gooeysite.custom_widgets import JSONEditorWidget
 from memory.models import MemoryEntry
 
 
 @admin.register(MemoryEntry)
-class MemoryEntryAdmin(admin.ModelAdmin):
+class MemoryEntryAdmin(GooeyModelAdmin):
     list_display = (
         "user_id",
         "key",

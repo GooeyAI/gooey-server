@@ -7,12 +7,13 @@ from app_users import models
 from bots.admin_links import open_in_new_tab, list_related_html_url, change_obj_url
 from bots.models import SavedRun, PublishedRun
 from embeddings.models import EmbeddedFile
+from gooeysite.admin import GooeyModelAdmin
 from usage_costs.models import UsageCost
 from workspaces.admin import WorkspaceAdmin, WorkspaceMembershipInline
 
 
 @admin.register(models.AppUser)
-class AppUserAdmin(admin.ModelAdmin):
+class AppUserAdmin(GooeyModelAdmin):
     deprecated_fields = (
         "balance",
         "is_paying",
@@ -227,7 +228,7 @@ class SavedRunInline(admin.StackedInline):
 
 
 @admin.register(models.AppUserTransaction)
-class AppUserTransactionAdmin(admin.ModelAdmin):
+class AppUserTransactionAdmin(GooeyModelAdmin):
     autocomplete_fields = ["user", "workspace"]
     list_display = [
         "invoice_id",
@@ -269,7 +270,7 @@ class AppUserTransactionAdmin(admin.ModelAdmin):
 
 
 @admin.register(LogEntry)
-class LogEntryAdmin(admin.ModelAdmin):
+class LogEntryAdmin(GooeyModelAdmin):
     list_display = readonly_fields = [
         "action_time",
         "user",

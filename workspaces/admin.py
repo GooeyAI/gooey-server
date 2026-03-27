@@ -2,13 +2,14 @@ import typing
 
 from django.contrib import admin
 from django.db.models import Sum, Q
-from safedelete.admin import SafeDeleteAdmin, SafeDeleteAdminFilter
+from safedelete.admin import SafeDeleteAdminFilter
 
 from api_keys.models import ApiKey
 from bots.admin_links import change_obj_url, open_in_new_tab, list_related_html_url
 from bots.models import SavedRun, BotIntegration
 from bots.models.published_run import PublishedRun
 from embeddings.models import EmbeddedFile
+from gooeysite.admin import GooeyModelAdmin, GooeySafeDeleteAdmin
 from payments.models import Subscription
 from usage_costs.models import UsageCost
 from . import models
@@ -26,7 +27,7 @@ class WorkspaceMembershipInline(admin.TabularInline):
 
 
 @admin.register(models.WorkspaceInvite)
-class WorkspaceInviteAdmin(admin.ModelAdmin):
+class WorkspaceInviteAdmin(GooeyModelAdmin):
     list_display = [
         "workspace",
         "email",
@@ -58,7 +59,7 @@ class WorkspaceInviteInline(admin.TabularInline):
 
 
 @admin.register(models.Workspace)
-class WorkspaceAdmin(SafeDeleteAdmin):
+class WorkspaceAdmin(GooeySafeDeleteAdmin):
     list_display = [
         "display_name",
         "is_personal",
@@ -73,14 +74,14 @@ class WorkspaceAdmin(SafeDeleteAdmin):
         "onedrive_user_name",
         "onedrive_access_token",
         "onedrive_refresh_token",
-    ] + list(SafeDeleteAdmin.list_display)
+    ] + list(GooeySafeDeleteAdmin.list_display)
     list_filter = (
         [
             "is_personal",
             "is_paying",
         ]
         + [SafeDeleteAdminFilter]
-        + list(SafeDeleteAdmin.list_filter)
+        + list(GooeySafeDeleteAdmin.list_filter)
     )
     fields = [
         "name",
@@ -232,15 +233,17 @@ class WorkspaceAdmin(SafeDeleteAdmin):
 
 
 @admin.register(models.WorkspaceMembership)
-class WorkspaceMembershipAdmin(SafeDeleteAdmin):
+class WorkspaceMembershipAdmin(GooeySafeDeleteAdmin):
     list_display = [
         "user",
         "workspace",
         "role",
         "created_at",
         "updated_at",
-    ] + list(SafeDeleteAdmin.list_display)
-    list_filter = ["role", SafeDeleteAdminFilter] + list(SafeDeleteAdmin.list_filter)
+    ] + list(GooeySafeDeleteAdmin.list_display)
+    list_filter = ["role", SafeDeleteAdminFilter] + list(
+        GooeySafeDeleteAdmin.list_filter
+    )
 
     def get_readonly_fields(
         self, request: "HttpRequest", obj: models.WorkspaceMembership | None = None
