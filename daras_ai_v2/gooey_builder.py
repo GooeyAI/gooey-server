@@ -236,7 +236,7 @@ def handle_widget_conversation_change() -> None:
 
     try:
         [conversation_id] = api_hashids.decode(conversation_id_hashed)
-    except IndexError:
+    except (IndexError, ValueError):
         return
 
     try:
