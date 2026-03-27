@@ -2308,7 +2308,7 @@ def render_twilio_label(default_label: str = ""):
 connect_choices = [
     ConnectChoice(
         platform=Platform.WEB,
-        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2bd17e74-1dcf-11ef-8207-02420a000136/thumbs/image_400x400.png",
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/29c0ffa8-29d8-11f1-ae3c-02420a00014a/image_400x400.png",
         label="Connect to your own App or Website.",
     ),
     ConnectChoice(
@@ -2333,7 +2333,7 @@ connect_choices = [
     ),
     ConnectChoice(
         platform=Platform.TELEGRAM,
-        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/dd142a5c-1de0-11f1-8def-02420a0001cf/telegram%20logo%20.png",
+        img="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/40df4ffa-29d8-11f1-94de-02420a00014b/telegram_logo.png",
         label="Connect to Telegram.",
     ),
 ]
