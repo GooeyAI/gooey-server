@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.db import models
-
 from ai_models.models import AIModelCreator, AIModelSpec
+from bots.admin_links import list_related_html_url
+from gooeysite.admin import GooeyModelAdmin
 from gooeysite.custom_widgets import JSONEditorWidget
 from usage_costs.admin import ModelPricingAdmin
 from django import forms
@@ -47,11 +48,17 @@ class AIModelSpecForm(forms.ModelForm):
 
 
 @admin.register(AIModelCreator)
-class AIModelCreatorAdmin(admin.ModelAdmin):
+class AIModelCreatorAdmin(GooeyModelAdmin):
     list_display = ["name", "photo", "website_url", "photo_url"]
     search_fields = ["name", "website_url", "photo_url"]
-    readonly_fields = ["photo"]
-    fields = ["name", "website_url", "photo_url", "photo"]
+    readonly_fields = ["photo", "ai_models"]
+    fields = ["name", "website_url", "photo_url", "photo", "ai_models"]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly_fields.append("name")
+        return readonly_fields
 
     @admin.display(description="Photo")
     def photo(self, obj):
@@ -59,9 +66,15 @@ class AIModelCreatorAdmin(admin.ModelAdmin):
             return ""
         return mark_safe(obj.html_icon(size="1.5rem"))
 
+    @admin.display(description="AI Models")
+    def ai_models(self, obj):
+        if not obj:
+            return ""
+        return list_related_html_url(obj.ai_model_specs, show_add=False)
+
 
 @admin.register(AIModelSpec)
-class AIModelSpecAdmin(admin.ModelAdmin):
+class AIModelSpecAdmin(GooeyModelAdmin):
     form = AIModelSpecForm
 
     list_display = [
@@ -97,6 +110,12 @@ class AIModelSpecAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if obj:
+            readonly_fields.append("name")
+        return readonly_fields
 
     fieldsets = [
         (

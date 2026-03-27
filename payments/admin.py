@@ -1,10 +1,11 @@
 from django.contrib import admin
 
+from gooeysite.admin import GooeyModelAdmin
 from .models import Subscription
 
 
 @admin.register(Subscription)
-class SubscriptionAdmin(admin.ModelAdmin):
+class SubscriptionAdmin(GooeyModelAdmin):
     search_fields = [
         "plan",
         "payment_provider",

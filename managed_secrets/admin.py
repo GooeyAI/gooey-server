@@ -1,10 +1,11 @@
 from django.contrib import admin
 
+from gooeysite.admin import GooeyModelAdmin
 from managed_secrets.models import ManagedSecret
 
 
 @admin.register(ManagedSecret)
-class ManagedSecretAdmin(admin.ModelAdmin):
+class ManagedSecretAdmin(GooeyModelAdmin):
     list_display = [
         "__str__",
         "workspace",

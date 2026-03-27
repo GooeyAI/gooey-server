@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from bots.admin_links import open_in_new_tab, change_obj_url
 from daras_ai.text_format import format_number_with_suffix
+from gooeysite.admin import GooeyModelAdmin
 from usage_costs import models
 
 
@@ -12,7 +13,7 @@ class CostQtyMixin:
 
 
 @admin.register(models.UsageCost)
-class UsageCostAdmin(admin.ModelAdmin, CostQtyMixin):
+class UsageCostAdmin(GooeyModelAdmin, CostQtyMixin):
     list_display = [
         "__str__",
         "cost_qty",
@@ -59,7 +60,7 @@ class UsageCostAdmin(admin.ModelAdmin, CostQtyMixin):
 
 
 @admin.register(models.ModelPricing)
-class ModelPricingAdmin(admin.ModelAdmin, CostQtyMixin):
+class ModelPricingAdmin(GooeyModelAdmin, CostQtyMixin):
     list_display = [
         "__str__",
         "cost_qty",

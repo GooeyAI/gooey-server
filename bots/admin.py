@@ -34,6 +34,7 @@ from bots.models import (
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
+from gooeysite.admin import GooeyModelAdmin
 from gooeysite.custom_actions import export_to_csv, export_to_excel
 from gooeysite.custom_filters import (
     JSONBExtractPath,
@@ -156,7 +157,7 @@ class BotIntegrationAnalysisChartInline(admin.TabularInline):
 
 
 @admin.register(BotIntegration)
-class BotIntegrationAdmin(admin.ModelAdmin):
+class BotIntegrationAdmin(GooeyModelAdmin):
     search_fields = [
         "name",
         "workspace__name",
@@ -359,7 +360,7 @@ class BotIntegrationAdmin(admin.ModelAdmin):
 
 
 @admin.register(PublishedRunVersion)
-class PublishedRunVersionAdmin(admin.ModelAdmin):
+class PublishedRunVersionAdmin(GooeyModelAdmin):
     search_fields = ["id", "version_id", "published_run__published_run_id"]
     autocomplete_fields = ["published_run", "saved_run", "changed_by"]
     readonly_fields = ["created_at"]
@@ -373,7 +374,7 @@ class PublishedRunVersionInline(admin.TabularInline):
 
 
 @admin.register(PublishedRun)
-class PublishedRunAdmin(admin.ModelAdmin):
+class PublishedRunAdmin(GooeyModelAdmin):
     list_display = [
         "__str__",
         "public_access",
@@ -429,7 +430,7 @@ class PublishedRunAdmin(admin.ModelAdmin):
 
 
 @admin.register(SavedRun)
-class SavedRunAdmin(admin.ModelAdmin):
+class SavedRunAdmin(GooeyModelAdmin):
     list_display = [
         "__str__",
         "run_id",
@@ -591,7 +592,7 @@ class ConversationAdminForm(NullifyEmptyStringsModelForm):
 
 
 @admin.register(Conversation)
-class ConversationAdmin(admin.ModelAdmin):
+class ConversationAdmin(GooeyModelAdmin):
     list_display = [
         "get_display_name",
         "view_messages",
@@ -705,7 +706,7 @@ class AnalysisResultFilter(admin.SimpleListFilter):
 
 
 @admin.register(Message)
-class MessageAdmin(admin.ModelAdmin):
+class MessageAdmin(GooeyModelAdmin):
     autocomplete_fields = ["conversation"]
     list_filter = [
         "role",
@@ -854,7 +855,7 @@ class FeedbackCommentInline(admin.StackedInline):
 
 
 @admin.register(Feedback)
-class FeedbackAdmin(admin.ModelAdmin):
+class FeedbackAdmin(GooeyModelAdmin):
     autocomplete_fields = ["message"]
     list_filter = ["rating", "message__conversation__bot_integration"]
     search_fields = (
@@ -968,7 +969,7 @@ class FeedbackAdmin(admin.ModelAdmin):
 
 
 @admin.register(WorkflowMetadata)
-class WorkflowMetadataAdmin(admin.ModelAdmin):
+class WorkflowMetadataAdmin(GooeyModelAdmin):
     list_display = [
         "workflow",
         "short_title",
@@ -985,7 +986,7 @@ class WorkflowMetadataAdmin(admin.ModelAdmin):
 
 
 @admin.register(Tag)
-class TagAdmin(admin.ModelAdmin):
+class TagAdmin(GooeyModelAdmin):
     list_display = [
         "name",
         "category",

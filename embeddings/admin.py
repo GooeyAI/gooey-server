@@ -2,10 +2,11 @@ from django.contrib import admin
 
 from bots.admin_links import list_related_html_url
 from embeddings.models import EmbeddingsReference, EmbeddedFile
+from gooeysite.admin import GooeyModelAdmin
 
 
 @admin.register(EmbeddedFile)
-class EmbeddedFileAdmin(admin.ModelAdmin):
+class EmbeddedFileAdmin(GooeyModelAdmin):
     list_display = [
         "url",
         "metadata",
@@ -55,7 +56,7 @@ class EmbeddedFileAdmin(admin.ModelAdmin):
 
 
 @admin.register(EmbeddingsReference)
-class EmbeddingsReferenceAdmin(admin.ModelAdmin):
+class EmbeddingsReferenceAdmin(GooeyModelAdmin):
     list_display = ["url", "title", "metadata", "vespa_doc_id", "created_at"]
     search_fields = ["embedded_file__url", "title", "snippet", "vespa_doc_id"]
     readonly_fields = ["vespa_doc_id", "created_at", "updated_at"]
