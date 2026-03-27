@@ -157,6 +157,7 @@ def render_gooey_builder_inline(
         update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
     )
 
+    handle_widget_conversation_change()
     conversation_data = get_conversation_data_for_saved_run(bi, sr)
 
     gui.div(style=dict(height="100%"), id="gooey-builder-embed")
@@ -221,3 +222,39 @@ def get_conversation_data_for_saved_run(
     if last_message == conversation.messages.latest():
         data["id"] = api_hashids.encode(conversation.id)
     return data
+
+
+def handle_widget_conversation_change() -> None:
+    from bots.models.convo_msg import Conversation
+    from routers.bots_api import api_hashids
+
+    conversation_id_hashed = gui.session_state.pop(
+        "builder_selected_conversation", None
+    )
+    if not conversation_id_hashed:
+        return
+
+    try:
+        [conversation_id] = api_hashids.decode(conversation_id_hashed)
+    except IndexError:
+        return
+
+    try:
+        conversation = Conversation.objects.get(id=conversation_id)
+    except Conversation.DoesNotExist:
+        return
+
+    # Find the lastest message whose builder run was associated with a child saved_run
+    last_message = (
+        conversation.messages.filter(
+            saved_run__child_builder_saved_runs__isnull=False,
+        )
+        .order_by("-created_at")
+        .select_related("saved_run")
+        .first()
+    )
+    if not last_message:
+        return
+
+    for child_sr in last_message.saved_run.child_builder_saved_runs.order_by().all():
+        raise gui.RedirectException(child_sr.get_app_url())
