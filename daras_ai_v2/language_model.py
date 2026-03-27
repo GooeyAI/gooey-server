@@ -10,6 +10,7 @@ from functools import wraps
 from time import time
 
 import aifail
+import gooey_gui as gui
 import requests
 import typing_extensions
 from aifail import openai_should_retry, retry_if, vertex_ai_should_retry, try_all
@@ -21,7 +22,6 @@ from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionChunk,
     ChatCompletion,
-    ChatCompletionMessageToolCallParam,
 )
 from openai.types.completion_usage import CompletionUsage
 from openai.types.responses import (
@@ -43,8 +43,6 @@ from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
 from functions.recipe_functions import BaseLLMTool
-
-import gooey_gui as gui
 
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "
@@ -813,13 +811,13 @@ def run_openai_chat(
         # cap the max tokens at the model's max limit
         max_tokens = min(max_tokens, model.llm_max_output_tokens)
 
-    if "openai" in model.label.lower():
+    if model.is_openai_model():
         # openai renamed max_tokens to max_completion_tokens
         kwargs["max_completion_tokens"] = max_tokens
     else:
         kwargs["max_tokens"] = max_tokens
 
-    if "openai" in model.label.lower() and model.llm_is_thinking_model:
+    if model.is_openai_model() and model.llm_is_thinking_model:
         # openai thinking models don't support frequency_penalty and presence_penalty
         avoid_repetition = False
 

@@ -174,3 +174,6 @@ class AIModelSpec(models.Model):
 
     def __str__(self):
         return f"{self.label} ({self.model_id})"
+
+    def is_openai_model(self):
+        return "openai" in self.creator.website_url
