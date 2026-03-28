@@ -60,11 +60,10 @@ def language_model_selector(
         AIModelSpec.objects.filter(
             category=AIModelSpec.Categories.llm,
         )
-        .select_related("creator")
         .exclude_deprecated(
             selected_models=gui.session_state.get(key),
         )
-        .order_by("-priority", "-label")
+        .order_for_frontend()
     )
     options = {model.name: model.display_html() for model in llm_models}
     return gui.selectbox(

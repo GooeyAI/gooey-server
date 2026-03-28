@@ -126,13 +126,12 @@ class VideoGenPage(BasePage):
                 safety_checker(text=text)
 
     def render(self):
-        video_models = (
+        video_models = list(
             AIModelSpec.objects.filter(category=AIModelSpec.Categories.video)
-            .select_related("creator")
             .exclude_deprecated(
                 selected_models=gui.session_state.get("selected_models")
             )
-            .order_by("-priority", "-label")
+            .order_for_frontend()
         )
 
         self.available_models = CaseInsensitiveDict(
@@ -144,10 +143,10 @@ class VideoGenPage(BasePage):
                 for model in AIModelSpec.objects.filter(
                     category=AIModelSpec.Categories.audio
                 )
-                .select_related("creator")
                 .exclude_deprecated(
                     selected_models=gui.session_state.get("selected_audio_model")
                 )
+                .order_for_frontend()
             }
         )
         super().render()

@@ -6,5 +6,6 @@
 - Prefer simple data-driven mappings over layered helper abstractions when the data set is small and fixed.
 - When building `selectbox` or `multiselect` options, prefer pre-rendered mappings like `options = {key: rendered_label}` and `format_func=options.__getitem__`.
 - In Django admin, prefer shared link helpers like `list_related_html_url` for related-object changelist links instead of hand-building admin URLs.
+- Always use the virtual environment in `.venv` for Python commands in this repo.
 - Run `ruff` after making code edits and fix any reported issues before finishing.
 - Do not push commits or update remote branches without explicit user confirmation.
