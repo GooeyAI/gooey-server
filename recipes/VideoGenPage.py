@@ -132,7 +132,7 @@ class VideoGenPage(BasePage):
             .exclude_deprecated(
                 selected_models=gui.session_state.get("selected_models")
             )
-            .order_by("-creator__priority", "-priority", "-creator__label", "-label")
+            .order_by("-creator__priority", "-creator__label", "-priority", "-label")
         )
 
         self.available_models = CaseInsensitiveDict(
