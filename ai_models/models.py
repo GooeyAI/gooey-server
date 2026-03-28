@@ -1,7 +1,7 @@
 import html
 
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.meta_preview_url import meta_preview_url
@@ -66,8 +66,8 @@ class AIModelSpecQuerySet(models.QuerySet):
 
     def order_for_frontend(self):
         return self.select_related("creator").order_by(
-            "-creator__priority",
-            "-creator__name",
+            F("creator__priority").desc(nulls_last=True),
+            F("creator__name").desc(nulls_last=True),
             "-priority",
             "-label",
         )
