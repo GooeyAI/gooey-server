@@ -69,8 +69,8 @@ class AIModelSpecQuerySet(models.QuerySet):
             F("creator__priority").desc(nulls_last=True),
             F("creator__name").desc(nulls_last=True),
             "-priority",
-            "-label",
             "-created_at",
+            "-label",
         )
 
 
