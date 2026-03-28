@@ -234,16 +234,15 @@ Here's what you uploaded:
             with col2:
                 del_button(del_key)
 
-        llm_models = sorted(
+        llm_models = (
             AIModelSpec.objects.filter(
                 llm_supports_json=True,
             )
             .select_related("creator")
             .exclude_deprecated(
                 selected_models=gui.session_state.get("selected_model"),
-            ),
-            key=lambda model: (model.priority, model.label.lower()),
-            reverse=True,
+            )
+            .order_by("-priority", "-label")
         )
         options = {model.name: model.display_html() for model in llm_models}
         gui.selectbox(
