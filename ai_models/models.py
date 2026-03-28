@@ -104,7 +104,7 @@ class AIModelSpec(models.Model):
     paid_only = models.BooleanField(default=False)
     priority = models.IntegerField(
         default=1,
-        help_text="Display priority for model lists. Higher priority appears first; ties are sorted alphabetically.",
+        help_text="Display priority for model lists. Higher priority appears first; ties are sorted reverse alphabetically.",
     )
     is_deprecated = models.BooleanField(default=False)
     redirect_to = models.ForeignKey(
