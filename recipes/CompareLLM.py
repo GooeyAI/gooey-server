@@ -62,11 +62,10 @@ class CompareLLMPage(BasePage):
             AIModelSpec.objects.filter(
                 category=AIModelSpec.Categories.llm,
             )
-            .select_related("creator")
             .exclude_deprecated(
                 selected_models=gui.session_state.get("selected_models"),
             )
-            .order_by("-priority", "-label")
+            .order_for_frontend()
         )
         options = {model.name: model.display_html() for model in llm_models}
         gui.multiselect(

@@ -9,6 +9,10 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 
 class AIModelCreator(models.Model):
     name = models.TextField(unique=True)
+    priority = models.IntegerField(
+        default=1,
+        help_text="Display priority for creator groups in model lists. Higher priority appears first; ties are sorted by creator name descending.",
+    )
     photo_url = CustomURLField(blank=True, default="")
     website_url = CustomURLField(blank=True, default="")
 
@@ -60,6 +64,14 @@ class AIModelSpecQuerySet(models.QuerySet):
                 q |= Q(name__in=selected_models)
         return self.filter(q)
 
+    def order_for_frontend(self):
+        return self.select_related("creator").order_by(
+            "-creator__priority",
+            "-creator__name",
+            "-priority",
+            "-label",
+        )
+
 
 class AIModelSpec(models.Model):
     class Categories(models.IntegerChoices):
@@ -104,7 +116,7 @@ class AIModelSpec(models.Model):
     paid_only = models.BooleanField(default=False)
     priority = models.IntegerField(
         default=1,
-        help_text="Display priority for model lists. Higher priority appears first; ties are sorted reverse alphabetically.",
+        help_text="Display priority for models within the same creator group. Higher priority appears first; ties are sorted by label descending.",
     )
     is_deprecated = models.BooleanField(default=False)
     redirect_to = models.ForeignKey(

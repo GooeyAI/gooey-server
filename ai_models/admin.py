@@ -49,10 +49,10 @@ class AIModelSpecForm(forms.ModelForm):
 
 @admin.register(AIModelCreator)
 class AIModelCreatorAdmin(GooeyModelAdmin):
-    list_display = ["name", "photo", "website_url", "photo_url"]
+    list_display = ["name", "priority", "photo", "website_url", "photo_url"]
     search_fields = ["name", "website_url", "photo_url"]
     readonly_fields = ["photo", "ai_models"]
-    fields = ["name", "website_url", "photo_url", "photo", "ai_models"]
+    fields = ["name", "priority", "website_url", "photo_url", "photo", "ai_models"]
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = list(super().get_readonly_fields(request, obj))
