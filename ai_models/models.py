@@ -9,8 +9,17 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 
 class AIModelCreator(models.Model):
     name = models.TextField(unique=True)
+    label = models.TextField(
+        help_text="The label of the creator to be used in the UI.",
+        blank=True,
+        default="",
+    )
     photo_url = CustomURLField(blank=True, default="")
     website_url = CustomURLField(blank=True, default="")
+    priority = models.IntegerField(
+        default=1,
+        help_text="Display priority for creator grouping. Higher priority appears first; ties are sorted reverse alphabetically by label.",
+    )
 
     def __str__(self):
         return self.name
