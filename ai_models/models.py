@@ -18,7 +18,7 @@ class AIModelCreator(models.Model):
     website_url = CustomURLField(blank=True, default="")
     priority = models.IntegerField(
         default=1,
-        help_text="Display priority for creator grouping. Higher priority appears first; ties are sorted reverse alphabetically by label.",
+        help_text="Display priority for creator grouping. Sort order: creator priority, model priority, creator label, model label (all descending).",
     )
 
     def __str__(self):
@@ -113,7 +113,7 @@ class AIModelSpec(models.Model):
     paid_only = models.BooleanField(default=False)
     priority = models.IntegerField(
         default=1,
-        help_text="Display priority for model lists. Higher priority appears first; ties are sorted reverse alphabetically.",
+        help_text="Display priority for model lists. Sort order: creator priority, model priority, creator label, model label (all descending).",
     )
     is_deprecated = models.BooleanField(default=False)
     redirect_to = models.ForeignKey(
