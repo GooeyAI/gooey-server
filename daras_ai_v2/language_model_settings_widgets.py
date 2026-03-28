@@ -64,7 +64,8 @@ def language_model_selector(
         .exclude_deprecated(
             selected_models=gui.session_state.get(key),
         ),
-        key=lambda model: (-model.priority, [-ord(c) for c in model.label.lower()]),
+        key=lambda model: (model.priority, model.label.lower()),
+        reverse=True,
     )
     options = {model.name: model.display_html() for model in llm_models}
     return gui.selectbox(

@@ -132,7 +132,8 @@ class VideoGenPage(BasePage):
             .exclude_deprecated(
                 selected_models=gui.session_state.get("selected_models")
             ),
-            key=lambda model: (-model.priority, [-ord(c) for c in model.label.lower()]),
+            key=lambda model: (model.priority, model.label.lower()),
+            reverse=True,
         )
 
         self.available_models = CaseInsensitiveDict(
