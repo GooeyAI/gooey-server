@@ -58,14 +58,15 @@ class CompareLLMPage(BasePage):
             help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
-        llm_models = (
+        llm_models = sorted(
             AIModelSpec.objects.filter(
                 category=AIModelSpec.Categories.llm,
             )
             .select_related("creator")
             .exclude_deprecated(
                 selected_models=gui.session_state.get("selected_models"),
-            )
+            ),
+            key=lambda model: (-model.priority, [-ord(c) for c in model.label.lower()]),
         )
         options = {model.name: model.display_html() for model in llm_models}
         gui.multiselect(
