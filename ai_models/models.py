@@ -9,16 +9,11 @@ from daras_ai_v2.meta_preview_url import meta_preview_url
 
 class AIModelCreator(models.Model):
     name = models.TextField(unique=True)
-    label = models.TextField(
-        help_text="The label of the creator to be used in the UI.",
-        blank=True,
-        default="",
-    )
     photo_url = CustomURLField(blank=True, default="")
     website_url = CustomURLField(blank=True, default="")
     priority = models.IntegerField(
         default=1,
-        help_text="Sort order: creator priority, creator label, model priority, model label (all descending).",
+        help_text="Sort order: creator priority, creator name, model priority, model label (all descending).",
     )
 
     def __str__(self):
@@ -113,7 +108,7 @@ class AIModelSpec(models.Model):
     paid_only = models.BooleanField(default=False)
     priority = models.IntegerField(
         default=1,
-        help_text="Sort order: creator priority, creator label, model priority, model label (all descending).",
+        help_text="Sort order: creator priority, creator name, model priority, model label (all descending).",
     )
     is_deprecated = models.BooleanField(default=False)
     redirect_to = models.ForeignKey(

@@ -64,7 +64,7 @@ def language_model_selector(
         .exclude_deprecated(
             selected_models=gui.session_state.get(key),
         )
-        .order_by("-creator__priority", "-creator__label", "-priority", "-label")
+        .order_by("-creator__priority", "-creator__name", "-priority", "-label")
     )
     options = {model.name: model.display_html() for model in llm_models}
     return gui.selectbox(
