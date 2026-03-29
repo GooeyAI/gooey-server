@@ -88,20 +88,76 @@ def render_inbuilt_tools_selector(key="inbuilt_tools_selector"):
                 gui.session_state.pop(k, None)
         return
 
+    functions = gui.session_state.get("functions", [])
     function_urls = {
-        function.get("url", "") for function in gui.session_state.get("functions", [])
+        function.get("url", "") for function in functions
     }
 
     with gui.alert_dialog(
         ref=dialog_ref,
-        modal_title="#### 🧰 Add Integrations",
+        modal_title="#### 🤝 Add Integrations",
         large=True,
     ):
+        gui.write(
+            'Select the integration + specific functions this workflow can securely access. '
+            '[Need help?](https://gooey.ai/IntegrationRouting)',
+            className="text-muted",
+        )
         render_tool_search_dialog(function_urls)
+        render_selected_integrations_summary(functions)
         with gui.div(
             className="d-flex justify-content-end mt-2 container-margin-reset"
         ):
-            gui.write(f"{len(function_urls)} integrations selected")
+            if gui.button(
+                "Close",
+                key=dialog_ref.close_btn_key,
+            ):
+                dialog_ref.set_open(False)
+
+
+def render_selected_integrations_summary(functions: list[dict]):
+    if not functions:
+        return
+
+    # Group functions by their toolkit (using logo as grouping key)
+    toolkits: dict[str, dict] = {}
+    for func in functions:
+        logo = func.get("logo", "")
+        label = func.get("label", "")
+        # Extract toolkit name from the URL path (toolkit_slug)
+        url = func.get("url", "")
+        # Try to get a toolkit name from the URL
+        toolkit_key = logo or url
+        if toolkit_key not in toolkits:
+            # Derive toolkit name from the URL path
+            toolkit_name = ""
+            if "/tool/" in url:
+                parts = url.split("/tool/")
+                if len(parts) > 1:
+                    toolkit_name = parts[1].split("/")[0].replace("_", " ").title()
+            toolkits[toolkit_key] = {
+                "logo": logo,
+                "name": toolkit_name,
+                "functions": [],
+            }
+        toolkits[toolkit_key]["functions"].append(label)
+
+    count = len(functions)
+    with gui.div(className="mt-3 container-margin-reset"):
+        gui.write(
+            f"**{count} INTEGRATION{'S' if count != 1 else ''} SELECTED**",
+            className="text-muted small",
+        )
+        for toolkit in toolkits.values():
+            logo_html = ""
+            if toolkit["logo"]:
+                logo_html = f"<img src='{toolkit['logo']}' width='16' height='16' class='me-1 mb-1' /> "
+            func_names = ", ".join(toolkit["functions"])
+            toolkit_name = toolkit["name"]
+            gui.write(
+                f"{logo_html}**{toolkit_name}** &nbsp; {func_names}",
+                className="small",
+            )
 
 
 def render_tool_search_dialog(function_urls: set[str]):
