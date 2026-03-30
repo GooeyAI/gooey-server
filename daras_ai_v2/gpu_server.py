@@ -7,6 +7,7 @@ from time import time
 from loguru import logger
 
 from daras_ai.image_input import gcs_blob_for, register_uploaded_blob
+from files.models import UploadedFile
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import GPUError, UserError
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -77,16 +78,21 @@ def call_celery_task_outfile_with_ret(
         )
         for blob in blobs
     ]
-    ret = call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
     for blob in blobs:
         try:
             register_uploaded_blob(
                 blob,
                 filename=filename,
                 content_type=content_type,
+                is_uploading=True,
             )
         except Exception:
-            logger.exception("Failed to register signed upload for blob {}", blob.name)
+            logger.exception("Failed to pre-register blob {}", blob.name)
+    ret = call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
+    UploadedFile.objects.filter(
+        bucket_name=blobs[0].bucket.name,
+        object_name__in=[b.name for b in blobs],
+    ).update(is_uploading=False)
     return [blob.public_url for blob in blobs], ret
 
 
