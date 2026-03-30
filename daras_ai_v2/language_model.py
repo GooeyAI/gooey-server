@@ -1368,9 +1368,35 @@ def _run_fireworks_chat(
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
+    fireworks_msgs = []
+    for msg in messages:
+        fireworks_msg = {
+            "role": msg.get("role") or CHATML_ROLE_USER,
+            "content": msg.get("content"),
+        }
+        tool_call_id = msg.get("tool_call_id")
+        if tool_call_id:
+            fireworks_msg["tool_call_id"] = tool_call_id
+        tool_calls = msg.get("tool_calls")
+        if tool_calls:
+            fireworks_tool_calls = []
+            for tool_call in tool_calls:
+                function = tool_call.get("function") or {}
+                fireworks_tool_call = {
+                    "id": tool_call.get("id") or "",
+                    "type": tool_call.get("type") or "function",
+                    "function": {
+                        "name": function.get("name") or "",
+                        "arguments": function.get("arguments") or "",
+                    },
+                }
+                fireworks_tool_calls.append(fireworks_tool_call)
+            fireworks_msg["tool_calls"] = fireworks_tool_calls
+        fireworks_msgs.append(fireworks_msg)
+
     data = dict(
         model=model,
-        messages=messages,
+        messages=fireworks_msgs,
         max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
