@@ -28,14 +28,6 @@ SECTIONS = [
 
 
 def render():
-    open_js = f"window.dispatchEvent(new Event('{SIDEBAR_KEY}:open'))"
-    with gui.tag(
-        "button",
-        className=f"btn btn-sm btn-outline-secondary mb-2 {SIDEBAR_KEY}-button",
-        onClick=open_js,
-    ):
-        gui.html('<i class="fa-solid fa-bars"></i>')
-
     with gui.div(className="container-fluid px-3 px-md-5 py-4"):
         render_layouts()
         render_content_and_text()
@@ -67,7 +59,9 @@ def show_source(fn):
         # strip the decorator line + def indentation for cleaner display
         src_lines = inspect.getsource(fn).split("\n")
         # skip the @show_source decorator line
-        src_lines = [l for l in src_lines if not l.strip().startswith("@show_source")]
+        src_lines = [
+            line for line in src_lines if not line.strip().startswith("@show_source")
+        ]
         formatted = "\n".join(src_lines)
         with (
             gui.div(className="my-3"),
@@ -87,14 +81,21 @@ def render_sidebar_nav():
     close_js = f"window.dispatchEvent(new Event('{SIDEBAR_KEY}:close'))"
 
     with gui.div(
-        className="p-3 border-bottom d-flex justify-content-between align-items-start"
+        className="p-3 border-bottom d-flex justify-content-between align-items-start bg-white"
     ):
         with gui.div():
-            gui.write(f"###### {DESCRIPTION}")
-            gui.write(f"### {TITLE}")
+            # inline github link
+            with gui.tag(
+                "a",
+                href="https://github.com/GooeyAI/gooey-gui",
+                className="text-decoration-none text-muted",
+            ):
+                gui.html(f"{DESCRIPTION} <i class='fa-brands fa-github'></i>")
+
+            gui.write(f"### {TITLE}", className="d-block")
         with gui.tag(
             "button",
-            className="btn btn-sm btn-outline-secondary border-0",
+            className="d-block d-lg-none btn btn-sm btn-outline-secondary border-0",
             onClick=close_js,
         ):
             gui.html('<i class="fa-solid fa-xmark"></i>')
@@ -575,8 +576,8 @@ def demo_nav_tabs():
     """Underline-style navigation tabs."""
     with gui.nav_tabs():
         for name in ["Active", "Inactive 1", "Inactive 2"]:
-            with gui.nav_item("/components", active=name == "Active"):
-                gui.html(name)
+            with gui.nav_item("/GuiComponents", active=name == "Active"):
+                gui.breadcrumb_item("Components", link_to="/GuiComponents/")
     with gui.nav_tab_content():
         gui.write("Content for the active tab")
 
@@ -934,24 +935,21 @@ def demo_image():
 @show_source
 def demo_video():
     """Video player with optional autoplay."""
-    gui.write(
-        "`gui.video(src, caption, autoplay, show_download_button)`\n\n"
-        "Pass a URL to any video file."
+    gui.video(
+        "https://v3b.fal.media/files/b/0a93710f/vY5DN0btTCiU7a5_yNqQf_0b3FO6JS.mp4#t=0.001",
+        caption="🎥 Random video via YouTube",
+        autoplay=True,
     )
 
 
 @show_source
 def demo_audio():
     """Audio player with optional download."""
-    gui.write(
-        "`gui.audio(src, caption, show_download_button)`\n\n"
-        "Pass a URL to any audio file."
+    gui.audio(
+        "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/0e7f71fc-dcd8-11ed-b644-02420a00015f/gooey.ai%20-%20four%20to%20the%20floor%20kick%20drum%20beat%20with...rhythms%20at%20a%20time%20signature%20of%2034%20andtempoof80%201.wav",
+        caption="🎧 Random audio",
+        show_download_button=True,
     )
-
-
-# ╔══════════════════════════════════════════════════════════════╗
-# ║  11. Overlays & Feedback                                    ║
-# ╚══════════════════════════════════════════════════════════════╝
 
 
 def render_overlays():
