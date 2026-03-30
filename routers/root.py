@@ -272,6 +272,7 @@ def file_upload(form_data: FormData = fastapi_request_form):
 def component_page(request: Request):
     import components_doc
 
+    request.session.setdefault(components_doc.SIDEBAR_KEY + ":default-open", True)
     sidebar, page_content = sidebar_layout(
         key=components_doc.SIDEBAR_KEY,
         session=request.session,
