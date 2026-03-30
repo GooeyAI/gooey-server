@@ -1,15 +1,22 @@
+import re
 import secrets
+
+import aifail
 import requests
+from furl import furl
+from loguru import logger
+
 from bots.models import BotIntegration, Conversation, Platform
 from daras_ai.image_input import get_mimetype_from_response, upload_file_from_bytes
+from daras_ai.text_format import unmarkdown
 from daras_ai_v2.asr import audio_bytes_to_wav
 from daras_ai_v2.base import RecipeRunState
 from daras_ai_v2.bots import BotInterface, BotIntegrationLookupFailed, ButtonPressed
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.search_ref import SearchReference
+from daras_ai_v2.telegram_markdown_renderer import markdown_to_telegram_html
 from daras_ai_v2.text_splitter import text_splitter
-from furl import furl
 from recipes.VideoBots import ReplyButton
 
 TELEGRAM_MAX_MSG_LENGTH = 4096
@@ -288,14 +295,10 @@ def _send_text_message(
     text: str,
     reply_markup: dict | None = None,
 ) -> str | None:
-    data = dict(chat_id=chat_id, text=text, parse_mode="MarkdownV2")
+    data = dict(chat_id=chat_id, text=text)
     if reply_markup:
         data["reply_markup"] = reply_markup
-    try:
-        result = _tg_api_call(bot_token, "sendMessage", data)
-    except requests.exceptions.HTTPError:
-        data.pop("parse_mode", None)
-        result = _tg_api_call(bot_token, "sendMessage", data)
+    result = _tg_html_api_send_msg(bot_token, "sendMessage", data)
     return str(result.get("message_id", ""))
 
 
@@ -307,25 +310,15 @@ def _edit_message(
     text: str,
     reply_markup: dict | None = None,
 ) -> str | None:
-    data = dict(
-        chat_id=chat_id,
-        message_id=message_id,
-        text=text,
-        parse_mode="MarkdownV2",
-    )
+    data = dict(chat_id=chat_id, message_id=message_id, text=text)
     if reply_markup:
         data["reply_markup"] = reply_markup
     try:
-        result = _tg_api_call(bot_token, "editMessageText", data)
+        result = _tg_html_api_send_msg(bot_token, "editMessageText", data)
     except requests.exceptions.HTTPError as e:
         if "message is not modified" in str(e):
             return message_id
-        data.pop("parse_mode", None)
-        try:
-            result = _tg_api_call(bot_token, "editMessageText", data)
-        except requests.exceptions.HTTPError as e2:
-            if "message is not modified" in str(e2):
-                return message_id
+        else:
             raise
     return str(result.get("message_id", message_id))
 
@@ -337,11 +330,8 @@ def _send_message_draft(
     draft_id: int,
     text: str,
 ) -> None:
-    _tg_api_call(
-        bot_token,
-        "sendMessageDraft",
-        data=dict(chat_id=chat_id, draft_id=draft_id, text=text),
-    )
+    data = dict(chat_id=chat_id, draft_id=draft_id, text=text)
+    _tg_html_api_send_msg(bot_token, "sendMessageDraft", data)
 
 
 def _build_inline_keyboard(
@@ -405,11 +395,46 @@ def set_telegram_commands(
     return result
 
 
-def _tg_api_call(bot_token: str, method: str, data: dict) -> dict:
-    print(f"tg_api_call: {data=}")
-    url = (furl(TELEGRAM_API_BASE) / f"bot{bot_token}" / method).url
-    r = requests.post(url, json=data)
-    raise_for_status(r)
-    res = r.json()
-    print(f"tg_api_call: {r.status_code=} {res=}")
+TELEGRAM_PARSE_ERR_RE = re.compile(
+    r"can't parse entities|parse entities|find end of the entity", re.IGNORECASE
+)
+
+
+def _tg_html_api_send_msg(
+    bot_token: str,
+    endpoint: str,
+    data: dict,
+    *,
+    timeout: float = 1,  # HACK: sometimes the telegram api blocks if no timeout is set
+):
+    text = data.get("text")
+    html_data = data | dict(text=markdown_to_telegram_html(text), parse_mode="HTML")
+    try:
+        return _tg_api_call(bot_token, endpoint, html_data, timeout=timeout)
+    except requests.exceptions.HTTPError as e:
+        if TELEGRAM_PARSE_ERR_RE.search(str(e)):
+            logger.warning(f"{endpoint} failed, will retry without parse_mode {e=}")
+            plain_text_data = data | dict(text=unmarkdown(text))
+            return _tg_api_call(bot_token, endpoint, plain_text_data, timeout=timeout)
+        else:
+            raise
+
+
+@aifail.retry_if(aifail.http_should_retry)
+def _tg_api_call(
+    bot_token: str, endpoint: str, data: dict, *, timeout: float | None = None
+) -> dict:
+    logger.debug(f"/{endpoint} {data=}")
+    url = (furl(TELEGRAM_API_BASE) / f"bot{bot_token}" / endpoint).url
+    try:
+        response = requests.post(url, json=data, timeout=timeout)
+    except requests.Timeout:
+        if timeout:
+            # try without timeout, just for making sure we weren't too conservative
+            response = requests.post(url, json=data)
+        else:
+            raise
+    raise_for_status(response)
+    res = response.json()
+    logger.debug(f"/{endpoint} {response.status_code=} {res=}")
     return res.get("result", {})
