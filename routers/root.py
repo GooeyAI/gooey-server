@@ -272,7 +272,15 @@ def file_upload(form_data: FormData = fastapi_request_form):
 def component_page(request: Request):
     import components_doc
 
-    with page_wrapper(request):
+    sidebar, page_content = sidebar_layout(
+        key=components_doc.SIDEBAR_KEY,
+        session=request.session,
+    )
+
+    with sidebar:
+        components_doc.render_sidebar_nav()
+
+    with page_content, page_wrapper(request):
         components_doc.render()
 
     return {
