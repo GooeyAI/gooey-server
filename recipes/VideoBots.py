@@ -580,12 +580,23 @@ Translation Glossary for LLM Language (English) -> User Langauge
             query_instructions = (request.query_instructions or "").strip()
             if query_instructions:
                 yield "Creating search query..."
-                response.final_search_query = generate_final_search_query(
+                search_query_raw = generate_final_search_query(
                     request=request,
                     response=response,
                     instructions=query_instructions,
                     context={"messages": chat_history},
+                    response_format_type="json_object",
                 ).strip()
+                try:
+                    search_query_parsed = json.loads(search_query_raw)
+                except json.JSONDecodeError:
+                    search_query_parsed = search_query_raw
+                if isinstance(search_query_parsed, dict):
+                    search_query_parsed = ", ".join(
+                        map(str, filter(None, search_query_parsed.values()))
+                    )
+                if search_query_parsed:
+                    response.final_search_query = str(search_query_parsed)
             else:
                 query_msgs.reverse()
                 response.final_search_query = "\n---\n".join(
@@ -1537,7 +1548,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         final_search_query = gui.session_state.get("final_search_query")
         if final_search_query:
             gui.text_area(
-                "###### `final_search_query`", value=final_search_query, disabled=True
+                "###### `search_query`",
+                value=str(final_search_query),
+                disabled=True,
             )
 
         final_keyword_query = gui.session_state.get("final_keyword_query")
