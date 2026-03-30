@@ -332,6 +332,7 @@ def _parse_form_data(
                 uf.content_type,
                 workspace=workspace,
                 user=user,
+                is_user_uploaded=True,
             )
             for uf in uf_list
         ]
