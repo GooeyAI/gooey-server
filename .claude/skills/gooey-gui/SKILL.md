@@ -150,6 +150,7 @@ if gui.button("Submit", key="submit_btn", type="primary"):
 ## Quick Reference — All Components
 
 ### Layout & Structure
+
 | Component | Returns | Description |
 |-----------|---------|-------------|
 | `gui.div(**props)` | NestingCtx | Generic container (`<div>`) |
@@ -161,6 +162,7 @@ if gui.button("Submit", key="submit_btn", type="primary"):
 | `sidebar_layout(key, session, disabled)` | tuple[NestingCtx, NestingCtx] | Sidebar + page content (from `widgets.sidebar`) |
 
 ### Content & Text
+
 | Component | Returns | Description |
 |-----------|---------|-------------|
 | `gui.write(*objs, unsafe_allow_html, **props)` | None | Primary output — renders Markdown |
@@ -173,6 +175,7 @@ if gui.button("Submit", key="submit_btn", type="primary"):
 | `gui.success(body, icon="check")` | None | Success message box |
 
 ### Inputs — Text
+
 | Component | Returns | Key params |
 |-----------|---------|------------|
 | `gui.text_input(label, key, placeholder, help)` | str | Single-line text |
@@ -181,6 +184,7 @@ if gui.button("Submit", key="submit_btn", type="primary"):
 | `gui.code_editor(value, key, label)` | str | Code editor with highlighting |
 
 ### Inputs — Numeric & Date
+
 | Component | Returns | Key params |
 |-----------|---------|------------|
 | `gui.number_input(label, min_value, max_value, value, step, key)` | float | Numeric input |
