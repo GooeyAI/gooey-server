@@ -86,6 +86,7 @@ class SavedRun(models.Model):
         blank=True,
         help_text="The error message. If this is not set, the run is deemed successful.",
     )
+    cancelled = models.BooleanField(default=False)
     run_time = models.DurationField(default=datetime.timedelta, blank=True)
     run_status = models.TextField(default="", blank=True)
 
@@ -204,6 +205,8 @@ class SavedRun(models.Model):
             ret[StateKeys.created_at] = self.created_at
         if self.error_msg:
             ret[StateKeys.error_msg] = self.error_msg
+        if self.cancelled:
+            ret[StateKeys.cancelled] = self.cancelled
         if self.run_time:
             ret[StateKeys.run_time] = self.run_time.total_seconds()
         if self.run_status:
@@ -234,6 +237,7 @@ class SavedRun(models.Model):
         if created_at:
             self.created_at = created_at
         self.error_msg = state.pop(StateKeys.error_msg, None) or ""
+        self.cancelled = bool(state.pop(StateKeys.cancelled, None))
         self.run_time = datetime.timedelta(
             seconds=state.pop(StateKeys.run_time, None) or 0
         )

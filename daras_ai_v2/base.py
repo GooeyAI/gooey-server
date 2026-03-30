@@ -47,6 +47,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
+from daras_ai_v2.exceptions import InsufficientCredits, StopRequested, is_stop_requested
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -135,6 +136,7 @@ class StateKeys:
     updated_at = "updated_at"
 
     error_msg = "__error_msg"
+    cancelled = "__cancelled"
     run_time = "__run_time"
     run_status = "__run_status"
     pressed_randomize = "__randomize"
@@ -1644,13 +1646,30 @@ class BasePage:
             ):
                 self.render_run_cost()
             with col2:
-                submitted = gui.button(
+                run_state = self.get_run_state(gui.session_state)
+                is_running = run_state in (
+                    RecipeRunState.starting,
+                    RecipeRunState.running,
+                )
+                stop_clicked = is_running and gui.button(
+                    f"{icons.cancel} Stop",
+                    key="--stop-run",
+                    type="secondary",
+                    className="my-0 py-2 text-danger",
+                )
+                submitted = not is_running and gui.button(
                     f"{icons.run} Run",
                     key=key,
                     type="primary",
                     className="my-0 py-2",
-                    # disabled=bool(gui.session_state.get(StateKeys.run_status)),
                 )
+            if stop_clicked:
+                if self.trigger_stop():
+                    gui.rerun()
+                else:
+                    gui.error("You don't have permission to stop this run.")
+            if is_running:
+                return False
             if not submitted:
                 return False
             try:
@@ -1777,6 +1796,8 @@ class BasePage:
         try:
             for val in self.run_v2(request, response):
                 state.update(response.model_dump(exclude_unset=True))
+                if is_stop_requested():
+                    raise StopRequested(self.get_stop_message())
                 yield val
         finally:
             state.update(response.model_dump(exclude_unset=True))
@@ -1866,6 +1887,8 @@ class BasePage:
 
     @classmethod
     def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
+        if state.get(StateKeys.cancelled):
+            return RecipeRunState.completed
         if detail := state.get(StateKeys.run_status):
             if detail.lower().strip(". ") == STARTING_STATE.lower().strip(". "):
                 return RecipeRunState.starting
@@ -1917,7 +1940,10 @@ class BasePage:
             if not is_deleted:
                 self.render_output()
 
-            if run_state in (RecipeRunState.running, RecipeRunState.starting):
+            if run_state in (
+                RecipeRunState.running,
+                RecipeRunState.starting,
+            ):
                 self.click_preview_tab()
                 self._render_running_output()
             elif not is_deleted:
@@ -2006,6 +2032,7 @@ class BasePage:
             run_status="",
             error_msg="",
             run_time=datetime.timedelta(),
+            cancelled=False,
         ).update(run_status=STARTING_STATE, uid=self.request.user.uid)
         if updated_count >= 1:
             # updated now
@@ -2081,6 +2108,7 @@ class BasePage:
         **defaults,
     ) -> SavedRun:
         gui.session_state[StateKeys.run_status] = run_status
+        gui.session_state[StateKeys.cancelled] = False
         gui.session_state.pop(StateKeys.error_msg, None)
         gui.session_state.pop(StateKeys.run_time, None)
         self._setup_rng_seed()
@@ -2164,6 +2192,15 @@ class BasePage:
     def realtime_channel_name(cls, run_id: str, uid: str) -> str:
         return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
 
+    def trigger_stop(self):
+        if not (self.is_current_user_owner() or self.is_current_user_admin()):
+            return False
+        sr = self.current_sr
+        gui.session_state[StateKeys.cancelled] = True
+        sr.cancelled = True
+        sr.save(update_fields=["cancelled"])
+        return True
+
     def _setup_rng_seed(self):
         seed = gui.session_state.get("seed")
         if not seed:
@@ -2178,6 +2215,8 @@ class BasePage:
             gui.session_state.pop(field_name, None)
 
     def _render_after_output(self):
+        if gui.session_state.get(StateKeys.cancelled):
+            gui.info(self.get_stop_message(), icon="🛑")
         self._render_regenerate_button()
 
     def _render_regenerate_button(self):
@@ -2363,7 +2402,9 @@ class BasePage:
                     )
 
             with gui.div(className="mt-2"):
-                if saved_run.run_status:
+                if saved_run.cancelled:
+                    gui.info(self.get_stop_message(), icon="🛑")
+                elif saved_run.run_status:
                     started_at_text(saved_run.created_at)
                     html_spinner(saved_run.run_status)
                 elif saved_run.error_msg:
@@ -2477,7 +2518,9 @@ class BasePage:
 
         raise exceptions.InsufficientCredits(self.request.user, sr)
 
-    def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
+    def deduct_credits(
+        self, state: dict, amount: int = None
+    ) -> tuple[AppUserTransaction, int]:
         assert self.request.user, "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
@@ -2596,6 +2639,10 @@ class BasePage:
 
     def get_cost_note(self) -> str | None:
         pass
+
+    def get_stop_message(self) -> str:
+        """Return the message to display when the run is stopped."""
+        return "Run stopped by user."
 
     def is_current_user_admin(self) -> bool:
         return self.is_user_admin(self.request.user)

@@ -128,7 +128,12 @@ class CompareLLMPage(BasePage):
     def get_raw_price(self, state: dict) -> float:
         grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
         price = sum(map(math.ceil, grouped_costs.values()))
-        if "agrillm_qwen3_30b" in state.get("selected_models", []):
+
+        models_to_charge = list(state.get("output_text", {}).keys()) or state.get(
+            "selected_models", []
+        )
+
+        if "agrillm_qwen3_30b" in models_to_charge:
             price += 100
 
         return price + self.PROFIT_CREDITS
