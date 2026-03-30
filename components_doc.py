@@ -576,8 +576,8 @@ def demo_nav_tabs():
     """Underline-style navigation tabs."""
     with gui.nav_tabs():
         for name in ["Active", "Inactive 1", "Inactive 2"]:
-            with gui.nav_item("/GuiComponents", active=name == "Active"):
-                gui.breadcrumb_item("Components", link_to="/GuiComponents/")
+            with gui.nav_item("/GuiComponents/", active=name == "Active"):
+                gui.html(name)
     with gui.nav_tab_content():
         gui.write("Content for the active tab")
 
