@@ -13,17 +13,10 @@ from daras_ai.image_input import get_mimetype_from_response, upload_file_from_by
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 
-if typing.TYPE_CHECKING:
-    from app_users.models import AppUser
-    from workspaces.models import Workspace
-
 
 def generate_on_fal(
     model_id: str,
     payload: dict,
-    *,
-    user: typing.Optional["AppUser"] = None,
-    workspace: typing.Optional["Workspace"] = None,
 ) -> typing.Generator[str, None, dict]:
     r = requests.post(
         str(furl("https://queue.fal.run") / model_id),
@@ -37,7 +30,7 @@ def generate_on_fal(
 
     r = requests.get(result["response_url"], headers=_fal_auth_headers())
     raise_for_status(r)
-    return _rewrite_fal_asset_urls(r.json(), user=user, workspace=workspace)
+    return _rewrite_fal_asset_urls(r.json())
 
 
 def stream_fal_status_events(
@@ -98,8 +91,6 @@ def _rewrite_fal_asset_urls(
     *,
     parent_key: str | None = None,
     url_cache: dict[str, str] | None = None,
-    user: typing.Optional["AppUser"] = None,
-    workspace: typing.Optional["Workspace"] = None,
 ) -> typing.Any:
     if url_cache is None:
         url_cache = {}
@@ -110,8 +101,6 @@ def _rewrite_fal_asset_urls(
                 value,
                 preferred_filename=os.path.basename(urlparse(value).path) or None,
                 url_cache=url_cache,
-                user=user,
-                workspace=workspace,
             )
         case dict():
             out = {}
@@ -120,8 +109,6 @@ def _rewrite_fal_asset_urls(
                     child,
                     parent_key=key,
                     url_cache=url_cache,
-                    user=user,
-                    workspace=workspace,
                 )
             return out
         case list():
@@ -130,8 +117,6 @@ def _rewrite_fal_asset_urls(
                     item,
                     parent_key=parent_key,
                     url_cache=url_cache,
-                    user=user,
-                    workspace=workspace,
                 )
                 for item in value
             ]
@@ -152,8 +137,6 @@ def _reupload_fal_asset_url(
     *,
     preferred_filename: str | None,
     url_cache: dict[str, str],
-    user: typing.Optional["AppUser"] = None,
-    workspace: typing.Optional["Workspace"] = None,
 ) -> str:
     cached = url_cache.get(url)
     if cached:
@@ -175,8 +158,6 @@ def _reupload_fal_asset_url(
             filename,
             r.content,
             content_type,
-            user=user,
-            workspace=workspace,
         )
     except Exception:
         logger.exception("Failed to re-upload FAL asset URL {}", url)
