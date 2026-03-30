@@ -125,6 +125,7 @@ def register_uploaded_blob(
     workspace: typing.Optional["Workspace"] = None,
     user: typing.Optional["AppUser"] = None,
     is_user_uploaded: bool = False,
+    is_uploading: bool = False,
 ) -> UploadedFile:
     if not blob.name or not blob.bucket:
         raise ValueError("Blob must have bucket and name set before registration.")
@@ -169,6 +170,7 @@ def register_uploaded_blob(
             workspace=workspace,
             user=user,
             is_user_uploaded=is_user_uploaded,
+            is_uploading=is_uploading,
         ),
     )
     if not created:

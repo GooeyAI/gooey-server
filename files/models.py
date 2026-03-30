@@ -72,6 +72,7 @@ class UploadedFile(models.Model):
         blank=True,
     )
     is_user_uploaded = models.BooleanField(default=False)
+    is_uploading = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
