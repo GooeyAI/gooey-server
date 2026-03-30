@@ -163,8 +163,6 @@ class GoogleImageGenPage(BasePage):
                 num_outputs=request.num_outputs,
                 guidance_scale=request.guidance_scale,
                 seed=request.seed,
-                user=self.request.user,
-                workspace=self.current_workspace,
             )
 
     def render_form_v2(self):

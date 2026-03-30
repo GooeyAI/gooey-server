@@ -672,8 +672,8 @@ def asr_step(request: VideoBotsPage.RequestModel, buffer: AudioBuffer) -> str:
             input_prompt=request.asr_prompt,
         )
     finally:
-        if not delete_uploaded_file_for_blob(blob):
-            blob.delete()
+        delete_uploaded_file_for_blob(blob)
+        blob.delete()
 
     request.translation_model = request.translation_model or DEFAULT_TRANSLATION_MODEL
     if (

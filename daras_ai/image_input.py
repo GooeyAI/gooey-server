@@ -100,16 +100,6 @@ def upload_gcs_blob_from_bytes(
     user: typing.Optional["AppUser"] = None,
     is_user_uploaded: bool = False,
 ) -> str:
-    if user is None or workspace is None:
-        from app_users.models import AppUser
-        from celeryapp.tasks import get_running_saved_run
-
-        if saved_run := get_running_saved_run():
-            if workspace is None:
-                workspace = saved_run.workspace
-            if user is None and saved_run.uid:
-                user = AppUser.objects.filter(uid=saved_run.uid).first()
-
     if not content_type:
         content_type = mimetypes.guess_type(blob.path)[0]
     content_type = content_type or "application/octet-stream"
@@ -138,6 +128,17 @@ def register_uploaded_blob(
 ) -> UploadedFile:
     if not blob.name or not blob.bucket:
         raise ValueError("Blob must have bucket and name set before registration.")
+
+    from celeryapp.tasks import get_running_saved_run
+
+    saved_run = get_running_saved_run()
+    if saved_run:
+        if workspace is None:
+            workspace = saved_run.workspace
+        if user is None and saved_run.uid:
+            from app_users.models import AppUser
+
+            user = AppUser.objects.filter(uid=saved_run.uid).first()
     if content_type is None:
         content_type = getattr(blob, "content_type", None)
     if total_bytes is None:
@@ -164,6 +165,7 @@ def register_uploaded_blob(
         defaults=dict(
             metadata=metadata,
             f_url=blob.public_url,
+            saved_run=saved_run,
             workspace=workspace,
             user=user,
             is_user_uploaded=is_user_uploaded,

@@ -50,6 +50,13 @@ class UploadedFile(models.Model):
     f_url = CustomURLField(unique=True, verbose_name="File URL")
     bucket_name = models.CharField(max_length=255)
     object_name = models.TextField()
+    saved_run = models.ForeignKey(
+        "bots.SavedRun",
+        on_delete=models.SET_NULL,
+        related_name="uploaded_files",
+        null=True,
+        blank=True,
+    )
     workspace = models.ForeignKey(
         "workspaces.Workspace",
         on_delete=models.SET_NULL,

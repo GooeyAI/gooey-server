@@ -141,8 +141,6 @@ class ModelTrainerPage(BasePage):
                             ),
                             steps=request.steps,
                         ),
-                        user=self.request.user,
-                        workspace=self.current_workspace,
                     )
                 response.model_url = result["diffusers_lora_file"]["url"]
 
@@ -158,8 +156,6 @@ class ModelTrainerPage(BasePage):
                             steps=request.steps,
                             learning_rate=request.learning_rate,
                         ),
-                        user=self.request.user,
-                        workspace=self.current_workspace,
                     )
                 response.model_url = result["diffusers_lora_file"]["url"]
 

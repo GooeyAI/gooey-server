@@ -4,6 +4,7 @@ import time
 
 import gooey_gui as gui
 import requests
+from django.db import IntegrityError
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -420,7 +421,7 @@ class TextToSpeechPage(BasePage):
                         filename="mms_tts_gen.wav",
                         content_type="audio/wav",
                     )
-                except Exception:
+                except (ValueError, IntegrityError):
                     logger.exception("Failed to register MMS TTS upload")
 
                 state["audio_url"] = blob.public_url

@@ -21,10 +21,6 @@ from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.gpu_server import b64_img_decode, call_sd_multi
 from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
-if typing.TYPE_CHECKING:
-    from app_users.models import AppUser
-    from workspaces.models import Workspace
-
 SD_IMG_MAX_SIZE = (768, 768)
 
 
@@ -345,8 +341,6 @@ def text2img(
     dall_e_3_style: str | None = None,
     gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
     loras: list[LoraWeight] | None = None,
-    user: typing.Optional["AppUser"] = None,
-    workspace: typing.Optional["Workspace"] = None,
 ):
     if model not in {
         Text2ImgModels.dall_e_3,
@@ -379,8 +373,6 @@ def text2img(
             output_images = yield from generate_fal_images(
                 model_id=text2img_model_ids[model],
                 payload=payload,
-                user=user,
-                workspace=workspace,
             )
             return output_images
         case (
@@ -452,8 +444,6 @@ def text2img(
             output_images = yield from generate_fal_images(
                 model_id=text2img_model_ids[model],
                 payload=payload,
-                user=user,
-                workspace=workspace,
             )
 
             resolution = payload.get("resolution")
@@ -534,13 +524,8 @@ def resolve_nano_banana_resolution(
 def generate_fal_images(
     model_id: str,
     payload: dict,
-    *,
-    user: typing.Optional["AppUser"] = None,
-    workspace: typing.Optional["Workspace"] = None,
 ) -> typing.Generator[str, None, list[str]]:
-    result = yield from generate_on_fal(
-        model_id, payload, user=user, workspace=workspace
-    )
+    result = yield from generate_on_fal(model_id, payload)
     return [r["url"] for r in result["images"]]
 
 
@@ -589,8 +574,6 @@ def img2img(
     guidance_scale: float,
     seed: int = 42,
     gpt_image_1_quality: typing.Literal["low", "medium", "high"] | None = None,
-    user: typing.Optional["AppUser"] = None,
-    workspace: typing.Optional["Workspace"] = None,
 ) -> typing.Generator[str, None, list[str]]:
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
@@ -631,8 +614,6 @@ def img2img(
             output_images = yield from generate_fal_images(
                 model_id=img2img_model_ids[Img2ImgModels[selected_model]],
                 payload=payload,
-                user=user,
-                workspace=workspace,
             )
 
             record_cost_auto(
@@ -703,8 +684,6 @@ def img2img(
             output_images = yield from generate_fal_images(
                 model_id=img2img_model_ids[Img2ImgModels[selected_model]],
                 payload=payload,
-                user=user,
-                workspace=workspace,
             )
 
             record_cost_auto(
