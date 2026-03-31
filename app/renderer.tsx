@@ -522,6 +522,7 @@ function RenderedTreeNode({
           state={state}
           disabled={props.disabled}
           defaultOpen={props.defaultOpen}
+          enableResize={props.enableResize}
         />
       );
     }

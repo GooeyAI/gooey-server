@@ -305,6 +305,8 @@ button .gui-html-container,
   --sidebar_open_width: 340px;
   --sidebar_closed_width: 0;
   --sidebar_mobile_width: 100vw;
+  --sidebar_desktop_breakpoint: 1140px;
+  /* change the values below when updating the sidebar_desktop_breakpoint variable */
 }
 
 .gooey-sidebar {
@@ -314,8 +316,24 @@ button .gui-html-container,
   left: 0;
   bottom: 0;
   z-index: 999;
-  border-right: 1px solid #e0e0e0;
   height: 100dvh;
+}
+
+.gooey-sidebar::after {
+  /* Right Sidebar Gradient Shadow */
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 100%;
+  background: linear-gradient(to left, rgba(15, 23, 42, 0.07) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gooey-sidebar-bordered {
+  border-right: 1px solid #e0e0e0;
 }
 
 .gooey-sidebar-open {
@@ -336,6 +354,7 @@ button .gui-html-container,
   cursor: e-resize;
 }
 
+/* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
 @media (max-width: 1140px) {
   .gooey-sidebar-open {
       position: fixed;
@@ -357,5 +376,36 @@ button .gui-html-container,
       width: 0px;
       max-width: 0px;
       overflow: hidden;
+  }
+}
+
+.gooey-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  z-index: 2;
+  background: transparent;
+  transition: background-color 150ms ease;
+}
+
+.gooey-sidebar-resizer:hover,
+body.gooey-sidebar-resizing .gooey-sidebar-resizer {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+body.gooey-sidebar-resizing,
+body.gooey-sidebar-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
+@media (max-width: 1140px) {
+  .gooey-sidebar-resizer {
+    display: none;
   }
 }
