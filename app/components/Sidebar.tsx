@@ -98,7 +98,7 @@ export default function GooeySidebar({
   }`;
 
   return (
-    <div className="d-flex w-100 h-100 position-relative">
+    <div className="d-flex w-100 h-100 position-relative gap-2">
       <div className={sidebarContainerClassName} style={sidebarContainerStyles}>
         <RenderedChildren
           children={sidebarDiv.children}
