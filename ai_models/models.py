@@ -189,3 +189,6 @@ class AIModelSpec(models.Model):
 
     def is_openai_model(self):
         return "openai" in self.creator.website_url
+
+    def is_anthropic_model(self):
+        return "anthropic" in self.creator.website_url
