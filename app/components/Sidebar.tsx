@@ -98,7 +98,7 @@ export default function GooeySidebar({
   }`;
 
   return (
-    <div className="d-flex gap-0 w-100 h-100 position-relative">
+    <div className="d-flex w-100 h-100 position-relative">
       <div className={sidebarContainerClassName} style={sidebarContainerStyles}>
         <RenderedChildren
           children={sidebarDiv.children}
@@ -109,6 +109,7 @@ export default function GooeySidebar({
           <SidebarResizer
             minWidth={340}
             maxWidth={800}
+            width={sidebarWidth}
             onWidthChange={setSidebarWidth}
           />
         )}

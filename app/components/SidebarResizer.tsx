@@ -3,16 +3,22 @@ import { useEffect, useRef } from "react";
 type Props = {
   minWidth?: number;
   maxWidth?: number;
+  width: number | null;
   onWidthChange: (width: number | null) => void;
 };
 
 export default function SidebarResizer({
   minWidth = 340,
   maxWidth = 800,
+  width,
   onWidthChange,
 }: Props) {
-  const widthRef = useRef<number | null>(null);
+  const widthRef = useRef<number | null>(width);
   const dragRef = useRef({ active: false, startX: 0, startWidth: 0 });
+
+  useEffect(() => {
+    widthRef.current = width;
+  }, [width]);
 
   // Clear inline width on mobile so CSS media queries take over;
   // restore last dragged width when coming back to desktop.
