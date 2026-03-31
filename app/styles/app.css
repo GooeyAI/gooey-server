@@ -301,6 +301,7 @@ button .gui-html-container,
   --sidebar_closed_width: 0;
   --sidebar_mobile_width: 100vw;
   --sidebar_desktop_breakpoint: 1140px;
+  /* change the values below when updating the sidebar_desktop_breakpoint variable */
 }
 
 .gooey-sidebar {
@@ -348,6 +349,7 @@ button .gui-html-container,
   cursor: e-resize;
 }
 
+/* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
 @media (max-width: 1140px) {
   .gooey-sidebar-open {
       position: fixed;
@@ -396,6 +398,7 @@ body.gooey-sidebar-resizing * {
   -webkit-user-select: none !important;
 }
 
+/* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
 @media (max-width: 1140px) {
   .gooey-sidebar-resizer {
     display: none;
