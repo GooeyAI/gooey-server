@@ -595,9 +595,9 @@ def demo_controllable_tabs():
 @show_source
 def demo_breadcrumbs():
     """Breadcrumb navigation with custom divider."""
-    with gui.breadcrumbs(divider="›"):
+    with gui.breadcrumbs(divider=">"):
         gui.breadcrumb_item("Home", link_to="/")
-        gui.breadcrumb_item("Components", link_to="/components")
+        gui.breadcrumb_item("Components", link_to="/GuiComponents/")
         gui.breadcrumb_item("Navigation")
 
 
