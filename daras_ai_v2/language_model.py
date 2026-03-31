@@ -835,6 +835,10 @@ def run_openai_chat(
     if tools:
         kwargs["tools"] = [tool.spec_openai for tool in tools]
 
+    if model.is_anthropic_model():
+        # Anthropic's OpenAI-compatible endpoint ignores response_format
+        response_format_type = None
+
     if response_format_type:
         kwargs["response_format"] = {"type": response_format_type}
 
