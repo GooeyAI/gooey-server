@@ -89,7 +89,7 @@ export default function GooeySidebar({
     pageClassName = "container-xxl";
   }
 
-  const sidebarInlineWidth = sidebarWidth
+  const sidebarContainerStyles = sidebarWidth
     ? { width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth }
     : undefined;
 
@@ -99,19 +99,19 @@ export default function GooeySidebar({
 
   return (
     <div className="d-flex gap-0 w-100 h-100 position-relative">
-      <div className={sidebarContainerClassName} style={sidebarInlineWidth}>
+      <div className={sidebarContainerClassName} style={sidebarContainerStyles}>
         <RenderedChildren
           children={sidebarDiv.children}
           onChange={onChange}
           state={state}
         />
-        <SidebarResizer
-          enabled={enableResize}
-          isOpen={isOpen}
-          minWidth={340}
-          maxWidth={800}
-          onWidthChange={setSidebarWidth}
-        />
+        {!!enableResize && !!isOpen && (
+          <SidebarResizer
+            minWidth={340}
+            maxWidth={800}
+            onWidthChange={setSidebarWidth}
+          />
+        )}
       </div>
       <div className={`d-flex flex-grow-1 mw-100`}>
         <div className={pageClassName}>
@@ -127,5 +127,14 @@ export default function GooeySidebar({
 }
 
 function isDesktop() {
-  return typeof window !== "undefined" && window.innerWidth >= 1140; // Bootstrap xl breakpoint
+  return (
+    typeof window !== "undefined" &&
+    window.innerWidth >=
+      parseInt(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--sidebar_desktop_breakpoint"
+        ),
+        10
+      )
+  );
 }
