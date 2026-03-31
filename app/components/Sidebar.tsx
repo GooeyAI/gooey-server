@@ -127,14 +127,13 @@ export default function GooeySidebar({
 }
 
 function isDesktop() {
-  return (
-    typeof window !== "undefined" &&
-    window.innerWidth >=
-      parseInt(
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--sidebar_desktop_breakpoint"
-        ),
-        10
-      )
-  );
+  if (typeof window === "undefined") return false;
+  const breakpoint =
+    parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue(
+        "--sidebar_desktop_breakpoint"
+      ),
+      10
+    ) || 1140;
+  return window.innerWidth >= breakpoint;
 }

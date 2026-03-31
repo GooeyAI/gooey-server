@@ -17,12 +17,8 @@ export default function SidebarResizer({
   // Clear inline width on mobile so CSS media queries take over;
   // restore last dragged width when coming back to desktop.
   useEffect(() => {
-    const breakpoint = parseInt(
-      getComputedStyle(document.documentElement).getPropertyValue(
-        "--sidebar_desktop_breakpoint"
-      ),
-      10
-    );
+    const breakpoint =
+      parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar_desktop_breakpoint"), 10) || 1140;
 
     const observer = new ResizeObserver(([entry]) => {
       onWidthChange(
