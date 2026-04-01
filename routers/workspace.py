@@ -202,14 +202,12 @@ def render_invite_team_form(
 
     error_msg_container = gui.div()
     with gui.div(className="d-flex justify-content-end gap-2 mt-2"):
-        close_btn = gui.button("Close")
-
         if selected_plan:
             label = "Add Payment Method"
         else:
             label = "Choose a Plan"
         submit_btn = gui.button(label, type="primary")
-        if not (submit_btn or close_btn):
+        if not submit_btn:
             return
 
     validate_and_invite_from_emails_csv(
@@ -292,13 +290,16 @@ def popup_close_or_navgiate_js(next_url: str) -> str:
 delimiters = re.compile(r"[\s,;|]+")
 
 
-def validate_emails_csv(emails_csv: str, max_emails: int = 5) -> list[str]:
-    """Raises ValidationError if an email is invalid"""
+def validate_emails_csv(emails_csv: str, max_emails: int) -> list[str]:
+    """
+    Raises ValidationError if an email is invalid OR when there are more than max_emails emails.
+    """
 
     emails = [email.lower().strip() for email in delimiters.split(emails_csv)]
     emails = filter(bool, emails)  # remove empty strings
-    emails = set(emails)  # remove duplicates
-    emails = list(emails)[:max_emails]  # take up to max_emails from the list
+    emails = list(set(emails))  # remove duplicates
+    if len(emails) > max_emails:
+        raise ValidationError(f"You can only invite up to {max_emails} members.")
 
     error_messages = []
     for email in emails:

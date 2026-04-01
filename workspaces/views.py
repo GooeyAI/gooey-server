@@ -257,7 +257,9 @@ def render_workspace_by_membership(membership: WorkspaceMembership, *, session: 
 
     with gui.div(className="d-flex justify-content-between align-items-center"):
         gui.write("#### Members")
-        member_invite_button_with_dialog(membership)
+        if membership.can_invite():
+            member_invite_button_with_dialog(membership)
+
     render_members_list(
         workspace=workspace,
         current_member=membership,
@@ -309,9 +311,6 @@ def member_invite_button_with_dialog(
 ):
     from routers.account import account_route
     from routers.workspace import validate_and_invite_from_emails_csv
-
-    if not membership.can_invite():
-        return
 
     ref = gui.use_confirm_dialog(key="invite-members", close_on_confirm=False)
 
@@ -376,7 +375,7 @@ def member_invite_button_with_dialog(
             workspace=membership.workspace,
             current_user=membership.user,
             error_msg_container=error_msg_container,
-            max_emails=5,
+            max_emails=unused_seats,
         )
         if not success:
             # don't close

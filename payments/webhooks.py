@@ -416,17 +416,19 @@ def set_subscription_seats_from_stripe_sub(
     auto_assign_team_seats(db_sub.workspace, invoice_id=invoice_id)
 
 
-def auto_assign_team_seats(workspace: Workspace, invoice_id: str | None = None):
-    memberships = {
-        m.id: m
-        for m in (
-            workspace.memberships.select_related("user")
-            .select_for_update()
-            .filter(deleted__isnull=True)
-            .order_by("-created_at")
-            .all()
-        )
-    }
+def auto_assign_team_seats(
+    workspace: Workspace, invoice_id: str, member_ids: list[str] | None = None
+):
+    memberships_qs = (
+        workspace.memberships.select_related("user")
+        .select_for_update()
+        .filter(deleted__isnull=True)
+        .order_by("-created_at")
+    )
+    if member_ids is not None:
+        memberships_qs = memberships_qs.filter(id__in=member_ids)
+
+    memberships = {m.id: m for m in memberships_qs}
     workspace_seats = (
         workspace.subscription.billed_seats()
         .select_related("seat_type")
@@ -448,13 +450,16 @@ def auto_assign_team_seats(workspace: Workspace, invoice_id: str | None = None):
     if not unassigned_seats and not members_without_seat:
         return
 
+    ret = {}
     for seat, member in zip(unassigned_seats, members_without_seat):
         seat.assigned_to = member
         seat.save(update_fields=["assigned_to"])
-        if invoice_id:
-            member.add_balance(
-                amount=seat.seat_type.monthly_credit_limit - member.balance,
-                invoice_id=f"{invoice_id}/{seat.id}",
-                reason=TransactionReason.MEMBER_SEAT_CHANGE,
-                plan=workspace.subscription.plan,
-            )
+        member.add_balance(
+            amount=seat.seat_type.monthly_credit_limit - member.balance,
+            invoice_id=f"{invoice_id}/{seat.id}",
+            reason=TransactionReason.MEMBER_SEAT_CHANGE,
+            plan=workspace.subscription.plan,
+        )
+        ret[member.pk] = seat
+
+    return ret

@@ -674,6 +674,10 @@ class WorkspaceMembership(SafeDeleteModel):
         return (
             self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
             and not self.workspace.is_personal
+            and (
+                PricingPlan.from_sub(self.workspace.subscription)
+                in [PricingPlan.TEAM, PricingPlan.ENTERPRISE]
+            )
         )
 
     @staticmethod
@@ -883,6 +887,14 @@ class WorkspaceInvite(models.Model):
                 "This invitation has expired. Please ask your team admin to send a new one."
             )
 
+        if PricingPlan.from_sub(self.workspace.subscription) not in [
+            PricingPlan.TEAM,
+            PricingPlan.ENTERPRISE,
+        ]:
+            raise ValidationError(
+                "This workspace is not accepting new members. Please ask your team admin to upgrade the workspace."
+            )
+
         membership, created = WorkspaceMembership.objects.get_or_create(
             workspace=self.workspace,
             user=invitee,
@@ -893,10 +905,15 @@ class WorkspaceInvite(models.Model):
 
         plan = PricingPlan.from_sub(self.workspace.subscription)
         if plan == PricingPlan.TEAM:
-            auto_assign_team_seats(
+            assigned_members = auto_assign_team_seats(
                 self.workspace,
                 invoice_id=f"{self.workspace.subscription.external_id}:invite_{self.id}:{uuid.uuid4()}",
+                member_ids=[membership.id],
             )
+            if membership.id not in assigned_members:
+                raise ValidationError(
+                    "This workspace has reached its member limit. Please ask your admin to upgrade the workspace."
+                )
 
         self.updated_by = updated_by
         self.status = self.Status.ACCEPTED
