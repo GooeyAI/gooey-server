@@ -12,13 +12,13 @@ from bots.admin_links import open_in_new_tab
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from gooeysite.custom_create import get_or_create_lazy
-from workspaces.models import Workspace
-
 from .saved_run import SavedRun
 from .workflow import Workflow, WorkflowAccessLevel
 
 if typing.TYPE_CHECKING:
     import celery.result
+
+    from functions.models import CalledFunction
 
 
 class PublishedRunQuerySet(models.QuerySet):
@@ -339,6 +339,7 @@ class PublishedRun(models.Model):
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
         current_user: AppUser | None = None,
+        called_fn: CalledFunction | None = None,
     ) -> tuple[celery.result.AsyncResult, SavedRun]:
         return self.saved_run.submit_api_call(
             workspace=workspace,
@@ -347,6 +348,7 @@ class PublishedRun(models.Model):
             enable_rate_limits=enable_rate_limits,
             deduct_credits=deduct_credits,
             parent_pr=self,
+            called_fn=called_fn,
         )
 
     @classmethod

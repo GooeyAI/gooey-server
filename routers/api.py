@@ -44,6 +44,7 @@ from workspaces.models import Workspace
 from workspaces.widgets import set_current_workspace
 
 if typing.TYPE_CHECKING:
+    from functions.models import CalledFunction
     from bots.models import SavedRun
     import celery.result
 
@@ -343,6 +344,7 @@ def submit_api_call(
     request_body: dict,
     enable_rate_limits: bool = False,
     deduct_credits: bool = True,
+    called_fn: typing.Optional["CalledFunction"] = None,
     **defaults,
 ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
     page, sr = create_new_run(
@@ -355,6 +357,9 @@ def submit_api_call(
         enable_rate_limits=enable_rate_limits,
         **defaults,
     )
+    if called_fn:
+        called_fn.function_run = sr
+        called_fn.save()
     # submit the task
     result = page.call_runner_task(sr, deduct_credits=deduct_credits)
     return result, sr

@@ -170,21 +170,20 @@ class WorkflowLLMTool(BaseLLMTool):
         else:
             request_body = kwargs
 
+        called_fn = CalledFunction(
+            saved_run=self.saved_run,
+            trigger=self.trigger.db_value,
+            tool_name=self.name,
+        )
         result, fn_sr = fn_sr.submit_api_call(
             workspace=self.workspace,
             current_user=self.current_user,
             parent_pr=fn_pr,
             request_body=request_body,
             deduct_credits=False,
+            called_fn=called_fn,
         )
         self.fn_sr = fn_sr
-
-        CalledFunction.objects.create(
-            saved_run=self.saved_run,
-            function_run=fn_sr,
-            trigger=self.trigger.db_value,
-            tool_name=self.name,
-        )
 
         # wait for the result if its a pre request function
         if self.trigger == FunctionTrigger.post:

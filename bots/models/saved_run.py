@@ -22,7 +22,9 @@ if typing.TYPE_CHECKING:
     import celery.result
     import pandas as pd
 
+    from functions.models import CalledFunction
     from .published_run import PublishedRun
+    from workspaces.models import Workspace
 
 
 class SavedRunQuerySet(models.QuerySet):
@@ -250,6 +252,7 @@ class SavedRun(models.Model):
         deduct_credits: bool = True,
         parent_pr: PublishedRun | None = None,
         current_user: AppUser | None = None,
+        called_fn: CalledFunction | None = None,
     ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
         from routers.api import submit_api_call
 
@@ -273,6 +276,7 @@ class SavedRun(models.Model):
                     request_body=request_body,
                     enable_rate_limits=enable_rate_limits,
                     deduct_credits=deduct_credits,
+                    called_fn=called_fn,
                 ),
             )
 
