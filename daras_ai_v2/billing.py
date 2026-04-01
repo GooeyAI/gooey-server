@@ -531,7 +531,11 @@ def _render_plan(
 ):
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
-    if plan == current_plan:
+    if plan == current_plan or (
+        plan == PricingPlan.TEAM
+        and current_plan != PricingPlan.ENTERPRISE
+        and not workspace.is_personal
+    ):
         extra_class = "border-dark"
     else:
         extra_class = "bg-light"
