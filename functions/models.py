@@ -52,7 +52,7 @@ class FunctionScopes(FunctionScope, GooeyEnum):
     )
 
     deployment_user = FunctionScope(
-        icon=f'<img align="left" width="24" height="24" src="{icons.integrations_img}">',
+        icon=f'<img width="24" height="24" src="{icons.integrations_img}">',
         label="&nbsp; User of any Deployment",
         parts=(ScopeParts.workspace, ScopeParts.deployment, ScopeParts.platform_user),
     )
@@ -102,7 +102,7 @@ class FunctionScopes(FunctionScope, GooeyEnum):
                 label = f"Only I ({user.full_name()})"
                 photo = user.get_photo()
                 if photo:
-                    label = f'<img align="left" src="{photo}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;"> &nbsp; {label}'
+                    label = f'<img src="{photo}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;"> &nbsp; {label}'
                 return label
 
             case cls.deployment_user if workspace:
@@ -129,7 +129,7 @@ class FunctionScopes(FunctionScope, GooeyEnum):
                     photo_url = published_run.photo_url
                 else:
                     photo_url = VideoBotsPage.get_root_pr().photo_url
-                icon = f'<img align="left" src="{photo_url}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">'
+                icon = f'<img src="{photo_url}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">'
 
                 if scope == cls.saved_workflow_user:
                     icon = (
