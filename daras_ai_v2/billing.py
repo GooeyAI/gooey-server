@@ -1266,6 +1266,10 @@ def payment_provider_radio(**props) -> str | None:
 def render_addon_section(
     workspace: Workspace, selected_payment_provider: PaymentProvider
 ):
+    # Check if workspace is allowed to purchase topups - hide entire section if not
+    if not workspace.allow_credit_topups():
+        return
+
     if (
         workspace.subscription
         and workspace.subscription.plan == PricingPlan.TEAM.db_value
@@ -1736,6 +1740,10 @@ def render_billing_history(
 def render_auto_recharge_section(workspace: Workspace):
     assert workspace.subscription
     subscription = workspace.subscription
+
+    # Check if workspace is allowed to use auto-recharge - hide entire section if not
+    if not workspace.allow_credit_topups():
+        return
 
     gui.write("## Auto Recharge & Limits")
     with gui.div(className="h4"):
