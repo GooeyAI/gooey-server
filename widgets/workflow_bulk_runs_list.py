@@ -169,6 +169,6 @@ def render_success_alert(success_alert: gui.AlertDialogRef, bulk_run_urls: list[
     ):
         for url, title in bulk_run_urls:
             gui.write(
-                f'##### <i class="fa fa-external-link"></i> <a href="{url}" target="_blank">{title}</a>',
+                f'##### {icons.external_link} <a href="{url}" target="_blank">{title}</a>',
                 unsafe_allow_html=True,
             )

@@ -482,7 +482,7 @@ def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
                 className="border rounded-4 px-3 py-2 d-flex align-items-center justify-content-between bg-light container-margin-reset"
             ):
                 gui.write(f"**{trigger.label} -** `{title}`")
-                gui.html("<i class='fa fa-external-link'></i>")
+                gui.html(icons.external_link)
 
 
 def get_external_tool_slug_from_url(url: str) -> str | None:

@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
-from daras_ai.text_format import format_timedelta
 from daras_ai_v2 import icons
 from daras_ai_v2 import breadcrumbs
 from daras_ai_v2.base import BasePage
@@ -257,8 +256,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     page_cls=page_cls, sr=sr, pr=pr
                 ).title_with_prefix()
                 gui.html(
-                    '<i class="fa fa-external-link"></i>'
-                    f' <a href="{url}" target="_blank">{title}</a>'
+                    f'{icons.external_link} <a href="{url}" target="_blank">{title}</a>'
                 )
                 try:
                     page_cls().render_output()

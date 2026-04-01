@@ -8,10 +8,12 @@ from enum import Enum
 import gooey_gui as gui
 import requests
 from django.utils import timezone
+from functools import cached_property
 from furl import furl
 from pydantic import BaseModel, Field
 
 from auth.token_authentication import generate_ephemeral_api_key
+from bots.models import PublishedRun
 from bots.models import Workflow
 from bots.models.saved_run import SavedRun
 from celeryapp.tasks import update_gcs_content_types
@@ -199,7 +201,7 @@ class FunctionsPage(BasePage):
                 scope=scope,
                 workspace=self.current_workspace,
                 user=self.request.user,
-                published_run=self.current_pr,
+                published_run=self.calling_pr,
             )
         except UserError:
             return {}, None
@@ -319,6 +321,8 @@ class FunctionsPage(BasePage):
             )
 
     def render_output(self):
+        self._render_calling_run_note()
+
         if error := gui.session_state.get("error"):
             with gui.tag("pre", className="bg-danger bg-opacity-25"):
                 gui.html(html.escape(error))
@@ -349,6 +353,54 @@ class FunctionsPage(BasePage):
                     html.escape(log.get("message")),
                     className=f"d-block py-1 {borderClass} {textClass}",
                 )
+
+    def _render_calling_run_note(self) -> None:
+        if not self.calling_sr:
+            return
+
+        run_title = self.get_run_title(self.calling_sr, self.calling_pr)
+        gui.html(
+            f"<p><em>Called by:</em> &nbsp; "
+            f'<a href="{self.calling_sr.get_app_url()}" target="_blank">{run_title} {icons.external_link}</a></p>',
+        )
+
+        memory_scope = gui.session_state.get("memory_scope")
+        if not memory_scope:
+            return
+
+        rendered_scope = FunctionScopes.format_label(
+            memory_scope,
+            workspace=self.current_workspace,
+            user=self.request.user,
+            published_run=self.calling_pr,
+        )
+        gui.html(
+            f"<p><em>Memory Access:</em> &nbsp; {rendered_scope}</p>",
+        )
+
+    @cached_property
+    def calling_pr(self) -> PublishedRun | None:
+        if self.calling_sr:
+            return self.calling_sr.parent_published_run()
+        else:
+            return None
+
+    @cached_property
+    def calling_sr(self) -> SavedRun | None:
+        if self.called_fn:
+            return self.called_fn.saved_run
+        else:
+            return None
+
+    @cached_property
+    def called_fn(self) -> CalledFunction | None:
+        return (
+            CalledFunction.objects.select_related(
+                "saved_run__parent_version__published_run"
+            )
+            .filter(function_run=self.current_sr)
+            .first()
+        )
 
 
 def execute_python(
