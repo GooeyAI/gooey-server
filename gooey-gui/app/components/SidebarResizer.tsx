@@ -1,0 +1,81 @@
+import { useEffect, useRef } from "react";
+
+type Props = {
+  minWidth?: number;
+  maxWidth?: number;
+  width: number | null;
+  onWidthChange: (width: number | null) => void;
+};
+
+export default function SidebarResizer({
+  minWidth = 340,
+  maxWidth = 800,
+  width,
+  onWidthChange,
+}: Props) {
+  const widthRef = useRef<number | null>(width);
+  const dragRef = useRef({ active: false, startX: 0, startWidth: 0 });
+
+  useEffect(() => {
+    widthRef.current = width;
+  }, [width]);
+
+  // Clear inline width on mobile so CSS media queries take over;
+  // restore last dragged width when coming back to desktop.
+  useEffect(() => {
+    const breakpoint =
+      parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sidebar_desktop_breakpoint"), 10) || 1140;
+
+    const observer = new ResizeObserver(([entry]) => {
+      onWidthChange(
+        entry.contentRect.width >= breakpoint ? widthRef.current : null
+      );
+    });
+
+    observer.observe(document.documentElement);
+    return () => observer.disconnect();
+  }, [onWidthChange]);
+
+  useEffect(() => {
+    return () => document.body.classList.remove("gooey-sidebar-resizing");
+  }, []);
+
+  function handleMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    // On the first drag widthRef is null — read the sidebar's current rendered width.
+    if (widthRef.current === null) {
+      widthRef.current =
+        (event.currentTarget.parentElement as HTMLElement)?.offsetWidth ??
+        minWidth;
+    }
+    dragRef.current = {
+      active: true,
+      startX: event.clientX,
+      startWidth: widthRef.current,
+    };
+    document.body.classList.add("gooey-sidebar-resizing");
+
+    function onMouseMove(e: MouseEvent) {
+      if (!dragRef.current.active) return;
+      e.preventDefault();
+      const next =
+        dragRef.current.startWidth + (e.clientX - dragRef.current.startX);
+      widthRef.current = Math.min(Math.max(next, minWidth), maxWidth);
+      onWidthChange(widthRef.current);
+    }
+
+    function onMouseUp() {
+      dragRef.current.active = false;
+      document.body.classList.remove("gooey-sidebar-resizing");
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  return (
+    <div className="gooey-sidebar-resizer" onMouseDown={handleMouseDown} />
+  );
+}

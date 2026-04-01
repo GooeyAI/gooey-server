@@ -1,0 +1,411 @@
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.gui-img {
+  width: 100%;
+  max-width: 450px;
+  height: auto;
+  margin-bottom: 0.9rem;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.gui-video {
+  width: 100%;
+  max-width: 450px;
+  height: auto;
+  margin-bottom: 0.9rem;
+}
+
+.gui-audio {
+  width: 100%;
+  margin-bottom: 0.9rem;
+}
+
+.gooey-output-text {
+  overflow-y: scroll;
+  background-color: #0000000d;
+  color: rgb(84, 84, 84);
+  border: 1px solid #c9c9c9;
+  padding: 5px 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.gooey-output-text p {
+  white-space: pre-wrap;
+}
+
+input[type="text"], 
+input[type="password"],
+textarea {
+  resize: vertical;
+  width: 100%;
+  overflow: auto;
+  border: 1px solid #c9c9c9;
+}
+
+input[type="number"] {
+  padding: 0.5rem;
+  width: 7rem;
+  border: 1px solid #c9c9c9;
+  display: block;
+}
+
+code,
+code[class*="language-"] {
+  font-size: 0.9rem;
+  color: inherit;
+  /* white-space: pre-wrap; */
+  /* word-wrap: break-word; */
+  /*margin: inherit;*/
+  /*padding: inherit;*/
+}
+
+pre,
+pre[class*="language-"] {
+  /*max-width: fit-content;*/
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: 0.8rem;
+  margin: 0 0 0.9rem;
+}
+
+div.code-toolbar > .toolbar > .toolbar-item > button {
+  background-color: rgba(0, 0, 0, 0.2);
+  color: black;
+  backdrop-filter: blur(3px);
+  box-shadow: inherit;
+  border-radius: inherit;
+  padding: 0.5rem;
+}
+
+div.code-toolbar > .toolbar {
+  font-size: 1.1rem;
+  top: 0.4rem;
+  right: 0.4rem;
+}
+
+div.code-toolbar {
+  /*max-width: fit-content;*/
+}
+
+.gui-input {
+  margin-bottom: 0.9rem;
+}
+
+.gui-input h3 {
+  font-size: 1rem;
+}
+
+.gui-input label p {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.gui-input-checkbox label p,
+.gui-input-radio label p {
+  margin: 0;
+  color: inherit;
+}
+
+.gui-input-text input, 
+.gui-input-password input {
+  padding: 0.8rem;
+}
+
+.gui-input-checkbox input,
+.gui-input-radio input {
+  margin-right: 0.8rem;
+  height: 1rem;
+  width: 1rem;
+  vertical-align: middle;
+}
+
+.gui-input-checkbox label,
+.gui-input-radio label {
+  vertical-align: middle;
+  user-select: none;
+}
+
+.inline-radio > .gui-input-radio {
+  display: inline;
+  margin-right: 1rem;
+}
+
+.btn {
+  margin: 0 0 0.8rem 2px;
+}
+
+[data-reach-tab] p,
+.btn p,
+.gui-expander-header p {
+  margin-bottom: 0;
+}
+
+.gui-expander {
+  border-radius: 0.375rem;
+  border-color: #dee2e6;
+  border-width: 1px;
+  /* background-color: aqua; */
+  border-style: solid;
+  margin-bottom: 0.9rem;
+}
+
+.gui-expander-header {
+  padding: 1rem 1.25rem;
+  user-select: none;
+  background-color: inherit;
+}
+
+.gui-expander-body {
+  padding: 1rem 1.25rem;
+}
+
+.gui-html-container {
+  display: contents;
+}
+
+.container-margin-reset p {
+    margin: 0;
+
+}
+
+.gui-md-container {
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.gui-md-container strong {
+  font-family: basiercircle-medium;
+}
+
+button[type="submit"],
+button .gui-html-container,
+.gui-html-container button {
+  white-space: nowrap;
+}
+
+::-webkit-scrollbar {
+  background: transparent;
+  color: white;
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 0;
+}
+
+[data-reach-tab-list] {
+  margin: 1rem 0;
+}
+
+[data-reach-tab] {
+  background-color: transparent;
+  border-color: rgba(0, 0, 0, var(--tw-border-opacity));
+  --tw-border-opacity: 0;
+}
+
+[data-reach-tab]:hover {
+  --tw-border-opacity: 1;
+}
+
+[data-reach-tab] {
+  border-radius: 9999px;
+  border-width: 1px;
+  margin-right: 0.8rem;
+}
+
+[data-reach-tab]:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+[data-reach-tab] {
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+}
+
+[data-reach-tab]:focus {
+  --tw-bg-opacity: 1;
+  background-color: rgba(255, 255, 255, var(--tw-bg-opacity));
+  --tw-text-opacity: 1;
+  color: rgba(0, 0, 0, var(--tw-text-opacity));
+}
+
+[data-reach-tab][data-selected] {
+  --tw-bg-opacity: 1;
+  background-color: rgba(0, 0, 0, var(--tw-bg-opacity));
+  --tw-text-opacity: 1;
+  color: rgba(255, 255, 255, var(--tw-text-opacity));
+}
+
+.uppy-Dashboard--clear-all {
+  font-size: 14px;
+  background: none;
+  border: none;
+  color: #2275d7;
+  cursor: pointer;
+  height: 29px;
+  line-height: 1;
+  margin: 0;
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  z-index: 1004;
+}
+
+.uppy-Dashboard-Item-progressIcon--circle {
+  display: none;
+}
+
+.uppy-StatusBar.is-complete {
+  display: none;
+}
+
+#nprogress .bar {
+  background: #02b3a1;
+  height: 4px;
+}
+
+#nprogress .peg {
+  box-shadow:
+    0 0 10px #02b3a1,
+    0 0 5px #02b3a1;
+  width: 100%;
+  transform: none;
+}
+
+#nprogress .spinner-icon {
+  border: solid 3px transparent;
+  border-top-color: #02b3a1;
+  border-left-color: #02b3a1;
+  width: 25px;
+  height: 25px;
+}
+
+.gui-input-range input[type="range"] {
+  width: 100%;
+  margin: 0 1rem;
+}
+
+.gui-input-number input {
+  padding: 0.5rem;
+}
+
+.bg-hover-light:hover {
+  background-color: var(--bs-gray-200) !important;
+}
+
+:root {
+  --sidebar_open_width: 340px;
+  --sidebar_closed_width: 0;
+  --sidebar_mobile_width: 100vw;
+  --sidebar_desktop_breakpoint: 1140px;
+  /* change the values below when updating the sidebar_desktop_breakpoint variable */
+}
+
+.gooey-sidebar {
+  background-color: #f9f9f9;
+  position: sticky;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 999;
+  height: 100dvh;
+}
+
+.gooey-sidebar::after {
+  /* Right Sidebar Gradient Shadow */
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 100%;
+  background: linear-gradient(to left, rgba(15, 23, 42, 0.07) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gooey-sidebar-bordered {
+  border-right: 1px solid #e0e0e0;
+}
+
+.gooey-sidebar-open {
+  display: flex;
+  min-width: var(--sidebar_open_width);
+  width: var(--sidebar_open_width);
+  max-width: var(--sidebar_open_width);
+}
+.gooey-sidebar-closed {
+  display: none;
+  min-width: var(--sidebar_closed_width);
+  width: var(--sidebar_closed_width);
+  max-width: var(--sidebar_closed_width);
+  overflow: hidden;
+}
+
+.gooey-sidebar-closed:hover {
+  cursor: e-resize;
+}
+
+/* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
+@media (max-width: 1140px) {
+  .gooey-sidebar-open {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      min-width: var(--sidebar_mobile_width);
+      width: var(--sidebar_mobile_width);
+      max-width: var(--sidebar_mobile_width);
+      z-index: 100;
+      border-left: 1px solid #e0e0e0;
+      border-right: none;
+      height: calc(100dvh); /* 4px for the progress bar */
+  }
+  .gooey-sidebar-closed {
+      position: sticky;
+      right: 0;
+      left: auto;
+      min-width: 0px;
+      width: 0px;
+      max-width: 0px;
+      overflow: hidden;
+  }
+}
+
+.gooey-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  z-index: 2;
+  background: transparent;
+  transition: background-color 150ms ease;
+}
+
+.gooey-sidebar-resizer:hover,
+body.gooey-sidebar-resizing .gooey-sidebar-resizer {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+body.gooey-sidebar-resizing,
+body.gooey-sidebar-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
+@media (max-width: 1140px) {
+  .gooey-sidebar-resizer {
+    display: none;
+  }
+}
