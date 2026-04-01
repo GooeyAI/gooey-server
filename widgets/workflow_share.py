@@ -212,12 +212,13 @@ def render_workspace_with_invite_button(workspace: Workspace, user_id: int) -> N
             membership = workspace.memberships.get(user_id=user_id)
         except WorkspaceMembership.DoesNotExist:
             return
-        member_invite_button_with_dialog(
-            membership,
-            close_on_confirm=False,
-            type="tertiary",
-            className="mb-0",
-        )
+        if membership.can_invite():
+            member_invite_button_with_dialog(
+                membership,
+                close_on_confirm=False,
+                type="tertiary",
+                className="mb-0",
+            )
 
 
 def render_share_options_for_personal_workspace(
