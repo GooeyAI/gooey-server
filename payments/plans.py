@@ -171,9 +171,7 @@ class PricingPlan(PricingPlanData, Enum):
               <li>API Secrets to securely access any system</li>
               <li>Bring your own WhatsApp number</li>
               <li>Embed copilots in your own App</li>
-              <li>Impact and usage <a
-                    href="https://gooey.ai/copilot/base-copilot-w-search-rag-code-execution-v1xm6uhp/integrations/PnM/stats/?view=Daily&details=Conversations&start_date=2025-10-15&end_date=2025-10-31&sort_by=Last+Sent"
-                >dashboards</a></li>
+              <li>Impact and usage <a href="https://docs.gooey.ai/ai-agent/conversation-analysis">dashboards</a></li>
               <li>Role Based Management</li>
               <li>Centralized billing</li>
               <li>Pooled Credits, Submission Rates and Concurrency</li>
@@ -275,11 +273,11 @@ class PricingPlan(PricingPlanData, Enum):
               <li>API Secrets to securely access any system (Researcher & above)</li>
               <li>Bring your own WhatsApp number</li>
               <li>Embed copilots in your own App</li>
-              <li>Impact and usage <a href="https://gooey.ai/copilot/base-copilot-w-search-rag-code-execution-v1xm6uhp/integrations/PnM/stats/?view=Daily&details=Conversations&start_date=2025-11-09&end_date=2025-11-25&sort_by=Last+Sent">dashboards</a></li>
+              <li>Impact and usage <a href="https://docs.gooey.ai/ai-agent/conversation-analysis">dashboards</a></li>
               <li>Role Based Management</li>
               <li>Centralized billing</li>
               <li>Version History on Workflows</li>
-              <li>Use-case specific, Workflow <a href="https://gooey.ai/bulk">Evaluation</a> to optimize model and component selection.</li>
+              <li>Use-case specific, Workflow <a href="https://docs.gooey.ai/tools/evaluations/understanding-bulk-runner-and-evaluation">Evaluation</a> to optimize model and component selection.</li>
             </ul>
             """
         ),
