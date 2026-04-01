@@ -34,7 +34,7 @@ def render_gooey_builder_launcher(
     with gui.styled("& button:hover { scale: 1.2; }"):
         with gui.div(
             className="position-fixed d-none d-xxl-block",
-            style={"bottom": "24px", "left": "16px", "zIndex": "1000"},
+            style={"bottom": "24px", "left": "16px", "zIndex": "99"},
         ):
             with gui.tag(
                 "button",
