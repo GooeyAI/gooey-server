@@ -231,7 +231,9 @@ def _clear_pending_stripe_subscription_changes(
     return subscription
 
 
-def billing_page(workspace: Workspace, user: AppUser, session: dict):
+def billing_page(
+    workspace: Workspace, user: AppUser, session: dict, plans_tab: str | None = None
+):
     render_payments_setup()
 
     if len(user.cached_workspaces) > 1:
@@ -253,7 +255,7 @@ def billing_page(workspace: Workspace, user: AppUser, session: dict):
 
     with gui.div(className="mb-5"):
         selected_payment_provider = render_all_plans(
-            workspace, user=user, session=session
+            workspace, user=user, session=session, plans_tab=plans_tab
         )
 
     with gui.div(className="mb-5"):
@@ -292,7 +294,6 @@ def render_current_plan(workspace: Workspace):
     monthly_charge = (
         workspace.subscription and workspace.subscription.charged_amount // 100
     )
-    # credits = workspace.subscription and workspace.subscription.amount
 
     if workspace.subscription.payment_provider:
         provider = PaymentProvider(workspace.subscription.payment_provider)
@@ -433,7 +434,7 @@ def render_credit_balance(workspace: Workspace):
 
 
 def render_all_plans(
-    workspace: Workspace, user: AppUser, session: dict
+    workspace: Workspace, user: AppUser, session: dict, plans_tab: str | None = None
 ) -> PaymentProvider:
     if workspace.subscription and workspace.subscription.payment_provider:
         selected_payment_provider = PaymentProvider(
@@ -445,7 +446,9 @@ def render_all_plans(
     gui.write("## Plans")
 
     if workspace.is_personal:
-        _render_all_plans_personal(workspace, user, session, selected_payment_provider)
+        _render_all_plans_personal(
+            workspace, user, session, selected_payment_provider, plans_tab=plans_tab
+        )
     else:
         _render_all_plans_team(workspace, user, session, selected_payment_provider)
 
@@ -480,13 +483,25 @@ def _render_all_plans_personal(
     user: AppUser,
     session: dict,
     selected_payment_provider: PaymentProvider,
+    plans_tab: str | None = None,
 ):
+    from gooey_gui import core
+
     team_plans = [PricingPlan.TEAM, PricingPlan.ENTERPRISE]
     personal_plans = [
         p for p in PricingPlan if not p.deprecated and p not in team_plans
     ]
 
-    personal_tab, team_tab = gui.tabs(["Individual", "Team and Enterprise"])
+    labels = ["Individual", "Team and Enterprise"]
+    default_index = 1 if plans_tab == "team" else 0
+    parent = core.RenderTreeNode(
+        name="tabs",
+        props=dict(defaultIndex=default_index),
+        children=[
+            core.RenderTreeNode(name="tab", props=dict(label=label)) for label in labels
+        ],
+    ).mount()
+    personal_tab, team_tab = [core.NestingCtx(child) for child in parent.children]
 
     with personal_tab:
         _render_plan_grid(
