@@ -212,7 +212,10 @@ class StripeWebhookHandler:
 
         for item in stripe_sub["items"].data:
             quantity += item.quantity
-            charged_amount += item.price.unit_amount * item.quantity
+            unit_amount = float(
+                item.price.unit_amount_decimal or item.price.unit_amount
+            )
+            charged_amount += unit_amount * item.quantity
 
         db_sub = set_workspace_subscription(
             provider=cls.PROVIDER,
