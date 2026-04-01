@@ -179,8 +179,6 @@ h6 {
 /* header */
 .header {
     background: #fff 0% 0% no-repeat padding-box;
-
-    z-index: 9;
     width: 100%;
     transition: all 0.2s ease-in-out;
 }
