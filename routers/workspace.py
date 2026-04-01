@@ -106,6 +106,19 @@ def render_create_workspace_form(
         gui.session_state["workspace_name"] = get_default_workspace_name_for_user(user)
     name = gui.text_input(label="###### Name", key="workspace_name")
 
+    if (
+        gui.session_state.pop("old_workspace_name", None) != name
+        or "handle_name" not in gui.session_state
+    ):
+        # generate a new suggestion when:
+        #   1. first render
+        #   2. user changes the workspace name
+        gui.session_state["handle_name"] = Handle.get_suggestion_for_team_workspace(
+            display_name=name
+        )
+
+    gui.session_state["old_workspace_name"] = name
+
     gui.write("###### Your workspace's URL")
     with gui.div(className="d-flex align-items-start gap-2"):
         with gui.div(className="mt-2 pt-1"):
@@ -113,10 +126,6 @@ def render_create_workspace_form(
             gui.html(settings.APP_BASE_URL.rstrip("/") + "/")
         with gui.div(className="d-block d-lg-flex gap-3 w-100"):
             # separate div for input & error msg for handle field
-            if "handle_name" not in gui.session_state:
-                gui.session_state["handle_name"] = (
-                    Handle.get_suggestion_for_team_workspace(display_name=name)
-                )
             handle_name = render_handle_input(label="", key="handle_name")
 
     description = gui.text_input(
