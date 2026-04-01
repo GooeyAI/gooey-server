@@ -259,6 +259,12 @@ def render_workspace_by_membership(membership: WorkspaceMembership, *, session: 
         gui.write("#### Members")
         if membership.can_invite():
             member_invite_button_with_dialog(membership)
+        else:
+            with gui.link(
+                to=get_route_path(account_route),
+                className="btn btn-theme btn-primary",
+            ):
+                gui.html(f"{icons.add_user} Upgrade to invite members")
 
     render_members_list(
         workspace=workspace,
