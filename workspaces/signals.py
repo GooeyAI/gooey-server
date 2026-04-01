@@ -9,6 +9,7 @@ from loguru import logger
 from safedelete.signals import post_softdelete
 
 from app_users.models import AppUser
+from payments.models import SubscriptionSeat
 from .models import Workspace, WorkspaceInvite, WorkspaceMembership, WorkspaceRole
 
 
@@ -48,6 +49,11 @@ def delete_workspace_if_no_members_left(instance: WorkspaceMembership, **kwargs)
         f"Deleting workspace {instance.workspace} because it has no members left"
     )
     instance.workspace.delete()
+
+
+@receiver(post_softdelete, sender=WorkspaceMembership)
+def unassign_seats_on_membership_delete(instance: WorkspaceMembership, **kwargs):
+    SubscriptionSeat.objects.filter(assigned_to=instance).update(assigned_to=None)
 
 
 @receiver(pre_save, sender=Workspace)
