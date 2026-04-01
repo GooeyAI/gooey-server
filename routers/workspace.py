@@ -14,7 +14,7 @@ from furl import furl
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
-from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from handles.models import Handle, COMMON_EMAIL_DOMAINS
 from routers.custom_api_router import CustomAPIRouter
@@ -96,10 +96,14 @@ def render_create_workspace_form(
     user: AppUser, session: dict, selected_plan: int | None, next_url: str
 ):
     from daras_ai_v2.profiles import render_handle_input, update_handle
+    from routers.account import account_route
 
+    plans_url = get_app_route_url(account_route, query_params=dict(tab="team"))
     gui.write("#### Create Gooey.AI Workspace")
     gui.caption(
-        "Workspaces allow you to collaborate with team members with a shared payment method."
+        "Workspaces allow you to collaborate with a shared payment method. "
+        f'<a href="{plans_url}" target="_blank">Plans</a> start at $40/month per member.',
+        unsafe_allow_html=True,
     )
 
     if "workspace_name" not in gui.session_state:
