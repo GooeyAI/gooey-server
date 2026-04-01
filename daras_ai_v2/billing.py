@@ -612,11 +612,11 @@ def _render_plan_pricing(
 
 def _render_seat_type_option(seat_type: SeatType, plan: PricingPlan) -> str:
     if plan == PricingPlan.PRO:
-        return f"{seat_type.monthly_credit_limit:,} credits/month • ${seat_type.monthly_charge:,}"
+        return f"Up to {seat_type.monthly_credit_limit:,} credits/month • ${seat_type.monthly_charge:,}"
     else:
         return (
             f"{seat_type.name}"
-            f" • Up to {seat_type.monthly_credit_limit or 0:,} Cr / month"
+            f" • Up to {seat_type.monthly_credit_limit:,} Cr / month"
             f" • ${seat_type.monthly_charge}"
         )
 
