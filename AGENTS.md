@@ -1,11 +1,16 @@
 ## Code Style
 
 - Prefer putting the main or public function above helper functions when editing files.
+- When extracting helpers from a main or public function, keep the main/public function first and place the new helper below it.
 - In migration files, keep the primary migration entrypoint or main backfill function first, with helper functions below it.
 - In `RunPython` migrations, always use `db_alias = schema_editor.connection.alias` and run ORM operations through `.using(db_alias)`.
 - Prefer simple data-driven mappings over layered helper abstractions when the data set is small and fixed.
 - When building `selectbox` or `multiselect` options, prefer pre-rendered mappings like `options = {key: rendered_label}` and `format_func=options.__getitem__`.
 - In Django admin, prefer shared link helpers like `list_related_html_url` for related-object changelist links instead of hand-building admin URLs.
-- Always use the virtual environment in `.venv` for Python commands in this repo.
+- Prefer explicit early-return guards like `if not value: return` over wrapping the main body in conditionals when control flow allows it.
+- Always use the virtual environment referenced by `.venv` for Python commands in this repo.
+- `.venv` may be either a virtualenv directory or a text file containing the virtualenv name.
+- If `.venv` is a file, resolve the env before running Python tools. In this repo, for example, `cat .venv` returns the virtualenv name and the interpreter may live at a path like `/Users/<user>/.virtualenvs/$(cat .venv)/bin/python`.
+- Prefer invoking the env's executables directly, for example `/Users/<user>/.virtualenvs/$(cat .venv)/bin/python`, `/Users/<user>/.virtualenvs/$(cat .venv)/bin/pytest`, and `/Users/<user>/.virtualenvs/$(cat .venv)/bin/ruff`.
 - Run `ruff` after making code edits and fix any reported issues before finishing.
 - Do not push commits or update remote branches without explicit user confirmation.
