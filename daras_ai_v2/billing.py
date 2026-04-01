@@ -637,8 +637,11 @@ def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelec
     colspec = [3, 1] if plan == PricingPlan.TEAM else [12, 0]
     col1, col2 = gui.columns(colspec, responsive=True)
     with col1:
+        label = "Monthly credits"
+        if plan == PricingPlan.TEAM:
+            label += " per member"
         seat_type_id = gui.selectbox(
-            label="Monthly credits per member",
+            label=label,
             options=seat_options,
             format_func=lambda seat_id: _render_seat_type_option(
                 seat_options[seat_id], plan=plan
