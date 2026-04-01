@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 import typing
-from functools import cache
 
 import stripe
 from django.db import models
@@ -171,7 +170,6 @@ class Subscription(models.Model):
     def billed_seats(self):
         return self.seats.filter(seat_type__is_public=True)
 
-    @cache
     def get_seat_type(self) -> SeatType | None:
         plan = PricingPlan.from_sub(self)
         if plan == PricingPlan.TEAM:
