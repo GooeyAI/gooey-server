@@ -358,14 +358,8 @@ def set_subscription_seats_from_stripe_sub(
     stripe_sub: stripe.Subscription | None,
     invoice_id: str,
 ):
-    plan = PricingPlan.from_sub(db_sub)
-    if plan not in [PricingPlan.TEAM] or not stripe_sub:
-        # if the plan doesn't have seats, delete all existing seats
-        db_sub.seats.all().delete()
-        return
-
     seat_types_by_key = {st.key: st for st in SeatType.objects.filter(is_public=True)}
-    new_seat_counts = get_seat_counts_from_stripe_sub(stripe_sub)
+    new_seat_counts = get_seat_counts_from_stripe_sub(stripe_sub) if stripe_sub else {}
     current_seats = (
         db_sub.billed_seats().select_related("seat_type").order_by("-assigned_to").all()
     )
@@ -401,9 +395,17 @@ def set_subscription_seats_from_stripe_sub(
                     amount=to_add,
                     invoice_id=f"{invoice_id}/{seat.id}",
                     reason=TransactionReason.MEMBER_SEAT_CHANGE,
-                    plan=db_sub.plan,
+                    plan=PricingPlan.TEAM.db_value,
                 )
         else:
+            if seat.assigned_to_id:
+                # this seat is being deleted, we should set the member balance to 0
+                seat.assigned_to.add_balance(
+                    amount=-seat.assigned_to.balance,
+                    invoice_id=f"{invoice_id}/{seat.id}",
+                    reason=TransactionReason.MEMBER_SEAT_CHANGE,
+                    plan=PricingPlan.TEAM.db_value,
+                )
             seat.delete()
 
     seats_to_create = []
@@ -414,9 +416,12 @@ def set_subscription_seats_from_stripe_sub(
             )
             for _ in range(new_count)
         ]
-    SubscriptionSeat.objects.bulk_create(seats_to_create)
+    if seats_to_create:
+        SubscriptionSeat.objects.bulk_create(seats_to_create)
 
-    auto_assign_team_seats(db_sub.workspace, invoice_id=invoice_id)
+    if PricingPlan.from_sub(db_sub) == PricingPlan.TEAM:
+        # if the new plan is still a team plan, auto-assign seats
+        auto_assign_team_seats(db_sub.workspace, invoice_id=invoice_id)
 
 
 def auto_assign_team_seats(
