@@ -328,6 +328,52 @@ def api_docs_page(request: Request):
     )
 
 
+@gui.route(app, "/languages/{lang}/")
+def language_page(request: Request, lang: str):
+    from recipes.asr_page import AsrPage
+    from daras_ai_v2.language_filters import (
+        asr_languages_without_dialects,
+        normalized_lang_or_none,
+    )
+    import langcodes
+
+    language_tag = lang.strip()
+    normalized_language = normalized_lang_or_none(language_tag)
+    if (
+        not normalized_language
+        or normalized_language not in asr_languages_without_dialects()
+    ):
+        raise HTTPException(status_code=404)
+
+    try:
+        language_name = langcodes.Language.get(language_tag).display_name()
+    except langcodes.LanguageTagError:
+        language_name = language_tag
+
+    with page_wrapper(request):
+        gui.component(
+            "LanguagePage",
+            language=language_name,
+            languageTag=language_tag,
+            newRunUrl=AsrPage.app_url(query_params={"language": language_tag}),
+        )
+
+    return dict(
+        meta=raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title=f"{language_name} Speech Recognition & Translation • Gooey.AI",
+            description=(
+                f"Open a fresh ASR workflow with {language_name} pre-selected, "
+                "then upload audio and choose your transcription model."
+            ),
+            image=meta_preview_url(AsrPage.explore_image)[0],
+            canonical_url=str(
+                furl(settings.APP_BASE_URL) / "languages" / language_tag / ""
+            ),
+        )
+    )
+
+
 def _api_docs_page(request: Request):
     from daras_ai_v2.all_pages import all_api_pages
 

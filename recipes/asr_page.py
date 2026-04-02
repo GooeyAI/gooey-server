@@ -27,7 +27,10 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc, field_title
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.language_filters import asr_languages_without_dialects
+from daras_ai_v2.language_filters import (
+    normalized_lang_or_none,
+    asr_languages_without_dialects,
+)
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.text_output_widget import text_outputs
 from recipes.DocSearch import render_documents
@@ -85,6 +88,9 @@ class AsrPage(BasePage):
         if google_translate_target and not translation_model:
             state["translation_model"] = TranslationModels.google.name
             state["translation_target"] = google_translate_target
+        if language_tag := self._get_language_seed():
+            state["language"] = language_tag
+            state["language_filter"] = normalized_lang_or_none(language_tag)
         return state
 
     @classmethod
@@ -300,3 +306,11 @@ class AsrPage(BasePage):
         texts = state.get("output_text", [])
         total_words = sum(len(whitespace_re.split(str(out))) for out in texts)
         return 0.04 * total_words
+
+    def _get_language_seed(self) -> str | None:
+        language_tag = (self.request.query_params.get("language") or "").strip()
+        if not language_tag:
+            return None
+        if normalized_lang_or_none(language_tag) not in asr_languages_without_dialects():
+            return None
+        return language_tag
