@@ -6,7 +6,7 @@ from textwrap import dedent
 import gooey_gui as gui
 
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import ComposioAuthRequired, UserError
+from daras_ai_v2.exceptions import ComposioAuthRequired
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from functions.recipe_functions import BaseLLMTool
 
@@ -66,7 +66,10 @@ class ComposioLLMTool(BaseLLMTool):
             )
 
         return composio.tools.execute(
-            slug=self.tool.slug, user_id=self.user_id, arguments=kwargs
+            slug=self.tool.slug,
+            user_id=self.user_id,
+            arguments=kwargs,
+            dangerously_skip_version_check=True,
         )
 
 
