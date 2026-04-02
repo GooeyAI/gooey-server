@@ -249,9 +249,8 @@ def billing_page(
         with gui.div(className="mb-5"):
             render_current_plan(workspace)
 
-    if PricingPlan.from_sub(workspace.subscription) != PricingPlan.TEAM:
-        with gui.div(className="mb-5"):
-            render_credit_balance(workspace)
+    with gui.div(className="mb-5"):
+        render_credit_balance(workspace)
 
     with gui.div(className="mb-5"):
         selected_payment_provider = render_all_plans(
@@ -304,13 +303,11 @@ def render_current_plan(workspace: Workspace):
         # ROW 1: Plan title and next invoice date
         left, right = left_and_right()
         with left:
-            gui.write(f"#### Plan: {plan.title}")
-
-            if provider:
-                gui.write(
-                    f"[{icons.edit} Manage Subscription](#payment-information)",
-                    unsafe_allow_html=True,
-                )
+            gui.write(
+                f'#### <span class="text-muted">Current Plan:</span> {plan.title}',
+                className="no-margin",
+                unsafe_allow_html=True,
+            )
 
         with right, gui.div(className="d-flex align-items-center gap-1"):
             if provider:
@@ -427,6 +424,15 @@ def _render_seat_info_for_team_subscription(subscription: Subscription):
 
 
 def render_credit_balance(workspace: Workspace):
+    plan = PricingPlan.from_sub(workspace.subscription)
+    if not workspace.is_personal and (
+        plan == PricingPlan.TEAM
+        or (plan == PricingPlan.STARTER and workspace.balance <= 0)
+    ):
+        # for team workspaces who have not paid earlier, only
+        # team (per-seat) plan is applicable
+        return None
+
     gui.write(f"## Credit Balance: {workspace.balance:,}")
     gui.caption(
         "Every time you submit a workflow or make an API call, we deduct credits from your account."
@@ -454,7 +460,7 @@ def render_all_plans(
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(
-            f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})**"
+            f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})** • Prices don’t include taxes",
         )
 
     return selected_payment_provider
@@ -676,7 +682,7 @@ def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelec
             count = gui.selectbox(
                 label="Seats",
                 options=[2, 3, 4, 5, 10, 15, 20, 25, 50],
-                key=f"seats-select-{plan.key}-{workspace.id}",
+                key=f"seat-count-select-{plan.key}-{workspace.id}",
                 value=(
                     workspace.subscription
                     and workspace.subscription.billed_seats().count()
@@ -751,14 +757,32 @@ def _render_plan_action_button(
         and seat_selection
         and seat_selection[1] < workspace.used_seats
     ):
-        gui.error(
-            f"""
-            You are currently using {workspace.used_seats} seats.
-            Please select at least {workspace.used_seats} seats or remove some members.
-
-            [View Members]({get_route_path(members_route)})
-            """
-        )
+        with gui.div(className="d-flex p-3 pb-0 gap-2 alert alert-danger text-black"):
+            # fire emoji
+            gui.write("🔥")
+            with gui.div():
+                gui.write(
+                    f"""
+                    You are currently using {workspace.used_seats} seats.
+                    Please select at least {workspace.used_seats} seats or remove some members.
+                    """
+                )
+                with gui.div(className="d-flex align-items-center gap-2"):
+                    if gui.button(
+                        f"Stay at {workspace.used_seats} seats",
+                        type="link",
+                        className="fw-normal",
+                    ):
+                        gui.session_state[
+                            f"seat-count-select-{plan.key}-{workspace.id}"
+                        ] = workspace.used_seats
+                        raise gui.RerunException()
+                    gui.write("|")
+                    gui.write(
+                        f"""
+                        [Edit Members]({get_route_path(members_route)})
+                        """
+                    )
 
     elif workspace.subscription and workspace.subscription.is_paid():
         render_change_subscription_button(
@@ -1573,6 +1597,8 @@ def render_paypal_subscription_button(
 
 
 def render_payment_information(workspace: Workspace):
+    from routers.account import payment_processing_route
+
     if not workspace.subscription:
         return
 
@@ -1626,12 +1652,10 @@ def render_payment_information(workspace: Workspace):
             with col2:
                 gui.html(pm_summary.billing_email)
 
-    from routers.account import payment_processing_route
-
     ref = gui.use_confirm_dialog(key="--delete-payment-method")
     gui.button_with_confirm_dialog(
         ref=ref,
-        trigger_label="Delete & Cancel Subscription",
+        trigger_label="Cancel Subscription",
         trigger_className="border-danger text-danger",
         modal_title="#### Delete Payment Information",
         modal_content="""
