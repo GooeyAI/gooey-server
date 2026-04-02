@@ -19,7 +19,7 @@ WORKDIR /app
 
 # CapRover builds from the monorepo root, so copy files from gooey-gui/.
 COPY gooey-gui/package.json gooey-gui/package-lock.json ./
-RUN npm i -g npm@latest && npm ci --verbose
+RUN npm ci --verbose
 
 ARG SENTRY_ORG
 ENV SENTRY_ORG=$SENTRY_ORG
