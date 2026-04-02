@@ -14,3 +14,12 @@
 - Prefer invoking the env's executables directly, for example `/Users/<user>/.virtualenvs/$(cat .venv)/bin/python`, `/Users/<user>/.virtualenvs/$(cat .venv)/bin/pytest`, and `/Users/<user>/.virtualenvs/$(cat .venv)/bin/ruff`.
 - Run `ruff` after making code edits and fix any reported issues before finishing.
 - Do not push commits or update remote branches without explicit user confirmation.
+
+## Gooey GUI Components
+
+- `gooey-gui/app/components` supports dynamically rendered custom components from the Python render tree.
+- For a component to participate in this system, the React component name, the file name, and the render-tree node name must match exactly. Example: `ComposioAuthRequired` lives in `gooey-gui/app/components/ComposioAuthRequired.tsx` and is rendered from Python with `gui.component("ComposioAuthRequired", ...)` or an equivalent wrapper.
+- In `gooey-gui/app/components`, define these components with a named export in the form `export function <Name>({ ... }) { ... }`. Do not use `export default` for components that are meant to be resolved dynamically through `app/components/index.ts`.
+- After adding a new dynamically rendered component under `gooey-gui/app/components`, add `export * from "./<Name>";` to `gooey-gui/app/components/index.ts`.
+- The dynamic renderer passes the shared contract `props + children + onChange + state` to these components. Components that need render-tree children or form state should accept those props directly instead of relying on a special-case branch in `gooey-gui/app/renderer.tsx`.
+- Prefer moving app-specific custom components onto the dynamic component path instead of adding more one-off `case` branches to `gooey-gui/app/renderer.tsx`. Keep only true renderer primitives and special protocol nodes in the explicit switch.
