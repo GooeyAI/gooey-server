@@ -1715,7 +1715,7 @@ def render_billing_history(
 
     txns = (
         AppUserTransaction.objects.select_related("member")
-        .filter(workspace=workspace, amount__gte=0)
+        .filter(workspace=workspace)
         .exclude(reason=TransactionReason.DEDUCT)
         .order_by("-created_at")
     )
