@@ -876,13 +876,12 @@ class WorkspaceInvite(models.Model):
                 "This invitation has expired. Please ask your team admin to send a new one."
             )
 
+        out_of_seats_error_message = "This workspace is full. Ask your admin to add another seat so you can join."
         if PricingPlan.from_sub(self.workspace.subscription) not in [
             PricingPlan.TEAM,
             PricingPlan.ENTERPRISE,
         ]:
-            raise ValidationError(
-                "This workspace is not accepting new members. Please ask your team admin to upgrade the workspace."
-            )
+            raise ValidationError(out_of_seats_error_message)
 
         membership, created = WorkspaceMembership.objects.get_or_create(
             workspace=self.workspace,
@@ -900,9 +899,7 @@ class WorkspaceInvite(models.Model):
                 member_ids=[membership.id],
             )
             if membership.id not in assigned_members:
-                raise ValidationError(
-                    "This workspace has reached its member limit. Please ask your admin to upgrade the workspace."
-                )
+                raise ValidationError(out_of_seats_error_message)
 
         self.updated_by = updated_by
         self.status = self.Status.ACCEPTED
