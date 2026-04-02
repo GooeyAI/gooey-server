@@ -17,8 +17,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# CapRover builds from the monorepo root, so copy files from gooey-gui/.
-COPY gooey-gui/package.json gooey-gui/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci --verbose
 
 ARG SENTRY_ORG
@@ -32,7 +31,7 @@ ENV SENTRY_RELEASE=$CAPROVER_GIT_COMMIT_SHA
 ARG WIX_URLS
 ENV WIX_URLS=$WIX_URLS
 
-COPY gooey-gui/ ./
+COPY . .
 RUN SENTRY_LOG_LEVEL=debug npm run build-prod
 
 ENV NODE_ENV=production
