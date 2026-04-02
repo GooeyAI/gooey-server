@@ -5,11 +5,11 @@
 # The assumptions here are that:
 # - you have redis installed but not running as a background service
 # - you have rabbitmq installed but not running as a background service
-# - your local gooey-ui repo is at ../gooey-ui/
+# - the frontend lives at ./gooey-gui/
 #
 # You can comment any of the processes if you have background services running
-# for them. You can also change the path for the `ui` process from `../gooey-ui/`
-# to wherever your local gooey-ui directory is.
+# for them. You can also change the path for the `ui` process if your frontend
+# directory is elsewhere.
 
 api: poetry run uvicorn server:app --host 127.0.0.1 --port 8080 --reload
 
@@ -19,4 +19,4 @@ dashboard: poetry run streamlit run Home.py --server.port 8501 --server.headless
 
 celery: poetry run celery -A celeryapp worker -P threads -c 16 -l DEBUG
 
-ui: cd ../gooey-gui/; PORT=3000 REDIS_URL=redis://localhost:6379 npm run dev
+ui: cd gooey-gui/; PORT=3000 REDIS_URL=redis://localhost:6379 npm run dev

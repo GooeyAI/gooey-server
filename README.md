@@ -123,7 +123,16 @@ export MAGICK_HOME=/opt/homebrew
 
 ### 🌍 Frontend
 
-Clone [gooey-gui](https://github.com/GooeyAI/gooey-gui) repo, in the same directory as `gooey-server` and follow the setup steps.
+The `gooey-gui` frontend lives inside this repository at `./gooey-gui`.
+
+After cloning `gooey-server`, install the frontend dependencies from the repo root:
+
+```bash
+cd gooey-gui
+npm install
+```
+
+The Python package imported by `gooey-server` is available as `gooey_gui`.
 
 ### 🧪 Run Tests
 
@@ -162,7 +171,7 @@ These are the services that you need to run to start developing locally. Open th
 | Service                 | Port   | Command                                                                                                                                   |
 | ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Python API + GUI Server | `8080` | `poetry run uvicorn server:app --host 127.0.0.1 --port 8080 --reload`                                                                     |
-| Node Frontend           | `3000` | `cd ../gooey-gui/; PORT=3000 REDIS_URL=redis://localhost:6379 npm run build && npm run start`                                             |
+| Node Frontend           | `3000` | `cd gooey-gui/; PORT=3000 REDIS_URL=redis://localhost:6379 npm run build && npm run start`                                                |
 | Celery (Task Runner)    | -      | `poetry run celery -A celeryapp worker -P threads -c 16 -l DEBUG`                                                                         |
 | Django Admin site       | `8000` | `poetry run python manage.py runserver 127.0.0.1:8000`                                                                                    |
 | Vespa (Vector DB)       | `8085` | `docker run --hostname vespa-container -p 8085:8080 -p 19071:19071 --volume vespa:/opt/vespa/var -it --rm --name vespa vespaengine/vespa` |
@@ -170,8 +179,7 @@ These are the services that you need to run to start developing locally. Open th
 This default startup assumes that Redis, RabbitMQ, and PostgreSQL are installed and running
 as background services on ports `6379`, `5672`, and `5432` respectively.
 
-The gooey-gui repo should be cloned at `../gooey-gui/`
-(adjacent to where the`gooey-server` repo sits).
+The frontend source lives at `./gooey-gui/` inside this repo.
 
 ### Reloading on code changes
 
@@ -182,7 +190,7 @@ The gooey-gui repo should be cloned at `../gooey-gui/`
 - If you are working on the gooey-gui (react frontend), you can run:
 
 ```shell
-cd ../gooey-gui/; PORT=3000 REDIS_URL=redis://localhost:6379 npm run dev
+cd gooey-gui/; PORT=3000 REDIS_URL=redis://localhost:6379 npm run dev
 ```
 
 #### Hot Reloading
