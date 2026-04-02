@@ -243,6 +243,9 @@ class Subscription(models.Model):
             raise ValueError("Invalid Payment Provider")
 
     def get_payment_method_summary(self) -> PaymentMethodSummary | None:
+        if not self.payment_provider or not self.external_id:
+            return
+
         match self.payment_provider:
             case PaymentProvider.PAYPAL:
                 subscription = paypal.Subscription.retrieve(self.external_id)

@@ -957,12 +957,13 @@ def _render_upgrade_subscription_button(
         if gui.button(
             "Create Team",
             type="primary",
-            onClick=open_create_workspace_popup_js(selected_plan=plan),
+            key=f"create-workspace-btn-{plan.key}-{workspace.id}",
+            onClick=open_create_workspace_popup_js(
+                selected_plan=plan, seat_selection=seat_selection
+            ),
         ):
             gui.session_state["pressed_create_workspace"] = True
         return
-    elif gui.session_state.pop("pressed_create_workspace", None):
-        upgrade_dialog.set_open(True)
 
     # For TEAM plan on team workspaces, show detailed order summary
     if plan == PricingPlan.TEAM:
@@ -1052,7 +1053,9 @@ def _render_create_subscription_button(
         if gui.button(
             "Create Team",
             type="primary",
-            onClick=open_create_workspace_popup_js(selected_plan=plan),
+            onClick=open_create_workspace_popup_js(
+                selected_plan=plan, seat_selection=seat_selection
+            ),
         ):
             gui.session_state["pressed_create_workspace"] = True
     elif plan == PricingPlan.TEAM and not workspace.is_personal:
@@ -1521,10 +1524,6 @@ def stripe_subscription_create(
 ):
     from routers.account import account_route
     from routers.account import payment_processing_route
-
-    if workspace.subscription and workspace.subscription.is_paid():
-        # sanity check: already subscribed to some plan
-        gui.rerun()
 
     # check for existing subscriptions on stripe
     customer = workspace.get_or_create_stripe_customer()
