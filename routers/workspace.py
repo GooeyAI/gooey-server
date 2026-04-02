@@ -14,9 +14,12 @@ from furl import furl
 
 from app_users.models import AppUser
 from daras_ai_v2 import settings
+from daras_ai_v2.billing import stripe_subscription_create
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from handles.models import Handle, COMMON_EMAIL_DOMAINS
+from payments.models import SeatType
+from payments.plans import PricingPlan
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.models import Workspace, WorkspaceInvite, WorkspaceRole
 from workspaces.widgets import (
@@ -34,7 +37,11 @@ app = CustomAPIRouter()
 
 @gui.route(app, "/workspaces/create/")
 def create_workspace_route(
-    request: Request, selected_plan: int | None = None, next: str | None = None
+    request: Request,
+    selected_plan: int | None = None,
+    selected_seat_type: str | None = None,
+    selected_seat_count: int | None = None,
+    next: str | None = None,
 ):
     """Render the workspace creation popup step 1."""
     if not request.user or request.user.is_anonymous:
@@ -46,6 +53,8 @@ def create_workspace_route(
             user=request.user,
             session=request.session,
             selected_plan=selected_plan,
+            selected_seat_type=selected_seat_type,
+            selected_seat_count=selected_seat_count,
             next_url=next,
         )
 
@@ -60,7 +69,11 @@ def create_workspace_route(
 
 @gui.route(app, "/workspaces/create/invite-team/")
 def workspace_invite_team_route(
-    request: Request, selected_plan: int | None = None, next: str | None = None
+    request: Request,
+    selected_plan: int | None = None,
+    selected_seat_type: str | None = None,
+    selected_seat_count: int | None = None,
+    next: str | None = None,
 ):
     if not request.user or request.user.is_anonymous:
         redirect_url = furl("/login", query_params={"next": request.url})
@@ -80,6 +93,8 @@ def workspace_invite_team_route(
             workspace=workspace,
             user=request.user,
             selected_plan=selected_plan,
+            selected_seat_type=selected_seat_type,
+            selected_seat_count=selected_seat_count,
             next_url=next,
         )
 
@@ -93,12 +108,17 @@ def workspace_invite_team_route(
 
 
 def render_create_workspace_form(
-    user: AppUser, session: dict, selected_plan: int | None, next_url: str
+    user: AppUser,
+    session: dict,
+    next_url: str,
+    selected_plan: int | None,
+    selected_seat_type: str | None = None,
+    selected_seat_count: int | None = None,
 ):
     from daras_ai_v2.profiles import render_handle_input, update_handle
     from routers.account import account_route
 
-    plans_url = get_app_route_url(account_route, query_params=dict(tab="team"))
+    plans_url = get_app_route_url(account_route, query_params={"plans_tab": "team"})
     gui.write("#### Create Gooey.AI Workspace")
     gui.caption(
         "Workspaces allow you to collaborate with a shared payment method. "
@@ -166,6 +186,10 @@ def render_create_workspace_form(
         )
         if selected_plan:
             next_url.query.params["selected_plan"] = selected_plan
+            if selected_seat_type:
+                next_url.query.params["selected_seat_type"] = selected_seat_type
+            if selected_seat_count:
+                next_url.query.params["selected_seat_count"] = selected_seat_count
         gui.js(
             # language=javascript
             """
@@ -192,11 +216,16 @@ def get_default_workspace_name_for_user(user: AppUser) -> str:
 
 
 def render_invite_team_form(
-    workspace: Workspace, user: AppUser, selected_plan: int | None, next_url: str
+    workspace: Workspace,
+    user: AppUser,
+    next_url: str,
+    selected_plan: int | None,
+    selected_seat_type: str | None = None,
+    selected_seat_count: int | None = None,
 ):
     gui.write(f"### Invite members to {workspace.display_name()} on Gooey.AI")
     gui.caption(
-        "This workspace is private and only members can access its workflows and shared billing."
+        "This workspace is private to members. Each member will need their own paid seat."
     )
     max_emails = 5
     emails_csv = render_emails_csv_input(max_emails=5, key="workspace:create:emails")
@@ -215,8 +244,11 @@ def render_invite_team_form(
 
     error_msg_container = gui.div()
     with gui.div(className="d-flex justify-content-end gap-2 mt-2"):
+        if gui.button("Cancel", onClick=popup_close_or_navgiate_js(next_url)):
+            return
+
         if selected_plan:
-            label = "Add Payment Method"
+            label = "Invite & Checkout"
         else:
             label = "Choose a Plan"
         submit_btn = gui.button(label, type="primary")
@@ -237,8 +269,24 @@ def render_invite_team_form(
     except ValidationError as e:
         with error_msg_container:
             gui.error("\n".join(e.messages))
-    else:
+        return
+
+    if not selected_plan:
         gui.js(popup_close_or_navgiate_js(next_url))
+        return
+
+    plan = PricingPlan.from_db_value(selected_plan)
+    seat_type = (
+        selected_seat_type and SeatType.objects.filter(key=selected_seat_type).first()
+    )
+    if plan == PricingPlan.TEAM:
+        seat_count = int(selected_seat_count or 2)
+    else:
+        seat_count = 1
+    seat_selection = seat_type and (seat_type, seat_count)
+    stripe_subscription_create(
+        workspace=workspace, plan=plan, seat_selection=seat_selection
+    )
 
 
 def render_emails_csv_input(max_emails: int, key: str) -> str:
