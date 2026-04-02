@@ -118,7 +118,7 @@ function showLoginProgress() {
   for (const elem of document.querySelectorAll(
     "[data-replace-login-spinner]",
   )) {
-    elem.innerHTML = "<h5>Logging you in...</h5>";
+    elem.innerHTML = "<h5>Signing in...</h5>";
   }
 }
 
@@ -132,4 +132,3 @@ async function loadAnonymousUser() {
   console.log("loaded anonymous user", firebase.auth().currentUser.isAnonymous);
   return credential.user;
 }
-
