@@ -80,7 +80,6 @@ anthropic = "^0.67.0"
 azure-cognitiveservices-speech = "^1.37.0"
 twilio = "^9.2.3"
 sentry-sdk = {version = "1.45.0", extras = ["loguru"]}
-gooey-gui = "0.6.0"
 django-safedelete = "^1.4.0"
 numexpr = "^2.10.1"
 django-csp = "^3.8"
