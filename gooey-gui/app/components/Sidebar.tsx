@@ -4,7 +4,7 @@ import type { OnChange } from "~/app";
 import { useEffect, useState } from "react";
 import SidebarResizer from "./SidebarResizer";
 
-export default function GooeySidebar({
+export function Sidebar({
   name,
   children,
   onChange,

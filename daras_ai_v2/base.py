@@ -1927,21 +1927,19 @@ class BasePage:
                 self._render_after_output()
 
     def _render_failed_output(self):
-        html_msg = self._get_custom_error_msg()
-        if html_msg:
-            gui.html(html_msg)
-        else:
+        if not self._render_custom_error():
             err_msg = gui.session_state.get(StateKeys.error_msg)
             gui.error(err_msg, unsafe_allow_html=True)
 
-    def _get_custom_error_msg(self) -> str | None:
+    def _render_custom_error(self) -> bool:
         if not self.current_sr or not self.current_sr.error_type:
-            return None
+            return False
         exc_cls = getattr(exceptions, self.current_sr.error_type, None)
         render = getattr(exc_cls, "render", None)
         if not callable(render):
-            return None
-        return render(self.current_sr.error_params)
+            return False
+        render(self.current_sr.error_params)
+        return True
 
     def click_preview_tab(self):
         # show the preview tab when running
