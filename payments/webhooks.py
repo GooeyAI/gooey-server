@@ -421,14 +421,14 @@ def set_subscription_seats_from_stripe_sub(
 
     if PricingPlan.from_sub(db_sub) == PricingPlan.TEAM:
         # if the new plan is still a team plan, auto-assign seats
-        auto_assign_team_seats(db_sub.workspace, invoice_id=invoice_id)
+        auto_assign_team_seats(db_sub, invoice_id=invoice_id)
 
 
 def auto_assign_team_seats(
-    workspace: Workspace, invoice_id: str, member_ids: list[str] | None = None
+    db_sub: Subscription, invoice_id: str, member_ids: list[str] | None = None
 ):
     memberships_qs = (
-        workspace.memberships.select_related("user")
+        db_sub.workspace.memberships.select_related("user")
         .select_for_update()
         .filter(deleted__isnull=True)
         .order_by("-created_at")
@@ -438,7 +438,7 @@ def auto_assign_team_seats(
 
     memberships = {m.id: m for m in memberships_qs}
     workspace_seats = (
-        workspace.subscription.billed_seats()
+        db_sub.billed_seats()
         .select_related("seat_type")
         .select_for_update()
         .order_by("-seat_type__monthly_credit_limit")
@@ -466,7 +466,7 @@ def auto_assign_team_seats(
             amount=seat.seat_type.monthly_credit_limit - member.balance,
             invoice_id=f"{invoice_id}/{seat.id}",
             reason=TransactionReason.MEMBER_SEAT_CHANGE,
-            plan=workspace.subscription.plan,
+            plan=db_sub.plan,
         )
         ret[member.pk] = seat
 
