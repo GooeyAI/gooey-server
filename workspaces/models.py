@@ -905,7 +905,7 @@ class WorkspaceInvite(models.Model):
         plan = PricingPlan.from_sub(self.workspace.subscription)
         if plan == PricingPlan.TEAM:
             assigned_members = auto_assign_team_seats(
-                self.workspace,
+                self.workspace.subscription,
                 invoice_id=f"{self.workspace.subscription.external_id}:invite_{self.id}:{uuid.uuid4()}",
                 member_ids=[membership.id],
             )
