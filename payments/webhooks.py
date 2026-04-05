@@ -213,7 +213,7 @@ class StripeWebhookHandler:
         for item in stripe_sub["items"].data:
             quantity += item.quantity
             unit_amount = float(
-                item.price.unit_amount_decimal or item.price.unit_amount
+                item.price.unit_amount or item.price.unit_amount_decimal
             )
             charged_amount += unit_amount * item.quantity
 
@@ -222,8 +222,8 @@ class StripeWebhookHandler:
             plan=plan,
             workspace=workspace,
             external_id=stripe_sub.id,
-            amount=quantity,
-            charged_amount=charged_amount,
+            amount=int(round(quantity)),
+            charged_amount=int(round(charged_amount)),
         )
         set_subscription_seats_from_stripe_sub(
             db_sub,
