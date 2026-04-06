@@ -41,7 +41,7 @@ class ModelProvider(models.IntegerChoices):
     azure_openai = 4, "Azure OpenAI"
     google = 2, "Google"
     together_ai = 3, "TogetherAI"
-    anthropic = 6, "Anthropic"
+    anthropic = 6, "Anthropic [Deprecated]"
     groq = 7, "groq"
     fireworks = 8, "Fireworks AI"
     mistral = 9, "Mistral AI"
@@ -52,6 +52,10 @@ class ModelProvider(models.IntegerChoices):
     publicai = 14, "PublicAI"
     modal = 15, "Modal"
     aks = 5, "Azure Kubernetes Service"
+
+    @classmethod
+    def _deprecated(cls):
+        return {cls.anthropic}
 
 
 class AIModelSpecQuerySet(models.QuerySet):

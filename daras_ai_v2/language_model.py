@@ -649,15 +649,7 @@ def _run_anthropic_chat(
         for entry in response.content:
             if entry.type != "tool_use":
                 continue
-            response = entry.input
-            if isinstance(response, dict):
-                response = response.get("response", {})
-            return [
-                {
-                    "role": CHATML_ROLE_ASSISTANT,
-                    "content": json.dumps(response),
-                }
-            ]
+            return _format_anthropic_json_response(entry.input)
     return [
         {
             "role": CHATML_ROLE_ASSISTANT,
@@ -835,32 +827,12 @@ def run_openai_chat(
     if tools:
         kwargs["tools"] = [tool.spec_openai for tool in tools]
 
-    anthropic_json_workaround = False
-    if model.is_anthropic_model() and response_format_type == "json_object":
-        anthropic_json_workaround = True
-        kwargs["tools"] = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "json_output",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "response": {
-                                "type": "object",
-                                "description": "The response to the user's prompt as a JSON object.",
-                            },
-                        },
-                    },
-                },
-            }
-        ]
-        kwargs["tool_choice"] = {
-            "type": "function",
-            "function": {"name": "json_output"},
-        }
-        response_format_type = None
-    elif model.is_anthropic_model():
+    anthropic_json_workaround = (
+        model.is_anthropic_model() and response_format_type == "json_object"
+    )
+    if model.is_anthropic_model():
+        if anthropic_json_workaround:
+            _apply_anthropic_json_workaround(kwargs)
         response_format_type = None
 
     if response_format_type:
@@ -903,44 +875,79 @@ def run_openai_chat(
         return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
 
     if anthropic_json_workaround:
-        ret = []
-        for choice in completion.choices:
-            if choice.finish_reason == "length":
-                raise UserError(
-                    "Claude's response got cut off due to hitting the max_tokens limit, and the truncated response contains an incomplete tool use block. "
-                    "Please retry the request with a higher max_tokens value to get the full tool use. "
-                ) from ValueError(
-                    f"Hit {choice.finish_reason=} when generating JSON: {choice.message=}"
-                )
-            tool_calls = choice.message.tool_calls or []
-            tool_call = tool_calls[0] if tool_calls else None
-            if not tool_call or tool_call.function.name != "json_output":
-                raise UserError(
-                    "Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
-                ) from ValueError(
-                    f"Failed to generate JSON response: {choice.finish_reason=} {choice.message=}"
-                )
-            tool_arguments = tool_call.function.arguments
-            if isinstance(tool_arguments, str):
-                try:
-                    tool_arguments = json.loads(tool_arguments)
-                except json.JSONDecodeError as exc:
-                    raise UserError(
-                        "Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
-                    ) from exc
-            tool_response = tool_arguments
-            if isinstance(tool_response, dict):
-                tool_response = tool_response.get("response", tool_response)
-            ret.append(
-                {
-                    "role": CHATML_ROLE_ASSISTANT,
-                    "content": json.dumps(tool_response),
-                }
-            )
+        ret = _extract_anthropic_json_responses(completion)
     else:
         ret = [choice.message.dict() for choice in completion.choices]
     record_openai_llm_usage(used_model, completion, messages, ret)
     return ret
+
+
+def _apply_anthropic_json_workaround(kwargs: dict) -> None:
+    kwargs["tools"] = [
+        {
+            "type": "function",
+            "function": {
+                "name": "json_output",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "response": {
+                            "type": "object",
+                            "description": "The response to the user's prompt as a JSON object.",
+                        },
+                    },
+                },
+            },
+        }
+    ]
+    kwargs["tool_choice"] = {
+        "type": "function",
+        "function": {"name": "json_output"},
+    }
+
+
+def _extract_anthropic_json_responses(
+    completion: ChatCompletion,
+) -> list[ConversationEntry]:
+    ret = []
+    for choice in completion.choices:
+        if choice.finish_reason == "length":
+            raise UserError(
+                "Claude's response got cut off due to hitting the max_tokens limit, and the truncated response contains an incomplete tool use block. "
+                "Please retry the request with a higher max_tokens value to get the full tool use. "
+            ) from ValueError(
+                f"Hit {choice.finish_reason=} when generating JSON: {choice.message=}"
+            )
+        tool_calls = choice.message.tool_calls or []
+        tool_call = tool_calls[0] if tool_calls else None
+        if not tool_call or tool_call.function.name != "json_output":
+            raise UserError(
+                "Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
+            ) from ValueError(
+                f"Failed to generate JSON response: {choice.finish_reason=} {choice.message=}"
+            )
+        try:
+            ret.extend(_format_anthropic_json_response(tool_call.function.arguments))
+        except json.JSONDecodeError as exc:
+            raise UserError(
+                "Claude was unable to generate a JSON response. Please retry the request with a different prompt, or try a different model."
+            ) from exc
+    return ret
+
+
+def _format_anthropic_json_response(
+    tool_arguments: str | dict | list | None,
+) -> list[ConversationEntry]:
+    if isinstance(tool_arguments, str):
+        tool_arguments = json.loads(tool_arguments)
+    if isinstance(tool_arguments, dict):
+        tool_arguments = tool_arguments.get("response", tool_arguments)
+    return [
+        {
+            "role": CHATML_ROLE_ASSISTANT,
+            "content": json.dumps(tool_arguments),
+        }
+    ]
 
 
 def _get_responses_create(
