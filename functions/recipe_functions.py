@@ -65,9 +65,20 @@ class BaseLLMTool:
 
         self.await_audio_completed = await_audio_completed
 
+    def _clean_gemma4_tool_call_args(self, data: typing.Any) -> typing.Any:
+        """Strip Gemma 4 control characters from tool call arguments."""
+        if isinstance(data, str):
+            return data.replace('<|"|>', "").replace('<|"|', "")
+        elif isinstance(data, dict):
+            return {k: self._clean_gemma4_tool_call_args(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._clean_gemma4_tool_call_args(v) for v in data]
+        return data
+
     def call_json(self, arguments: str) -> str:
         try:
             kwargs = json.loads(arguments)
+            kwargs = self._clean_gemma4_tool_call_args(kwargs)
             ret = self.call(**kwargs)
         except (json.JSONDecodeError, TypeError) as e:
             ret = dict(error=repr(e))
