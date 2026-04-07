@@ -661,7 +661,7 @@ class WorkspaceMembership(SafeDeleteModel):
 
     def can_invite(self):
         return (
-            self.role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+            self.can_edit_workspace()
             and not self.workspace.is_personal
             and (
                 PricingPlan.from_sub(self.workspace.subscription)
