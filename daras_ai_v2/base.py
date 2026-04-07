@@ -2499,8 +2499,7 @@ class BasePage:
             PricingPlan.from_sub(self.current_workspace.subscription)
             == PricingPlan.TEAM
         ):
-            membership = self.current_workspace_membership
-            if membership:
+            if self.current_workspace_membership:
                 txn = self.current_workspace_membership.add_balance(
                     amount=-amount, invoice_id=invoice_id
                 )
