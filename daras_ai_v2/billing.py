@@ -290,7 +290,9 @@ def render_current_plan(workspace: Workspace):
     assert plan is not PricingPlan.ENTERPRISE
 
     monthly_charge = (
-        workspace.subscription and workspace.subscription.charged_amount // 100
+        workspace.subscription
+        and (workspace.subscription.charged_amount // 100)
+        or plan.monthly_charge
     )
 
     if workspace.subscription.payment_provider:
