@@ -136,7 +136,6 @@ def _get_scheduled_team_downgrade_info(
         seat_counts = {}
 
         for item in phase_items:
-            item = phase_items[0]
             price = item.get("price")
             quantity = int(item.get("quantity") or 0)
 
