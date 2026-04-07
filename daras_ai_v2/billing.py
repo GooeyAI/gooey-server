@@ -25,10 +25,7 @@ from daras_ai_v2.settings import templates
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
 from payments.models import PaymentMethodSummary, SeatType, Subscription
 from payments.plans import PricingPlan
-from payments.webhooks import (
-    StripeWebhookHandler,
-    set_workspace_subscription,
-)
+from payments.webhooks import StripeWebhookHandler
 from scripts.migrate_existing_subscriptions import available_subscriptions
 from widgets.author import render_author_from_workspace
 from workspaces.models import Workspace, WorkspaceRole
@@ -80,23 +77,19 @@ def _get_workspace_seat_options(plan: PricingPlan) -> dict[int, SeatType]:
     return {seat_type.id: seat_type for seat_type in qs}
 
 
-def _get_scheduled_team_downgrade_info(
-    subscription_model,
-) -> dict[str, typing.Any] | None:
+def _get_scheduled_downgrade_info(subscription_model) -> dict[str, typing.Any]:
     if (
         not subscription_model
         or subscription_model.payment_provider != PaymentProvider.STRIPE
         or not subscription_model.external_id
     ):
-        return None
+        return {}
 
-    stripe_sub = stripe.Subscription.retrieve(
-        subscription_model.external_id, expand=["schedule"]
-    )
+    stripe_sub = stripe.Subscription.retrieve(subscription_model.external_id)
 
     current_period_end = stripe_sub.get("current_period_end")
     if not current_period_end:
-        return None
+        return {}
     if stripe_sub.get("cancel_at_period_end"):
         return dict(
             plan_title=PricingPlan.STARTER.title,
@@ -147,29 +140,34 @@ def _get_scheduled_team_downgrade_info(
             else:
                 credits += quantity
 
-            total_charge_cents += int(
-                float(price.get("unit_amount_decimal")) * quantity
-            )
+            total_charge_cents += float(price.get("unit_amount_decimal")) * quantity
 
             return dict(
                 plan_title=plan.title,
                 plan_db_value=plan.db_value,
-                total_monthly_charge=total_charge_cents // 100,
+                total_monthly_charge=round(total_charge_cents / 100),
                 credits=credits,
                 seat_counts=seat_counts,
                 effective_date=datetime.fromtimestamp(start_date).strftime("%d %b %Y"),
             )
 
-    return None
+    return {}
 
 
-def _schedule_team_plan_change_next_cycle(
+def _schedule_plan_change_next_cycle(
     *,
     subscription: stripe.Subscription,
     new_plan: PricingPlan,
-    new_selection: SeatSelection,
+    new_selection: SeatSelection | None = None,
 ):
-    seat_type, seat_count = new_selection
+    if new_plan == PricingPlan.TEAM:
+        assert new_selection is not None, (
+            "Seat selection must be provided when changing team plan"
+        )
+        seat_type, seat_count = new_selection
+    else:
+        seat_type, seat_count = None, 1
+
     new_metadata = dict(subscription.metadata or {})
     new_metadata[settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD] = new_plan.key
 
@@ -278,12 +276,14 @@ def render_payments_setup():
 
 def render_current_plan(workspace: Workspace):
     plan = PricingPlan.from_sub(workspace.subscription)
-    assert plan is not PricingPlan.ENTERPRISE
+    assert workspace.subscription is not None and plan is not PricingPlan.ENTERPRISE
+
+    seat_type = workspace.subscription.get_seat_type()
+    seat_count = max(1, workspace.subscription.billed_seats().count())
 
     monthly_charge = (
-        workspace.subscription
-        and (workspace.subscription.charged_amount // 100)
-        or plan.monthly_charge
+        workspace.subscription.charged_amount // 100
+        or plan.get_active_monthly_charge(seat_type=seat_type, seat_count=seat_count)
     )
 
     if workspace.subscription.payment_provider:
@@ -347,50 +347,60 @@ def render_current_plan(workspace: Workspace):
                     )
 
         scheduled_downgrade = gui.run_in_thread(
-            _get_scheduled_team_downgrade_info,
+            _get_scheduled_downgrade_info,
             args=[workspace.subscription],
             cache=True,
             placeholder="",
+            key=f"run_in_thread/scheduled_downgrade/{workspace.subscription.id}",
         )
         if scheduled_downgrade:
-            next_plan = PricingPlan.from_db_value(scheduled_downgrade["plan_db_value"])
-            effective_date = scheduled_downgrade["effective_date"]
+            _render_scheduled_downgrade_warning(
+                scheduled_downgrade, className="mt-3 mb-0"
+            )
 
-            if next_plan == PricingPlan.STARTER:
-                change_text = f"Your plan will be cancelled on {effective_date}."
-            elif next_plan == PricingPlan.TEAM:
-                seat_counts = scheduled_downgrade["seat_counts"]
-                seat_type_objs = {
-                    st.key: st
-                    for st in SeatType.objects.filter(key__in=seat_counts.keys())
-                }
-                parts = [
-                    f"{count} {seat_type_objs[key].name} seat{'s' if count != 1 else ''} "
-                    f"(with up to {seat_type_objs[key].monthly_credit_limit:,} credits/seat/month)"
-                    for key, count in seat_counts.items()
-                    if key in seat_type_objs
-                ]
-                total_monthly = scheduled_downgrade["total_monthly_charge"]
-                change_text = (
-                    f"Your plan will change to {' + '.join(parts)} "
-                    f"on {effective_date} "
-                    f"with a new total price of ${total_monthly:,}/month."
-                )
-            else:
-                total_monthly = scheduled_downgrade["total_monthly_charge"]
-                change_text = (
-                    f"Your plan will change to **{next_plan.title}** "
-                    f"(with {next_plan.credits:,} pooled credits/month) "
-                    f"on {effective_date} "
-                    f"with a new total price of ${total_monthly:,}/month."
-                )
 
-            with gui.div(className="mt-2 alert alert-warning mb-0"):
-                gui.write(
-                    f"{icons.alert} {change_text}",
-                    unsafe_allow_html=True,
-                    className="container-margin-reset",
-                )
+def _render_scheduled_downgrade_warning(
+    downgrade_info: dict[str, typing.Any],
+    *,
+    className: str = "",
+):
+    next_plan = PricingPlan.from_db_value(downgrade_info["plan_db_value"])
+    effective_date = downgrade_info["effective_date"]
+
+    if next_plan == PricingPlan.STARTER:
+        change_text = f"Your plan will be cancelled on {effective_date}."
+    elif next_plan == PricingPlan.TEAM:
+        seat_counts = downgrade_info["seat_counts"]
+        seat_type_objs = {
+            st.key: st for st in SeatType.objects.filter(key__in=seat_counts.keys())
+        }
+        parts = [
+            f"{count} {seat_type_objs[key].name} seat{'s' if count != 1 else ''} "
+            f"(with up to {seat_type_objs[key].monthly_credit_limit:,} credits/seat/month)"
+            for key, count in seat_counts.items()
+            if key in seat_type_objs
+        ]
+        total_monthly = downgrade_info["total_monthly_charge"]
+        change_text = (
+            f"Your plan will change to {' + '.join(parts)} "
+            f"on {effective_date} "
+            f"with a new total price of ${total_monthly:,}/month."
+        )
+    else:
+        total_monthly = downgrade_info["total_monthly_charge"]
+        change_text = (
+            f"Your plan will change to **{next_plan.title}** "
+            f"(with {next_plan.credits:,} pooled credits/month) "
+            f"on {effective_date} "
+            f"with a new total price of ${total_monthly:,}/month."
+        )
+
+    with gui.div(className=f"alert alert-warning {className}"):
+        gui.write(
+            f"{icons.alert} {change_text}",
+            unsafe_allow_html=True,
+            className="container-margin-reset",
+        )
 
 
 def _render_seat_info_for_team_subscription(subscription: Subscription):
@@ -866,11 +876,16 @@ def render_change_subscription_button(
             )
             return
 
-    current_monthly_charge = workspace.subscription.charged_amount // 100 or 0
+    current_monthly_charge = (
+        workspace.subscription.charged_amount // 100
+        or current_plan.get_active_monthly_charge(
+            seat_type=current_seat_type, seat_count=current_seat_count
+        )
+    )
     new_monthly_charge = plan.get_active_monthly_charge(
         seat_type=seat_type, seat_count=seat_count
     )
-    if new_monthly_charge > current_monthly_charge:
+    if new_monthly_charge > current_monthly_charge or current_plan.deprecated:
         _render_upgrade_subscription_button(
             workspace=workspace, plan=plan, seat_selection=seat_selection
         )
@@ -1195,10 +1210,9 @@ def change_subscription(
 
     # Check if plan and seat selection are unchanged
     if current_plan in [PricingPlan.TEAM, PricingPlan.PRO]:
-        current_selection = (
-            workspace.subscription.get_seat_type(),
-            workspace.subscription.billed_seats().count() or 1,
-        )
+        current_seat_type = workspace.subscription.get_seat_type()
+        current_seat_count = workspace.subscription.billed_seats().count() or 1
+        current_selection = (current_seat_type, current_seat_count)
     else:
         current_selection = None
 
@@ -1215,6 +1229,7 @@ def change_subscription(
         case PaymentProvider.STRIPE:
             if not new_plan.supports_stripe():
                 gui.error(f"Stripe subscription not available for {new_plan}")
+                return
 
             stripe_sub = stripe.Subscription.retrieve(
                 workspace.subscription.external_id,
@@ -1223,34 +1238,40 @@ def change_subscription(
             # New plan change should replace any previously scheduled cancel/downgrade.
             _clear_pending_stripe_subscription_changes(stripe_sub)
 
-            current_monthly_charge = (workspace.subscription.charged_amount or 0) // 100
+            if workspace.subscription.charged_amount:
+                current_monthly_charge = workspace.subscription.charged_amount // 100
+            else:
+                current_monthly_charge = current_plan.get_actve_monthly_charge(
+                    seat_type=current_seat_type, seat_count=current_seat_count
+                )
+
             if new_selection:
                 new_seat_type, new_seat_count = new_selection
             else:
                 new_seat_type, new_seat_count = None, 1
+
             new_monthly_charge = new_plan.get_active_monthly_charge(
                 seat_type=new_seat_type, seat_count=new_seat_count
             )
 
-            if current_plan == PricingPlan.TEAM and new_plan == PricingPlan.TEAM:
-                assert new_selection is not None, (
-                    "Seat selection must be provided when changing team plan"
+            if (
+                not current_plan.deprecated
+                and new_monthly_charge < current_monthly_charge
+            ):
+                # for downgrades, schedule for next cycle
+                _schedule_plan_change_next_cycle(
+                    subscription=stripe_sub,
+                    new_plan=new_plan,
+                    new_selection=new_selection,
+                )
+                raise gui.RedirectException(
+                    get_app_route_url(payment_processing_route), status_code=303
                 )
 
-                if new_monthly_charge < current_monthly_charge:
-                    # downgrade within TEAM plan
-                    _schedule_team_plan_change_next_cycle(
-                        subscription=stripe_sub,
-                        new_plan=new_plan,
-                        new_selection=new_selection,
-                    )
-                    raise gui.RedirectException(
-                        get_app_route_url(payment_processing_route), status_code=303
-                    )
-
-                # for upgrades within a team plan
-                kwargs["payment_behavior"] = "error_if_incomplete"
+            if current_plan == PricingPlan.TEAM:
+                # prorate for changes within Team plan
                 kwargs["proration_behavior"] = "always_invoice"
+                kwargs["payment_behavior"] = "error_if_incomplete"
             else:
                 kwargs["proration_behavior"] = "none"
                 kwargs["billing_cycle_anchor"] = "now"
@@ -1588,8 +1609,6 @@ def render_paypal_subscription_button(
 
 
 def render_payment_information(workspace: Workspace):
-    from routers.account import payment_processing_route
-
     if not workspace.subscription:
         return
 
@@ -1643,10 +1662,42 @@ def render_payment_information(workspace: Workspace):
             with col2:
                 gui.html(pm_summary.billing_email)
 
+    _render_delete_payment_method_button(workspace)
+
+
+def _render_delete_payment_method_button(workspace: Workspace):
+    from routers.account import payment_processing_route
+
+    plan = PricingPlan.from_sub(workspace.subscription)
+    if plan == PricingPlan.STARTER:
+        label = "Delete Payment Method"
+    else:
+        downgrade_info = gui.run_in_thread(
+            _get_scheduled_downgrade_info,
+            args=[workspace.subscription],
+            cache=True,
+            placeholder="",
+            key=f"run_in_thread/scheduled_downgrade/{workspace.subscription.id}",
+        )
+        if downgrade_info is None:
+            # thread is still running
+            # -- don't show the delete button
+            return
+        if (
+            downgrade_info
+            and downgrade_info["plan_db_value"] == PricingPlan.STARTER.db_value
+        ):
+            # subscription is already scheduled to be cancelled
+            # -- don't show the delete button
+            _render_scheduled_downgrade_warning(downgrade_info)
+            return
+
+        label = "Delete & Cancel Subscription"
+
     ref = gui.use_confirm_dialog(key="--delete-payment-method")
     gui.button_with_confirm_dialog(
         ref=ref,
-        trigger_label="Cancel Subscription",
+        trigger_label=label,
         trigger_className="border-danger text-danger",
         modal_title="#### Delete Payment Information",
         modal_content="""
@@ -1658,17 +1709,8 @@ This will cancel your subscription and remove your saved payment method.
         confirm_className="border-danger bg-danger text-white",
     )
     if ref.pressed_confirm:
-        set_workspace_subscription(
-            provider=None,
-            plan=PricingPlan.STARTER,
-            workspace=workspace,
-            external_id=None,
-        )
-        pm = (
-            workspace.subscription
-            and workspace.subscription.stripe_get_default_payment_method()
-        )
-        if pm:
+        change_subscription(workspace, new_plan=PricingPlan.STARTER)
+        if pm := workspace.subscription.stripe_get_default_payment_method():
             pm.detach()
         raise gui.RedirectException(
             get_app_route_url(payment_processing_route), status_code=303

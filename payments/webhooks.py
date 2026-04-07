@@ -225,11 +225,12 @@ class StripeWebhookHandler:
             amount=int(round(quantity)),
             charged_amount=int(round(charged_amount)),
         )
-        set_subscription_seats_from_stripe_sub(
-            db_sub,
-            stripe_sub=stripe_sub,
-            invoice_id=f"{stripe_sub.id}:update_{uuid.uuid4()}",
-        )
+        if not db_sub.workspace.is_personal:
+            set_subscription_seats_from_stripe_sub(
+                db_sub,
+                stripe_sub=stripe_sub,
+                invoice_id=f"{stripe_sub.id}:update_{uuid.uuid4()}",
+            )
 
     @classmethod
     def handle_subscription_cancelled(cls, workspace: Workspace):

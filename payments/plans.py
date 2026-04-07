@@ -482,7 +482,10 @@ class PricingPlan(PricingPlanData, Enum):
     # PayPal
 
     def supports_paypal(self) -> bool:
-        return bool(self.monthly_charge)
+        return bool(self.monthly_charge) and self not in [
+            PricingPlan.TEAM,
+            PricingPlan.PRO,
+        ]
 
     def get_paypal_plan(self) -> dict[str, Any]:
         if not self.supports_paypal():
