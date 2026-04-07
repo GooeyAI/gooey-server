@@ -4,7 +4,7 @@ import { OnChange } from "~/app";
 import { RenderedChildren, TreeNode } from "~/renderer";
 import { TooltipPlacement } from "./GooeyTooltip";
 
-export default function GooeyPopover({
+export function GooeyPopover({
   content,
   children,
   onChange,

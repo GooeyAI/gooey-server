@@ -91,11 +91,16 @@ class InsufficientCredits(UserError):
         )
 
     @staticmethod
-    def render(error_params: dict | None) -> str:
-        from daras_ai_v2.settings import templates
+    def render(error_params: dict | None):
+        import gooey_gui as gui
 
-        return templates.get_template("insufficient_credits.html").render(
-            **(error_params or {})
+        error_params = error_params or {}
+        gui.component(
+            "InsufficientCredits",
+            accountUrl=error_params.get("account_url"),
+            discordInviteUrl=settings.DISCORD_INVITE_URL,
+            isAnonymous=error_params.get("is_anonymous"),
+            verifiedEmailUserFreeCredits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
         )
 
 
@@ -123,11 +128,13 @@ class ComposioAuthRequired(UserError):
         )
 
     @staticmethod
-    def render(error_params: dict | None) -> str:
-        from daras_ai_v2.settings import templates
+    def render(error_params: dict | None):
+        import gooey_gui as gui
 
-        return templates.get_template("composio_auth_required.html").render(
-            **(error_params or {})
+        error_params = error_params or {}
+        gui.component(
+            "ComposioAuthRequired",
+            redirectUrl=error_params.get("redirect_url"),
         )
 
 
@@ -141,11 +148,14 @@ class PaymentRequired(UserError):
         )
 
     @staticmethod
-    def render(error_params: dict | None) -> str:
-        from daras_ai_v2.settings import templates
+    def render(error_params: dict | None):
+        import gooey_gui as gui
 
-        return templates.get_template("payment_required.html").render(
-            **(error_params or {})
+        error_params = error_params or {}
+        gui.component(
+            "PaymentRequired",
+            discordInviteUrl=settings.DISCORD_INVITE_URL,
+            paidOnlyModels=error_params.get("paid_only_models") or [],
         )
 
 
