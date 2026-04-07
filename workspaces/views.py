@@ -259,7 +259,7 @@ def render_workspace_by_membership(membership: WorkspaceMembership, *, session: 
         gui.write("#### Members")
         if membership.can_invite():
             member_invite_button_with_dialog(membership)
-        else:
+        elif plan == PricingPlan.STARTER and membership.can_edit_workspace():
             with gui.link(
                 to=get_route_path(account_route),
                 className="btn btn-theme btn-primary",
