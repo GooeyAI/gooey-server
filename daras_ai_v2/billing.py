@@ -106,14 +106,13 @@ def _get_scheduled_team_downgrade_info(
             ),
         )
 
-    schedule = stripe_sub.get("schedule")
-    if not schedule:
-        return None
+    schedule_id = stripe_sub.get("schedule")
+    if not schedule_id:
+        return {}
 
-    if isinstance(schedule, str):
-        schedule = stripe.SubscriptionSchedule.retrieve(
-            schedule, expand=["phases.items.price.product"]
-        )
+    schedule = stripe.SubscriptionSchedule.retrieve(
+        schedule_id, expand=["phases.items.price.product"]
+    )
 
     for phase in schedule.get("phases", []):
         start_date = phase.get("start_date")
@@ -174,8 +173,6 @@ def _schedule_team_plan_change_next_cycle(
     new_metadata = dict(subscription.metadata or {})
     new_metadata[settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD] = new_plan.key
 
-    _clear_pending_stripe_subscription_changes(subscription)
-
     schedule = stripe.SubscriptionSchedule.create(
         from_subscription=subscription.id, expand=["phases.items.price"]
     )
@@ -208,26 +205,20 @@ def _schedule_team_plan_change_next_cycle(
     )
 
 
-def _clear_pending_stripe_subscription_changes(
-    subscription: stripe.Subscription,
-) -> stripe.Subscription:
+def _clear_pending_stripe_subscription_changes(subscription: stripe.Subscription):
+    # check for pending downgrade
     schedule = subscription.get("schedule")
-    schedule_id = schedule and (
-        isinstance(schedule, str)
-        and schedule
-        or isinstance(schedule, dict)
-        and schedule.get("id")
-        or None
-    )
+    if isinstance(schedule, dict):
+        schedule_id = schedule.get("id")
+    else:
+        schedule_id = schedule
+
     if schedule_id:
         stripe.SubscriptionSchedule.release(schedule_id)
-        subscription["schedule"] = None
 
+    # check for pending cancellation
     if subscription.get("cancel_at_period_end"):
         stripe.Subscription.modify(subscription.id, cancel_at_period_end=False)
-        subscription["cancel_at_period_end"] = False
-
-    return subscription
 
 
 def billing_page(
@@ -1230,7 +1221,7 @@ def change_subscription(
                 expand=["items", "items.data.price", "schedule"],
             )
             # New plan change should replace any previously scheduled cancel/downgrade.
-            stripe_sub = _clear_pending_stripe_subscription_changes(stripe_sub)
+            _clear_pending_stripe_subscription_changes(stripe_sub)
 
             current_monthly_charge = (workspace.subscription.charged_amount or 0) // 100
             if new_selection:
