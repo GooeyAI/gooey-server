@@ -25,3 +25,8 @@
 - The dynamic renderer passes the shared contract `props + children + onChange + state` to these components. Components that need render-tree children or form state should accept those props directly instead of relying on a special-case branch in `gooey-gui/app/renderer.tsx`.
 - When nesting Python-rendered UI inside a dynamic component, prefer `with gui.component("Name", ...)` as a context manager on the Python side and render the passed child tree on the React side with `RenderedChildren` from `gooey-gui/app/renderer.tsx`. Do not render raw `children` directly in React; in this system they are render-tree nodes, not normal React children.
 - Prefer moving app-specific custom components onto the dynamic component path instead of adding more one-off `case` branches to `gooey-gui/app/renderer.tsx`. Keep only true renderer primitives and special protocol nodes in the explicit switch.
+
+## New Pages
+
+- If you are asked to create a new page, create a React component for that page, add the corresponding Python route/page entrypoint, and render that React component from the new Python route.
+- When the page should live inside the standard Gooey page shell, render the component under `page_wrapper` as appropriate instead of building a separate ad hoc layout path.
