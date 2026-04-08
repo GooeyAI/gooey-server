@@ -124,21 +124,12 @@ def _section(section_id: str, title: str, subtitle: str = ""):
                 gui.html(subtitle)
 
 
-class _card_ctx:
-    """Context manager for a demo card with a title."""
-
-    def __init__(self, title: str = ""):
-        self.title = title
-
-    def __enter__(self):
-        self._div = gui.div(className="bg-white border rounded-3 p-3 mb-3")
-        self._div.__enter__()
-        if self.title:
-            gui.write(f"**{self.title}**")
-        return self
-
-    def __exit__(self, *args):
-        self._div.__exit__(*args)
+def card(title: str):
+    """Render a demo card with a title. Re-enter the returned div to add body content."""
+    div = gui.div(className="bg-white border rounded-3 p-3 mb-3")
+    with div:
+        gui.write(f"**{title}**")
+    return div
 
 
 # ╔══════════════════════════════════════════════════════════════╗
@@ -155,14 +146,14 @@ def render_styling_and_scripting():
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.styled — Scoped CSS with & selector"):
+        with card("gui.styled — Scoped CSS with & selector"):
             demo_styled()
 
     with col2:
-        with _card_ctx("Bootstrap 5 className"):
+        with card("Bootstrap 5 className"):
             demo_bootstrap_classes()
 
-    with _card_ctx("gui.js — Inject JavaScript"):
+    with card("gui.js — Inject JavaScript"):
         demo_js()
 
 
@@ -218,13 +209,13 @@ def render_icons():
         "Font Awesome 6 — use <i> tags with gui.html()",
     )
 
-    with _card_ctx("How to render icons"):
+    with card("How to render icons"):
         demo_icons_usage()
 
-    with _card_ctx("Common icon styles"):
+    with card("Common icon styles"):
         demo_icon_styles()
 
-    with _card_ctx("Icons in buttons"):
+    with card("Icons in buttons"):
         demo_icons_in_buttons()
 
 
@@ -306,24 +297,24 @@ def render_layouts():
         "gui.div, gui.tag, gui.columns, gui.center, gui.expander, sidebar_layout",
     )
 
-    with _card_ctx("gui.columns — Equal columns"):
+    with card("gui.columns — Equal columns"):
         demo_columns_equal()
 
-    with _card_ctx("gui.columns — Weighted columns"):
+    with card("gui.columns — Weighted columns"):
         demo_columns_weighted()
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.center"):
+        with card("gui.center"):
             demo_center()
     with col2:
-        with _card_ctx("gui.expander"):
+        with card("gui.expander"):
             demo_expander()
 
-    with _card_ctx("gui.div & gui.tag"):
+    with card("gui.div & gui.tag"):
         demo_div_and_tag()
 
-    with _card_ctx("sidebar_layout — Collapsible sidebar"):
+    with card("sidebar_layout — Collapsible sidebar"):
         demo_sidebar()
 
 
@@ -447,26 +438,26 @@ def render_content_and_text():
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.write — Primary output (supports Markdown)"):
+        with card("gui.write — Primary output (supports Markdown)"):
             demo_write()
 
-        with _card_ctx("gui.html — Raw HTML"):
+        with card("gui.html — Raw HTML"):
             demo_html()
 
-        with _card_ctx("gui.error & gui.success"):
+        with card("gui.error & gui.success"):
             demo_alerts()
 
     with col2:
-        with _card_ctx("gui.markdown — Explicit Markdown block"):
+        with card("gui.markdown — Explicit Markdown block"):
             demo_markdown()
 
-        with _card_ctx("gui.text — Preformatted text"):
+        with card("gui.text — Preformatted text"):
             demo_text()
 
-        with _card_ctx("gui.caption & gui.newline"):
+        with card("gui.caption & gui.newline"):
             demo_caption_newline()
 
-    with _card_ctx("Headings via gui.write"):
+    with card("Headings via gui.write"):
         demo_headings()
 
 
@@ -545,17 +536,17 @@ def render_navigation():
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.tabs — Rounded tabs"):
+        with card("gui.tabs — Rounded tabs"):
             demo_tabs()
 
-        with _card_ctx("gui.breadcrumbs"):
+        with card("gui.breadcrumbs"):
             demo_breadcrumbs()
 
     with col2:
-        with _card_ctx("gui.nav_tabs — Underline tabs"):
+        with card("gui.nav_tabs — Underline tabs"):
             demo_nav_tabs()
 
-        with _card_ctx("gui.controllable_tabs"):
+        with card("gui.controllable_tabs"):
             demo_controllable_tabs()
 
 
@@ -615,17 +606,17 @@ def render_inputs_text():
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.text_input"):
+        with card("gui.text_input"):
             demo_text_input()
 
-        with _card_ctx("gui.text_area"):
+        with card("gui.text_area"):
             demo_text_area()
 
     with col2:
-        with _card_ctx("gui.password_input"):
+        with card("gui.password_input"):
             demo_password_input()
 
-        with _card_ctx("gui.code_editor"):
+        with card("gui.code_editor"):
             demo_code_editor()
 
 
@@ -686,15 +677,15 @@ def render_inputs_numeric():
 
     col1, col2, col3 = gui.columns(3)
     with col1:
-        with _card_ctx("gui.number_input"):
+        with card("gui.number_input"):
             demo_number_input()
 
     with col2:
-        with _card_ctx("gui.slider"):
+        with card("gui.slider"):
             demo_slider()
 
     with col3:
-        with _card_ctx("gui.date_input"):
+        with card("gui.date_input"):
             demo_date_input()
 
 
@@ -746,23 +737,23 @@ def render_inputs_selection():
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.checkbox"):
+        with card("gui.checkbox"):
             demo_checkbox()
 
-        with _card_ctx("gui.radio"):
+        with card("gui.radio"):
             demo_radio()
 
-        with _card_ctx("gui.selectbox"):
+        with card("gui.selectbox"):
             demo_selectbox()
 
     with col2:
-        with _card_ctx("gui.switch"):
+        with card("gui.switch"):
             demo_switch()
 
-        with _card_ctx("gui.horizontal_radio"):
+        with card("gui.horizontal_radio"):
             demo_horizontal_radio()
 
-        with _card_ctx("gui.multiselect"):
+        with card("gui.multiselect"):
             demo_multiselect()
 
 
@@ -827,7 +818,7 @@ def demo_multiselect():
 def render_inputs_file():
     _section("inputs-file", "File Upload", "gui.file_uploader")
 
-    with _card_ctx("gui.file_uploader"):
+    with card("gui.file_uploader"):
         demo_file_uploader()
 
 
@@ -854,19 +845,19 @@ def render_buttons_and_links():
         "gui.button, gui.anchor, gui.url_button, gui.download_button",
     )
 
-    with _card_ctx("gui.button — All types"):
+    with card("gui.button — All types"):
         demo_buttons()
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.anchor — Styled link"):
+        with card("gui.anchor — Styled link"):
             demo_anchor()
 
     with col2:
-        with _card_ctx("gui.url_button"):
+        with card("gui.url_button"):
             demo_url_button()
 
-    with _card_ctx("gui.download_button"):
+    with card("gui.download_button"):
         demo_download_button()
 
 
@@ -911,15 +902,15 @@ def render_media():
 
     col1, col2, col3 = gui.columns(3)
     with col1:
-        with _card_ctx("gui.image"):
+        with card("gui.image"):
             demo_image()
 
     with col2:
-        with _card_ctx("gui.video"):
+        with card("gui.video"):
             demo_video()
 
     with col3:
-        with _card_ctx("gui.audio"):
+        with card("gui.audio"):
             demo_audio()
 
 
@@ -961,24 +952,24 @@ def render_overlays():
 
     col1, col2, col3 = gui.columns(3)
     with col1:
-        with _card_ctx("gui.tooltip"):
+        with card("gui.tooltip"):
             demo_tooltip()
 
     with col2:
-        with _card_ctx("gui.popover"):
+        with card("gui.popover"):
             demo_popover()
 
     with col3:
-        with _card_ctx("gui.pill"):
+        with card("gui.pill"):
             demo_pill()
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.alert_dialog"):
+        with card("gui.alert_dialog"):
             demo_alert_dialog()
 
     with col2:
-        with _card_ctx("gui.button_with_confirm_dialog"):
+        with card("gui.button_with_confirm_dialog"):
             demo_confirm_dialog()
 
 
@@ -1051,14 +1042,14 @@ def render_data_display():
 
     col1, col2 = gui.columns(2)
     with col1:
-        with _card_ctx("gui.json — Interactive JSON viewer"):
+        with card("gui.json — Interactive JSON viewer"):
             demo_json()
 
     with col2:
-        with _card_ctx("gui.data_table"):
+        with card("gui.data_table"):
             demo_data_table()
 
-    with _card_ctx("gui.plotly_chart"):
+    with card("gui.plotly_chart"):
         demo_plotly_chart()
 
 
@@ -1106,7 +1097,7 @@ def demo_plotly_chart():
 def render_state():
     _section("state", "State Management", "gui.session_state")
 
-    with _card_ctx("gui.session_state — Per-user state dict"):
+    with card("gui.session_state — Per-user state dict"):
         demo_session_state()
 
 
