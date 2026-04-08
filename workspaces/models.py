@@ -158,6 +158,10 @@ class Workspace(SafeDeleteModel):
     # features
     enable_bot_builder = models.BooleanField(default=False)
     restrict_function_scope = models.BooleanField(default=False)
+    public_by_default = models.BooleanField(
+        default=False,
+        help_text="Make run links and newly saved workflows publicly viewable by default.",
+    )
 
     # billing
     balance = models.IntegerField("bal", default=0)
@@ -214,6 +218,13 @@ class Workspace(SafeDeleteModel):
 
     def get_slug(self):
         return slugify(self.display_name())
+
+    def should_default_runs_be_public(self):
+        return bool(
+            self.public_by_default
+            and not self.is_personal
+            and self.can_have_private_published_runs()
+        )
 
     def can_have_private_published_runs(self):
         if self.is_personal:

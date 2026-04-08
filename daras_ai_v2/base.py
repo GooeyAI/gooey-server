@@ -2599,16 +2599,16 @@ class BasePage:
 
         sr, pr = self.current_sr_pr
         if pr.saved_run_id != sr.id:
+            workspace = sr.workspace
             # not published run
             return (
                 # free workspace: allow anyone
-                not sr.workspace.subscription_id
-                or (
-                    PricingPlan.from_sub(sr.workspace.subscription)
-                    == PricingPlan.STARTER
-                )
+                not workspace
+                or not workspace.subscription_id
+                or PricingPlan.from_sub(workspace.subscription) == PricingPlan.STARTER
+                or workspace.should_default_runs_be_public()
                 # paid workspace: allow members
-                or bool(user and sr.workspace in user.cached_workspaces)
+                or bool(user and workspace in user.cached_workspaces)
             )
 
         # published run
