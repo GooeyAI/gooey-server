@@ -2265,6 +2265,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                     "💔️ Disconnect",
                     key="btn_disconnect",
                 ):
+                    if bi.platform == Platform.TELEGRAM:
+                        bi.telegram_bot_token = ""
+                        bi.telegram_bot_id = None
+                        bi.telegram_bot_user_name = ""
+
                     bi.saved_run = None
                     bi.published_run = None
                     bi.save()
