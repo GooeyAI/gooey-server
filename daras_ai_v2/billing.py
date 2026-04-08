@@ -302,19 +302,20 @@ def render_current_plan(workspace: Workspace):
             )
 
         with right, gui.div(className="d-flex align-items-center gap-1"):
-            if provider:
-                if next_invoice_ts := gui.run_in_thread(
+            if provider and (
+                next_invoice_ts := gui.run_in_thread(
                     workspace.subscription.get_next_invoice_timestamp, cache=True
-                ):
-                    gui.html("Next invoice on ")
-                    with gui.tag("span", className="badge rounded-pill text-bg-dark"):
-                        gui.html(
-                            "...",
-                            **render_local_date_attrs(
-                                next_invoice_ts,
-                                date_options={"day": "numeric", "month": "long"},
-                            ),
-                        )
+                )
+            ):
+                gui.html("Next invoice on ")
+                with gui.tag("span", className="badge rounded-pill text-bg-dark"):
+                    gui.html(
+                        "...",
+                        **render_local_date_attrs(
+                            next_invoice_ts,
+                            date_options={"day": "numeric", "month": "long"},
+                        ),
+                    )
 
         # ROW 2: Plan pricing details
         left, right = left_and_right(className="mt-5")
