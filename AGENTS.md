@@ -1,7 +1,8 @@
 ## Code Style
 
-- Prefer putting the main or public function above helper functions when editing files.
+- When editing files, keep every function above the helpers it calls.
 - When extracting helpers from a main or public function, keep the main/public function first and place the new helper below it.
+- Before finishing an edit, verify that all functions you added or changed still follow caller-above-callee ordering.
 - In migration files, keep the primary migration entrypoint or main backfill function first, with helper functions below it.
 - In `RunPython` migrations, always use `db_alias = schema_editor.connection.alias` and run ORM operations through `.using(db_alias)`.
 - Prefer simple data-driven mappings over layered helper abstractions when the data set is small and fixed.

@@ -1812,7 +1812,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                     workspace=self.current_workspace,
                     title=run_title,
                     notes=pr.notes,
-                    public_access=WorkflowAccessLevel.VIEW_ONLY,
                 )
 
             match pressed_platform:

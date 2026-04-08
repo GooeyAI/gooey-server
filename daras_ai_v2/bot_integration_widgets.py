@@ -203,8 +203,6 @@ def save_analysis_runs_for_integration(
 
 
 def twilio_specific_settings(bi: BotIntegration):
-    SETTINGS_FIELDS = ["twilio_use_missed_call", "twilio_initial_text", "twilio_initial_audio_url", "twilio_waiting_text", "twilio_waiting_audio_url", "twilio_fresh_conversation_per_call"]  # fmt:skip
-
     bi.twilio_initial_text = gui.text_area(
         "###### 📝 Initial Text (said at the beginning of each call)",
         value=bi.twilio_initial_text,
@@ -674,7 +672,6 @@ def _connect_telegram_bot(
     is_admin: bool,
     current_app_url: str,
 ) -> str | None:
-    from bots.models import WorkflowAccessLevel
     from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
     from daras_ai_v2.fastapi_tricks import get_api_route_url
     from daras_ai_v2.telegram_bot import (
@@ -708,7 +705,6 @@ def _connect_telegram_bot(
             workspace=workspace,
             title=run_title,
             notes=pr.notes,
-            public_access=WorkflowAccessLevel.VIEW_ONLY,
         )
 
     webhook_url = get_api_route_url(
