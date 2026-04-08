@@ -827,10 +827,14 @@ def run_openai_chat(
     if tools:
         kwargs["tools"] = [tool.spec_openai for tool in tools]
 
-    anthropic_json_workaround = (
-        model.is_anthropic_model() and response_format_type == "json_object"
-    )
+    anthropic_json_workaround = False
     if model.is_anthropic_model():
+        anthropic_json_workaround = response_format_type == "json_object"
+        if anthropic_json_workaround and tools:
+            raise ValueError(
+                "Anthropic models do not support combining user-defined tools with "
+                "JSON response format. Please use one or the other."
+            )
         if anthropic_json_workaround:
             _apply_anthropic_json_workaround(kwargs)
         response_format_type = None
@@ -883,7 +887,7 @@ def run_openai_chat(
 
 
 def _apply_anthropic_json_workaround(kwargs: dict) -> None:
-    kwargs["tools"] = [
+    kwargs.setdefault("tools", []).append(
         {
             "type": "function",
             "function": {
@@ -899,7 +903,7 @@ def _apply_anthropic_json_workaround(kwargs: dict) -> None:
                 },
             },
         }
-    ]
+    )
     kwargs["tool_choice"] = {
         "type": "function",
         "function": {"name": "json_output"},
