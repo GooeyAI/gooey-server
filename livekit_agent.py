@@ -39,6 +39,7 @@ from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, NotGive
 from livekit.agents.utils import AudioBuffer
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from livekit.rtc.room import ConnectionState
+from loguru import logger
 
 from ai_models.models import AIModelSpec, ModelProvider
 from bots.models.bot_integration import BotIntegration, Platform
@@ -47,9 +48,9 @@ from bots.models.saved_run import SavedRun
 from daras_ai.image_input import (
     gcs_blob_for,
     gcs_bucket,
-    delete_uploaded_file_for_blob,
     delete_uploaded_file_for_gcs_url,
     get_mimetype_from_response,
+    register_uploaded_blob,
     upload_gcs_blob_from_bytes,
     upload_file_from_bytes,
 )
@@ -66,6 +67,7 @@ from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from daras_ai_v2.utils import clamp
+from files.models import UploadedFile
 from functions.workflow_tools import WorkflowLLMTool
 from number_cycling.utils import EXTENSION_NUMBER_LENGTH
 from recipes.TextToSpeech import TextToSpeechPage
@@ -75,7 +77,6 @@ from recipes.VideoBots import (
     infer_asr_model_and_language,
 )
 from routers.api import create_new_run
-from loguru import logger
 
 DTMF_TIMEOUT = 30
 MAX_TRIES = 5
@@ -640,7 +641,9 @@ def asr_step(request: VideoBotsPage.RequestModel, buffer: AudioBuffer) -> str:
         request.asr_model, request.asr_language = infer_asr_model_and_language(
             request.user_language or ""
         )
+
     blob = gcs_blob_for(filename="audio.wav")
+    register_uploaded_blob(blob=blob, is_uploading=True, is_user_uploaded=True)
     try:
         upload_gcs_blob_from_bytes(blob, buffer.to_wav_bytes(), "audio/wav")
         user_input = run_asr(
@@ -653,8 +656,7 @@ def asr_step(request: VideoBotsPage.RequestModel, buffer: AudioBuffer) -> str:
             input_prompt=request.asr_prompt,
         )
     finally:
-        delete_uploaded_file_for_blob(blob)
-        blob.delete()
+        UploadedFile.objects.from_gcs_blob(blob).delete()
 
     request.translation_model = request.translation_model or DEFAULT_TRANSLATION_MODEL
     if (
