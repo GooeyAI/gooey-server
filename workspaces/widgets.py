@@ -193,16 +193,16 @@ def workspace_selector_link(
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:
     try:
-        workspace_id = session[SESSION_SELECTED_WORKSPACE]
-        return Workspace.objects.get(
-            id=workspace_id,
-            memberships__user=user,
-            memberships__deleted__isnull=True,
+        workspace = next(
+            w
+            for w in user.cached_workspaces
+            if w.id == session[SESSION_SELECTED_WORKSPACE]
         )
-    except (KeyError, Workspace.DoesNotExist):
+    except (KeyError, StopIteration):
         workspace = user.get_or_create_personal_workspace()[0]
         set_current_workspace(session, workspace.id)
-        return workspace
+
+    return workspace
 
 
 def set_current_workspace(session: dict, workspace_id: int):
