@@ -50,8 +50,8 @@ from routers.static_pages import serve_static_file
 from widgets.sidebar import sidebar_layout
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
 from workspaces.widgets import (
+    get_current_workspace,
     global_workspace_selector,
-    set_current_workspace,
     workspace_selector_link,
 )
 
@@ -225,7 +225,6 @@ async def file_upload_meta(body_json: dict = fastapi_request_json):
 @app.post("/__/file-upload/")
 def file_upload(request: Request, form_data: FormData = fastapi_request_form):
     from wand.image import Image
-    from workspaces.widgets import SESSION_SELECTED_WORKSPACE
 
     file = form_data["file"]
     data = file.file.read()
@@ -267,15 +266,7 @@ def file_upload(request: Request, form_data: FormData = fastapi_request_form):
         )
 
     user = ensure_request_app_user(request)
-    try:
-        workspace = next(
-            w
-            for w in user.cached_workspaces
-            if w.id == request.session[SESSION_SELECTED_WORKSPACE]
-        )
-    except (KeyError, StopIteration):
-        workspace = user.cached_workspaces[0]
-        set_current_workspace(request.session, int(workspace.id))
+    workspace = get_current_workspace(user, request.session)
 
     return {
         "url": upload_file_from_bytes(
