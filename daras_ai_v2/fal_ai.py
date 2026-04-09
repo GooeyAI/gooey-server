@@ -129,7 +129,7 @@ def _is_fal_asset_url(url: str) -> bool:
         f = furl(url)
     except Exception:
         return False
-    return "fal.media" in (f.origin or "")
+    return "fal.media" in f.origin
 
 
 def _reupload_fal_asset_url(
