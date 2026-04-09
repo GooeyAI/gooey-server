@@ -160,7 +160,7 @@ class Workspace(SafeDeleteModel):
     restrict_function_scope = models.BooleanField(default=False)
     public_by_default = models.BooleanField(
         default=False,
-        help_text="Make run links and newly saved workflows publicly viewable by default.",
+        help_text="[Only for paid team workspaces] Make run links and newly saved workflows publicly viewable by default.",
     )
 
     # billing

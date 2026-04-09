@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='workspace',
             name='public_by_default',
-            field=models.BooleanField(default=False, help_text='Make run links and newly saved workflows publicly viewable by default.'),
+            field=models.BooleanField(default=False, help_text='[Only for paid team workspaces] Make run links and newly saved workflows publicly viewable by default.'),
         ),
     ]

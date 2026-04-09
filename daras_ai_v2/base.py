@@ -382,7 +382,7 @@ class BasePage:
                 )
 
     def render(self):
-        if not self.is_current_user_authorized():
+        if not self.is_user_authorized(self.request.user):
             self.render_unauthorized()
             return
 
@@ -2596,34 +2596,29 @@ class BasePage:
     def is_user_authorized(self, user: AppUser | None = None) -> bool:
         if self.is_user_admin(user):
             return True
-
         sr, pr = self.current_sr_pr
-        if pr.saved_run_id != sr.id:
+        # saved workflow pages
+        if pr.saved_run_id == sr.id:
+            workspace = pr.workspace
+            # approved examples can be accessed by anyone
+            if pr.is_approved_example:
+                return True
+            # saved workflow explicitly set to public access
+            if pr.public_access >= WorkflowAccessLevel.FIND_AND_VIEW:
+                return True
+        # workflow run pages
+        else:
             workspace = sr.workspace
-            # not published run
-            return (
-                # free workspace: allow anyone
-                not workspace
-                or not workspace.subscription_id
-                or PricingPlan.from_sub(workspace.subscription) == PricingPlan.STARTER
-                or workspace.should_default_runs_be_public()
-                # paid workspace: allow members
-                or bool(user and workspace in user.cached_workspaces)
-            )
-
-        # published run
-        return (
-            pr.is_approved_example
-            or (
-                WorkflowAccessLevel(pr.public_access)
-                in (WorkflowAccessLevel.FIND_AND_VIEW, WorkflowAccessLevel.EDIT)
-            )
-            # current user is in the same workspace
-            or bool(user and pr.workspace in user.cached_workspaces)
-        )
-
-    def is_current_user_authorized(self) -> bool:
-        return self.is_user_authorized(self.request.user)
+            # runs created in free tier workspaces are public
+            if not (workspace and workspace.subscription_id):
+                return True
+            if PricingPlan.from_sub(workspace.subscription) == PricingPlan.STARTER:
+                return True
+            # workspace explicitly set to be public_by_default
+            if workspace.should_default_runs_be_public():
+                return True
+        # members can access
+        return bool(user and workspace in user.cached_workspaces)
 
 
 def started_at_text(dt: datetime.datetime):

@@ -18,12 +18,12 @@ if typing.TYPE_CHECKING:
 
 
 class WorkflowAccessLevel(models.IntegerChoices):
-    VIEW_ONLY = 1
-    FIND_AND_VIEW = 2
-    EDIT = 4
+    VIEW_ONLY = 1, "Private"
+    FIND_AND_VIEW = 2, "View Only"
+    EDIT = 4, "Editable"
 
     # migration: set pr.public_access=VIEW_ONLY, pr.workspace_access=EDIT
-    INTERNAL = (3, "Internal (Deprecated)")
+    INTERNAL = 3, "Internal (Deprecated)"
 
     @classmethod
     def get_team_sharing_options(
