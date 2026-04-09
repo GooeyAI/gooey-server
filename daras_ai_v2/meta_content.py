@@ -215,7 +215,7 @@ def robots_tag_for_page(
     is_root = pr and pr.saved_run == sr and pr.is_root()
     is_example = pr and pr.saved_run == sr and not pr.is_root()
 
-    if not page.is_user_authorized(None):
+    if not page.is_user_authorized():
         # nofollow & noindex if page is not open for anonymous users
         no_follow, no_index = True, True
     else:
