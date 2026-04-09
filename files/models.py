@@ -1,8 +1,16 @@
+from __future__ import annotations
+
+import typing
+
 from django.db import models
 from django.template.defaultfilters import filesizeformat
 from loguru import logger
 
 from bots.custom_fields import CustomURLField
+
+if typing.TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from google.cloud.storage import Blob
 
 
 class FileMetadata(models.Model):
@@ -41,6 +49,13 @@ class FileMetadata(models.Model):
         ]
 
 
+class UploadedFileManager(models.Manager):
+    def from_gcs_blob(self, blob: Blob) -> QuerySet[UploadedFile] | None:
+        if not blob.name or not blob.bucket:
+            return None
+        return self.filter(bucket_name=blob.bucket.name, object_name=blob.name)
+
+
 class UploadedFile(models.Model):
     metadata = models.ForeignKey(
         "files.FileMetadata",
@@ -73,7 +88,10 @@ class UploadedFile(models.Model):
     )
     is_user_uploaded = models.BooleanField(default=False)
     is_uploading = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = UploadedFileManager()
 
     class Meta:
         indexes = [

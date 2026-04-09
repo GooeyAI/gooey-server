@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import requests
+from django.db import transaction
 from PIL import Image, ImageOps
 from furl import furl
 
@@ -127,43 +128,39 @@ def register_uploaded_blob(
     is_user_uploaded: bool = False,
     is_uploading: bool = False,
 ) -> UploadedFile:
+    from app_users.models import AppUser
+    from celeryapp.tasks import get_running_saved_run
+
     if not blob.name or not blob.bucket:
         raise ValueError("Blob must have bucket and name set before registration.")
-
-    from celeryapp.tasks import get_running_saved_run
 
     saved_run = get_running_saved_run()
     if saved_run:
         if workspace is None:
             workspace = saved_run.workspace
         if user is None and saved_run.uid:
-            from app_users.models import AppUser
-
             user = AppUser.objects.filter(uid=saved_run.uid).first()
+
     if content_type is None:
-        content_type = getattr(blob, "content_type", None)
+        content_type = (
+            blob.content_type
+            or mimetypes.guess_type(blob.name)[0]
+            or "application/octet-stream"
+        )
+
     if total_bytes is None:
-        total_bytes = getattr(blob, "size", None)
-    etag = getattr(blob, "etag", None)
+        total_bytes = blob.size or 0
 
-    content_type = (
-        content_type or mimetypes.guess_type(blob.name)[0] or "application/octet-stream"
-    )
-    total_bytes = total_bytes or 0
-
-    bucket_name = blob.bucket.name
-    object_name = blob.name
-
-    metadata = FileMetadata.objects.create(
-        name=filename or Path(blob.name).name,
-        etag=etag,
-        mime_type=content_type,
-        total_bytes=total_bytes,
-    )
-    uploaded, created = UploadedFile.objects.get_or_create(
-        bucket_name=bucket_name,
-        object_name=object_name,
-        defaults=dict(
+    with transaction.atomic():
+        metadata = FileMetadata.objects.create(
+            name=filename or Path(blob.name).name,
+            etag=blob.etag,
+            mime_type=content_type,
+            total_bytes=total_bytes,
+        )
+        uploaded_file = UploadedFile.objects.create(
+            bucket_name=blob.bucket.name,
+            object_name=blob.name,
             metadata=metadata,
             f_url=blob.public_url,
             saved_run=saved_run,
@@ -171,27 +168,9 @@ def register_uploaded_blob(
             user=user,
             is_user_uploaded=is_user_uploaded,
             is_uploading=is_uploading,
-        ),
-    )
-    if not created:
-        metadata.delete()
-    return uploaded
+        )
 
-
-def get_uploaded_file_for_blob(blob: "Blob") -> typing.Optional[UploadedFile]:
-    if not blob.name or not blob.bucket:
-        return None
-    return UploadedFile.objects.filter(
-        bucket_name=blob.bucket.name, object_name=blob.name
-    ).first()
-
-
-def delete_uploaded_file_for_blob(blob: "Blob") -> bool:
-    uploaded = get_uploaded_file_for_blob(blob)
-    if not uploaded:
-        return False
-    uploaded.delete()
-    return True
+    return uploaded_file
 
 
 def delete_uploaded_file_for_gcs_url(url: str) -> bool:

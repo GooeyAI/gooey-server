@@ -11,11 +11,7 @@ from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, Workflow
-from daras_ai.image_input import (
-    delete_uploaded_file_for_blob,
-    gcs_blob_for,
-    upload_gcs_blob_from_bytes,
-)
+from daras_ai.image_input import gcs_blob_for, upload_gcs_blob_from_bytes
 from daras_ai_v2 import icons
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
@@ -25,6 +21,7 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.stable_diffusion import LoraWeight, Text2ImgModels
+from files.models import UploadedFile
 from recipes.CompareText2Img import CompareText2ImgPage
 from workspaces.models import Workspace
 
@@ -309,8 +306,7 @@ def zip_images(input_images: list[str], captions: dict[str, str] | None) -> str:
         upload_gcs_blob_from_bytes(blob, f.getvalue(), "application/zip")
         yield blob.public_url
     finally:
-        if not delete_uploaded_file_for_blob(blob):
-            blob.delete()
+        UploadedFile.objects.from_gcs_blob(blob).delete()
 
 
 def render_flux_lora_fast_form(selected_model: str):
