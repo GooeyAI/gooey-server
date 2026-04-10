@@ -9,6 +9,7 @@ from time import time
 
 import gooey_gui as gui
 import sentry_sdk
+from django.utils import timezone
 from fastapi import Depends, HTTPException, Query
 from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -17,18 +18,11 @@ from furl import furl
 from loguru import logger
 from starlette.datastructures import FormData
 from starlette.requests import Request
-from starlette.responses import (
-    FileResponse,
-    PlainTextResponse,
-    Response,
-)
+from starlette.responses import FileResponse, PlainTextResponse, Response
 
 from app_users.models import AppUser
 from bots.models import BotIntegration, PublishedRun, Workflow
-from bots.models.convo_msg import (
-    Conversation,
-    db_msgs_to_api_json,
-)
+from bots.models.convo_msg import Conversation, db_msgs_to_api_json
 from daras_ai.image_input import safe_filename, upload_file_from_bytes
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
@@ -196,6 +190,9 @@ def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
                     existing_user.copy_from_firebase_user(auth.get_user(uid))
             except AppUser.DoesNotExist:
                 pass
+            else:
+                existing_user.last_login_at = timezone.now()
+                existing_user.save(update_fields=["last_login_at"])
             return RedirectResponse(
                 request.query_params.get("next", DEFAULT_LOGIN_REDIRECT),
                 status_code=303,
@@ -302,8 +299,8 @@ def explore_page(
 
 @app.get("/tools/{toolkit_slug}/{tool_slug}")
 def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
-    from composio import Composio
     import composio_client
+    from composio import Composio
 
     try:
         tool = Composio().tools.get_raw_composio_tool_by_slug(slug=tool_slug)

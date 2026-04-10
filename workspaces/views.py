@@ -565,7 +565,7 @@ def render_members_list(
             with gui.tag("th", scope="col"):
                 gui.html("Role")
             with gui.tag("th", scope="col", className="text-nowrap"):
-                gui.html(f"{icons.time} Since")
+                gui.html(f"{icons.time} Last login")
             with gui.tag("th", scope="col"):
                 gui.html("")
 
@@ -595,7 +595,12 @@ def render_members_list(
                     with gui.tag("td", className="text-nowrap"):
                         gui.html(WorkspaceRole.display_html(m.role))
                     with gui.tag("td"):
-                        gui.html("...", **render_local_date_attrs(m.created_at))
+                        gui.html(
+                            "...",
+                            **render_local_date_attrs(
+                                m.user.last_login_at or m.created_at
+                            ),
+                        )
                     with gui.tag("td", className="text-end"):
                         render_membership_actions(m, current_member=current_member)
 
