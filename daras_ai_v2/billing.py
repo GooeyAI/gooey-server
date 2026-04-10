@@ -1242,7 +1242,7 @@ def change_subscription(
             if workspace.subscription.charged_amount:
                 current_monthly_charge = workspace.subscription.charged_amount // 100
             else:
-                current_monthly_charge = current_plan.get_actve_monthly_charge(
+                current_monthly_charge = current_plan.get_active_monthly_charge(
                     seat_type=current_seat_type, seat_count=current_seat_count
                 )
 
