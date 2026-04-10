@@ -44,6 +44,7 @@ from routers import (
     telegram_api,
     static_pages,
     onedrive_api,
+    gmail_api,
     workspace,
     pycon,
 )
@@ -66,6 +67,7 @@ app.include_router(broadcast_api.app)
 app.include_router(account.app, include_in_schema=False)
 app.include_router(facebook_api.app, include_in_schema=False)
 app.include_router(onedrive_api.app, include_in_schema=False)
+app.include_router(gmail_api.app, include_in_schema=False)
 app.include_router(slack_api.router, include_in_schema=False)
 app.include_router(workspace.app, include_in_schema=False)
 app.include_router(url_shortener.app, include_in_schema=False)

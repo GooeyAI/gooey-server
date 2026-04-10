@@ -276,6 +276,17 @@ MAX_UPLOAD_SIZE = config("MAX_UPLOAD_SIZE", default=1024 * 1024 * 250, cast=int)
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
 FIREBASE_CONFIG = config("FIREBASE_CONFIG", default="")
 
+# Gmail API (OAuth2 + Pub/Sub push notifications)
+GMAIL_CLIENT_ID = config("GMAIL_CLIENT_ID", default="")
+GMAIL_CLIENT_SECRET = config("GMAIL_CLIENT_SECRET", default="")
+GMAIL_PUBSUB_TOPIC = config(
+    "GMAIL_PUBSUB_TOPIC",
+    default=f"projects/{GCP_PROJECT}/topics/gmail-push",
+)
+GMAIL_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
+
 UBERDUCK_KEY = config("UBERDUCK_KEY", None)
 UBERDUCK_SECRET = config("UBERDUCK_SECRET", None)
 

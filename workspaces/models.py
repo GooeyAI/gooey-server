@@ -143,6 +143,30 @@ class Workspace(SafeDeleteModel):
         editable=True,
     )
 
+    # Gmail integration
+    gmail_user_email = models.CharField(
+        blank=True,
+        default="",
+        max_length=255,
+        help_text="Connected Gmail address",
+    )
+    gmail_access_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Gmail OAuth2 access token",
+    )
+    gmail_refresh_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Gmail OAuth2 refresh token",
+    )
+    gmail_history_id = models.CharField(
+        blank=True,
+        default="",
+        max_length=50,
+        help_text="Last processed Gmail historyId for incremental sync",
+    )
+
     # profile
     handle = models.OneToOneField(
         "handles.Handle",
