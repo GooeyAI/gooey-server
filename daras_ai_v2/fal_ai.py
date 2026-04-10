@@ -14,10 +14,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 
 
-def generate_on_fal(
-    model_id: str,
-    payload: dict,
-) -> typing.Generator[str, None, dict]:
+def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None, dict]:
     r = requests.post(
         str(furl("https://queue.fal.run") / model_id),
         headers=_fal_auth_headers(),
@@ -86,40 +83,18 @@ def _fal_auth_headers():
     }
 
 
-def _rewrite_fal_asset_urls(
-    value: typing.Any,
-    *,
-    parent_key: str | None = None,
-    url_cache: dict[str, str] | None = None,
-) -> typing.Any:
-    if url_cache is None:
-        url_cache = {}
-
+def _rewrite_fal_asset_urls(value: typing.Any) -> typing.Any:
     match value:
         case str() if _is_fal_asset_url(value):
-            return _reupload_fal_asset_url(
-                value,
-                preferred_filename=os.path.basename(urlparse(value).path) or None,
-                url_cache=url_cache,
-            )
+            filename = os.path.basename(urlparse(value).path) or "fal_asset"
+            return _reupload_fal_asset_url(value, filename=filename)
         case dict():
             out = {}
             for key, child in value.items():
-                out[key] = _rewrite_fal_asset_urls(
-                    child,
-                    parent_key=key,
-                    url_cache=url_cache,
-                )
+                out[key] = _rewrite_fal_asset_urls(child)
             return out
         case list():
-            return [
-                _rewrite_fal_asset_urls(
-                    item,
-                    parent_key=parent_key,
-                    url_cache=url_cache,
-                )
-                for item in value
-            ]
+            return [_rewrite_fal_asset_urls(item) for item in value]
         case _:
             return value
 
@@ -132,36 +107,26 @@ def _is_fal_asset_url(url: str) -> bool:
     return "fal.media" in f.origin
 
 
-def _reupload_fal_asset_url(
-    url: str,
-    *,
-    preferred_filename: str | None,
-    url_cache: dict[str, str],
-) -> str:
-    cached = url_cache.get(url)
-    if cached:
-        return cached
-
+def _reupload_fal_asset_url(url: str, *, filename: str) -> str:
     r = requests.get(url)
     raise_for_status(r)
 
-    filename = preferred_filename or os.path.basename(urlparse(url).path) or "fal_asset"
     content_type = get_mimetype_from_response(r) or None
 
     # If FAL returns extensionless filenames, preserve a useful extension.
-    if not os.path.splitext(filename)[1] and content_type:
-        if ext := mimetypes.guess_extension(content_type):
-            filename += ext
+    if (
+        not os.path.splitext(filename)[1]
+        and content_type
+        and (ext := mimetypes.guess_extension(content_type))
+    ):
+        filename += ext
 
     try:
         uploaded_url = upload_file_from_bytes(
-            filename,
-            r.content,
-            content_type,
+            filename, r.content, content_type=content_type
         )
     except Exception:
         logger.exception("Failed to re-upload FAL asset URL {}", url)
         return url
 
-    url_cache[url] = uploaded_url
     return uploaded_url
