@@ -121,6 +121,7 @@ class AppUser(models.Model):
     )
     updated_at = models.DateTimeField(auto_now=True)
     upgraded_from_anonymous_at = models.DateTimeField(null=True, blank=True)
+    last_login_at = models.DateTimeField(null=True, blank=True)
 
     disable_safety_checker = models.BooleanField(default=False)
 
