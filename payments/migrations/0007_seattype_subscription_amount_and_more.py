@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("payments", "0006_alter_subscription_plan"),
-        ("workspaces", "0014_workspacemembership_balance"),
+        ("workspaces", "0015_workspacemembership_balance"),
     ]
 
     operations = [
