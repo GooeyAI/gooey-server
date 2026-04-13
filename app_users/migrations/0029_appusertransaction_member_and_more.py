@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("app_users", "0028_remove_appuser_appuser_search_vector_idx"),
-        ("workspaces", "0014_workspacemembership_balance"),
+        ("workspaces", "0015_workspacemembership_balance"),
     ]
 
     operations = [
