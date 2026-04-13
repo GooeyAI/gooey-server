@@ -382,7 +382,7 @@ class BasePage:
                 )
 
     def render(self):
-        if not self.is_current_user_authorized():
+        if not self.is_user_authorized(self.request.user):
             self.render_unauthorized()
             return
 
@@ -1936,21 +1936,19 @@ class BasePage:
                 self._render_after_output()
 
     def _render_failed_output(self):
-        html_msg = self._get_custom_error_msg()
-        if html_msg:
-            gui.html(html_msg)
-        else:
+        if not self._render_custom_error():
             err_msg = gui.session_state.get(StateKeys.error_msg)
             gui.error(err_msg, unsafe_allow_html=True)
 
-    def _get_custom_error_msg(self) -> str | None:
+    def _render_custom_error(self) -> bool:
         if not self.current_sr or not self.current_sr.error_type:
-            return None
+            return False
         exc_cls = getattr(exceptions, self.current_sr.error_type, None)
         render = getattr(exc_cls, "render", None)
         if not callable(render):
-            return None
-        return render(self.current_sr.error_params)
+            return False
+        render(self.current_sr.error_params)
+        return True
 
     def click_preview_tab(self):
         # show the preview tab when running
@@ -2629,34 +2627,29 @@ class BasePage:
     def is_user_authorized(self, user: AppUser | None = None) -> bool:
         if self.is_user_admin(user):
             return True
-
         sr, pr = self.current_sr_pr
-        if pr.saved_run_id != sr.id:
-            # not published run
-            return (
-                # free workspace: allow anyone
-                not sr.workspace.subscription_id
-                or (
-                    PricingPlan.from_sub(sr.workspace.subscription)
-                    == PricingPlan.STARTER
-                )
-                # paid workspace: allow members
-                or bool(user and sr.workspace in user.cached_workspaces)
-            )
-
-        # published run
-        return (
-            pr.is_approved_example
-            or (
-                WorkflowAccessLevel(pr.public_access)
-                in (WorkflowAccessLevel.FIND_AND_VIEW, WorkflowAccessLevel.EDIT)
-            )
-            # current user is in the same workspace
-            or bool(user and pr.workspace in user.cached_workspaces)
-        )
-
-    def is_current_user_authorized(self) -> bool:
-        return self.is_user_authorized(self.request.user)
+        # saved workflow pages
+        if pr.saved_run_id == sr.id:
+            workspace = pr.workspace
+            # approved examples can be accessed by anyone
+            if pr.is_approved_example:
+                return True
+            # saved workflow explicitly set to public access
+            if pr.public_access >= WorkflowAccessLevel.FIND_AND_VIEW:
+                return True
+        # workflow run pages
+        else:
+            workspace = sr.workspace
+            # runs created in free tier workspaces are public
+            if not (workspace and workspace.subscription_id):
+                return True
+            if PricingPlan.from_sub(workspace.subscription) == PricingPlan.STARTER:
+                return True
+            # workspace explicitly set to be public_by_default
+            if workspace.should_default_runs_be_public():
+                return True
+        # members can access
+        return bool(user and workspace in user.cached_workspaces)
 
 
 def started_at_text(dt: datetime.datetime):

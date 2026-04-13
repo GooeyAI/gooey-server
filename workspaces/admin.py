@@ -95,6 +95,7 @@ class WorkspaceAdmin(GooeySafeDeleteAdmin):
         (
             "enable_bot_builder",
             "restrict_function_scope",
+            "public_by_default",
         ),
         (
             "view_saved_runs",

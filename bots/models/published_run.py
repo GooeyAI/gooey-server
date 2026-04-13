@@ -19,6 +19,7 @@ if typing.TYPE_CHECKING:
     import celery.result
 
     from functions.models import CalledFunction
+    from workspaces.models import Workspace
 
 
 class PublishedRunQuerySet(models.QuerySet):
@@ -73,7 +74,11 @@ class PublishedRunQuerySet(models.QuerySet):
             or PublishedRun._meta.get_field("workspace").get_default()
         )
         if not public_access:
-            if workspace and workspace.can_have_private_published_runs():
+            if (
+                workspace
+                and workspace.can_have_private_published_runs()
+                and not workspace.should_default_runs_be_public()
+            ):
                 public_access = WorkflowAccessLevel.VIEW_ONLY
             else:
                 public_access = WorkflowAccessLevel.FIND_AND_VIEW

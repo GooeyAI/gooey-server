@@ -1812,7 +1812,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                     workspace=self.current_workspace,
                     title=run_title,
                     notes=pr.notes,
-                    public_access=WorkflowAccessLevel.VIEW_ONLY,
                 )
 
             match pressed_platform:
@@ -1986,16 +1985,19 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             col1, col2 = gui.columns(2, style={"alignItems": "center"})
             with col1:
                 gui.write("###### Test")
-                test_caption = (
-                    f"Call or send a text message via {Platform(bi.platform).label}."
-                )
+                if bi.platform == Platform.TWILIO:
+                    test_caption = f"Call or send a text message via {Platform(bi.platform).label}."
+                else:
+                    test_caption = f"Send a message via {Platform(bi.platform).label}."
                 if bi.extension_number:
                     test_caption += f" (with extension {bi.extension_number})."
-                gui.caption(
-                    test_caption,
-                    help="**SMS:** Send `/extension <extension number>` to connect to the agent. `/disconnect` to start fresh.\n\n"
-                    "**Voice Call:** ` * <extension number>` to change extension, `*#` to disconnect.",
-                )
+                help_text = None
+                if bi.platform == Platform.TWILIO:
+                    help_text = (
+                        "**SMS:** Send `/extension <extension number>` to connect to the agent. `/disconnect` to start fresh.\n\n"
+                        "**Voice Call:** ` * <extension number>` to change extension, `*#` to disconnect."
+                    )
+                gui.caption(test_caption, help=help_text)
             with col2:
                 if not test_link:
                     gui.write("Message quicklink not available.")
@@ -2028,6 +2030,25 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                         test_link,
                         unsafe_allow_html=True,
                         new_tab=True,
+                    )
+
+            if bi.platform == Platform.TELEGRAM:
+                col1, col2 = gui.columns(2, style={"alignItems": "center"})
+                with col1:
+                    gui.write("###### Manage Bot")
+                    gui.caption(
+                        "Open BotFather in Telegram to manage your bot's name, photo, and other settings."
+                    )
+                with col2:
+                    telegram_botfather_url = furl(
+                        "https://t.me/BotFather", query_params={"text": "/mybots"}
+                    )
+                    gui.anchor(
+                        f"{icon} Open BotFather",
+                        str(telegram_botfather_url),
+                        unsafe_allow_html=True,
+                        new_tab=True,
+                        type="secondary",
                     )
 
             if bi.platform == Platform.WHATSAPP and bi.extension_number:
@@ -2243,6 +2264,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                     "💔️ Disconnect",
                     key="btn_disconnect",
                 ):
+                    if bi.platform == Platform.TELEGRAM:
+                        bi.telegram_bot_token = ""
+                        bi.telegram_bot_id = None
+                        bi.telegram_bot_user_name = ""
+
                     bi.saved_run = None
                     bi.published_run = None
                     bi.save()

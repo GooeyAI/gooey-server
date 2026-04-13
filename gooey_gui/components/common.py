@@ -31,11 +31,17 @@ form = dummy
 dataframe = dummy
 
 
+def component(nodename: str, **props):
+    node = core.RenderTreeNode(name=nodename, props=props)
+    node.mount()
+    return core.NestingCtx(node)
+
+
 def countdown_timer(
     end_time: datetime,
     delay_text: str,
 ) -> core.NestingCtx:
-    return _node(
+    return component(
         "countdown-timer",
         endTime=end_time.astimezone(timezone.utc).isoformat(),
         delayText=delay_text,
@@ -43,15 +49,15 @@ def countdown_timer(
 
 
 def nav_tabs():
-    return _node("nav-tabs")
+    return component("nav-tabs")
 
 
 def nav_item(href: str, *, active: bool):
-    return _node("nav-item", to=href, active="true" if active else None)
+    return component("nav-item", to=href, active="true" if active else None)
 
 
 def nav_tab_content():
-    return _node("nav-tab-content")
+    return component("nav-tab-content")
 
 
 def div(**props) -> core.NestingCtx:
@@ -59,17 +65,17 @@ def div(**props) -> core.NestingCtx:
 
 
 def link(*, to: str, **props) -> core.NestingCtx:
-    return _node("Link", to=to, **props)
+    return component("Link", to=to, **props)
 
 
 def tag(tag_name: str, **props) -> core.NestingCtx:
     props["__reactjsxelement"] = tag_name
-    return _node("tag", **props)
+    return component("tag", **props)
 
 
 def html(body: str, **props):
     props["className"] = props.get("className", "") + " gui-html-container"
-    return _node("html", body=body, **props)
+    return component("html", body=body, **props)
 
 
 def write(*objs: typing.Any, line_clamp: int = None, unsafe_allow_html=False, **props):
@@ -100,24 +106,18 @@ def markdown(
     **props,
 ):
     if body is None:
-        return _node("markdown", body="", **props)
+        return component("markdown", body="", **props)
     if not unsafe_allow_html:
         body = html_lib.escape(body)
     props["className"] = (
         props.get("className", "") + " gui-html-container gui-md-container"
     )
-    return _node(
+    return component(
         "markdown",
         body=dedent(body).strip(),
         lineClamp=line_clamp,
         **props,
     )
-
-
-def _node(nodename: str, **props):
-    node = core.RenderTreeNode(name=nodename, props=props)
-    node.mount()
-    return core.NestingCtx(node)
 
 
 def styled(css: str) -> core.NestingCtx:
@@ -126,7 +126,7 @@ def styled(css: str) -> core.NestingCtx:
     selector = "." + className
     css = css.replace("&", selector)
     core.add_styles(className, css)
-    return _node("", className=className)
+    return component("", className=className)
 
 
 def text(body: str, **props):
@@ -707,7 +707,7 @@ def data_table(file_url_or_cells: str | list, **props):
         props["fileUrl"] = file_url_or_cells
     else:
         props["cells"] = file_url_or_cells
-    return _node("data-table", **props)
+    return component("data-table", **props)
 
 
 def table(df: "pd.DataFrame"):
@@ -846,7 +846,7 @@ def popover(
     content = core.RenderTreeNode(name="content")
 
     popover = core.RenderTreeNode(
-        name="popover",
+        name="GooeyPopover",
         props=props | dict(content=content.children, placement=placement),
     )
     popover.mount()
