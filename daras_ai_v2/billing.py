@@ -1203,7 +1203,7 @@ def change_subscription(
     new_plan: PricingPlan,
     new_selection: SeatSelection | None = None,
     **kwargs,
-):
+) -> typing.NoReturn | None:
     from routers.account import account_route
     from routers.account import payment_processing_route
 
@@ -1667,38 +1667,10 @@ def render_payment_information(workspace: Workspace):
 
 
 def _render_delete_payment_method_button(workspace: Workspace):
-    from routers.account import payment_processing_route
-
-    plan = PricingPlan.from_sub(workspace.subscription)
-    if plan == PricingPlan.STARTER:
-        label = "Delete Payment Method"
-    else:
-        downgrade_info = gui.run_in_thread(
-            _get_scheduled_downgrade_info,
-            args=[workspace.subscription],
-            cache=True,
-            placeholder="",
-            key=f"run_in_thread/scheduled_downgrade/{workspace.subscription.id}",
-        )
-        if downgrade_info is None:
-            # thread is still running
-            # -- don't show the delete button
-            return
-        if (
-            downgrade_info
-            and downgrade_info["plan_db_value"] == PricingPlan.STARTER.db_value
-        ):
-            # subscription is already scheduled to be cancelled
-            # -- don't show the delete button
-            _render_scheduled_downgrade_warning(downgrade_info)
-            return
-
-        label = "Delete & Cancel Subscription"
-
     ref = gui.use_confirm_dialog(key="--delete-payment-method")
     gui.button_with_confirm_dialog(
         ref=ref,
-        trigger_label=label,
+        trigger_label="Delete & Cancel Subscription",
         trigger_className="border-danger text-danger",
         modal_title="#### Delete Payment Information",
         modal_content="""
@@ -1710,12 +1682,9 @@ This will cancel your subscription and remove your saved payment method.
         confirm_className="border-danger bg-danger text-white",
     )
     if ref.pressed_confirm:
-        change_subscription(workspace, new_plan=PricingPlan.STARTER)
         if pm := workspace.subscription.stripe_get_default_payment_method():
             pm.detach()
-        raise gui.RedirectException(
-            get_app_route_url(payment_processing_route), status_code=303
-        )
+        change_subscription(workspace, new_plan=PricingPlan.STARTER)
 
 
 def change_payment_method(workspace: Workspace):
