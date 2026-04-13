@@ -7,7 +7,6 @@ from django.utils import timezone
 from payments.models import SeatType
 from payments.plans import PricingPlan
 
-GOOEY_ADMIN_SEAT_TYPE_NAME = "Gooey Admin"
 DEFAULT_PLAN_SEAT_TYPES: dict[PricingPlan, list[dict[str, int]]] = {
     PricingPlan.PRO: [
         {"monthly_charge": 25, "monthly_credit_limit": 2_000},
@@ -71,16 +70,7 @@ def run(*_args):
                     updated=stats.updated + 1,
                 )
 
-    _, admin_created = SeatType.objects.update_or_create(
-        name=GOOEY_ADMIN_SEAT_TYPE_NAME,
-        key=f"{current_year}/{PricingPlan.TEAM.key}/gooey-admin",
-        defaults=dict(
-            monthly_charge=0,
-            monthly_credit_limit=2_500,
-            is_public=False,
-            plan=PricingPlan.TEAM.db_value,
-        ),
-    )
+    _, admin_created = SeatType.objects.get_or_create_gooey_admin_seat_type()
     if admin_created:
         stats = SeedStats(
             created=stats.created + 1,

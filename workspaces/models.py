@@ -670,20 +670,6 @@ class WorkspaceMembership(SafeDeleteModel):
         )
 
     @staticmethod
-    def get_or_create_gooey_admin_seat_type() -> "SeatType":
-        from payments.models import SeatType
-
-        return SeatType.objects.get_or_create(
-            name="Gooey Admin",
-            defaults=dict(
-                monthly_charge=0,
-                monthly_credit_limit=2_500,
-                is_public=False,
-                plan=PricingPlan.TEAM.db_value,
-            ),
-        )[0]
-
-    @staticmethod
     def get_default_subscription_seat_type(
         workspace: "Workspace",
     ) -> typing.Optional["SeatType"]:
@@ -877,10 +863,14 @@ class WorkspaceInvite(models.Model):
             )
 
         out_of_seats_error_message = "This workspace is full. Ask your admin to add another seat so you can join."
-        if PricingPlan.from_sub(self.workspace.subscription) not in [
-            PricingPlan.TEAM,
-            PricingPlan.ENTERPRISE,
-        ]:
+        if (
+            PricingPlan.from_sub(self.workspace.subscription)
+            not in [
+                PricingPlan.TEAM,
+                PricingPlan.ENTERPRISE,
+            ]
+            and invitee.email not in settings.ADMIN_EMAILS
+        ):
             raise ValidationError(out_of_seats_error_message)
 
         membership, created = WorkspaceMembership.objects.get_or_create(

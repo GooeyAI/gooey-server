@@ -446,23 +446,33 @@ def auto_assign_team_seats(
         .all()
     )
 
-    members_with_seat = set(
+    assigned_member_ids = set(
         seat.assigned_to_id
         for seat in workspace_seats
         if seat.assigned_to_id is not None
     )
-    members_without_seat = [
-        m for m_id, m in memberships.items() if m_id not in members_with_seat
+    unassigned_members = [
+        m for m_id, m in memberships.items() if m_id not in assigned_member_ids
     ]
     unassigned_seats = [seat for seat in workspace_seats if seat.assigned_to_id is None]
 
-    if not unassigned_seats and not members_without_seat:
+    if not unassigned_members:
         return
 
     ret = {}
-    for seat, member in zip(unassigned_seats, members_without_seat):
+    for member in unassigned_members:
+        if member.user.email in settings.ADMIN_EMAILS:
+            logger.info(f"Assigning admin seat to {member.user.email}")
+            seat_type, _ = SeatType.objects.get_or_create_gooey_admin_seat_type()
+            seat = SubscriptionSeat(subscription=db_sub, seat_type=seat_type)
+        elif not unassigned_seats:
+            # unassigned_seats is []
+            continue
+        else:
+            seat = unassigned_seats.pop(0)
+
         seat.assigned_to = member
-        seat.save(update_fields=["assigned_to"])
+        seat.save()
         member.add_balance(
             amount=seat.seat_type.monthly_credit_limit - member.balance,
             invoice_id=f"{invoice_id}/{seat.id}",

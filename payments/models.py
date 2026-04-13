@@ -445,6 +445,22 @@ class Subscription(models.Model):
         )
 
 
+class SeatTypeManager(models.Manager):
+    def get_or_create_gooey_admin_seat_type(self) -> tuple["SeatType", bool]:
+        from payments.models import SeatType
+
+        return SeatType.objects.get_or_create(
+            name="Gooey Admin",
+            key=f"2026/{PricingPlan.TEAM.key}/gooey-admin",
+            defaults=dict(
+                monthly_charge=0,
+                monthly_credit_limit=2_500,
+                is_public=False,
+                plan=PricingPlan.TEAM.db_value,
+            ),
+        )
+
+
 class SeatType(models.Model):
     name = models.CharField(max_length=100)
     monthly_charge = models.PositiveIntegerField(default=0)
@@ -480,6 +496,8 @@ class SeatType(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = SeatTypeManager()
 
     def __str__(self):
         return f"{self.name} | {self.monthly_credit_limit:,}Cr for ${self.monthly_charge:,}/month (Plan: {self.get_plan_display()})"
