@@ -66,4 +66,4 @@ def _gcs_blob_exists(public_url: str) -> bool:
     try:
         return gcs_bucket().blob(blob_name).exists()
     except Exception:
-        return True  # fail open — assume exists to avoid hiding real thumbnails
+        return False
