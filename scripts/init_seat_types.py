@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.utils import timezone
 
 from payments.models import SeatType
 from payments.plans import PricingPlan
@@ -35,13 +34,11 @@ def _default_seat_type_name(*, monthly_credit_limit: int) -> str:
 def run(*_args):
     stats = SeedStats()
 
-    current_year = timezone.now().year
-
     # seed global seat types (shared across workspaces)
     for plan, seat_types in DEFAULT_PLAN_SEAT_TYPES.items():
         for seat_type in seat_types:
             key = seat_type.get(
-                "key", f"{current_year}/{plan.key}/{seat_type['monthly_credit_limit']}"
+                "key", f"2026/{plan.key}/{seat_type['monthly_credit_limit']}"
             )
             name = seat_type.get(
                 "name",
@@ -60,27 +57,15 @@ def run(*_args):
                 ),
             )
             if created:
-                stats = SeedStats(
-                    created=stats.created + 1,
-                    updated=stats.updated,
-                )
+                stats = SeedStats(created=stats.created + 1, updated=stats.updated)
             else:
-                stats = SeedStats(
-                    created=stats.created,
-                    updated=stats.updated + 1,
-                )
+                stats = SeedStats(created=stats.created, updated=stats.updated + 1)
 
     _, admin_created = SeatType.objects.get_or_create_gooey_admin_seat_type()
     if admin_created:
-        stats = SeedStats(
-            created=stats.created + 1,
-            updated=stats.updated,
-        )
+        stats = SeedStats(created=stats.created + 1, updated=stats.upda)
     else:
-        stats = SeedStats(
-            created=stats.created,
-            updated=stats.updated + 1,
-        )
+        stats = SeedStats(created=stats.created, updated=stats.updated + 1)
 
     print(
         "Seeded workspace seat types:",
