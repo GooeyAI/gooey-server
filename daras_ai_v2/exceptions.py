@@ -12,6 +12,7 @@ from starlette.status import HTTP_401_UNAUTHORIZED
 from starlette.status import HTTP_402_PAYMENT_REQUIRED
 
 from daras_ai_v2 import settings
+from daras_ai_v2.fastapi_tricks import get_route_path
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
@@ -77,36 +78,105 @@ class GPUError(UserError):
 
 
 class InsufficientCredits(UserError):
-    def __init__(self, user: AppUser, sr: SavedRun):
-        from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
-
-        account_url = furl(settings.APP_BASE_URL) / "account/"
-        if user.is_anonymous:
-            account_url.query.params["next"] = sr.get_app_url(
-                query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
-            )
-        error_params = dict(
-            account_url=str(account_url),
-            is_anonymous=user.is_anonymous,
-            SUBMIT_AFTER_LOGIN_Q=SUBMIT_AFTER_LOGIN_Q,
-        )
+    def __init__(self, *, price: int = 0):
         super().__init__(
             "Insufficient credits",
             status_code=HTTP_402_PAYMENT_REQUIRED,
-            error_params=error_params,
+            error_params={"price": price},
         )
 
     @staticmethod
-    def render(error_params: dict | None):
+    def render(error_params: dict):
         import gooey_gui as gui
 
-        error_params = error_params or {}
+        from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
+        from routers.account import account_route
+        from workspaces.widgets import set_current_workspace
+
+        RERUN_KEY = "--insufficient-credits-rerun"
+        UPGRADE_KEY = "--insufficient-credits-upgrade"
+        BUY_CREDITS_KEY = "--insufficient-credits-buy-personal"
+
+        request = error_params["request"]
+        sr = error_params["sr"]
+        current_workspace = error_params.get("current_workspace")
+        price = error_params.get("price", None)
+        current_user = request.user
+        personal_workspace = (
+            current_user and current_user.get_or_create_personal_workspace()[0]
+        )
+
+        show_upgrade = False
+
+        if (
+            not current_user
+            or not sr.workspace
+            or sr.workspace not in current_user.cached_workspaces
+        ):
+            # anon user or unrelated user or sr.workspace is None
+            title = "Run failed (Not enough credits)"
+            rerun_workspace = current_workspace
+
+        elif current_user.uid == sr.uid and len(current_user.cached_workspaces) <= 1:
+            # user started the run in their personal workspace
+            # AND they are not part of any team workspace
+            title = "You've run out of Gooey.AI credits"
+            rerun_workspace = personal_workspace
+
+        else:
+            # user is part of the run's workspace
+            title = f"You've run out of credits in {sr.workspace.display_name(current_user)}"
+            rerun_workspace = personal_workspace
+            if (
+                not sr.workspace.is_personal
+                and current_user in sr.workspace.get_admins()
+            ):
+                show_upgrade = True
+
+        if not rerun_workspace:
+            rerun_workspace_name = None
+        elif rerun_workspace.is_personal:
+            rerun_workspace_name = "Personal"
+        else:
+            rerun_workspace_name = rerun_workspace.display_name(current_user)
+
+        show_rerun = rerun_workspace and rerun_workspace.balance >= (price or 1)
+        is_anonymous = not current_user or current_user.is_anonymous
+        account_url = furl(settings.APP_BASE_URL) / get_route_path(account_route)
+        if is_anonymous:
+            account_url.query.params["next"] = sr.get_app_url(
+                query_params={SUBMIT_AFTER_LOGIN_Q: "1"},
+            )
+
+        if gui.session_state.pop(RERUN_KEY, None) and rerun_workspace:
+            set_current_workspace(request.session, rerun_workspace.id)
+            gui.session_state["-submit-workflow"] = True
+            raise gui.RerunException()
+
+        if gui.session_state.pop(BUY_CREDITS_KEY, None) and rerun_workspace:
+            set_current_workspace(request.session, rerun_workspace.id)
+            raise gui.RedirectException(get_route_path(account_route))
+
+        if gui.session_state.pop(UPGRADE_KEY, None) and sr:
+            set_current_workspace(request.session, sr.workspace_id)
+            raise gui.RedirectException(get_route_path(account_route))
+
         gui.component(
             "InsufficientCredits",
-            accountUrl=error_params.get("account_url"),
-            discordInviteUrl=settings.DISCORD_INVITE_URL,
-            isAnonymous=error_params.get("is_anonymous"),
+            accountUrl=str(account_url),
+            isAnonymous=is_anonymous,
             verifiedEmailUserFreeCredits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
+            rerunKey=RERUN_KEY,
+            upgradeKey=UPGRADE_KEY,
+            buyCreditsKey=BUY_CREDITS_KEY,
+            price=price,
+            title=title,
+            showUpgrade=show_upgrade,
+            showRerun=bool(show_rerun),
+            rerunWorkspaceBalance=(
+                rerun_workspace.balance if rerun_workspace else None
+            ),
+            rerunWorkspaceName=rerun_workspace_name,
         )
 
 
