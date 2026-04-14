@@ -1931,6 +1931,12 @@ class BasePage:
             err_msg = gui.session_state.get(StateKeys.error_msg)
             gui.error(err_msg, unsafe_allow_html=True)
 
+    def _get_default_error_params(self) -> dict[str, typing.Any]:
+        ret = {"request": self.request, "sr": self.current_sr}
+        if self.request.user:
+            ret.update({"current_workspace": self.current_workspace})
+        return ret
+
     def _render_custom_error(self) -> bool:
         if not self.current_sr or not self.current_sr.error_type:
             return False
@@ -1938,7 +1944,9 @@ class BasePage:
         render = getattr(exc_cls, "render", None)
         if not callable(render):
             return False
-        render(self.current_sr.error_params)
+        error_params = dict(self.current_sr.error_params or {})
+        error_params.update(self._get_default_error_params())
+        render(error_params)
         return True
 
     def click_preview_tab(self):
@@ -2472,7 +2480,7 @@ class BasePage:
         if workspace.balance >= price:
             return
 
-        raise exceptions.InsufficientCredits(self.request.user, sr)
+        raise exceptions.InsufficientCredits(price=price)
 
     def deduct_credits(self, state: dict) -> tuple[AppUserTransaction, int]:
         assert self.request.user, "request.user must be set to deduct credits"
