@@ -70,12 +70,23 @@ class AggFunctionResult(typing_extensions.TypedDict):
 def remove_common_prefix_suffix(a: list[str]) -> list[str]:
     if not a:
         return a
-    prefix = len(os.path.commonprefix(a)) or 0
-    suffix = -len(os.path.commonprefix([s[::-1] for s in a])) or None
-    ret = [s[prefix:suffix] for s in a]
+    prefix = _common_affix_at_boundary(a)
+    suffix = _common_affix_at_boundary(a, reverse=True)
+    ret = [s.removeprefix(prefix).removesuffix(suffix) for s in a]
     if not all(ret) or all(s.isdigit() for s in ret):
         return a
     return ret
+
+
+def _common_affix_at_boundary(values: list[str], reverse: bool = False) -> str:
+    text = os.path.commonprefix([s[::-1] if reverse else s for s in values])
+    if reverse:
+        text = text[::-1]
+    indexes = range(len(text)) if reverse else range(len(text) - 1, -1, -1)
+    for i in indexes:
+        if not text[i].isalnum():
+            return text[i:] if reverse else text[: i + 1]
+    return ""
 
 
 def _render_results(results: list[AggFunctionResult]):
