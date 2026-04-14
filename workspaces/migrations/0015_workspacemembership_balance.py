@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("workspaces", "0013_workspace_enable_bot_builder_and_more"),
+        ('workspaces', '0014_workspace_public_by_default'),
     ]
 
     operations = [
