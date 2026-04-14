@@ -1470,7 +1470,7 @@ class BasePage:
         return get_current_workspace(self.request.user, self.request.session)
 
     @cached_property
-    def current_workspace_membership(self) -> WorkspaceMembership | None:
+    def current_membership(self) -> WorkspaceMembership | None:
         if not self.request.user:
             return None
 
@@ -2467,7 +2467,7 @@ class BasePage:
         price = self.get_price_roundoff(state)
 
         if PricingPlan.from_sub(workspace.subscription) == PricingPlan.TEAM:
-            membership = self.current_workspace_membership
+            membership = self.current_membership
             if not membership:
                 raise exceptions.UserError("""
                   The workspace member who created this workflow is no longer part of the workspace.
@@ -2499,8 +2499,8 @@ class BasePage:
             PricingPlan.from_sub(self.current_workspace.subscription)
             == PricingPlan.TEAM
         ):
-            if self.current_workspace_membership:
-                txn = self.current_workspace_membership.add_balance(
+            if self.current_membership:
+                txn = self.current_membership.add_balance(
                     amount=-amount, invoice_id=invoice_id
                 )
                 return txn, amount
