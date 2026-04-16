@@ -614,10 +614,7 @@ def _render_plan_pricing(
 ) -> SeatSelection | None:
     pricing_div = gui.div(className="container-margin-reset")
 
-    if payment_provider == PaymentProvider.STRIPE and plan in [
-        PricingPlan.TEAM,
-        PricingPlan.PRO,
-    ]:
+    if plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         seat_selection = _render_seat_selection(plan=plan, workspace=workspace)
     else:
         seat_selection = None
