@@ -5,7 +5,6 @@ import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import PublishedRun
 from daras_ai_v2 import icons, settings
-from daras_ai_v2.meta_preview_url import meta_preview_url
 from widgets.workflow_metadata_gen import (
     render_ai_generated_image_widget,
 )
@@ -28,9 +27,8 @@ def render_workflow_photo_uploader(
     with gui.div(
         className="d-flex gap-2 flex-md-column flex-row align-items-center h-100 pt-md-4 mt-md-2 pb-3 pb-md-0"
     ):
-        pr_photo_url = photo_url and meta_preview_url(photo_url, check_exists=True)[0]
         pressed_generate = render_ai_generated_image_widget(
-            image_url=pr_photo_url,
+            image_url=photo_url,
             key=key,
             is_generating=is_generating,
             error_msg=error_msg,

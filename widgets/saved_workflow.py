@@ -331,3 +331,22 @@ def render_media_component(url: str):
             </object>
             """
         )
+
+
+def render_thumb_with_fallback(
+    *,
+    thumb_url: str,
+    fallback_url: str,
+    style: dict | None = None,
+    className: str = "",
+):
+    """
+    Render an image that prefers a GCS thumbnail but falls back to the original URL
+    if the thumbnail doesn't exist.
+
+    Uses <object data=thumb><img src=original/></object>. The browser tries the thumb
+    first; on 404 it renders the inner <img>. This avoids a server-side GCS existence
+    check in the page-load hot path.
+    """
+    with gui.tag("object", data=thumb_url, style=style, className=className):
+        gui.image(src=fallback_url, style=style, className=className)

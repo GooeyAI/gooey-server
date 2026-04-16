@@ -447,6 +447,7 @@ class BasePage:
 
     def _render_header(self):
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+        from widgets.saved_workflow import render_thumb_with_fallback
 
         sr, pr = self.current_sr_pr
         is_example = pr.saved_run == sr
@@ -473,24 +474,23 @@ class BasePage:
             img_style["borderRadius"] = "12px"
 
         with gui.div(className="d-flex gap-4 w-100 mb-2"):
-            pr_photo_url = (
-                pr.photo_url
-                and meta_preview_url(pr.photo_url, size="96x96", check_exists=True)[0]
-            )
-            if pr_photo_url:
+            if pr.photo_url:
+                thumb_url, _ = meta_preview_url(pr.photo_url, size="96x96")
                 with gui.div(className="d-none d-md-inline"):
-                    gui.image(
-                        src=pr_photo_url,
+                    render_thumb_with_fallback(
+                        thumb_url=thumb_url,
+                        fallback_url=pr.photo_url,
                         style=img_style | dict(width="96px", height="96px"),
                     )
 
             # desktop image and title, social buttons, extra and breadcrumbs
             with gui.div(className="w-100 d-flex flex-column gap-2"):
                 with gui.div(className="d-flex align-items-start w-100 my-auto"):
-                    if pr_photo_url:
+                    if pr.photo_url:
                         with gui.div(className="d-inline d-md-none me-2"):
-                            gui.image(
-                                src=pr_photo_url,
+                            render_thumb_with_fallback(
+                                thumb_url=thumb_url,
+                                fallback_url=pr.photo_url,
                                 style=img_style | dict(width="56px", height="56px"),
                             )
 

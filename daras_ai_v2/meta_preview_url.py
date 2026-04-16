@@ -24,7 +24,6 @@ def meta_preview_url(
     file_url: str | None,
     fallback_img: str = DEFAULT_META_IMG,
     size: PreviewSizes = "400x400",
-    check_exists: bool = False,
 ) -> tuple[str | None, bool]:
     if not file_url:
         return fallback_img, False
@@ -44,26 +43,8 @@ def meta_preview_url(
 
     if content_type.startswith("video/"):
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
-        thumb_url = str(f)
-        if check_exists and not _gcs_blob_exists(thumb_url):
-            return file_url, False
-        return thumb_url, True
+        return str(f), True
     if content_type in {"image/png", "image/jpeg", "image/tiff", "image/webp"}:
         f.path.segments = dir_segments + ["thumbs", f"{base}_{size}{ext}"]
-        thumb_url = str(f)
-        if check_exists and not _gcs_blob_exists(thumb_url):
-            return file_url, False
-        return thumb_url, False
+        return str(f), False
     return file_url, False
-
-
-def _gcs_blob_exists(public_url: str) -> bool:
-    from daras_ai.image_input import gcs_bucket
-
-    f = furl(public_url)
-    # path segments: [bucket-name, ...blob-path-parts]
-    blob_name = "/".join(f.path.segments[1:])
-    try:
-        return gcs_bucket().blob(blob_name).exists()
-    except Exception:
-        return False
