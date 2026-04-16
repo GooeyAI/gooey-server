@@ -156,23 +156,25 @@ def _get_scheduled_downgrade_info(subscription_model) -> dict[str, typing.Any]:
 
 def _schedule_plan_change_next_cycle(
     *,
-    subscription: stripe.Subscription,
+    stripe_sub: stripe.Subscription,
     new_plan: PricingPlan,
     new_selection: SeatSelection | None = None,
 ):
-    if new_plan == PricingPlan.TEAM:
+    _clear_pending_stripe_subscription_changes(stripe_sub)
+
+    if new_plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         assert new_selection is not None, (
-            "Seat selection must be provided when changing team plan"
+            "Seat selection must be provided when changing team/pro plan"
         )
         seat_type, seat_count = new_selection
     else:
         seat_type, seat_count = None, 1
 
-    new_metadata = dict(subscription.metadata or {})
+    new_metadata = dict(stripe_sub.metadata or {})
     new_metadata[settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD] = new_plan.key
 
     schedule = stripe.SubscriptionSchedule.create(
-        from_subscription=subscription.id, expand=["phases.items.price"]
+        from_subscription=stripe_sub.id, expand=["phases.items.price"]
     )
     current_phase = (schedule.get("phases") or [None])[0]
     assert current_phase is not None, "Subscription schedule missing current phase"
@@ -389,9 +391,10 @@ def _render_scheduled_downgrade_warning(
         )
     else:
         total_monthly = downgrade_info["total_monthly_charge"]
+        credits = downgrade_info["credits"]
         change_text = (
             f"Your plan will change to **{next_plan.title}** "
-            f"(with {next_plan.credits:,} pooled credits/month) "
+            f"(with {credits:,} pooled credits/month) "
             f"on {effective_date} "
             f"with a new total price of ${total_monthly:,}/month."
         )
@@ -1229,13 +1232,6 @@ def change_subscription(
                 gui.error(f"Stripe subscription not available for {new_plan}")
                 return
 
-            stripe_sub = stripe.Subscription.retrieve(
-                workspace.subscription.external_id,
-                expand=["items", "items.data.price", "schedule"],
-            )
-            # New plan change should replace any previously scheduled cancel/downgrade.
-            _clear_pending_stripe_subscription_changes(stripe_sub)
-
             if workspace.subscription.charged_amount:
                 current_monthly_charge = workspace.subscription.charged_amount // 100
             else:
@@ -1252,13 +1248,17 @@ def change_subscription(
                 seat_type=new_seat_type, seat_count=new_seat_count
             )
 
+            stripe_sub = stripe.Subscription.retrieve(
+                workspace.subscription.external_id,
+                expand=["items", "items.data.price", "schedule"],
+            )
             if (
                 not current_plan.deprecated
                 and new_monthly_charge < current_monthly_charge
             ):
                 # for downgrades, schedule for next cycle
                 _schedule_plan_change_next_cycle(
-                    subscription=stripe_sub,
+                    stripe_sub=stripe_sub,
                     new_plan=new_plan,
                     new_selection=new_selection,
                 )
@@ -1266,6 +1266,7 @@ def change_subscription(
                     get_app_route_url(payment_processing_route), status_code=303
                 )
 
+            # for upgrades, charge immediately
             if current_plan == PricingPlan.TEAM:
                 # prorate for changes within Team plan
                 kwargs["proration_behavior"] = "always_invoice"
