@@ -56,17 +56,19 @@ def payment_processing_route(
                 "PayPal transactions take up to a minute to reflect in your account"
             )
 
-    with page_wrapper(request, className="m-auto"):
-        with gui.center():
-            with gui.div(className="d-flex align-items-center"):
-                gui.div(
-                    className="gooey-spinner me-4",
-                    style=dict(height="3rem", width="3rem"),
-                )
-                gui.write("# Processing...")
+    with page_wrapper(
+        request,
+        className="flex-grow-1 d-flex flex-column justify-content-center align-items-center",
+    ):
+        with gui.div(className="d-flex align-items-center"):
+            gui.div(
+                className="gooey-spinner me-4",
+                style=dict(height="3rem", width="3rem"),
+            )
+            gui.write("# Processing...")
 
-            if subtext:
-                gui.caption(subtext)
+        if subtext:
+            gui.caption(subtext)
 
     gui.js(
         # language=JavaScript
