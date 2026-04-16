@@ -11,6 +11,7 @@ from handles.models import COMMON_EMAIL_DOMAINS
 from .models import Workspace
 
 if typing.TYPE_CHECKING:
+    from daras_ai_v2.billing import SeatSelection
     from payments.plans import PricingPlan
 
 
@@ -221,6 +222,7 @@ def render_create_workspace_alert():
 
 def open_create_workspace_popup_js(
     selected_plan: typing.Optional["PricingPlan"] = None,
+    seat_selection: typing.Optional["SeatSelection"] = None,
 ):
     from routers.workspace import create_workspace_route
     from routers.account import account_route
@@ -231,13 +233,16 @@ def open_create_workspace_popup_js(
     )
     if selected_plan:
         popup_url.query.params["selected_plan"] = selected_plan.db_value
+        if seat_selection:
+            popup_url.query.params["selected_seat_type"] = seat_selection[0].key
+            popup_url.query.params["selected_seat_count"] = str(seat_selection[1])
         next_url = ""  # don't redirect as we are already on the account page
 
     # language=javascript
     return """
         let popupUrl = %r;
         let nextUrl = %r;
-        
+
         window.addEventListener("message", function(event) {
             if (!event.data.workspaceCreated) return;
             if (nextUrl) { 
@@ -246,14 +251,10 @@ def open_create_workspace_popup_js(
                 gui.rerun()
             } 
         });
-        
-        // try to open the popup
-        let popup = window.open(popupUrl, "create_workspace", "width=1000,height=600,scrollbars=yes,resizable=yes");
-        // if the popup was blocked, open it in a new tab
-        if (!popup) {
-           popup = window.open(popupUrl, "_blank");
-        }
-        // if the popup was blocked, redirect to the url
+
+        // try to open in new tab
+        popup = window.open(popupUrl, "_blank");
+        // if the popup was blocked in new tab, redirect to the url
         if (!popup)  {
             event.preventDefault();
             gui.navigate(popupUrl);

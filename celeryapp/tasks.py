@@ -28,6 +28,7 @@ from payments.auto_recharge import (
     run_auto_recharge_gracefully,
     should_attempt_auto_recharge,
 )
+from payments.plans import PricingPlan
 from workspaces.widgets import set_current_workspace
 
 if typing.TYPE_CHECKING:
@@ -198,6 +199,9 @@ def run_low_balance_email_check(workspace: "Workspace"):
         not workspace.is_paying
         or workspace.balance > settings.LOW_BALANCE_EMAIL_CREDITS
     ):
+        return
+    # don't send email if user is on team plan
+    if PricingPlan.from_sub(workspace.subscription) == PricingPlan.TEAM:
         return
     last_purchase = (
         AppUserTransaction.objects.filter(workspace=workspace, amount__gt=0)

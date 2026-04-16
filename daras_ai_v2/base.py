@@ -102,7 +102,7 @@ from widgets.workflow_image import (
     render_workflow_photo_uploader,
 )
 from widgets.workflow_share import render_share_button
-from workspaces.models import Workspace
+from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import (
     get_current_workspace,
     render_create_workspace_alert,
@@ -1470,6 +1470,15 @@ class BasePage:
         return get_current_workspace(self.request.user, self.request.session)
 
     @cached_property
+    def current_membership(self) -> WorkspaceMembership | None:
+        if not self.request.user:
+            return None
+
+        return self.current_workspace.memberships.filter(
+            user=self.request.user, deleted__isnull=True
+        ).first()
+
+    @cached_property
     def current_sr_user(self) -> AppUser | None:
         if not self.current_sr.uid:
             return None
@@ -2457,6 +2466,16 @@ class BasePage:
         workspace = self.current_workspace
         price = self.get_price_roundoff(state)
 
+        if PricingPlan.from_sub(workspace.subscription) == PricingPlan.TEAM:
+            membership = self.current_membership
+            if not membership:
+                raise exceptions.UserError("""
+                  The workspace member who created this workflow is no longer part of the workspace.
+                """)
+            if membership.balance >= price:
+                return
+            raise exceptions.InsufficientCredits(self.request.user, sr)
+
         if workspace.balance >= price:
             return
 
@@ -2474,10 +2493,22 @@ class BasePage:
         assert self.request.user, "request.user must be set to deduct credits"
 
         amount = self.get_price_roundoff(state)
+        invoice_id = f"gooey_in_{uuid.uuid1()}"
+
+        if (
+            PricingPlan.from_sub(self.current_workspace.subscription)
+            == PricingPlan.TEAM
+        ):
+            if self.current_membership:
+                txn = self.current_membership.add_balance(
+                    amount=-amount, invoice_id=invoice_id
+                )
+                return txn, amount
+
         txn = self.current_workspace.add_balance(
             amount=-amount,
-            invoice_id=f"gooey_in_{uuid.uuid1()}",
             user=self.request.user,
+            invoice_id=invoice_id,
         )
         return txn, amount
 

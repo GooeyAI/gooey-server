@@ -10,14 +10,15 @@ import stripe
 from daras_ai_v2 import paypal, settings
 from .utils import make_stripe_recurring_plan, make_paypal_recurring_plan
 
+if typing.TYPE_CHECKING:
+    from payments.models import SeatType, Subscription
+
+
 STRIPE_PRODUCT_NAMES = {
     "basic": "Gooey.AI Basic Plan",
     "premium": "Gooey.AI Premium Plan",
 }
 REVERSE_STRIPE_PRODUCT_NAMES = {v: k for k, v in STRIPE_PRODUCT_NAMES.items()}
-
-if typing.TYPE_CHECKING:
-    from payments.models import Subscription
 
 
 class PricingPlanData(typing.NamedTuple):
@@ -35,17 +36,39 @@ class PricingPlanData(typing.NamedTuple):
     pricing_title: str | None = None
     pricing_caption: str | None = None
 
-    def get_pricing_title(self) -> str:
+    def get_pricing_title(
+        self, *, seat_type: SeatType | None = None, seat_count: int | None = None
+    ) -> str:
         if self.pricing_title is not None:
             return self.pricing_title
+
+        if seat_type:
+            total_monthly_charge = seat_type.monthly_charge * (seat_count or 1)
         else:
-            return f"${self.monthly_charge} / month"
+            total_monthly_charge = self.monthly_charge
+
+        return f"${total_monthly_charge}/month"
 
     def get_pricing_caption(self) -> str:
-        if self.pricing_caption is not None:
-            return self.pricing_caption
-        else:
-            return f"{self.credits:,} Credits / month"
+        return self.pricing_caption or ""
+
+    def get_active_credits(
+        self,
+        seat_type: typing.Optional["SeatType"] = None,
+        seat_count: int = 1,
+    ) -> int:
+        if seat_type:
+            return (seat_type.monthly_credit_limit or 0) * seat_count
+        return self.credits
+
+    def get_active_monthly_charge(
+        self,
+        seat_type: typing.Optional["SeatType"] = None,
+        seat_count: int = 1,
+    ) -> int:
+        if seat_type:
+            return seat_type.monthly_charge * seat_count
+        return self.monthly_charge
 
 
 class PricingPlan(PricingPlanData, Enum):
@@ -100,7 +123,6 @@ class PricingPlan(PricingPlanData, Enum):
         ),
         deprecated=True,
     )
-
     BUSINESS_2024 = PricingPlanData(
         db_value=5,
         key="business",
@@ -131,51 +153,7 @@ class PricingPlan(PricingPlanData, Enum):
         ),
         deprecated=True,
     )
-
-    # -- active
-    STARTER = PricingPlanData(
-        db_value=3,
-        key="starter",
-        title="Pay as you go",
-        description="Everyone at first, cash-strapped startups, open source developers.",
-        credits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
-        monthly_charge=0,
-        long_description=dedent(
-            """
-            #### Features
-            <ul class="text-muted">
-              <li>Public Workflows</li>
-              <li>One public workspace (up to 5 members)</li>
-              <li>Run all frontier models</li>
-              <li><a href="/explore">Explore, fork & run</a> any public workflow</li>
-              <li>Best in class RAG & agentic flows</li>
-              <li>Run any code via <a href="/functions/" target="_blank">functions</a></li>
-              <li>Test and deploy via <a href="/copilot/" target="_blank">Copilot</a> Web Widget</li>
-              <li><a href="/speech/" target="_blank">Speech Recognition</a> and translation for 1000+ languages</li>
-              <li>API access</li>
-              <li>Use-case specific, golden QnA based <a href="/bulk/">bulk evaluation</a></li>
-              <li>Basic usage and interaction history export and dashboards</li>
-              <li>
-                Broad selection of <a href="/tts/">Text to Speech voices</a> and custom 11Labs voices for
-                <a href="/Lipsync/">Lipsync</a> and <a href="/copilot/">Copilot</a>
-              </li>
-            </ul>
-            """
-        ),
-        footer=dedent(
-            """
-            <ul class="text-muted">
-              <li>Non-commercial license</li>
-              <li>Community Support in Discord</li>
-              <li>Up to 5,000 runs of any Workflow</li>
-              <br/>
-            </ul>
-            """
-        ),
-        pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS:,} free credits. 1000 for $10 thereafter.",
-    )
-
-    BUSINESS = PricingPlanData(
+    BUSINESS_2025 = PricingPlanData(
         db_value=7,
         key="business_2025",
         title="Business",
@@ -187,22 +165,127 @@ class PricingPlan(PricingPlanData, Enum):
             """
             #### Everything in Free +
             <ul class="text-muted">
-              <li>Private Workflows</li>
-              <li>1 Private Workspace (up to 5 members)</li>
-              <li>Collaborate on Workflows with version history</li>
-              <li>SOC2, GDPR compliance, Level 5 API support from OpenAI and others</li>
-              <li>API secrets for secure connections to external services</li>
-              <li>Higher submission rate and concurrency limits</li>
+
+              <li>Private Team Workspace</li>
+              <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
+              <li>API Secrets to securely access any system</li>
               <li>Bring your own WhatsApp number</li>
+              <li>Embed copilots in your own App</li>
+              <li>Impact and usage <a href="https://docs.gooey.ai/ai-agent/conversation-analysis">dashboards</a></li>
+              <li>Role Based Management</li>
+              <li>Centralized billing</li>
+              <li>Pooled Credits, Submission Rates and Concurrency</li>
+              <li>Version History on Workflows</li>
             </ul>
             """
         ),
         footer=dedent(
             """
             <ul class="text-muted">
-              <li>Commercial license</li>
-              <li>Premium support via dedicated Discord Channel</li>
-              <li>Up to 20,000 runs of any Workflow</li>
+              <li>Full Commercial license</li>
+              <li>Premium team support via Email</li>
+            </ul>
+            """
+        ),
+        deprecated=True,
+    )
+
+    # -- active
+    STARTER = PricingPlanData(
+        db_value=3,
+        key="starter",
+        title="Free",
+        description="Kick our tires",
+        credits=0,
+        monthly_charge=0,
+        long_description=dedent(
+            """
+            #### Features
+            <ul class="text-muted">
+              <li>Public Workflows</li>
+              <li>Run all frontier <a href="/compare-llm">LLMs</a></li>
+              <li><a href="/explore">Explore</a>, fork & run any public AI Workflow</li>
+              <li>Test and deploy via <a href="/copilot/">Agent Web Widget</a></li>
+              <li><a href="/speech/">Speech recognition</a> and translation for 1000+ languages</li>
+              <li>Broad selection of <a href="/text-to-speech/">Text to Speech voices</a> for <a href="/lipsync/">Lipsync</a> and <a href="/copilot/">Copilot</a></li>
+              <li>Access top image generation models</li>
+              <li>Deploy Workflows via the Web, WhatsApp, SMS/Voice, Slack or FB</li>
+            </ul>
+            """
+        ),
+        footer=dedent(
+            """
+            <ul class="text-muted">
+              <li>Non-commercial license</li>
+              <li>Community support in Discord</li>
+            </ul>
+            """
+        ),
+        pricing_title="$0",
+        pricing_caption=f"{settings.VERIFIED_EMAIL_USER_FREE_CREDITS} credits to start.",
+    )
+
+    PRO = PricingPlanData(
+        db_value=8,
+        key="pro_2026",
+        title="Pro",
+        description="More for power users",
+        monthly_charge=25,
+        credits=2_000,
+        long_description=dedent(
+            """
+            #### Everything in Free +
+            <ul class="text-muted">
+              <li>Private Workflows</li>
+              <li>Access to frontier video & animation models</li>
+              <li>Increased file upload limit</li>
+              <li>Higher rate limits</li>
+              <li>Execute any code via JS / Python <a href="/functions/">functions</a></li>
+              <li>SOC2 Type II + GDPR Compliance</li>
+              <li><a href="https://docs.gooey.ai/api-reference/getting-started">API access</a> to every workflow</li>
+              <li>No model training</li>
+            </ul>
+            """
+        ),
+        footer="""
+        <ul class="text-muted">
+          <li>Commercial license for images, QR Codes, and videos</li>
+          <li>Premium Support via dedicated Discord Channel</li>
+        </ul>
+        """,
+    )
+
+    TEAM = PricingPlanData(
+        db_value=9,
+        key="team_2025",
+        title="Team",
+        description="Predictable pricing per seat.",
+        monthly_charge=40,
+        credits=2_500,
+        long_description=dedent(
+            """
+            #### All Pro Features +
+            <ul class="text-muted">
+              <li>Private Team Workspace</li>
+              <li>Central billing and administration</li>
+              <li>HIPAA, SOC2 Type II, and GDPR compliance</li>
+              <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
+              <li>API Secrets to securely access any system (Researcher & above)</li>
+              <li>Bring your own WhatsApp number</li>
+              <li>Embed copilots in your own App</li>
+              <li>Impact and usage <a href="https://docs.gooey.ai/ai-agent/conversation-analysis">dashboards</a></li>
+              <li>Role Based Management</li>
+              <li>Centralized billing</li>
+              <li>Version History on Workflows</li>
+              <li>Use-case specific, Workflow <a href="https://docs.gooey.ai/tools/evaluations/understanding-bulk-runner-and-evaluation">Evaluation</a> to optimize model and component selection.</li>
+            </ul>
+            """
+        ),
+        footer=dedent(
+            """
+            <ul class="text-muted">
+              <li>Commerical license</li>
+              <li>Premium Support via Email</li>
             </ul>
             """
         ),
@@ -212,37 +295,35 @@ class PricingPlan(PricingPlanData, Enum):
         db_value=6,
         key="enterprise",
         title="Enterprise",
-        description="For organizations ready for transformation with Gooey.AI as the foundation of their AI strategy.",
+        description="Pooled Usage. For organizations ready for transformation with Gooey.AI as the foundation of their AI strategy.",
         monthly_charge=0,
         credits=999_999,
         pricing_title="Custom",
         pricing_caption="Typically $25,000 - $500,000 annually",
         long_description=dedent(
             """
-            #### Everything in Business +
+            #### All Team Features +
             <ul class="text-muted">
+              <li>Pooled Credits, Submission Rates and Concurrency</li>
+              <li>Single sign-on (SSO) &amp; Oauth login</li>
+              <li>Zero Data Retention</li>
               <li>Unlimited Workspaces for private collaboration among teams and clients</li>
-              <li>Custom inference queues and rate limits</li>
-              <li>Strategic AI consulting</li>
-              <li>Accelerator and GoTo Market partnerships</li>
-              <li>Organizational onboarding with founders</li>
-              <li>White label Workspaces for client engagement</li>
-              <li>Custom Workflow evaluation and optimization</li>
-              <li>Custom model training, tuning, and hosting</li>
-              <li>Tailored usage and interaction analytics</li>
-              <li>SMS and TTS Telephony for Copilots</li>
+              <li>Strategic AI consulting including:
+                <ul>
+                  <li>Rock-bottom, full-transparency, no mark-up token pricing</li>
+                  <li>Ongoing cost optimization + evals across all AI model providers</li>
+                  <li>Tailored onboarding and training</li>
+                </ul>
+              </li>
+              <li>Bespoke Workflows &amp; features</li>
+              <li>Dedicated numbers for WhatsApp, Voice + SMS AI Agents</li>
+              <li>Impact + ROI dashboards for your org based on industry best practices</li>
+              <li>Export usage to your own BI platforms</li>
+              <li>Integrations with your internal systems</li>
+              <li>Host + Integrate your fine-tuned model in Gooey.AI infra</li>
               <li>Use your own keys for OpenAI, Azure, and others</li>
-              <li>On-prem deployment</li>
-              <li>Custom workflows & feature development</li>
-            </ul>
-            """
-        ),
-        footer=dedent(
-            """
-            <ul class="text-muted">
-              <li>Commercial & reseller license</li>
-              <li>Support via Zoom, dedicated support channels, and SLA</li>
-              <li>Unlimited API calls</li>
+              <li>On-prem deployments</li>
+              <li>Custom inference queues and rate limits</li>
             </ul>
             """
         ),
@@ -254,7 +335,8 @@ class PricingPlan(PricingPlanData, Enum):
 
     def __gt__(self, other: PricingPlan) -> bool:
         return not self == other and (
-            self == PricingPlan.ENTERPRISE or self.monthly_charge > other.monthly_charge
+            self == PricingPlan.ENTERPRISE
+            or self.get_active_monthly_charge() > other.get_active_monthly_charge()
         )
 
     def __le__(self, other: PricingPlan) -> bool:
@@ -268,8 +350,10 @@ class PricingPlan(PricingPlanData, Enum):
         return [(plan.db_value, plan.title) for plan in cls]
 
     @classmethod
-    def from_sub(cls, sub: "Subscription") -> PricingPlan:
-        return cls.from_db_value(sub.plan)
+    def from_sub(cls, sub: typing.Optional["Subscription"]) -> PricingPlan:
+        if sub:
+            return cls.from_db_value(sub.plan)
+        return cls.STARTER
 
     @classmethod
     def from_db_value(cls, db_value: int) -> PricingPlan:
@@ -283,9 +367,27 @@ class PricingPlan(PricingPlanData, Enum):
         if product.name in REVERSE_STRIPE_PRODUCT_NAMES:
             return cls.get_by_key(REVERSE_STRIPE_PRODUCT_NAMES[product.name])
 
+        if product.default_price:
+            product_price = product.default_price.unit_amount  # in cents
+        else:
+            product_price = None
+
         for plan in cls:
-            if plan.supports_stripe() and plan.get_stripe_product_id() == product.id:
+            if not plan.supports_stripe():
+                continue
+
+            expected_price = plan.monthly_charge * 100
+
+            if product.name == plan.title and (
+                product_price is None or product_price == expected_price
+            ):
                 return plan
+            if product.name.startswith(f"{plan.title} - ") and (
+                product_price is None or product_price >= expected_price
+            ):
+                return plan
+
+        return None
 
     @classmethod
     def get_by_paypal_plan_id(cls, plan_id: str) -> PricingPlan | None:
@@ -294,35 +396,96 @@ class PricingPlan(PricingPlanData, Enum):
                 return plan
 
     @classmethod
-    def get_by_key(cls, key: str) -> PricingPlan | None:
+    def get_by_key(cls, key: str) -> PricingPlan:
         for plan in cls:
             if plan.key == key:
                 return plan
+        raise KeyError(f"Invalid {cls.__name__} key: {key}")
+
+    # Stripe
 
     def supports_stripe(self) -> bool:
         return bool(self.monthly_charge)
 
-    def supports_paypal(self) -> bool:
-        return bool(self.monthly_charge)
-
-    def get_stripe_line_item(self) -> dict[str, Any]:
+    def get_stripe_line_item(
+        self, *, seat_type: SeatType | None = None, seat_count: int = 1
+    ) -> dict[str, Any]:
         if not self.supports_stripe():
             raise ValueError(f"Can't bill {self.title} via Stripe")
+
+        if self == PricingPlan.TEAM and seat_type:
+            return {
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": seat_type.monthly_charge * 100,
+                    "product": self.get_stripe_product_id(
+                        product_name=f"{self.title} - {seat_type.name} Seat",
+                        seat_type=seat_type,
+                    ),
+                    "recurring": {"interval": "month"},
+                },
+                "quantity": seat_count,
+            }
+
+        credits = self.get_active_credits(seat_type=seat_type, seat_count=seat_count)
+        monthly_charge = self.get_active_monthly_charge(
+            seat_type=seat_type, seat_count=seat_count
+        )
 
         if self.key in STRIPE_PRODUCT_NAMES:
             # via product_name
             return make_stripe_recurring_plan(
                 product_name=STRIPE_PRODUCT_NAMES[self.key],
-                credits=self.credits,
-                amount=self.monthly_charge,
+                credits=credits,
+                amount=monthly_charge,
             )
         else:
-            # via product_id
             return make_stripe_recurring_plan(
                 product_id=self.get_stripe_product_id(),
-                credits=self.credits,
-                amount=self.monthly_charge,
+                credits=credits,
+                amount=monthly_charge,
             )
+
+    def get_stripe_product_id(
+        self,
+        *,
+        product_name: str | None = None,
+        seat_type: SeatType | None = None,
+    ) -> str:
+        monthly_charge = self.get_active_monthly_charge(seat_type=seat_type)
+        product_name = product_name or self.title
+
+        metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: self.key}
+        if seat_type:
+            metadata[settings.STRIPE_ITEM_SEAT_TYPE_METADATA_FIELD] = seat_type.key
+
+        for product in stripe.Product.list(expand=["data.default_price"]).data:
+            if (
+                product.default_price
+                and product.default_price.unit_amount == monthly_charge * 100
+                and product.metadata == metadata
+            ):  # cents
+                return product.id
+
+        product = stripe.Product.create(
+            name=product_name,
+            description=self.description,
+            default_price_data={
+                "currency": "usd",
+                "unit_amount": monthly_charge * 100,
+                "recurring": {"interval": "month"},
+            },
+            metadata=metadata,
+        )
+        return product.id
+
+    # PayPal
+
+    def supports_paypal(self) -> bool:
+        return bool(self.monthly_charge) and self not in [
+            PricingPlan.TEAM,
+            PricingPlan.PRO,
+        ]
 
     def get_paypal_plan(self) -> dict[str, Any]:
         if not self.supports_paypal():
@@ -333,25 +496,6 @@ class PricingPlan(PricingPlanData, Enum):
             credits=self.credits,
             amount=self.monthly_charge,
         )
-
-    def get_stripe_product_id(self) -> str:
-        for product in stripe.Product.list(expand=["data.default_price"]).data:
-            if (
-                product.default_price
-                and product.default_price.unit_amount == self.monthly_charge * 100
-            ):  # cents
-                return product.id
-
-        product = stripe.Product.create(
-            name=self.title,
-            description=self.description,
-            default_price_data={
-                "currency": "usd",
-                "unit_amount": self.monthly_charge * 100,
-                "recurring": {"interval": "month"},
-            },
-        )
-        return product.id
 
     def get_paypal_plan_id(self) -> str:
         product_id = paypal_get_or_create_default_product().id

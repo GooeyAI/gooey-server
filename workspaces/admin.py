@@ -8,7 +8,6 @@ from api_keys.models import ApiKey
 from bots.admin_links import change_obj_url, open_in_new_tab, list_related_html_url
 from bots.models import SavedRun, BotIntegration
 from bots.models.published_run import PublishedRun
-from embeddings.models import EmbeddedFile
 from gooeysite.admin import GooeyModelAdmin, GooeySafeDeleteAdmin
 from payments.models import Subscription
 from usage_costs.models import UsageCost
@@ -239,12 +238,15 @@ class WorkspaceMembershipAdmin(GooeySafeDeleteAdmin):
         "user",
         "workspace",
         "role",
+        "seat",
+        "balance",
         "created_at",
         "updated_at",
     ] + list(GooeySafeDeleteAdmin.list_display)
-    list_filter = ["role", SafeDeleteAdminFilter] + list(
+    list_filter = ["role", "seat__seat_type", SafeDeleteAdminFilter] + list(
         GooeySafeDeleteAdmin.list_filter
     )
+    search_fields = ["user__email", "user__display_name", "workspace__name"]
 
     def get_readonly_fields(
         self, request: "HttpRequest", obj: models.WorkspaceMembership | None = None

@@ -81,9 +81,7 @@ def payment_processing_route(
         redirectUrl=get_route_path(account_route),
     )
 
-    return dict(
-        meta=raw_build_meta_tags(url=str(request.url), title="Processing Payment...")
-    )
+    return dict(meta=raw_build_meta_tags(url=str(request.url), title="Processing..."))
 
 
 @gui.route(app, "/account")
@@ -98,9 +96,11 @@ def old_account_route(request: Request):
 
 
 @gui.route(app, "/account/billing")
-def account_route(request: Request):
+def account_route(request: Request, plans_tab: typing.Literal["team"] | None = None):
     with account_page_wrapper(request, AccountTabs.billing) as current_workspace:
-        billing_tab(request, current_workspace)
+        if plans_tab and not current_workspace.is_personal:
+            raise gui.RedirectException(get_route_path(account_route))
+        billing_tab(request, current_workspace, plans_tab=plans_tab)
     url = get_og_url_path(request)
     return dict(
         meta=raw_build_meta_tags(
@@ -275,10 +275,15 @@ class AccountTabs(TabData, Enum):
         return ret
 
 
-def billing_tab(request: Request, workspace: Workspace):
+def billing_tab(request: Request, workspace: Workspace, plans_tab: str | None = None):
     if not workspace.memberships.get(user=request.user).can_edit_workspace():
         raise gui.RedirectException(get_route_path(members_route))
-    return billing_page(workspace=workspace, user=request.user, session=request.session)
+    return billing_page(
+        workspace=workspace,
+        user=request.user,
+        session=request.session,
+        plans_tab=plans_tab,
+    )
 
 
 def profile_tab(request: Request, workspace: Workspace):
