@@ -194,6 +194,7 @@ class Subscription(models.Model):
     # stripe & paypal operations
 
     def cancel(self, immediately: bool = True) -> None:
+        from daras_ai_v2.billing import clear_pending_stripe_subscription_changes
         from payments.webhooks import set_workspace_subscription
 
         if not (self.payment_provider and self.is_paid()):
@@ -216,6 +217,9 @@ class Subscription(models.Model):
                     else:
                         raise
             case PaymentProvider.STRIPE if not immediately:
+                clear_pending_stripe_subscription_changes(
+                    stripe.Subscription.retrieve(self.external_id)
+                )
                 stripe.Subscription.modify(self.external_id, cancel_at_period_end=True)
             case PaymentProvider.PAYPAL:
                 paypal.Subscription.retrieve(self.external_id).cancel()
