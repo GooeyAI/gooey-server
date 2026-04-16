@@ -295,7 +295,7 @@ def render_current_plan(workspace: Workspace):
 
     with gui.div(className=f"{rounded_border} border-dark"):
         # ROW 1: Plan title and next invoice date
-        left, right = left_and_right()
+        left, right = left_and_right(className="align-items-start")
         with left:
             gui.write(
                 f'#### <span class="text-muted">Current Plan:</span> {plan.title}',
@@ -320,19 +320,24 @@ def render_current_plan(workspace: Workspace):
                     )
 
         # ROW 2: Plan pricing details
-        left, right = left_and_right(className="mt-5")
-        with left:
+        left, right = left_and_right(className="align-items-start mt-3 mt-md-5 gap-5")
+        with left, gui.div(className="d-flex gap-1 align-items-baseline d-md-block"):
             if plan.pricing_title:
-                gui.write(plan.pricing_title, className="no-margin")
+                gui.write(plan.pricing_title, className="no-margin text-nowrap")
             else:
-                gui.write(f"# ${monthly_charge:,}/month", className="no-margin")
+                gui.write(
+                    f"# ${monthly_charge:,}/month", className="no-margin text-nowrap"
+                )
 
             if monthly_charge and provider:
                 gui.caption(
                     f" via **{provider.label}**", className="text-muted no-margin"
                 )
 
-        with right, gui.div(className="text-end"):
+        with (
+            right,
+            gui.div(className="text-md-end mt-3 mt-md-0"),
+        ):
             if plan == PricingPlan.TEAM:
                 _render_seat_info_for_team_subscription(workspace.subscription)
             else:
@@ -358,7 +363,7 @@ def render_current_plan(workspace: Workspace):
         )
         if scheduled_downgrade:
             _render_scheduled_downgrade_warning(
-                scheduled_downgrade, className="mt-3 mb-0"
+                scheduled_downgrade, className="mt-5 mb-0"
             )
 
 
@@ -408,13 +413,16 @@ def _render_scheduled_downgrade_warning(
 
 
 def _render_seat_info_for_team_subscription(subscription: Subscription):
-    seats = subscription.seats.select_related("seat_type").all()
+    seats_qs = subscription.seats.select_related("seat_type").filter(
+        seat_type__is_public=True
+    )
     seat_counts = {}
-    for seat in seats:
+    for seat in seats_qs:
         seat_counts[seat.seat_type] = seat_counts.get(seat.seat_type, 0) + 1
 
     seat_title = " + ".join(
-        f"{count} {seat_type.name}" for seat_type, count in seat_counts.items()
+        f'<span class="d-inline-block">{count} {seat_type.name}</span>'
+        for seat_type, count in seat_counts.items()
     )
     gui.write(
         f"# {seat_title} seats",
@@ -1779,7 +1787,8 @@ def render_billing_history(
         records.append(record)
 
     gui.write("## Billing History", className="d-block")
-    gui.table(pd.DataFrame.from_records(records))
+    with gui.div(className="w-100 overflow-auto"):
+        gui.table(pd.DataFrame.from_records(records))
     if txns.count() > limit:
         gui.caption(f"Showing only the most recent {limit} transactions.")
 
@@ -1868,7 +1877,11 @@ def render_auto_recharge_section(workspace: Workspace):
             gui.success("Settings saved!")
 
 
-def left_and_right(*, className: str = "", **props):
-    className += " d-flex flex-row justify-content-between align-items-center"
+def left_and_right(*, responsive: bool = True, className: str = "", **props):
+    if responsive:
+        className += " d-block d-md-flex"
+    else:
+        className += " d-flex"
+    className += " flex-row justify-content-between"
     with gui.div(className=className, **props):
         return gui.div(), gui.div()
