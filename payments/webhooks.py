@@ -427,7 +427,7 @@ def set_subscription_seats_from_stripe_sub(
 
 def auto_assign_team_seats(
     db_sub: Subscription, invoice_id: str, member_ids: list[str] | None = None
-):
+) -> dict[int, SubscriptionSeat]:
     memberships_qs = (
         db_sub.workspace.memberships.select_related("user")
         .select_for_update()
@@ -438,9 +438,8 @@ def auto_assign_team_seats(
         memberships_qs = memberships_qs.filter(id__in=member_ids)
 
     memberships = {m.id: m for m in memberships_qs}
-    workspace_seats = (
-        db_sub.billed_seats()
-        .select_related("seat_type")
+    workspace_seats = list(
+        db_sub.seats.select_related("seat_type")
         .select_for_update()
         .order_by("-seat_type__monthly_credit_limit")
         .all()
@@ -454,10 +453,11 @@ def auto_assign_team_seats(
     unassigned_members = [
         m for m_id, m in memberships.items() if m_id not in assigned_member_ids
     ]
-    unassigned_seats = [seat for seat in workspace_seats if seat.assigned_to_id is None]
-
-    if not unassigned_members:
-        return
+    unassigned_seats = [
+        seat
+        for seat in workspace_seats
+        if seat.assigned_to_id is None and seat.seat_type.is_public
+    ]
 
     ret = {}
     for member in unassigned_members:
