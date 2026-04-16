@@ -162,8 +162,6 @@ def _schedule_plan_change_next_cycle(
     new_plan: PricingPlan,
     new_selection: SeatSelection | None = None,
 ):
-    clear_pending_stripe_subscription_changes(stripe_sub)
-
     if new_plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         assert new_selection is not None, (
             "Seat selection must be provided when changing team/pro plan"
@@ -1276,6 +1274,8 @@ def change_subscription(
                 workspace.subscription.external_id,
                 expand=["items", "items.data.price", "schedule"],
             )
+            clear_pending_stripe_subscription_changes(stripe_sub)
+
             if (
                 not current_plan.deprecated
                 and new_monthly_charge < current_monthly_charge
@@ -1300,7 +1300,6 @@ def change_subscription(
                 kwargs["billing_cycle_anchor"] = "now"
 
             metadata = {settings.STRIPE_USER_SUBSCRIPTION_METADATA_FIELD: new_plan.key}
-
             stripe.Subscription.modify(
                 stripe_sub.id,
                 items=[
