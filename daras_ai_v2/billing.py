@@ -160,7 +160,7 @@ def _schedule_plan_change_next_cycle(
     new_plan: PricingPlan,
     new_selection: SeatSelection | None = None,
 ):
-    _clear_pending_stripe_subscription_changes(stripe_sub)
+    clear_pending_stripe_subscription_changes(stripe_sub)
 
     if new_plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         assert new_selection is not None, (
@@ -205,7 +205,7 @@ def _schedule_plan_change_next_cycle(
     )
 
 
-def _clear_pending_stripe_subscription_changes(subscription: stripe.Subscription):
+def clear_pending_stripe_subscription_changes(subscription: stripe.Subscription):
     # check for pending downgrade
     schedule = subscription.get("schedule")
     if isinstance(schedule, dict):
