@@ -474,7 +474,7 @@ def render_all_plans(
 
     with gui.div(className="my-2 d-flex justify-content-center"):
         gui.caption(
-            f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})** • Prices don’t include taxes",
+            f"**[See all features & benefits]({settings.PRICING_DETAILS_URL})** • Prices don’t include taxes • Questions? Mail [humans@gooey.ai](mailto:humans@gooey.ai)",
         )
 
     return selected_payment_provider
