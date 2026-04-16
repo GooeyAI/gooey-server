@@ -35,6 +35,8 @@ from workspaces.widgets import open_create_workspace_popup_js, set_current_works
 rounded_border = "w-100 border shadow-sm rounded p-3"
 SeatSelection = tuple[SeatType, int]
 
+SEAT_COUNT_OPTIONS = [2, 3, 4, 5, 10, 15, 20, 25, 50]
+
 
 def _get_team_tier_upgrade_prorated_amount(
     workspace: Workspace,
@@ -689,16 +691,25 @@ def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelec
         selected_seat_type = seat_options[seat_type_id]
 
     if plan == PricingPlan.TEAM:
+        default_seat_count = (
+            workspace.subscription
+            and workspace.subscription.billed_seats().count()
+            or max(workspace.used_seats, 1)
+        )
+        if (
+            default_seat_count not in SEAT_COUNT_OPTIONS
+            and default_seat_count < SEAT_COUNT_OPTIONS[-1]
+        ):
+            default_seat_count = next(
+                c for c in SEAT_COUNT_OPTIONS if c > default_seat_count
+            )
+
         with col2:
             count = gui.selectbox(
                 label="Seats",
-                options=[2, 3, 4, 5, 10, 15, 20, 25, 50],
+                options=SEAT_COUNT_OPTIONS,
                 key=f"seat-count-select-{plan.key}-{workspace.id}",
-                value=(
-                    workspace.subscription
-                    and workspace.subscription.billed_seats().count()
-                    or max(workspace.used_seats, 1)
-                ),
+                value=default_seat_count,
                 className="mb-0 container-margin-reset",
             )
     else:
@@ -768,30 +779,35 @@ def _render_plan_action_button(
         and seat_selection
         and seat_selection[1] < workspace.used_seats
     ):
+        min_allowed_seat_count = next(
+            (c for c in SEAT_COUNT_OPTIONS if c >= workspace.used_seats),
+            SEAT_COUNT_OPTIONS[-1],
+        )
+
         with gui.div(className="d-flex p-3 pb-0 gap-2 alert alert-danger text-black"):
             # fire emoji
             gui.write("🔥")
             with gui.div():
                 gui.write(
                     f"""
-                    You are currently using {workspace.used_seats} seats.
-                    Please select at least {workspace.used_seats} seats or remove some members.
+                    You currently have {workspace.used_seats} members in your team.
+                    Please select a plan with at least {workspace.used_seats} seats or remove some members.
                     """
                 )
                 with gui.div(className="d-flex align-items-center gap-2"):
                     if gui.button(
-                        f"Stay at {workspace.used_seats} seats",
+                        f"Stay at {min_allowed_seat_count} seats",
                         type="link",
                         className="fw-normal",
                     ):
                         gui.session_state[
                             f"seat-count-select-{plan.key}-{workspace.id}"
-                        ] = workspace.used_seats
+                        ] = min_allowed_seat_count
                         raise gui.RerunException()
                     gui.write("|")
                     gui.write(
                         f"""
-                        [Edit Members]({get_route_path(members_route)})
+                        [Remove Members]({get_route_path(members_route)})
                         """
                     )
 
