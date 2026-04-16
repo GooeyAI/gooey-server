@@ -63,7 +63,7 @@ def run(*_args):
 
     _, admin_created = SeatType.objects.get_or_create_gooey_admin_seat_type()
     if admin_created:
-        stats = SeedStats(created=stats.created + 1, updated=stats.upda)
+        stats = SeedStats(created=stats.created + 1, updated=stats.updated)
     else:
         stats = SeedStats(created=stats.created, updated=stats.updated + 1)
 
