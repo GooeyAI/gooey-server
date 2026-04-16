@@ -41,6 +41,7 @@ class BaseLLMTool:
         self.name = name
         self.label = label
         self.properties = properties
+        self.description = description
 
         self.spec_parameters = {
             "type": "object",
@@ -92,30 +93,40 @@ class WorkflowLLMTool(BaseLLMTool):
     def __init__(self, function_url: str):
         from bots.models import Workflow
         from daras_ai_v2.workflow_url_input import url_to_runs
+        from daras_ai_v2.base import extract_model_fields
 
         self.function_url = function_url
 
         self.page_cls, self.fn_sr, self.fn_pr = url_to_runs(function_url)
         self._fn_runs = (self.fn_sr, self.fn_pr)
 
+        self.name = slugify(self.fn_pr.title).replace("-", "_")
+
         self.is_function_workflow = self.fn_sr.workflow == Workflow.FUNCTIONS
         if self.is_function_workflow:
             fn_vars = self.fn_sr.state.get("variables", {})
             fn_vars_schema = self.fn_sr.state.get("variables_schema", {})
         else:
-            fn_vars = self.page_cls.get_example_request(self.fn_sr.state, self.fn_pr)[1]
-            fn_vars_schema = self.page_cls.RequestModel.model_json_schema().get(
-                "properties", {}
-            )
+            fn_vars = extract_model_fields(self.page_cls.RequestModel, self.fn_sr.state)
+            if hasattr(self.page_cls, "get_tool_call_schema"):
+                fn_vars_schema = self.page_cls.get_tool_call_schema(self.fn_sr.state)
+            elif hasattr(self.page_cls, "get_update_gui_state_schema"):
+                fn_vars_schema = self.page_cls.get_update_gui_state_schema(
+                    self.fn_sr.state
+                )
+            else:
+                fn_vars_schema = self.page_cls.RequestModel.model_json_schema().get(
+                    "properties", {}
+                )
         properties = dict(generate_tool_properties(fn_vars, fn_vars_schema))
 
-        name = slugify(self.fn_pr.title).replace("-", "_")
         super().__init__(
-            name=name,
-            label=self.fn_pr.title or name,
+            name=self.name,
+            label=self.fn_pr.title,
             description=self.fn_pr.notes,
             properties=properties,
         )
+        self.spec_function["description"] = self._build_workflow_description(fn_vars)
 
     def bind(
         self,
@@ -222,7 +233,7 @@ class WorkflowLLMTool(BaseLLMTool):
         )
 
     def _get_gooey_memory_tool_scope_name(self) -> str | None:
-        from functions.inbuilt_tools import (
+        from functions.gooey_memory_tools import (
             GooeyMemoryLLMToolDelete,
             GooeyMemoryLLMToolRead,
             GooeyMemoryLLMToolWrite,
@@ -242,6 +253,17 @@ class WorkflowLLMTool(BaseLLMTool):
             if tool_slug in memory_tool_names:
                 return function.get("scope")
         return None
+
+    def _build_workflow_description(self, fn_vars: dict) -> str:
+        from functions.inbuilt_tools import render_fn_pseudocode
+
+        description = (
+            self.fn_pr.notes
+            + "\n\nUse default parameters unless explicitly requested. "
+            "It's a bad programming practice if argument equals to the default parameter value. "
+        )
+        params = [f"{k} = {json.dumps(v)}" for k, v in fn_vars.items()]
+        return render_fn_pseudocode(self.name, description, params)
 
     def _get_system_vars(self) -> tuple[dict, dict]:
         request = self.request_model.model_validate(self.state)
@@ -340,24 +362,44 @@ def generate_tool_properties(
 
 
 def get_nested_type(val, schema=None) -> dict[str, typing.Any]:
-    json_type = schema and schema.get("type") or get_json_type(val)
+    schema = schema or {}
+    json_schema = {
+        key: value
+        for key, value in schema.items()
+        if key not in {"description", "role"}
+    }
+    json_type = json_schema.get("type") or get_json_type(val)
     if json_type == "array":
+        if json_schema.get("items"):
+            return {"type": "array"} | json_schema
         try:
-            return {"type": "array", "items": get_nested_type(val[0])}
+            return {"type": "array"} | json_schema | {"items": get_nested_type(val[0])}
         except IndexError:
-            return {"type": "array", "items": {"type": "object"}}
-    else:
-        return {"type": json_type}
+            return {"type": "array"} | json_schema | {"items": {"type": "object"}}
+    if json_type == "object":
+        if json_schema.get("properties") or "additionalProperties" in json_schema:
+            return {"type": "object"} | json_schema
+        if isinstance(val, dict):
+            return (
+                {"type": "object"}
+                | json_schema
+                | {
+                    "properties": {
+                        key: get_nested_type(value) for key, value in val.items()
+                    }
+                }
+            )
+    return {"type": json_type} | json_schema
 
 
 def get_json_type(val) -> "JsonTypes":
     match val:
+        case bool():
+            return "boolean"
         case str():
             return "string"
         case int() | float() | complex():
             return "number"
-        case bool():
-            return "boolean"
         case list() | tuple() | set():
             return "array"
         case _:

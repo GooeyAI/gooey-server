@@ -36,7 +36,12 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
-from daras_ai_v2.base import BasePage, RecipeRunState, RecipeTabs, StateKeys
+from daras_ai_v2.base import (
+    BasePage,
+    RecipeRunState,
+    RecipeTabs,
+    StateKeys,
+)
 from daras_ai_v2.bot_integration_connect import connect_bot_to_published_run
 from daras_ai_v2.bot_integration_widgets import (
     broadcast_input,
@@ -105,7 +110,10 @@ from daras_ai_v2.vector_search import (
     doc_or_yt_url_to_file_metas,
     doc_url_to_text_pages,
 )
-from functions.inbuilt_tools import get_inbuilt_tools_from_state
+from functions.inbuilt_tools import (
+    LoadToolsLLMTool,
+    get_inbuilt_tools_from_state,
+)
 from functions.models import FunctionTrigger
 from functions.recipe_functions import BaseLLMTool
 from functions.recipe_functions import (
@@ -667,6 +675,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
     ) -> typing.Iterator[str | None]:
         yield f"Summarizing with {model.label}..."
 
+        tools_by_name = tools_by_name or {}
+        active_tools_by_name = self._filter_active_tools(tools_by_name)
+
         audio_session_extra = None
         if model.llm_is_audio_model:
             audio_session_extra = {}
@@ -682,7 +693,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
             reasoning_effort=request.reasoning_effort,
-            tools=list(tools_by_name.values()),
+            tools=list(active_tools_by_name.values()),
             stream=True,
             audio_url=request.input_audio,
             audio_session_extra=audio_session_extra,
@@ -711,7 +722,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             tool_calls = choices[0].get("tool_calls")
             if tool_calls:
                 for call in tool_calls:
-                    tool = tools_by_name[call["function"]["name"]]
+                    tool = active_tools_by_name[call["function"]["name"]]
                     call["label"] = tool.label
                     call["icon"] = tool.get_icon()
                 response.final_prompt[-1]["tool_calls"] = tool_calls
@@ -767,19 +778,24 @@ Translation Glossary for LLM Language (English) -> User Langauge
         if not tool_calls:
             return
         for call in tool_calls:
-            tool, arguments = get_tool_from_call(call["function"], tools_by_name)
+            tool, arguments = get_tool_from_call(call["function"], active_tools_by_name)
             if not arguments:
                 continue
             yield f"🛠 {tool.label}..."
-            output = tool.call_json(arguments)
-            response.final_prompt.append(
-                dict(
-                    role="tool",
-                    content=output,
-                    tool_call_id=call["id"],
-                    run_url=tool.get_url(),
-                ),
-            )
+            try:
+                output = tool.call_json(arguments)
+            except Exception as e:
+                output = json.dumps({"error": str(e)})
+                raise
+            finally:
+                response.final_prompt.append(
+                    dict(
+                        role="tool",
+                        content=output,
+                        tool_call_id=call["id"],
+                        run_url=tool.get_url(),
+                    ),
+                )
 
         yield from self.llm_loop(
             request=request,
@@ -788,6 +804,25 @@ Translation Glossary for LLM Language (English) -> User Langauge
             prev_output_text=output_text,
             tools_by_name=tools_by_name,
         )
+
+    def __init__(self, *args, **kwargs):
+        self._active_tool_names = set()
+        super().__init__(*args, **kwargs)
+
+    def _filter_active_tools(
+        self, tools_by_name: dict[str, BaseLLMTool]
+    ) -> dict[str, BaseLLMTool]:
+        load_tools = LoadToolsLLMTool(tools_by_name, self._active_tool_names)
+        return {
+            load_tools.name: load_tools,
+        } | {
+            tool_name: tool
+            for tool_name, tool in tools_by_name.items()
+            if (
+                tool_name in self._active_tool_names
+                or load_tools.is_first_class_tool(tool)
+            )
+        }
 
     def output_translation_step(self, request, response, output_text):
         from daras_ai_v2.bots import parse_bot_html
@@ -1191,6 +1226,26 @@ PS. This is the workflow that we used to create RadBots - a collection of Turing
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["input_prompt", "messages"]
 
+    @classmethod
+    def get_tool_call_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
+        properties = super().get_tool_call_schema(builder_state)
+        request = builder_state.get("request", builder_state)
+
+        selected_model = request.get("selected_model")
+        llm_models = (
+            AIModelSpec.objects.filter(
+                category=AIModelSpec.Categories.llm,
+            )
+            .exclude_deprecated(selected_models=selected_model)
+            .order_for_frontend()
+        )
+        properties["selected_model"] = cls.override_nullable_string_enum_schema(
+            properties.get("selected_model", {}),
+            [model.name for model in llm_models],
+        )
+
+        return properties
+
     def render_run_preview_output(self, state: dict):
         from daras_ai_v2.bots import parse_bot_html
 
@@ -1570,18 +1625,41 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             gui.write("###### `references`")
             gui.json(references, collapseStringsAfterLength=False)
 
-        tools = list(
-            get_inbuilt_tools_from_state(gui.session_state),
-        )
+        tools_by_name = {
+            tool.name: tool for tool in get_inbuilt_tools_from_state(gui.session_state)
+        }
         if gui.session_state.get("functions"):
             try:
-                tools += list(
-                    get_workflow_tools_from_state(
+                tools_by_name |= {
+                    tool.name: tool
+                    for tool in get_workflow_tools_from_state(
                         gui.session_state, FunctionTrigger.prompt
-                    ),
-                )
+                    )
+                }
             except Exception:
                 pass
+
+        final_prompt = gui.session_state.get("final_prompt")
+        direct_tools = {
+            tool_name: tool
+            for tool_name, tool in tools_by_name.items()
+            if LoadToolsLLMTool.is_first_class_tool(tool)
+        }
+        searched_tools = {
+            tool_name: tool
+            for tool_name, tool in tools_by_name.items()
+            if not LoadToolsLLMTool.is_first_class_tool(tool)
+        }
+        loaded_tool_names = self._get_loaded_tool_names_from_final_prompt(final_prompt)
+        if searched_tools:
+            direct_tools["load_tools"] = LoadToolsLLMTool(
+                searched_tools, loaded_tool_names
+            )
+        for tool_name in loaded_tool_names:
+            tool = searched_tools.get(tool_name)
+            if tool:
+                direct_tools[tool.name] = tool
+        tools = list(direct_tools.values())
         if tools:
             gui.write(f"🛠️ `{FunctionTrigger.prompt.name} functions`")
             gui.json(
@@ -1590,7 +1668,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 collapseStringsAfterLength=False,
             )
 
-        final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
             if isinstance(final_prompt, str):
                 text_output("###### `final_prompt`", value=final_prompt, height=300)
@@ -1612,6 +1689,32 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         for idx, audio_url in enumerate(gui.session_state.get("output_audio", [])):
             gui.write(f"###### 🔉 `output_audio[{idx}]`")
             gui.audio(audio_url)
+
+    def _get_loaded_tool_names_from_final_prompt(self, final_prompt) -> list[str]:
+        if not isinstance(final_prompt, list):
+            return []
+
+        loaded_tool_names = []
+        for entry in final_prompt:
+            if not isinstance(entry, dict) or entry.get("role") != "tool":
+                continue
+            content = entry.get("content")
+            if not isinstance(content, str):
+                continue
+            try:
+                payload = json.loads(content)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            for tool_name in payload.get("loaded_tools") or []:
+                if not isinstance(tool_name, str):
+                    continue
+                if tool_name in loaded_tool_names:
+                    continue
+                loaded_tool_names.append(tool_name)
+
+        return loaded_tool_names
 
     def get_raw_price(self, state: dict):
         total = get_non_ivr_price_credits(self.current_sr) + self.PROFIT_CREDITS

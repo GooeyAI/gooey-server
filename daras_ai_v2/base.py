@@ -61,7 +61,7 @@ from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
 from functions.composio_tools import ComposioLLMTool
 from functions.inbuilt_tools import (
-    INBUILT_INTEGRATION_TOOLS,
+    INBUILT_FUNCTION_TOOLS,
     get_inbuilt_tools_from_state,
 )
 from functions.models import (
@@ -210,6 +210,8 @@ class BasePage:
 
         self.tab = tab
         self.request = request
+
+        self._active_tool_names = set()
 
     @classmethod
     def api_endpoint(cls) -> str:
@@ -1448,7 +1450,7 @@ class BasePage:
                         query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
                     ),
                 )
-            case _ if tool.name in INBUILT_INTEGRATION_TOOLS:
+            case _ if tool.name in INBUILT_FUNCTION_TOOLS:
                 return tool.bind(
                     user_id=FunctionScopes.get_user_id_for_scope(
                         tool.scope,
@@ -2544,10 +2546,38 @@ class BasePage:
         return []
 
     @classmethod
-    def get_update_gui_state_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
+    def get_tool_call_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
         """Return top-level request properties for the builder's update_gui_state tool."""
         schema = cls.RequestModel.model_json_schema(ref_template="{model}")
         return schema["properties"]
+
+    @classmethod
+    def override_nullable_string_enum_schema(
+        cls, schema: dict[str, typing.Any], enum: list[str]
+    ) -> dict[str, typing.Any]:
+        if schema.get("anyOf"):
+            non_null_schema = next(
+                (
+                    entry
+                    for entry in schema["anyOf"]
+                    if entry.get("type") and entry.get("type") != "null"
+                ),
+                {},
+            )
+            return schema | {"anyOf": [non_null_schema | {"enum": enum}, {"type": "null"}]}
+        return schema | {"type": "string", "enum": enum}
+
+    @classmethod
+    def override_nullable_string_array_enum_schema(
+        cls, schema: dict[str, typing.Any], enum: list[str]
+    ) -> dict[str, typing.Any]:
+        array_schema = {
+            "type": "array",
+            "items": {"type": "string", "enum": enum},
+        }
+        if schema.get("anyOf"):
+            return schema | {"anyOf": [array_schema, {"type": "null"}]}
+        return schema | array_schema
 
     @classmethod
     def get_example_request(

@@ -112,6 +112,21 @@ class SEOSummaryPage(BasePage):
         summarized_urls: list[dict]
         final_prompt: str
 
+    @classmethod
+    def get_tool_call_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
+        properties = super().get_tool_call_schema(builder_state)
+        request = builder_state.get("request", builder_state)
+        properties["selected_model"] = cls.override_nullable_string_enum_schema(
+            properties.get("selected_model", {}),
+            [
+                model.name
+                for model in AIModelSpec.objects.get_llms_for_frontend(
+                    selected_models=request.get("selected_model")
+                )
+            ],
+        )
+        return properties
+
     def related_workflows(self):
         from recipes.SocialLookupEmail import SocialLookupEmailPage
         from recipes.GoogleImageGen import GoogleImageGenPage

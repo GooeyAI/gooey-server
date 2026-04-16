@@ -68,6 +68,17 @@ class AIModelSpecQuerySet(models.QuerySet):
                 q |= Q(name__in=selected_models)
         return self.filter(q)
 
+    def get_llms_for_frontend(self, *, selected_models: list[str] | str | None = None):
+        return (
+            self.filter(
+                category=AIModelSpec.Categories.llm,
+            )
+            .exclude_deprecated(
+                selected_models=selected_models,
+            )
+            .order_for_frontend()
+        )
+
     def order_for_frontend(self):
         return self.select_related("creator").order_by(
             F("creator__priority").desc(nulls_last=True),

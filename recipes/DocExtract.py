@@ -9,6 +9,7 @@ from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel, Field
 
+from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -139,6 +140,21 @@ class DocExtractPage(BasePage):
             "translation_model",
             "translation_target",
         ]
+
+    @classmethod
+    def get_tool_call_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
+        properties = super().get_tool_call_schema(builder_state)
+        request = builder_state.get("request", builder_state)
+        properties["selected_model"] = cls.override_nullable_string_enum_schema(
+            properties.get("selected_model", {}),
+            [
+                model.name
+                for model in AIModelSpec.objects.get_llms_for_frontend(
+                    selected_models=request.get("selected_model")
+                )
+            ],
+        )
+        return properties
 
     def render_form_v2(self):
         bulk_documents_uploader(

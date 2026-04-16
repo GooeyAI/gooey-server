@@ -172,7 +172,7 @@ These are the services that you need to run to start developing locally. Open th
 | ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Python API + GUI Server | `8080` | `poetry run uvicorn server:app --host 127.0.0.1 --port 8080 --reload`                                                                     |
 | Node Frontend           | `3000` | `cd gooey-gui/; PORT=3000 REDIS_URL=redis://localhost:6379 npm run build && npm run start`                                                |
-| Celery (Task Runner)    | -      | `poetry run celery -A celeryapp worker -P threads -c 16 -l DEBUG`                                                                         |
+| Celery (Task Runner)    | -      | `poetry run watchfiles --filter python --ignore-paths ".git,node_modules,gooey-gui/node_modules,__pycache__,.pytest_cache,.ruff_cache,.mypy_cache" --target-type command "poetry run celery -A celeryapp worker -P threads -c 16 -l DEBUG" .` |
 | Django Admin site       | `8000` | `poetry run python manage.py runserver 127.0.0.1:8000`                                                                                    |
 | Vespa (Vector DB)       | `8085` | `docker run --hostname vespa-container -p 8085:8080 -p 19071:19071 --volume vespa:/opt/vespa/var -it --rm --name vespa vespaengine/vespa` |
 
@@ -185,7 +185,7 @@ The frontend source lives at `./gooey-gui/` inside this repo.
 
 - The Python API + GUI Server should reload the entire server on code changes. You can refresh the page to see the changes.
 
-- The Celery worker must be manually restarted on code changes.
+- The Celery worker now restarts automatically on Python file changes when started with the `watchfiles` command above.
 
 - If you are working on the gooey-gui (react frontend), you can run:
 

@@ -49,6 +49,21 @@ class CompareLLMPage(BasePage):
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["input_prompt", "selected_models"]
 
+    @classmethod
+    def get_tool_call_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
+        properties = super().get_tool_call_schema(builder_state)
+        request = builder_state.get("request", builder_state)
+        properties["selected_models"] = cls.override_nullable_string_array_enum_schema(
+            properties.get("selected_models", {}),
+            [
+                model.name
+                for model in AIModelSpec.objects.get_llms_for_frontend(
+                    selected_models=request.get("selected_models")
+                )
+            ],
+        )
+        return properties
+
     def render_form_v2(self):
         gui.code_editor(
             label="#### 👩‍💻 Prompt",
@@ -58,14 +73,8 @@ class CompareLLMPage(BasePage):
             help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
-        llm_models = (
-            AIModelSpec.objects.filter(
-                category=AIModelSpec.Categories.llm,
-            )
-            .exclude_deprecated(
-                selected_models=gui.session_state.get("selected_models"),
-            )
-            .order_for_frontend()
+        llm_models = AIModelSpec.objects.get_llms_for_frontend(
+            selected_models=gui.session_state.get("selected_models")
         )
         options = {model.name: model.display_html() for model in llm_models}
         gui.multiselect(
