@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import subprocess
 import typing
@@ -10,6 +12,10 @@ from starlette.status import HTTP_401_UNAUTHORIZED
 from starlette.status import HTTP_402_PAYMENT_REQUIRED
 
 from daras_ai_v2 import settings
+
+if typing.TYPE_CHECKING:
+    from app_users.models import AppUser
+    from bots.models import SavedRun
 
 
 def raise_for_status(resp: requests.Response, is_user_url: bool = False):
@@ -71,7 +77,7 @@ class GPUError(UserError):
 
 
 class InsufficientCredits(UserError):
-    def __init__(self, user: "AppUser", sr: "SavedRun"):
+    def __init__(self, user: AppUser, sr: SavedRun):
         from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
 
         account_url = furl(settings.APP_BASE_URL) / "account/"
