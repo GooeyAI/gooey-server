@@ -59,6 +59,17 @@ class ModelProvider(models.IntegerChoices):
 
 
 class AIModelSpecQuerySet(models.QuerySet):
+    def get_llms_for_frontend(self, *, selected_models: list[str] | str | None = None):
+        return (
+            self.filter(
+                category=AIModelSpec.Categories.llm,
+            )
+            .exclude_deprecated(
+                selected_models=selected_models,
+            )
+            .order_for_frontend()
+        )
+
     def exclude_deprecated(self, *, selected_models: list[str] | str | None = None):
         q = Q(is_deprecated=False)
         if selected_models:

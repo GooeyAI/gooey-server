@@ -1,7 +1,6 @@
 import json
 import typing
 from datetime import datetime
-from functools import partial
 from types import SimpleNamespace
 
 import gooey_gui as gui

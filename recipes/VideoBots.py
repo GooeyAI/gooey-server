@@ -9,6 +9,7 @@ from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
 
+from ai_models.llm_openapi import LLMModelField
 from ai_models.models import AIModelSpec
 from bots.models import (
     BotIntegration,
@@ -226,7 +227,7 @@ class VideoBotsPage(BasePage):
         )
 
         # llm model
-        selected_model: str | None = None
+        selected_model: LLMModelField | None = None
         document_model: str | None = Field(
             None,
             title="🩻 Photo / Document Intelligence",
@@ -370,7 +371,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
             llm_model = AIModelSpec.objects.get(name=request.selected_model)
         except AIModelSpec.DoesNotExist:
             raise UserError(
-                f"Model {request.selected_model} not found. Should be one of: {AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm).values_list('name', flat=True)}"
+                f"Model {request.selected_model} not found. Should be one of: "
+                + ", ".join(
+                    AIModelSpec.objects.filter(
+                        category=AIModelSpec.Categories.llm
+                    ).values_list("name", flat=True)
+                )
             )
         user_input = (request.input_prompt or "").strip()
         if not (
@@ -771,15 +777,20 @@ Translation Glossary for LLM Language (English) -> User Langauge
             if not arguments:
                 continue
             yield f"🛠 {tool.label}..."
-            output = tool.call_json(arguments)
-            response.final_prompt.append(
-                dict(
-                    role="tool",
-                    content=output,
-                    tool_call_id=call["id"],
-                    run_url=tool.get_url(),
-                ),
-            )
+            try:
+                output = tool.call_json(arguments)
+            except Exception as e:
+                output = json.dumps({"error": str(e)})
+                raise
+            finally:
+                response.final_prompt.append(
+                    dict(
+                        role="tool",
+                        content=output,
+                        tool_call_id=call["id"],
+                        run_url=tool.get_url(),
+                    ),
+                )
 
         yield from self.llm_loop(
             request=request,

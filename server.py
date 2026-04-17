@@ -48,12 +48,14 @@ from routers import (
     pycon,
 )
 from routers import twilio_ws_api
+from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     limiter = anyio.to_thread.current_default_thread_limiter()
     limiter.total_tokens = config("MAX_THREADS", default=limiter.total_tokens, cast=int)
+    patch_custom_schema_fastapi(app)
     yield
 
 

@@ -1,8 +1,6 @@
 from django.db import models
 
 from bots.custom_fields import CustomURLField
-from daras_ai_v2.stable_diffusion import InpaintingModels
-from usage_costs.twilio_usage_cost import IVRPlatformMedium
 from ai_models.models import ModelProvider
 
 max_digits = 15

@@ -1,13 +1,7 @@
-import base64
-import html as html_lib
-import math
-import textwrap
 import typing
-from datetime import datetime, timezone
+from datetime import datetime
 
-from furl import furl
 from gooey_gui import core
-from loguru import logger
 
 from .common import LabelVisibility, TooltipPlacement, dedent
 

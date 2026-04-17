@@ -3,6 +3,7 @@ import typing
 
 import gooey_gui as gui
 from ai_models.models import AIModelSpec
+from ai_models.llm_openapi import LLMModelField
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -68,7 +69,7 @@ class DocSearchPage(BasePage):
         task_instructions: str | None = None
         query_instructions: str | None = None
         check_document_updates: bool | None = None
-        selected_model: str | None = None
+        selected_model: LLMModelField | None = None
 
         citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None = (
             None

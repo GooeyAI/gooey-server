@@ -131,13 +131,13 @@ class UpdateGuiStateLLMTool(BaseLLMTool):
     def __init__(self, builder_state: dict, page_slug: str):
         from daras_ai_v2.all_pages import normalize_slug, page_slug_map
 
+        request = builder_state.get("request", builder_state)
         try:
             page_cls = page_slug_map[normalize_slug(page_slug)]
         except KeyError:
-            request = builder_state.get("request", builder_state)
             properties = dict(generate_tool_properties(request, {}))
         else:
-            properties = page_cls.get_update_gui_state_schema(builder_state)
+            properties = page_cls.get_tool_call_schema(request)
 
         properties["-submit-workflow"] = {
             "type": "boolean",

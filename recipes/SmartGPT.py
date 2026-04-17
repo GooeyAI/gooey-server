@@ -4,6 +4,7 @@ import jinja2.sandbox
 from pydantic import BaseModel
 
 import gooey_gui as gui
+from ai_models.llm_openapi import LLMModelField
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.functional import map_parallel
@@ -35,7 +36,7 @@ class SmartGPTPage(BasePage):
         reflexion_prompt: str | None = None
         dera_prompt: str | None = None
 
-        selected_model: str | None = None
+        selected_model: LLMModelField | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

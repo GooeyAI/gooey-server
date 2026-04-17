@@ -1,13 +1,10 @@
-import random
 import re
 
-import hashids
 import phonenumbers
 from django.db import IntegrityError, transaction
 
 from bots.models.bot_integration import BotIntegration, Platform
-from daras_ai_v2 import settings
-from number_cycling.models import SharedPhoneNumber, SharedPhoneNumberBotUser
+from number_cycling.models import SharedPhoneNumber
 from workspaces.models import Workspace
 import secrets
 

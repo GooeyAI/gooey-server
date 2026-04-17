@@ -28,7 +28,6 @@ from livekit.agents import (
     CloseEvent,
     ConversationItemAddedEvent,
     ErrorEvent,
-    RoomInputOptions,
     function_tool,
     stt,
     tts,
