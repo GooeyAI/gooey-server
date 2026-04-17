@@ -689,25 +689,26 @@ def _render_seat_selection(plan: PricingPlan, workspace: Workspace) -> SeatSelec
         selected_seat_type = seat_options[seat_type_id]
 
     if plan == PricingPlan.TEAM:
-        default_seat_count = (
-            workspace.subscription
-            and workspace.subscription.billed_seats().count()
-            or max(workspace.used_seats, 1)
-        )
-        if (
-            default_seat_count not in SEAT_COUNT_OPTIONS
-            and default_seat_count < SEAT_COUNT_OPTIONS[-1]
-        ):
-            default_seat_count = next(
-                c for c in SEAT_COUNT_OPTIONS if c > default_seat_count
+        if PricingPlan.from_sub(workspace.subscription) == PricingPlan.TEAM:
+            seat_count_value = workspace.subscription.billed_seats().count()
+        elif workspace.used_seats > SEAT_COUNT_OPTIONS[-1]:
+            seat_count_value = workspace.used_seats
+        else:
+            seat_count_value = next(
+                c for c in SEAT_COUNT_OPTIONS if c >= workspace.used_seats
             )
+
+        if seat_count_value not in SEAT_COUNT_OPTIONS:
+            options = sorted(list(set(SEAT_COUNT_OPTIONS + [seat_count_value])))
+        else:
+            options = SEAT_COUNT_OPTIONS
 
         with col2:
             count = gui.selectbox(
                 label="Seats",
-                options=SEAT_COUNT_OPTIONS,
+                options=options,
                 key=f"seat-count-select-{plan.key}-{workspace.id}",
-                value=default_seat_count,
+                value=seat_count_value,
                 className="mb-0 container-margin-reset",
             )
     else:
@@ -731,13 +732,11 @@ def _render_plan_action_button(
     current_seat_type = (
         workspace.subscription and workspace.subscription.get_seat_type()
     )
-    current_seats = (
-        workspace.subscription
-        and max(1, workspace.subscription.billed_seats().count())
-        or 1
+    current_seat_count = (
+        workspace.subscription and workspace.subscription.billed_seats().count() or 1
     )
     current_seat_selection = (
-        current_seat_type and (current_seat_type, current_seats) or None
+        current_seat_type and (current_seat_type, current_seat_count) or None
     )
 
     if plan == current_plan and (
@@ -777,30 +776,33 @@ def _render_plan_action_button(
         and seat_selection
         and seat_selection[1] < workspace.used_seats
     ):
-        min_allowed_seat_count = next(
-            (c for c in SEAT_COUNT_OPTIONS if c >= workspace.used_seats),
-            SEAT_COUNT_OPTIONS[-1],
-        )
+        if (
+            current_plan == PricingPlan.TEAM
+            and current_seat_count >= workspace.used_seats
+        ):
+            label = f"Stay at {current_seat_count} seats"
+            allowed_seat_count = current_seat_count
+        else:
+            allowed_seat_count = next(
+                (c for c in SEAT_COUNT_OPTIONS if c >= workspace.used_seats),
+                workspace.used_seats,
+            )
+            label = f"Purchase {allowed_seat_count} seats"
 
         with gui.div(className="d-flex p-3 pb-0 gap-2 alert alert-danger text-black"):
             # fire emoji
             gui.write("🔥")
             with gui.div():
-                gui.write(
-                    f"""
-                    You currently have {workspace.used_seats} members in your team.
-                    Please select a plan with at least {workspace.used_seats} seats or remove some members.
-                    """
-                )
+                gui.write("You need to purchase seats for each active member:")
                 with gui.div(className="d-flex align-items-center gap-2"):
                     if gui.button(
-                        f"Stay at {min_allowed_seat_count} seats",
+                        label,
                         type="link",
                         className="fw-normal",
                     ):
                         gui.session_state[
                             f"seat-count-select-{plan.key}-{workspace.id}"
-                        ] = min_allowed_seat_count
+                        ] = allowed_seat_count
                         raise gui.RerunException()
                     gui.write("|")
                     gui.write(
