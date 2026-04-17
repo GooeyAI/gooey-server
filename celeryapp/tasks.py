@@ -134,7 +134,7 @@ def runner_task(
             traceback.print_exc()
         sentry_sdk.capture_exception(e, level=sentry_level)
         error_msg = err_msg_for_exc(e)
-        sr.error_type = type(e).__qualname__
+        sr.error_type = getattr(e, "error_type", None) or type(e).__qualname__
         sr.error_code = getattr(e, "status_code", None)
         sr.error_params = error_params or {}
 
