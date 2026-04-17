@@ -52,6 +52,10 @@ from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.openapi_tricks import (
+    patch_custom_schema_pydantic,
+    get_full_pydantic_schema,
+)
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
@@ -2544,10 +2548,10 @@ class BasePage:
         return []
 
     @classmethod
-    def get_update_gui_state_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
-        """Return top-level request properties for the builder's update_gui_state tool."""
-        schema = cls.RequestModel.model_json_schema(ref_template="{model}")
-        return schema["properties"]
+    def get_tool_call_schema(cls, request: dict) -> dict[str, typing.Any]:
+        """Return top-level request properties for tool calling schema."""
+        properties = get_full_pydantic_schema(cls.RequestModel)
+        return patch_custom_schema_pydantic(properties, request)
 
     @classmethod
     def get_example_request(

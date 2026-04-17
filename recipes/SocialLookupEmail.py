@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import gooey_gui as gui
 from ai_models.models import AIModelSpec
+from ai_models.llm_openapi import LLMModelField
 from bots.models import Workflow
 from daras_ai.text_format import daras_ai_format_str
 from daras_ai_v2 import settings
@@ -52,7 +53,7 @@ class SocialLookupEmailPage(BasePage):
         # domain: str | None
         # key_words: str | None
 
-        selected_model: str | None = None
+        selected_model: LLMModelField | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass

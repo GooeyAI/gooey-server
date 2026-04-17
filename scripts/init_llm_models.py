@@ -1,5 +1,3 @@
-import typing
-from enum import Enum
 from django.db import transaction
 from ai_models.models import AIModelSpec, ModelProvider
 

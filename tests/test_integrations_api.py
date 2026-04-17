@@ -3,7 +3,7 @@ import json
 from furl import furl
 from starlette.testclient import TestClient
 
-from bots.models import BotIntegration, Platform
+from bots.models import BotIntegration
 from server import app
 
 client = TestClient(app)

@@ -10,6 +10,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from ai_models.models import AIModelSpec
+from ai_models.llm_openapi import LLMModelField
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import raise_for_status
@@ -91,7 +92,7 @@ class SEOSummaryPage(BasePage):
 
         enable_html: bool | None = None
 
-        selected_model: str | None = None
+        selected_model: LLMModelField | None = None
 
         max_search_urls: int | None = None
 

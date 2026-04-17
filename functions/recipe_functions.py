@@ -10,8 +10,13 @@ from app_users.models import AppUser
 from daras_ai_v2 import icons
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.field_render import field_title_desc
-from functions.models import CalledFunction, FunctionScopes, FunctionTrigger
+from functions.models import (
+    CalledFunction,
+    FunctionScopes,
+    FunctionTrigger,
+)
 from widgets.switch_with_section import switch_with_section
+import textwrap
 
 if typing.TYPE_CHECKING:
     from bots.models import PublishedRun, SavedRun
@@ -92,28 +97,28 @@ class WorkflowLLMTool(BaseLLMTool):
     def __init__(self, function_url: str):
         from bots.models import Workflow
         from daras_ai_v2.workflow_url_input import url_to_runs
+        from daras_ai_v2.base import extract_model_fields
 
         self.function_url = function_url
 
         self.page_cls, self.fn_sr, self.fn_pr = url_to_runs(function_url)
         self._fn_runs = (self.fn_sr, self.fn_pr)
 
+        self.name = slugify(self.fn_pr.title).replace("-", "_")
+
         self.is_function_workflow = self.fn_sr.workflow == Workflow.FUNCTIONS
         if self.is_function_workflow:
             fn_vars = self.fn_sr.state.get("variables", {})
             fn_vars_schema = self.fn_sr.state.get("variables_schema", {})
+            properties = dict(generate_tool_properties(fn_vars, fn_vars_schema))
         else:
-            fn_vars = self.page_cls.get_example_request(self.fn_sr.state, self.fn_pr)[1]
-            fn_vars_schema = self.page_cls.RequestModel.model_json_schema().get(
-                "properties", {}
-            )
-        properties = dict(generate_tool_properties(fn_vars, fn_vars_schema))
+            fn_vars = extract_model_fields(self.page_cls.RequestModel, self.fn_sr.state)
+            properties = self.page_cls.get_tool_call_schema(self.fn_sr.state)
 
-        name = slugify(self.fn_pr.title).replace("-", "_")
         super().__init__(
-            name=name,
-            label=self.fn_pr.title or name,
-            description=self.fn_pr.notes,
+            name=self.name,
+            label=self.fn_pr.title or self.name,
+            description=self._build_workflow_description(fn_vars),
             properties=properties,
         )
 
@@ -243,6 +248,15 @@ class WorkflowLLMTool(BaseLLMTool):
                 return function.get("scope")
         return None
 
+    def _build_workflow_description(self, fn_vars: dict) -> str:
+        description = (
+            self.fn_pr.notes
+            + "\n\nUse default parameters unless explicitly requested. "
+            "It's a bad programming practice if argument equals to the default parameter value. "
+        )
+        params = [f"{k} = {json.dumps(v)}" for k, v in fn_vars.items()]
+        return render_fn_pseudocode(self.name, description, params)
+
     def _get_system_vars(self) -> tuple[dict, dict]:
         request = self.request_model.model_validate(self.state)
         system_vars = dict(
@@ -344,7 +358,7 @@ def get_nested_type(val, schema=None) -> dict[str, typing.Any]:
     if json_type == "array":
         try:
             return {"type": "array", "items": get_nested_type(val[0])}
-        except IndexError:
+        except (IndexError, TypeError):
             return {"type": "array", "items": {"type": "object"}}
     else:
         return {"type": json_type}
@@ -352,16 +366,22 @@ def get_nested_type(val, schema=None) -> dict[str, typing.Any]:
 
 def get_json_type(val) -> "JsonTypes":
     match val:
+        case bool():
+            return "boolean"
         case str():
             return "string"
         case int() | float() | complex():
             return "number"
-        case bool():
-            return "boolean"
         case list() | tuple() | set():
             return "array"
         case _:
             return "object"
+
+
+def render_fn_pseudocode(name: str, description: str, params: list[str]) -> str:
+    description = textwrap.indent(description, " * ", predicate=lambda line: True)
+    params_str = ", ".join(params)
+    return "/**\n" + description + "\n */\n" + name + "({ " + params_str + " });"
 
 
 def is_functions_enabled(key="functions") -> bool:

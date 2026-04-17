@@ -259,9 +259,8 @@ class VideoGenPage(BasePage):
         render_audio_gen_form(self.available_audio_models)
 
     @classmethod
-    def get_update_gui_state_schema(cls, builder_state: dict) -> dict[str, typing.Any]:
-        properties = super().get_update_gui_state_schema(builder_state)
-        request = builder_state.get("request", builder_state)
+    def get_tool_call_schema(cls, request: dict) -> dict[str, typing.Any]:
+        properties = super().get_tool_call_schema(request)
 
         selected_models = request.get("selected_models") or []
         video_models = AIModelSpec.objects.filter(name__in=selected_models)
