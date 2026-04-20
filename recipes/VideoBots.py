@@ -106,13 +106,11 @@ from daras_ai_v2.vector_search import (
     doc_or_yt_url_to_file_metas,
     doc_url_to_text_pages,
 )
-from functions.inbuilt_tools import get_inbuilt_tools_from_state
-from functions.models import FunctionTrigger
 from functions.base_llm_tool import BaseLLMTool
 from functions.base_llm_tool import (
     get_tool_from_call,
-    get_workflow_tools_from_state,
 )
+from functions.workflow_tools import DynamicLLMToolLoader
 from payments.plans import PricingPlan
 from recipes.DocExtract import document_intelligence_settings
 from recipes.DocSearch import get_top_k_references, references_as_prompt
@@ -661,6 +659,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
             )
         return user_input
 
+    def __init__(self, *args, **kwargs):
+        self.active_tool_names = set()
+        super().__init__(*args, **kwargs)
+
     def llm_loop(
         self,
         *,
@@ -679,6 +681,15 @@ Translation Glossary for LLM Language (English) -> User Langauge
             if request.openai_voice_name:
                 audio_session_extra["voice"] = request.openai_voice_name
 
+        loader = DynamicLLMToolLoader(tools_by_name, self.active_tool_names)
+        tools_by_name[loader.name] = loader
+        active_tools = [
+            tool for tool in tools_by_name.values() if loader.is_tool_active(tool)
+        ]
+        response.final_prompt[0]["tools"] = [
+            tool.spec_function for tool in active_tools
+        ]
+
         chunks: typing.Generator[list[dict], None, None] = run_language_model(
             model=model.name,
             messages=response.final_prompt,
@@ -688,7 +699,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             avoid_repetition=request.avoid_repetition,
             response_format_type=request.response_format_type,
             reasoning_effort=request.reasoning_effort,
-            tools=list(tools_by_name.values()),
+            tools=active_tools,
             stream=True,
             audio_url=request.input_audio,
             audio_session_extra=audio_session_extra,
@@ -1580,26 +1591,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         if references:
             gui.write("###### `references`")
             gui.json(references, collapseStringsAfterLength=False)
-
-        tools = list(
-            get_inbuilt_tools_from_state(gui.session_state),
-        )
-        if gui.session_state.get("functions"):
-            try:
-                tools += list(
-                    get_workflow_tools_from_state(
-                        gui.session_state, FunctionTrigger.prompt
-                    ),
-                )
-            except Exception:
-                pass
-        if tools:
-            gui.write(f"🛠️ `{FunctionTrigger.prompt.name} functions`")
-            gui.json(
-                [tool.spec_function for tool in tools],
-                depth=3,
-                collapseStringsAfterLength=False,
-            )
 
         final_prompt = gui.session_state.get("final_prompt")
         if final_prompt:
