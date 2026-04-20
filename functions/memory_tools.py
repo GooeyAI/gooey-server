@@ -4,7 +4,7 @@ import typing
 from django.utils import timezone
 
 from functions.models import FunctionScopes
-from functions.recipe_functions import (
+from functions.base_llm_tool import (
     BaseLLMTool,
 )
 from memory.models import MemoryEntry

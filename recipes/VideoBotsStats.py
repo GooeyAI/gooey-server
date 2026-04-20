@@ -40,7 +40,7 @@ from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
 from daras_ai_v2.workflow_url_input import workflow_url_input
 from functions.models import VariableSchema
-from functions.recipe_functions import FUNCTIONS_HELP_TEXT
+from functions.base_llm_tool import FUNCTIONS_HELP_TEXT
 from recipes.BulkRunner import list_view_editor
 from recipes.Functions import FunctionsPage
 from recipes.VideoBots import VideoBotsPage

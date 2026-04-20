@@ -1,4 +1,4 @@
-from functions.recipe_functions import (
+from functions.base_llm_tool import (
     BaseLLMTool,
     generate_tool_properties,
 )

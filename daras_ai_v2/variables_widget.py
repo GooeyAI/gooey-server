@@ -9,7 +9,7 @@ import jinja2.meta
 import jinja2.sandbox
 
 from daras_ai_v2 import icons
-from functions.recipe_functions import get_json_type
+from functions.base_llm_tool import get_json_type
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import JsonTypes

@@ -65,7 +65,7 @@ from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
 from functions.composio_tools import ComposioLLMTool
 from functions.inbuilt_tools import (
-    INBUILT_INTEGRATION_TOOLS,
+    INBUILT_TOOLKITS,
     get_inbuilt_tools_from_state,
 )
 from functions.models import (
@@ -74,15 +74,15 @@ from functions.models import (
     RecipeFunction,
     VariableSchema,
 )
-from functions.recipe_functions import (
+from functions.base_llm_tool import (
     BaseLLMTool,
-    WorkflowLLMTool,
     call_recipe_functions,
     functions_input,
     get_workflow_tools_from_state,
     is_functions_enabled,
     render_called_functions,
 )
+from functions.workflow_tools import WorkflowLLMTool
 from payments.auto_recharge import (
     run_auto_recharge_gracefully,
     should_attempt_auto_recharge,
@@ -1452,7 +1452,7 @@ class BasePage:
                         query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
                     ),
                 )
-            case _ if tool.name in INBUILT_INTEGRATION_TOOLS:
+            case _ if tool.name in INBUILT_TOOLKITS:
                 return tool.bind(
                     user_id=FunctionScopes.get_user_id_for_scope(
                         tool.scope,

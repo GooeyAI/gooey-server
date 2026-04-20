@@ -8,7 +8,7 @@ import gooey_gui as gui
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import ComposioAuthRequired
 from daras_ai_v2.redis_cache import redis_cache_decorator
-from functions.recipe_functions import BaseLLMTool
+from functions.base_llm_tool import BaseLLMTool
 
 if typing.TYPE_CHECKING:
     from composio.types import Tool

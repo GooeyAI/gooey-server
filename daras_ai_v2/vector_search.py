@@ -386,7 +386,7 @@ def fn_url_to_file_metadata(
     leaf_url: str,
 ) -> tuple[FileMetadata, list[tuple[str, FileMetadata]]] | None:
     from functions.models import FunctionTrigger
-    from functions.recipe_functions import WorkflowLLMTool
+    from functions.workflow_tools import WorkflowLLMTool
     from recipes.VideoBots import VideoBotsPage
 
     try:
