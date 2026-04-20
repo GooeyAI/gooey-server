@@ -12,7 +12,7 @@ from websockets.sync.client import ClientConnection
 
 from ai_models.models import AIModelSpec
 from functions.inbuilt_tools import CallTransferLLMTool
-from functions.recipe_functions import BaseLLMTool
+from functions.base_llm_tool import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json
 
 # Disable websocket logging

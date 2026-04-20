@@ -127,9 +127,10 @@ for entry in assistant_entries:
 If a workflow tool is slow or triggers another full run, stub `WorkflowLLMTool.call` and capture its kwargs instead of executing it:
 
 ```python
-from functions.recipe_functions import WorkflowLLMTool
+from functions.base_llm_tool import WorkflowLLMTool
 
 captured_calls = []
+
 
 def fake_call(self, **kwargs):
     captured_calls.append(
@@ -142,6 +143,7 @@ def fake_call(self, **kwargs):
         }
     )
     return {"stubbed": True, "tool_name": self.name, "kwargs": kwargs}
+
 
 with (
     patch("daras_ai_v2.base.get_current_workspace", return_value=workspace),

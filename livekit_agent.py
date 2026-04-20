@@ -62,7 +62,7 @@ from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from daras_ai_v2.utils import clamp
-from functions.recipe_functions import WorkflowLLMTool
+from functions.workflow_tools import WorkflowLLMTool
 from number_cycling.utils import EXTENSION_NUMBER_LENGTH
 from recipes.TextToSpeech import TextToSpeechPage
 from recipes.VideoBots import (

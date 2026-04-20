@@ -16,7 +16,7 @@ from functions.memory_tools import (
     GooeyMemoryLLMToolDelete,
 )
 from functions.models import FunctionScopes
-from functions.recipe_functions import (
+from functions.base_llm_tool import (
     BaseLLMTool,
     get_external_tool_slug_from_url,
 )
@@ -65,7 +65,7 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
             continue
         scope = FunctionScopes.get(function.get("scope"))
         try:
-            tool_cls = INBUILT_INTEGRATION_TOOLS[tool_slug]
+            tool_cls = INBUILT_TOOLKITS[tool_slug]
             yield tool_cls(scope)
         except KeyError:
             composio_tools[tool_slug] = scope
@@ -301,7 +301,7 @@ class FeedbackCollectionLLMTool(BaseLLMTool):
         return {"success": True}
 
 
-INBUILT_INTEGRATION_TOOLS = {
+INBUILT_TOOLKITS = {
     tool.name: tool
     for tool in [
         GooeyMemoryLLMToolRead,

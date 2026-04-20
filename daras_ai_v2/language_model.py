@@ -42,7 +42,7 @@ from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
-from functions.recipe_functions import BaseLLMTool
+from functions.base_llm_tool import BaseLLMTool
 
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "
