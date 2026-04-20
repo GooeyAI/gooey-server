@@ -9,7 +9,7 @@ from django.db.models import Q, QuerySet
 from furl import furl
 from pydantic import BaseModel, Field
 
-from ai_models.llm_openapi import LLMModelField
+from ai_models.llm_openapi import LLMMarker
 from ai_models.models import AIModelSpec
 from bots.models import (
     BotIntegration,
@@ -227,7 +227,7 @@ class VideoBotsPage(BasePage):
         )
 
         # llm model
-        selected_model: LLMModelField | None = None
+        selected_model: LLMMarker | None = None
         document_model: str | None = Field(
             None,
             title="🩻 Photo / Document Intelligence",

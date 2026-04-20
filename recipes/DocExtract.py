@@ -9,7 +9,7 @@ from django.db.models import IntegerChoices
 from furl import furl
 from pydantic import BaseModel, Field
 
-from ai_models.llm_openapi import LLMModelField
+from ai_models.llm_openapi import LLMMarker
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
@@ -93,7 +93,7 @@ class DocExtractPage(BasePage):
 
         sheet_url: OptionalHttpUrlStr = None
 
-        selected_model: LLMModelField | None = None
+        selected_model: LLMMarker | None = None
         document_model: str | None = Field(
             "azure-prebuilt-layout",
             title="🩻 Document Intelligence Model",

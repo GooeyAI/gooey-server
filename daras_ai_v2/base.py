@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
 
+from ai_models.llm_openapi import patch_ai_model_schema_enums
 from app_users.models import AppUser, AppUserTransaction
 from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
 from bots.models import (
@@ -53,7 +54,6 @@ from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.openapi_tricks import (
-    patch_custom_schema_pydantic,
     get_full_pydantic_schema,
 )
 from daras_ai_v2.query_params_util import extract_query_params
@@ -2551,7 +2551,8 @@ class BasePage:
     def get_tool_call_schema(cls, request: dict) -> dict[str, typing.Any]:
         """Return top-level request properties for tool calling schema."""
         properties = get_full_pydantic_schema(cls.RequestModel)
-        return patch_custom_schema_pydantic(properties, request)
+        patch_ai_model_schema_enums(properties)
+        return properties
 
     @classmethod
     def get_example_request(

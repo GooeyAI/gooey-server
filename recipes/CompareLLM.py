@@ -5,7 +5,7 @@ import typing
 import gooey_gui as gui
 from pydantic import BaseModel
 
-from ai_models.llm_openapi import LLMModelField
+from ai_models.llm_openapi import LLMMarker
 from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
@@ -38,7 +38,7 @@ class CompareLLMPage(BasePage):
 
     class RequestModelBase(BasePage.RequestModel):
         input_prompt: str | None = None
-        selected_models: list[LLMModelField] | None = None
+        selected_models: list[LLMMarker] | None = None
 
     class RequestModel(LanguageModelSettings, RequestModelBase):
         pass
@@ -59,8 +59,10 @@ class CompareLLMPage(BasePage):
             help="Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating",
         )
 
-        llm_models = AIModelSpec.objects.get_llms_for_frontend(
-            selected_models=gui.session_state.get("selected_models")
+        llm_models = AIModelSpec.objects.filter(
+            category=AIModelSpec.Categories.llm,
+        ).order_for_frontend(
+            selected_models=gui.session_state.get("selected_models"),
         )
         options = {model.name: model.display_html() for model in llm_models}
         gui.multiselect(

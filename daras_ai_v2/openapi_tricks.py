@@ -5,7 +5,7 @@ from asgiref.sync import sync_to_async
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from ai_models.llm_openapi import patch_llm_model_schema_enums
+from ai_models.llm_openapi import patch_ai_model_schema_enums
 
 
 def patch_custom_schema_fastapi(app: FastAPI):
@@ -17,7 +17,7 @@ def patch_custom_schema_fastapi(app: FastAPI):
     def custom_openapi():
         schema = app._openapi_old()
         loop = asyncio.get_running_loop()
-        loop.create_task(patch_openapi_full(schema))
+        loop.create_task(patch_openapi_schema(schema))
         return schema
 
     custom_openapi()
@@ -26,15 +26,11 @@ def patch_custom_schema_fastapi(app: FastAPI):
 
 
 @sync_to_async
-def patch_openapi_full(openapi_schema) -> dict:
+def patch_openapi_schema(openapi_schema) -> dict:
     components = openapi_schema.get("components") or {}
     schemas = components.get("schemas") or {}
-    return patch_custom_schema_pydantic(schemas)
-
-
-def patch_custom_schema_pydantic(schema: dict, request: dict | None = None) -> dict:
-    patch_llm_model_schema_enums(schema)
-    return schema
+    patch_ai_model_schema_enums(schemas)
+    return schemas
 
 
 def get_full_pydantic_schema(model: typing.Type[BaseModel]) -> dict:

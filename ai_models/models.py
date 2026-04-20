@@ -59,15 +59,16 @@ class ModelProvider(models.IntegerChoices):
 
 
 class AIModelSpecQuerySet(models.QuerySet):
-    def get_llms_for_frontend(self, *, selected_models: list[str] | str | None = None):
+    def order_for_frontend(self, *, selected_models: list[str] | str | None = None):
         return (
-            self.filter(
-                category=AIModelSpec.Categories.llm,
+            self.exclude_deprecated(selected_models=selected_models)
+            .select_related("creator")
+            .order_by(
+                F("creator__priority").desc(nulls_last=True),
+                F("creator__name").desc(nulls_last=True),
+                "-priority",
+                "-label",
             )
-            .exclude_deprecated(
-                selected_models=selected_models,
-            )
-            .order_for_frontend()
         )
 
     def exclude_deprecated(self, *, selected_models: list[str] | str | None = None):
@@ -78,14 +79,6 @@ class AIModelSpecQuerySet(models.QuerySet):
             else:
                 q |= Q(name__in=selected_models)
         return self.filter(q)
-
-    def order_for_frontend(self):
-        return self.select_related("creator").order_by(
-            F("creator__priority").desc(nulls_last=True),
-            F("creator__name").desc(nulls_last=True),
-            "-priority",
-            "-label",
-        )
 
 
 class AIModelSpec(models.Model):

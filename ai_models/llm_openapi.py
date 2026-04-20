@@ -4,29 +4,39 @@ from pydantic import Field
 
 from ai_models.models import AIModelSpec
 
-_LLM_MODEL_MARKER = "x-gooey-llm-model"
+_MARKER = "x-gooey-model-marker"
 
-LLMModelField = typing.Annotated[
+LLMMarker: type[str] = typing.Annotated[
     str,
-    Field(json_schema_extra={_LLM_MODEL_MARKER: True}),
+    Field(json_schema_extra={_MARKER: AIModelSpec.Categories.llm.value}),
+]
+VideoModelMarker: type[str] = typing.Annotated[
+    str,
+    Field(json_schema_extra={_MARKER: AIModelSpec.Categories.video.value}),
+]
+AudioModelMarker: type[str] = typing.Annotated[
+    str,
+    Field(json_schema_extra={_MARKER: AIModelSpec.Categories.audio.value}),
 ]
 
 
-def patch_llm_model_schema_enums(
-    schema: dict | list[typing.Any], llm_model_names: list[str] | None = None
-) -> None:
+def patch_ai_model_schema_enums(schema, _cache=None):
+    _cache = _cache or {}
     match schema:
         case dict():
-            if schema.pop(_LLM_MODEL_MARKER, None):
-                if llm_model_names is None:
-                    llm_model_names = list(
-                        AIModelSpec.objects.get_llms_for_frontend().values_list(
-                            "name", flat=True
-                        )
+            category = schema.pop(_MARKER, None)
+            if category:
+                try:
+                    choices = _cache[category]
+                except KeyError:
+                    _cache[category] = choices = list(
+                        AIModelSpec.objects.filter(category=category)
+                        .order_for_frontend()
+                        .values_list("name", flat=True)
                     )
-                schema["enum"] = llm_model_names
+                schema["enum"] = choices
             for value in schema.values():
-                patch_llm_model_schema_enums(value, llm_model_names)
+                patch_ai_model_schema_enums(value, _cache)
         case list():
             for item in schema:
-                patch_llm_model_schema_enums(item, llm_model_names)
+                patch_ai_model_schema_enums(item, _cache)

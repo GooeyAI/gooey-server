@@ -15,6 +15,7 @@ from django.db.models import Q
 from pydantic import BaseModel
 from requests.utils import CaseInsensitiveDict
 
+from ai_models.llm_openapi import AudioModelMarker, VideoModelMarker
 from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes
@@ -42,11 +43,11 @@ class VideoGenPage(BasePage):
     price_deferred = True
 
     class RequestModel(BasePage.RequestModel):
-        selected_models: list[str]
+        selected_models: list[VideoModelMarker]
         inputs: dict[str, typing.Any]
 
         # Audio generation settings
-        selected_audio_model: str | None = None
+        selected_audio_model: AudioModelMarker | None = None
         audio_inputs: dict[str, typing.Any] | None = None
 
     class ResponseModel(BaseModel):
@@ -127,11 +128,11 @@ class VideoGenPage(BasePage):
 
     def render(self):
         video_models = list(
-            AIModelSpec.objects.filter(category=AIModelSpec.Categories.video)
-            .exclude_deprecated(
+            AIModelSpec.objects.filter(
+                category=AIModelSpec.Categories.video
+            ).order_for_frontend(
                 selected_models=gui.session_state.get("selected_models")
             )
-            .order_for_frontend()
         )
 
         self.available_models = CaseInsensitiveDict(
@@ -142,11 +143,9 @@ class VideoGenPage(BasePage):
                 model.name: model
                 for model in AIModelSpec.objects.filter(
                     category=AIModelSpec.Categories.audio
-                )
-                .exclude_deprecated(
+                ).order_for_frontend(
                     selected_models=gui.session_state.get("selected_audio_model")
                 )
-                .order_for_frontend()
             }
         )
         super().render()
