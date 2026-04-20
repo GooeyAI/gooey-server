@@ -33,15 +33,16 @@ def meta_preview_url(
     if not segments:
         return file_url, False
 
-    if (f.host or "").lower() != GCS_HOST:
-        return file_url, False
-
     dir_segments = segments[:-1]
     basename = segments[-1]
     base, ext = os.path.splitext(basename)
     content_type = mimetypes.guess_type(basename)[0] or ""
+    is_video = content_type.startswith("video/")
 
-    if content_type.startswith("video/"):
+    if (f.host or "").lower() != GCS_HOST:
+        return file_url, is_video
+
+    if is_video:
         f.path.segments = dir_segments + ["thumbs", f"{base}.gif"]
         return str(f), True
     if content_type in {"image/png", "image/jpeg", "image/tiff", "image/webp"}:

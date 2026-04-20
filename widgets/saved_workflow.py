@@ -315,22 +315,32 @@ def render_workflow_media(output_url: str, published_run: PublishedRun):
 def render_media_component(url: str):
     preview_url, is_video = meta_preview_url(url)
     if is_video:
-        url = furl(url).add(fragment_args={"t": "0.001"}).url
-        gui.html(
-            f"""
-            <object data={preview_url!r} class="gui-video w-100">
-            <video src={url!r} class="gui-video" autoplay playsInline loop muted>
-            </object>
-            """
-        )
+        video_url = furl(preview_url).add(fragment_args={"t": "0.001"}).url
+        if preview_url == url:
+            gui.html(
+                f'<video src={video_url!r} class="gui-video w-100" autoplay playsInline loop muted controls>'
+            )
+        else:
+            gui.html(
+                f"""
+                <object data={preview_url!r} class="gui-video w-100">
+                <video src={video_url!r} class="gui-video" autoplay playsInline loop muted controls>
+                </object>
+                """
+            )
     else:
-        gui.html(
-            f"""
-            <object data={preview_url!r} class="gui-image w-100">
-            <img src={url!r} class="gui-image" autoplay playsInline loop muted>
-            </object>
-            """
-        )
+        if preview_url == url:
+            gui.html(
+                f'<img src={url!r} class="gui-image w-100">'
+            )
+        else:
+            gui.html(
+                f"""
+                <object data={preview_url!r} class="gui-image w-100">
+                <img src={url!r} class="gui-image">
+                </object>
+                """
+            )
 
 
 def render_thumb_with_fallback(
@@ -348,5 +358,8 @@ def render_thumb_with_fallback(
     first; on 404 it renders the inner <img>. This avoids a server-side GCS existence
     check in the page-load hot path.
     """
+    if thumb_url == fallback_url:
+        return gui.image(src=fallback_url, style=style, className=className)
+
     with gui.tag("object", data=thumb_url, style=style, className=className):
         gui.image(src=fallback_url, style=style, className=className)
