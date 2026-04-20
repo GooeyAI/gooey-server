@@ -330,9 +330,7 @@ def render_media_component(url: str):
             )
     else:
         if preview_url == url:
-            gui.html(
-                f'<img src={url!r} class="gui-image w-100">'
-            )
+            gui.html(f'<img src={url!r} class="gui-image w-100">')
         else:
             gui.html(
                 f"""
