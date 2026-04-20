@@ -227,7 +227,7 @@ class WorkflowLLMTool(BaseLLMTool):
         )
 
     def _get_gooey_memory_tool_scope_name(self) -> str | None:
-        from functions.inbuilt_tools import (
+        from functions.memory_tools import (
             GooeyMemoryLLMToolDelete,
             GooeyMemoryLLMToolRead,
             GooeyMemoryLLMToolWrite,
