@@ -6,26 +6,26 @@ from ai_models.models import AIModelSpec
 
 _MARKER = "x-gooey-model-marker"
 
-LLMMarker: type[str] = typing.Annotated[
+LLMMarker: typing.TypeAlias = typing.Annotated[
     str,
     Field(json_schema_extra={_MARKER: AIModelSpec.Categories.llm.value}),
 ]
-VideoModelMarker: type[str] = typing.Annotated[
+VideoModelMarker: typing.TypeAlias = typing.Annotated[
     str,
     Field(json_schema_extra={_MARKER: AIModelSpec.Categories.video.value}),
 ]
-AudioModelMarker: type[str] = typing.Annotated[
+AudioModelMarker: typing.TypeAlias = typing.Annotated[
     str,
     Field(json_schema_extra={_MARKER: AIModelSpec.Categories.audio.value}),
 ]
 
 
 def patch_ai_model_schema_enums(schema, _cache=None):
-    _cache = _cache or {}
     match schema:
         case dict():
-            category = schema.pop(_MARKER, None)
+            category: AIModelSpec.Categories | None = schema.pop(_MARKER, None)
             if category:
+                _cache = _cache or {}
                 try:
                     choices = _cache[category]
                 except KeyError:

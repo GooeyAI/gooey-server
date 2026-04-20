@@ -43,6 +43,7 @@ class BaseLLMTool:
     ):
         self.name = name
         self.label = label
+        self.description = description
         self.properties = properties
 
         self.spec_parameters = {

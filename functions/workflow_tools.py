@@ -7,6 +7,12 @@ import typing
 from django.utils.text import slugify
 
 from app_users.models import AppUser
+from functions.gooey_builder_tools import UpdateGuiStateLLMTool
+from functions.inbuilt_tools import (
+    FeedbackCollectionLLMTool,
+    VectorSearchLLMTool,
+    CallTransferLLMTool,
+)
 from functions.models import CalledFunction, FunctionTrigger
 from functions.base_llm_tool import (
     BaseLLMTool,
@@ -14,10 +20,13 @@ from functions.base_llm_tool import (
     get_external_tool_slug_from_url,
 )
 
+
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
     from daras_ai_v2.base import BasePage
     from workspaces.models import Workspace
+
+DYNAMIC_TOOL_SEARCH_THRESHOLD = 20_000
 
 
 class WorkflowLLMTool(BaseLLMTool):
@@ -220,21 +229,33 @@ class WorkflowLLMTool(BaseLLMTool):
         return self.fn_sr.get_app_url()
 
 
-class LoadToolsLLMTool(BaseLLMTool):
+class DynamicLLMToolLoader(BaseLLMTool):
+    name = "load_tools"
+
     def __init__(
         self, available_tools: dict[str, BaseLLMTool], active_tool_names: set[str]
     ):
         self.available_tools = available_tools
         self.active_tool_names = active_tool_names
 
-        filtered_tools = [
-            tool
-            for tool in available_tools.values()
-            if not self.is_first_class_tool(tool) and tool.name not in active_tool_names
+        # enable tool search if the appx size of tool specs exceeds a certain threshold
+        self.enabled = (
+            sum(
+                len(json.dumps(tool.spec_function))
+                for tool in self.available_tools.values()
+            )
+            > DYNAMIC_TOOL_SEARCH_THRESHOLD
+        )
+        if not self.enabled:
+            super().__init__(name=self.name, label="", description="", properties={})
+            return
+
+        searchable_tools = [
+            tool for tool in available_tools.values() if not self.is_tool_active(tool)
         ]
 
         tool_catalog = "\n\n".join(
-            _render_tool_catalog_entry(tool) for tool in filtered_tools
+            _render_tool_catalog_entry(tool) for tool in searchable_tools
         )
         description = (
             "Request the full schema for one or more tools by exact name. "
@@ -243,10 +264,10 @@ class LoadToolsLLMTool(BaseLLMTool):
             f"\n\nAvailable tools:\n\n{tool_catalog}"
         )
 
-        searchable_tool_names = sorted(tool.name for tool in filtered_tools)
+        searchable_tool_names = sorted(tool.name for tool in searchable_tools)
 
         super().__init__(
-            name="load_tools",
+            name=self.name,
             label="Load Tools",
             description=description,
             properties={
@@ -262,12 +283,6 @@ class LoadToolsLLMTool(BaseLLMTool):
             required=["tool_names"],
         )
 
-    @staticmethod
-    def is_first_class_tool(tool: BaseLLMTool) -> bool:
-        from functions.composio_tools import ComposioLLMTool
-
-        return not isinstance(tool, (WorkflowLLMTool, ComposioLLMTool))
-
     def call(self, tool_names: list[str]) -> dict:
         missing = []
         for tool_name in tool_names:
@@ -279,6 +294,23 @@ class LoadToolsLLMTool(BaseLLMTool):
         if missing:
             ret["missing_tools"] = missing
         return ret
+
+    def is_tool_active(self, tool: BaseLLMTool) -> bool:
+        if self.enabled:
+            return (
+                tool.name in self.active_tool_names
+                or tool.name == self.name
+                or isinstance(tool, self.excluded_tools)
+            )
+        else:
+            return tool.name != self.name
+
+    excluded_tools = (
+        CallTransferLLMTool,
+        VectorSearchLLMTool,
+        FeedbackCollectionLLMTool,
+        UpdateGuiStateLLMTool,
+    )
 
 
 def _render_tool_catalog_entry(tool: BaseLLMTool) -> str:
