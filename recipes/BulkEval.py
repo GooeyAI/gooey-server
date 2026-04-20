@@ -234,14 +234,10 @@ Here's what you uploaded:
             with col2:
                 del_button(del_key)
 
-        llm_models = (
-            AIModelSpec.objects.filter(
-                llm_supports_json=True,
-            )
-            .exclude_deprecated(
-                selected_models=gui.session_state.get("selected_model"),
-            )
-            .order_for_frontend()
+        llm_models = AIModelSpec.objects.filter(
+            llm_supports_json=True,
+        ).order_for_frontend(
+            selected_models=gui.session_state.get("selected_model"),
         )
         options = {model.name: model.display_html() for model in llm_models}
         gui.selectbox(

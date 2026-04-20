@@ -5,7 +5,7 @@ import gooey_gui as gui
 from pydantic import BaseModel
 
 from ai_models.models import AIModelSpec
-from ai_models.llm_openapi import LLMModelField
+from ai_models.llm_openapi import LLMMarker
 from bots.models import Workflow
 from daras_ai_v2.asr import AsrModels
 from daras_ai_v2.base import BasePage
@@ -65,7 +65,7 @@ class DocSummaryPage(BasePage):
         task_instructions: str | None = None
         merge_instructions: str | None = None
 
-        selected_model: LLMModelField | None = None
+        selected_model: LLMMarker | None = None
 
         chain_type: (
             typing.Literal[tuple(e.name for e in CombineDocumentsChains)] | None

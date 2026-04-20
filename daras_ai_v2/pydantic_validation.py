@@ -61,7 +61,7 @@ def validate_url(url: str) -> str:
     return url
 
 
-HttpUrlStr = typing.Annotated[
+HttpUrlStr: type[str] = typing.Annotated[
     str,
     pydantic.AfterValidator(validate_url),
     HttpUrlTypeAnnotation,

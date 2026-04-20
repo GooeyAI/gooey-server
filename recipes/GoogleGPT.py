@@ -5,7 +5,7 @@ from furl import furl
 from pydantic import BaseModel, Field
 
 from ai_models.models import AIModelSpec
-from ai_models.llm_openapi import LLMModelField
+from ai_models.llm_openapi import LLMMarker
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.doc_search_settings_widgets import (
@@ -89,7 +89,7 @@ class GoogleGPTPage(BasePage):
         task_instructions: str | None = None
         query_instructions: str | None = None
 
-        selected_model: LLMModelField | None = None
+        selected_model: LLMMarker | None = None
         check_document_updates: bool | None = None
         max_search_urls: int | None = None
 
