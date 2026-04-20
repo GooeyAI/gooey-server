@@ -476,22 +476,28 @@ class BasePage:
         with gui.div(className="d-flex gap-4 w-100 mb-2"):
             if pr.photo_url:
                 thumb_url, _ = meta_preview_url(pr.photo_url, size="96x96")
-                with gui.div(className="d-none d-md-inline"):
+                with gui.div(
+                    className="d-none d-md-inline",
+                    style=dict(width="96px", height="96px", flexShrink=0),
+                ):
                     render_thumb_with_fallback(
                         thumb_url=thumb_url,
                         fallback_url=pr.photo_url,
-                        style=img_style | dict(width="96px", height="96px"),
+                        style=img_style | dict(width="100%", height="100%"),
                     )
 
             # desktop image and title, social buttons, extra and breadcrumbs
             with gui.div(className="w-100 d-flex flex-column gap-2"):
                 with gui.div(className="d-flex align-items-start w-100 my-auto"):
                     if pr.photo_url:
-                        with gui.div(className="d-inline d-md-none me-2"):
+                        with gui.div(
+                            className="d-inline d-md-none me-2",
+                            style=dict(width="56px", height="56px", flexShrink=0),
+                        ):
                             render_thumb_with_fallback(
                                 thumb_url=thumb_url,
                                 fallback_url=pr.photo_url,
-                                style=img_style | dict(width="56px", height="56px"),
+                                style=img_style | dict(width="100%", height="100%"),
                             )
 
                     with gui.div(
