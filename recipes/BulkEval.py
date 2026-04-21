@@ -1,5 +1,5 @@
-import itertools
 import json
+import itertools
 import os
 import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
@@ -53,6 +53,8 @@ AggFunctionsList = [
 class EvalPrompt(typing_extensions.TypedDict):
     name: str
     prompt: str
+    graph_description: typing_extensions.NotRequired[str]
+    lower_is_better: typing_extensions.NotRequired[bool]
 
 
 class AggFunction(typing_extensions.TypedDict):
@@ -65,6 +67,8 @@ class AggFunctionResult(typing_extensions.TypedDict):
     function: typing.Literal[tuple(AggFunctionsList)]
     count: int
     value: float
+    graph_description: typing_extensions.NotRequired[str]
+    lower_is_better: typing_extensions.NotRequired[bool]
 
 
 def remove_common_prefix_suffix(a: list[str]) -> list[str]:
@@ -97,6 +101,8 @@ def _render_results(results: list[AggFunctionResult]):
         gui.write("---\n###### **Aggregate**: " + k.capitalize())
 
         g = list(g)
+        graph_description = g[0].get("graph_description") or ""
+        lower_is_better = bool(g[0].get("lower_is_better"))
 
         columns = remove_common_prefix_suffix([d["column"] for d in g])
         values = [round(d["value"] or 0, 2) for d in g]
@@ -104,6 +110,8 @@ def _render_results(results: list[AggFunctionResult]):
         norm_values = [
             (v - min(values)) / ((max(values) - min(values)) or 1) for v in values
         ]
+        if lower_is_better:
+            norm_values = [1 - v for v in norm_values]
         colors = sample_colorscale("RdYlGn", norm_values, colortype="tuple")
         colors = [f"rgba{(r * 255, g * 255, b * 255, 0.5)}" for r, g, b in colors]
 
@@ -138,7 +146,10 @@ def _render_results(results: list[AggFunctionResult]):
                 margin=dict(l=0, r=0, t=24, b=0),
             ),
         )
-        gui.plotly_chart(fig)
+        with gui.div(className="d-flex flex-column align-items-center"):
+            gui.plotly_chart(fig)
+            if graph_description:
+                gui.caption(graph_description, className="text-center")
 
 
 class BulkEvalPage(BasePage):
@@ -217,26 +228,35 @@ Here's what you uploaded:
             gui.data_table(file)
         gui.write("---")
 
-        def render_inputs(key: str, del_key: str, d: EvalPrompt):
-            col1, col2 = gui.columns([8, 1], responsive=False)
-            with col1:
-                d["name"] = gui.text_input(
-                    label="",
-                    label_visibility="collapsed",
-                    placeholder="Metric Name",
-                    key=key + ":name",
-                    value=d.get("name"),
-                ).strip()
-                d["prompt"] = gui.text_area(
-                    label="",
-                    label_visibility="collapsed",
-                    placeholder="Prompt",
-                    key=key + ":prompt",
-                    value=d.get("prompt"),
-                    height=500,
-                ).strip()
-            with col2:
-                del_button(del_key)
+        def render_inputs(key: str, _del_key: str, d: EvalPrompt):
+            d["name"] = gui.text_input(
+                label="",
+                label_visibility="collapsed",
+                placeholder="Metric Name",
+                key=key + ":name",
+                value=d.get("name"),
+            ).strip()
+            d["graph_description"] = gui.text_input(
+                label="",
+                label_visibility="collapsed",
+                placeholder="Graph Description (optional)",
+                key=key + ":graph_description",
+                value=d.get("graph_description"),
+            ).strip()
+            d["lower_is_better"] = gui.checkbox(
+                "Low scores are better",
+                key=key + ":lower_is_better",
+                value=bool(d.get("lower_is_better")),
+            )
+            d["prompt"] = gui.code_editor(
+                label="",
+                label_visibility="collapsed",
+                placeholder="Prompt",
+                key=key + ":prompt",
+                value=d.get("prompt"),
+                language="jinja",
+                style=dict(maxHeight="500px"),
+            ).strip()
 
         llm_models = AIModelSpec.objects.filter(
             llm_supports_json=True,
@@ -256,7 +276,6 @@ Here's what you uploaded:
             help=field_desc(self.RequestModel, "eval_prompts"),
         )
         list_view_editor(
-            add_btn_label="Add a Prompt",
             key="eval_prompts",
             render_inputs=render_inputs,
         )
@@ -347,6 +366,7 @@ class TaskResult(typing.NamedTuple):
     llm_output: dict
     doc_ix: int
     current_rec: dict
+    input_cols: set[str]
     out_df_recs: list[dict]
     ep: EvalPrompt
 
@@ -365,9 +385,9 @@ def submit(
         for out_df_recs, current_rec, prompt_columns in iter_eval_groups(
             df, request.array_columns
         ):
-            for ep in request.eval_prompts:
+            for ep in request.eval_prompts or []:
                 prompt = render_prompt_vars(
-                    ep["prompt"],
+                    ep.get("prompt") or "",
                     gui.session_state | {"columns": prompt_columns},
                 )
                 response.final_prompts[doc_ix].append(prompt)
@@ -380,6 +400,7 @@ def submit(
                             llm_output={},
                             doc_ix=doc_ix,
                             current_rec=current_rec,
+                            input_cols=set(current_rec.keys()),
                             out_df_recs=out_df_recs,
                             ep=ep,
                         ),
@@ -449,11 +470,15 @@ def iterate(
             yield "Uploading Results..."
 
         result = fut.result()
-        input_cols = set(result.current_rec.keys())
+        metric_graph_settings: dict[str, dict[str, str | bool]] = {}
 
         for metric_name, metric_value in result.llm_output.items():
             col = f"{result.ep['name']} - {metric_name}"
             result.current_rec[col] = metric_value
+            metric_graph_settings[col] = {
+                "graph_description": result.ep.get("graph_description") or "",
+                "lower_is_better": bool(result.ep.get("lower_is_better")),
+            }
 
         out_df = pd.DataFrame.from_records(result.out_df_recs)
         f = upload_file_from_bytes(
@@ -470,7 +495,7 @@ def iterate(
             else:
                 cols = out_df.select_dtypes(include=["float", "int"]).columns
             for col in cols:
-                if col in input_cols:
+                if col in result.input_cols:
                     continue
                 col_values = out_df[col].dropna()
                 agg_value = col_values.agg(agg["function"])
@@ -480,6 +505,7 @@ def iterate(
                         "function": agg["function"],
                         "count": len(col_values),
                         "value": agg_value,
+                        **metric_graph_settings.get(col, {}),
                     }
                 )
         response.aggregations[result.doc_ix] = aggs
