@@ -189,8 +189,7 @@ class WorkflowLLMTool(BaseLLMTool):
     def _build_workflow_description(self, fn_vars: dict) -> str:
         description = (
             self.fn_pr.notes
-            + "\n\nUse default parameters unless explicitly requested. "
-            "It's a bad programming practice if argument equals to the default parameter value. "
+            + "\n\nDon't override default function parameters unless explicitly requested. "
         )
         params = [f"{k} = {json.dumps(v)}" for k, v in fn_vars.items()]
         return render_fn_pseudocode(self.name, description, params)
@@ -258,10 +257,12 @@ class DynamicLLMToolLoader(BaseLLMTool):
             _render_tool_catalog_entry(tool) for tool in searchable_tools
         )
         description = (
-            "Request the full schema for one or more tools by exact name. "
-            "Use this before calling tools that are not currently loaded. "
+            f"You MUST call `{self.name}` to fetch the JSON schema for any tool before calling it. "
             "If a task needs multiple tools, request all of them in a single call."
-            f"\n\nAvailable tools:\n\n{tool_catalog}"
+            f"\n\nAvailable tools:\n\n{tool_catalog}\n\n"
+            "These stubs are only a hint. "
+            f"Always refer to the actual JSON schema returned by `{self.name}` "
+            "for the most up-to-date and accurate information about the tools, as they may change over time. "
         )
 
         searchable_tool_names = sorted(tool.name for tool in searchable_tools)
