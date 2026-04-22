@@ -149,15 +149,6 @@ class CompareText2ImgPage(BasePage):
     def render_usage_guide(self):
         youtube_video("TxT-mTYP0II")
 
-    def render_description(self):
-        gui.markdown(
-            """
-            This recipe takes any text and renders an image using multiple Text2Image engines.
-            Use it to understand which image generator e.g. DallE or Stable Diffusion is best for your particular prompt.
-            """
-        )
-        prompting101()
-
     def render_settings(self):
         gui.write(
             """

@@ -113,20 +113,6 @@ class ObjectInpaintingPage(BasePage):
         input_image = gui.session_state.get("input_image")
         assert text_prompt and input_image, "Please provide a Prompt and a Object Photo"
 
-    def render_description(self):
-        gui.write(
-            """
-            This recipe an image of an object, masks it and then renders the background around the object according to the prompt. 
-            
-            How It Works:
-            1. Takes an image
-            2. Attempts to find an object in the image
-            3. Masks the object
-            4. Adjusts the X/Y position and zoom according to the settings
-            5. Draws the background around the object according to the prompt.
-            """
-        )
-
     def render_settings(self):
         img_model_settings(InpaintingModels)
 

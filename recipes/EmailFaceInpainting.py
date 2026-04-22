@@ -84,24 +84,6 @@ class EmailFaceInpaintingPage(FaceInpaintingPage):
     def get_example_preferred_fields(self, state: dict) -> list[str]:
         return ["email_address"]
 
-    def render_description(self):
-        gui.write(
-            """
-    *EmailID > Profile pic > Face Masking + Zoom > Stable Diffusion > GFPGAN > Email*  
-    
-    This recipe takes only an email address and returns a photo of the person with that email, rendered using the text prompt.
-    
-    How It Works:
-    
-    1. Calls social media APIs to get a user's twitter, facebook, linkedin or insta profile photo 
-    2. Extracts faces from any image
-    3. Adjusts the zoom and X & Y placement of the face
-    4. Generates images from the given prompt and inpaints with Stable diffusion
-    5. Improves faces using gfpgan   
-    6. Sends an email with the rendered image
-    """
-        )
-
     def render_form_v2(self):
         gui.text_area(
             """

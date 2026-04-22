@@ -88,20 +88,6 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         )
         assert gui.session_state.get("input_face"), "Please provide an Input Face"
 
-    def render_description(self):
-        gui.write(
-            """
-                This recipe takes any text and a video of a person (plus the voice defined in Settings) to create a lipsync'd video of that person speaking your text.
-
-                How It Works:
-
-                1. Takes any text + a video (with a face in it)
-                2. Generates audio file in voice of your choice
-                3. Merges the audio and video
-                4. Renders a lipsynced video with your text
-            """
-        )
-
     def render_steps(self):
         audio_url = gui.session_state.get("audio_url")
         gui.audio(audio_url, caption="Output Audio", show_download_button=True)

@@ -897,26 +897,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # don't show the input prompt in the run titles, instead show get_run_title()
         return None
 
-    def render_description(self):
-        gui.write(
-            """
-Have you ever wanted to create a bot that you could talk to about anything? Ever wanted to create your own https://dara.network/RadBots or https://Farmer.CHAT? This is how.
-
-This workflow takes a dialog LLM prompt describing your character, a collection of docs & links and optional an video clip of your bot's face and  voice settings.
-
-We use all these to build a bot that anyone can speak to about anything and you can host directly in your own site or app, or simply connect to your Facebook, WhatsApp or Instagram page.
-
-How It Works:
-1. Appends the user's question to the bottom of your dialog script.
-2. Sends the appended script to OpenAI's GPT3 asking it to respond to the question in the style of your character
-3. Synthesizes your character's response as audio using your voice settings (using Google Text-To-Speech or Uberduck)
-4. Lip syncs the face video clip to the voice clip
-5. Shows the resulting video to the user
-
-PS. This is the workflow that we used to create RadBots - a collection of Turing-test videobots, authored by leading international writers, singers and playwrights - and really inspired us to create Gooey.AI so that every person and organization could create their own fantastic characters, in any personality of their choosing. It's also the workflow that powers https://Farmer.CHAT and was demo'd at the UN General Assembly in April 2023 as a multi-lingual WhatsApp bot for Indian, Ethiopian and Kenyan farmers.
-        """
-        )
-
     def render_form_v2(self):
         gui.code_editor(
             label=(

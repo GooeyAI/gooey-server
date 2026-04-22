@@ -230,13 +230,6 @@ class VideoGenPage(BasePage):
             VideoBotsPage,
         ]
 
-    def render_description(self):
-        gui.markdown(
-            """
-            Describe your scene and optional look-and-feel. Choose one or more video models to compare (Sora, Veo 3, Pika, Runway). Add an optional reference image for style or subject. Click Run to generate videos on the right. Adjust your prompt or settings and run again to iterate fast.
-            """
-        )
-
     def render_usage_guide(self):
         gui.markdown(
             """

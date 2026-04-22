@@ -394,26 +394,6 @@ To understand what each field represents, check out our [API docs](https://api.g
             sr.wait_for_celery_result(result)
             response.eval_runs.append(sr.get_app_url())
 
-    def render_description(self):
-        gui.write(
-            """
-Building complex AI workflows like copilot) and then evaluating each iteration is complex.
-Workflows are affected by the particular LLM used (GPT4 vs PalM2), their vector DB knowledge sets (e.g. your google docs), how synthetic data creation happened (e.g. how you transformed your video transcript or PDF into structured data), which translation or speech engine you used and your LLM prompts. Every change can affect the quality of your outputs.
-
-1. This bulk tool enables you to do two incredible things:
-2. Upload your own set of inputs (e.g. typical questions to your bot) to any gooey workflow (e.g. /copilot) and run them in bulk to generate outputs or answers.
-3. Compare the results of competing workflows to determine which one generates better outputs.
-
-To get started:
-1. Enter the Gooey.AI Workflow URLs that you'd like to run in bulk
-2. Enter a csv of sample inputs to run in bulk
-3. Ensure that the mapping between your inputs and API parameters of the Gooey.AI workflow are correctly mapped.
-4. Tap Submit.
-5. Wait for results
-6. Make a change to your Gooey Workflow, copy its URL and repeat Step 1 (or just add the link to see the results of both workflows together)
-        """
-        )
-
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
 

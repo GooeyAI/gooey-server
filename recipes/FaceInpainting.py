@@ -73,22 +73,6 @@ class FaceInpaintingPage(BasePage):
         diffusion_images: list[HttpUrlStr]
         output_images: list[HttpUrlStr]
 
-    def render_description(self):
-        gui.write(
-            """    
-    This recipe takes a photo with a face and then uses the text prompt to paint a background.
-    
-    How It Works:
-    
-    1. Extracts faces from any image using MediaPipe
-    2. Generates images from the given prompt and paints a background scene with Stable diffusion
-    3. Improves faces using GFPGAN    
-    
-    *Face Inpainting: Photo > Face Masking > Stable Diffusion > GFPGAN*
-
-    """
-        )
-
     def render_form_v2(self):
         gui.text_area(
             """

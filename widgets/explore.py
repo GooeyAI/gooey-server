@@ -138,7 +138,7 @@ def render_image(page: BasePage):
 def _render_as_featured(page_cls: typing.Type[BasePage]):
     page = page_cls()
     render_image(page)
-    render_description(page)
+    _render_page_description(page)
 
 
 def _render_non_featured(page_cls: typing.Type[BasePage]):
@@ -147,10 +147,10 @@ def _render_non_featured(page_cls: typing.Type[BasePage]):
     with col1:
         render_image(page)
     with col2:
-        render_description(page)
+        _render_page_description(page)
 
 
-def render_description(page: BasePage):
+def _render_page_description(page: BasePage):
     with gui.link(to=page.app_url()):
         gui.markdown(f"#### {page.get_recipe_title()}")
 

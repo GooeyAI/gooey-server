@@ -1599,9 +1599,6 @@ class BasePage:
         # TODO: fix to also handle published run case
         return SavedRun.objects.filter(workflow=cls.workflow).count()
 
-    def render_description(self):
-        pass
-
     def render_settings(self):
         pass
 
@@ -1694,37 +1691,24 @@ class BasePage:
 
         return ret
 
-    def _render_step_row(self):
-        key = "details-expander"
-        with gui.expander("**ℹ️ Details**", key=key):
+    def _render_step_row(self, key="details-expander"):
+        with gui.expander("**🐞 Debug**", key=key):
             if not gui.session_state.get(key):
                 return
-            col1, col2 = gui.columns([1, 2])
-            with col1:
-                self.render_description()
-            with col2:
-                placeholder = gui.div()
-                render_called_functions(
-                    saved_run=self.current_sr, trigger=FunctionTrigger.pre
-                )
-                try:
-                    self.render_steps()
-                except NotImplementedError:
-                    pass
-                else:
-                    with placeholder:
-                        gui.write("##### 👣 Steps")
-                render_called_functions(
-                    saved_run=self.current_sr, trigger=FunctionTrigger.post
-                )
-
-                gui.caption(
-                    f"""
-                    Run Time: {self.current_sr.run_time.total_seconds():.2f}s\n\n
-                    [Parent Run]({self.current_sr.parent and self.current_sr.parent.get_app_url()})
-                    """,
-                    unsafe_allow_html=True,
-                )
+            render_called_functions(
+                saved_run=self.current_sr, trigger=FunctionTrigger.pre
+            )
+            self.render_steps()
+            render_called_functions(
+                saved_run=self.current_sr, trigger=FunctionTrigger.post
+            )
+            gui.caption(
+                f"""
+                Run Time: {self.current_sr.run_time.total_seconds():.2f}s\n\n
+                [Parent Run]({self.current_sr.parent and self.current_sr.parent.get_app_url()})
+                """,
+                unsafe_allow_html=True,
+            )
 
     def _render_help(self):
         placeholder = gui.div()
@@ -2391,7 +2375,7 @@ class BasePage:
         pass
 
     def render_steps(self):
-        raise NotImplementedError
+        pass
 
     @classmethod
     def preview_input(cls, state: dict) -> str | None:

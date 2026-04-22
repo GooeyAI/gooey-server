@@ -227,16 +227,6 @@ class QRCodeGeneratorPage(BasePage):
             "Please provide QR Code URL, text content, contact info, or upload an image"
         )
 
-    def render_description(self):
-        gui.markdown(
-            """
-            Create interactive and engaging QR codes with stunning visuals that are amazing for marketing, branding, and more. Combining AI Art and QR Code has never been easier! 
-            Enter your URL and image prompt, and in just 30 seconds, we'll generate an artistic QR codes tailored to your style. 
-            It is made possible by the open source [Control Net](https://github.com/lllyasviel/ControlNet).
-            """
-        )
-        prompting101()
-
     def render_steps(self):
         email_import = gui.session_state.get("__email_imported")
         if email_import:

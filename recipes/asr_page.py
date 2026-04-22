@@ -112,18 +112,6 @@ class AsrPage(BasePage):
 
         return " ".join(filter(None, [lang_or_model, cls.get_recipe_title()]))
 
-    def render_description(self):
-        gui.markdown(
-            """
-            This workflow let's you compare the latest and finest speech recognition models from [OpenAI](https://openai.com/research/whisper), [AI4Bharat](https://ai4bharat.org) and [Bhashini](https://bhashini.gov.in) and Google's USM coming soon.
-            """
-        )
-        gui.markdown(
-            """
-            Just upload an audio file (mp3, wav, ogg or aac file) setting its language and then choose a speech recognition engine. You can also translate the output to any language too (using Google's Translation APIs).
-            """
-        )
-
     def related_workflows(self) -> list:
         from recipes.VideoBots import VideoBotsPage
         from recipes.CompareLLM import CompareLLMPage

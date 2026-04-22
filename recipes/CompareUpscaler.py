@@ -140,13 +140,6 @@ class CompareUpscalerPage(BasePage):
             step=1,
         )
 
-    def render_description(self):
-        gui.write(
-            """
-            Have an old photo or just a funky AI picture? Run this workflow to compare the top image upscalers.
-            """
-        )
-
     def render_output(self):
         _render_outputs(gui.session_state)
 

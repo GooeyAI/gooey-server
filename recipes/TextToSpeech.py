@@ -93,19 +93,6 @@ class TextToSpeechPage(BasePage):
         elevenlabs_load_state(self)
         super().run_as_api_tab()
 
-    def render_description(self):
-        gui.write(
-            """
-            *Convert text into audio in the voice of your choice*
-
-            How It Works:
-
-            1. Takes any text input
-            2. Generates an audio file in voice of your choice (from Settings)
-            3. Creates an audio file
-            """
-        )
-
     def render_form_v2(self):
         gui.text_area(
             """

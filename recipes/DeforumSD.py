@@ -195,62 +195,6 @@ class DeforumSDPage(BasePage):
     #             ],
     #         )
 
-    def render_description(self):
-        gui.markdown(
-            """
-            - Every Submit will require approximately 3-5 minutes to render.
-
-            - Animation is complex: Please watch the video and review our decks to help you.
-
-            - Test your image prompts BEFORE adding lots of frames e.g. Tweak key frame images with just 10 frames between them AND then increase the FPS or frame count between them once you like the outputs. This will save you time and credits.
-
-            - No lost work! All your animations or previously generated versions are in the History tab. If they don't appear here, it likely means they aren't done rendering yet.
-
-            """
-        )
-        gui.markdown(
-            """
-            #### Resources:
-
-            [Learn Animation](https://www.help.gooey.ai/learn-animation)
-
-            [Gooey Guide to Prompting](https://docs.google.com/presentation/d/1RaoMP0l7FnBZovDAR42zVmrUND9W5DW6eWet-pi6kiE/edit?usp=sharing)
-
-            Here’s a comprehensive style guide to assist you with different stylized animation prompts:
-
-            [StableDiffusion CheatSheet](https://supagruen.github.io/StableDiffusion-CheatSheet/)
-
-            """
-        )
-        gui.write("---")
-        gui.markdown(
-            """
-            Animation Length: You can indicate how long you want your animation to be by increasing or decreasing your frame count.
-
-            FPS: Every Animation is set at 12 frames per second by default. You can change this default frame rate/ frames per second (FPS) on the Settings menu.
-
-            Prompts: Within your sequence you can input multiple text Prompts for your visuals. Each prompt can be defined for a specific keyframe number.
-
-            ##### What are keyframes?
-
-            Keyframes define the transition points from one prompt to the next, or the start and end points of a prompted action set in between the total frame count or sequence. These keyframes or markers are necessary to establish smooth transitions or jump cuts, whatever you prefer.
-
-            Use the Camera Settings to generate animations with depth and other 3D parameters.
-            """
-        )
-        gui.markdown(
-            """
-            Prompt Construction Tip:
-
-            Changing Elements transition better from a visual prompt that is artefact or object heavy to another busy visual prompt. For example: Prompt 1: a busy street transitions to Prompt 2: a busy interior of a park. This transition will render interesting and beautiful imagery.
-
-            `Transitions from a simpler or plain visual prompt to a more complex visual might be challenging to generate. For example: Prompt 1: a blue sky to Prompt 2: a crowded market. This is because there are fewer artefacts for the generator to transition.`
-
-            This recipe takes any text and creates animation. It's based on the Deforum notebook with lots of details at http://deforum.art.
-
-            """
-        )
-
     def render_output(self):
         output_video = gui.session_state.get("output_video")
         if output_video:

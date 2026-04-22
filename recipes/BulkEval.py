@@ -137,13 +137,6 @@ class BulkEvalPage(BasePage):
 
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/aad314f0-9a97-11ee-8318-02420a0001c7/W.I.9.png.png"
 
-    def render_description(self):
-        gui.write(
-            """
-Summarize and score every row of any CSV, google sheet or excel with GPT4 (or any LLM you choose).  Then average every score in any column to generate automated evaluations.
-            """
-        )
-
     def related_workflows(self) -> list:
         from recipes.BulkRunner import BulkRunnerPage
         from recipes.VideoBots import VideoBotsPage

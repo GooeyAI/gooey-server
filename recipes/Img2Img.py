@@ -117,15 +117,6 @@ class Img2ImgPage(BasePage):
         input_image = gui.session_state.get("input_image")
         assert input_image, "Please provide an Input Image"
 
-    def render_description(self):
-        gui.write(
-            """
-            This recipe takes an image and a prompt and then attempts to alter the image, based on the text.
-
-            Adjust the Prompt Strength in Settings to change how strongly the text should influence the image. 
-            """
-        )
-
     def render_settings(self):
         img_model_settings(Img2ImgModels)
 

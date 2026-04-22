@@ -77,23 +77,6 @@ class SocialLookupEmailPage(BasePage):
             EmailFaceInpaintingPage,
         ]
 
-    def render_description(self):
-        gui.write(
-            """
-            
-    This recipe takes an email address and a sample email body. It attempts to pull the social profile of the email address and then personlize the email using AI.
-
-    How It Works:
-
-    1. Calls social media APIs to get a user's social profile from twitter, facebook, linkedin and/or insta. 
-    2. Inserts relevant parts of the profile (e.g. city, previous workplaces) into the email.
-    3. Send the email to OpenAI to craft a great, personalized email
-    
-     *EmailID > Profile > Email Template > GPT3 > Email*  
-
-    """
-        )
-
     def render_usage_guide(self):
         youtube_video("lVWQbS_rFaM")
 
