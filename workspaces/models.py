@@ -568,7 +568,7 @@ class WorkspaceMembership(SafeDeleteModel):
     role = models.IntegerField(
         choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
     )
-    balance = models.IntegerField(default=0)
+    balance = models.IntegerField(default=0, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)  # same as joining date
     updated_at = models.DateTimeField(auto_now=True)
