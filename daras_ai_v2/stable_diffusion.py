@@ -49,6 +49,7 @@ class Text2ImgModels(Enum):
 
     flux_1_dev = "FLUX.1 [dev]"
 
+    gpt_image_2 = "GPT Image 2 (OpenAI)"
     gpt_image_1 = "GPT Image 1 (OpenAI)"
     gpt_image_1_5 = "GPT Image 1.5 (OpenAI)"
     dall_e_3 = "DALL·E 3 (OpenAI)"
@@ -90,6 +91,7 @@ text2img_model_ids = {
     Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
     Text2ImgModels.nano_banana_2: "fal-ai/nano-banana-2",
     Text2ImgModels.nano_banana: "fal-ai/nano-banana",
+    Text2ImgModels.gpt_image_2: "gpt-image-2",
     Text2ImgModels.gpt_image_1: "gpt-image-1",
     Text2ImgModels.gpt_image_1_5: "gpt-image-1.5",
     Text2ImgModels.dall_e_3: "dall-e-3",
@@ -109,6 +111,7 @@ class Img2ImgModels(Enum):
 
     flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
 
+    gpt_image_2 = "GPT Image 2 (OpenAI)"
     gpt_image_1 = "GPT Image 1 (OpenAI)"
     gpt_image_1_5 = "GPT Image 1.5 (OpenAI)"
 
@@ -147,6 +150,7 @@ class Img2ImgModels(Enum):
             cls.nano_banana,
             cls.nano_banana_2,
             cls.nano_banana_pro,
+            cls.gpt_image_2,
             cls.gpt_image_1,
             cls.gpt_image_1_5,
         }
@@ -159,6 +163,7 @@ img2img_model_ids = {
     Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Img2ImgModels.dall_e: "dall-e-2",
+    Img2ImgModels.gpt_image_2: "gpt-image-2",
     Img2ImgModels.gpt_image_1: "gpt-image-1",
     Img2ImgModels.gpt_image_1_5: "gpt-image-1.5",
     Img2ImgModels.nano_banana: "fal-ai/nano-banana/edit",
@@ -340,6 +345,7 @@ def text2img(
     if model not in {
         Text2ImgModels.dall_e_3,
         Text2ImgModels.flux_1_dev,
+        Text2ImgModels.gpt_image_2,
         Text2ImgModels.gpt_image_1,
         Text2ImgModels.gpt_image_1_5,
         Text2ImgModels.nano_banana,
@@ -369,11 +375,15 @@ def text2img(
                 payload=payload,
             )
             return output_images
-        case Text2ImgModels.gpt_image_1 | Text2ImgModels.gpt_image_1_5:
+        case (
+            Text2ImgModels.gpt_image_2
+            | Text2ImgModels.gpt_image_1
+            | Text2ImgModels.gpt_image_1_5
+        ):
             from openai import OpenAI
 
             client = OpenAI()
-            width, height = _get_gpt_image_1_img_size(width, height)
+            width, height = _get_gpt_image_img_size(width, height)
             with capture_openai_content_policy_violation():
                 response = client.images.generate(
                     model=text2img_model_ids[model],
@@ -537,9 +547,9 @@ def _get_dall_e_3_img_size(width: int, height: int) -> tuple[int, int]:
         return 1792, 1024
 
 
-def _get_gpt_image_1_img_size(width: int, height: int) -> tuple[int, int]:
+def _get_gpt_image_img_size(width: int, height: int) -> tuple[int, int]:
     """
-    Returns the appropriate size for GPT Image 1 based on input dimensions.
+    Returns the appropriate size for the GPT Image models based on input dimensions.
     Supported sizes: 1024x1024, 1536x1024, 1024x1536
     """
     if height == width:
@@ -577,6 +587,7 @@ def img2img(
 
     if not prompt and selected_model in (
         Img2ImgModels.flux_pro_kontext.name,
+        Img2ImgModels.gpt_image_2.name,
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.gpt_image_1_5.name,
         Img2ImgModels.nano_banana.name,
@@ -611,7 +622,11 @@ def img2img(
             )
 
             return output_images
-        case Img2ImgModels.gpt_image_1.name | Img2ImgModels.gpt_image_1_5.name:
+        case (
+            Img2ImgModels.gpt_image_2.name
+            | Img2ImgModels.gpt_image_1.name
+            | Img2ImgModels.gpt_image_1_5.name
+        ):
             from openai import NOT_GIVEN, OpenAI
 
             payload_input_images = []
@@ -624,7 +639,7 @@ def img2img(
                     width, height = edge, edge
                     response_format = "b64_json"
                 else:
-                    width, height = _get_gpt_image_1_img_size(init_width, init_height)
+                    width, height = _get_gpt_image_img_size(init_width, init_height)
                     response_format = NOT_GIVEN
 
                 image = resize_img_pad(image_bytes, (width, height))
