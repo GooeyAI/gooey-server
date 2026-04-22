@@ -48,9 +48,7 @@ from bots.models.saved_run import SavedRun
 from daras_ai.image_input import (
     gcs_blob_for,
     gcs_bucket,
-    delete_uploaded_file_for_gcs_url,
     get_mimetype_from_response,
-    register_uploaded_blob,
     upload_gcs_blob_from_bytes,
     upload_file_from_bytes,
 )
@@ -643,9 +641,10 @@ def asr_step(request: VideoBotsPage.RequestModel, buffer: AudioBuffer) -> str:
         )
 
     blob = gcs_blob_for(filename="audio.wav")
-    register_uploaded_blob(blob=blob, is_uploading=True, is_user_uploaded=True)
+    upload_gcs_blob_from_bytes(
+        blob, buffer.to_wav_bytes(), "audio/wav", is_user_uploaded=True
+    )
     try:
-        upload_gcs_blob_from_bytes(blob, buffer.to_wav_bytes(), "audio/wav")
         user_input = run_asr(
             audio_url=blob.public_url,
             selected_model=request.asr_model,
@@ -783,11 +782,11 @@ def tts_step(
         mime_type = get_mimetype_from_response(r)
     finally:
         if is_user_uploaded_url(audio_url):
-            if not delete_uploaded_file_for_gcs_url(audio_url):
-                blob = gcs_bucket().blob(
-                    audio_url.split(settings.GS_BUCKET_NAME)[-1].strip("/")
-                )
-                blob.delete()
+            blob = gcs_bucket().blob(
+                audio_url.split(settings.GS_BUCKET_NAME)[-1].strip("/")
+            )
+            UploadedFile.objects.from_gcs_blob(blob).delete()
+            blob.delete()
     return audio_wav_bytes, mime_type
 
 
