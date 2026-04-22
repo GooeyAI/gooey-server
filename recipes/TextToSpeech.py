@@ -4,14 +4,12 @@ import time
 
 import gooey_gui as gui
 import requests
-from django.db import IntegrityError
-from loguru import logger
 from pydantic import BaseModel, Field
 
 from bots.models import Workflow
 from daras_ai.image_input import (
     gcs_blob_for,
-    register_uploaded_blob,
+    register_blob,
     upload_file_from_bytes,
 )
 from daras_ai.text_format import unmarkdown
@@ -410,19 +408,15 @@ class TextToSpeechPage(BasePage):
                 )
 
                 run_mms_tts = modal.Function.from_name(modal_app.name, "run_mms_tts")
-                with modal.enable_output():
+                with (
+                    modal.enable_output(),
+                    register_blob(
+                        blob, filename="mms_tts_gen.wav", content_type="audio/wav"
+                    ),
+                ):
                     run_mms_tts.remote(
                         language=language, text=text, upload_url=upload_url
                     )
-
-                try:
-                    register_uploaded_blob(
-                        blob,
-                        filename="mms_tts_gen.wav",
-                        content_type="audio/wav",
-                    )
-                except (ValueError, IntegrityError):
-                    logger.exception("Failed to register MMS TTS upload")
 
                 state["audio_url"] = blob.public_url
 

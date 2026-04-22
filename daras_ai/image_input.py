@@ -4,6 +4,7 @@ import os
 import re
 import typing
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -104,8 +105,7 @@ def upload_gcs_blob_from_bytes(
     if not content_type:
         content_type = mimetypes.guess_type(blob.path)[0]
     content_type = content_type or "application/octet-stream"
-    blob.upload_from_string(data, content_type=content_type)
-    register_uploaded_blob(
+    with register_blob(
         blob,
         filename=filename,
         content_type=content_type,
@@ -113,11 +113,13 @@ def upload_gcs_blob_from_bytes(
         workspace=workspace,
         user=user,
         is_user_uploaded=is_user_uploaded,
-    )
+    ):
+        blob.upload_from_string(data, content_type=content_type)
     return blob.public_url
 
 
-def register_uploaded_blob(
+@contextmanager
+def register_blob(
     blob: "Blob",
     *,
     filename: str | None = None,
@@ -126,13 +128,9 @@ def register_uploaded_blob(
     workspace: typing.Optional["Workspace"] = None,
     user: typing.Optional["AppUser"] = None,
     is_user_uploaded: bool = False,
-    is_uploading: bool = False,
-) -> UploadedFile:
+) -> typing.Iterator[UploadedFile]:
     from app_users.models import AppUser
     from celeryapp.tasks import get_running_saved_run
-
-    if not blob.name or not blob.bucket:
-        raise ValueError("Blob must have bucket and name set before registration.")
 
     saved_run = get_running_saved_run()
     if saved_run:
@@ -167,27 +165,16 @@ def register_uploaded_blob(
             workspace=workspace,
             user=user,
             is_user_uploaded=is_user_uploaded,
-            is_uploading=is_uploading,
+            is_uploading=True,
         )
 
-    return uploaded_file
-
-
-def delete_uploaded_file_for_gcs_url(url: str) -> bool:
-    segments = [seg for seg in furl(url).path.segments if seg]
-    if not segments:
-        return False
-    bucket_name = segments[0]
-    object_name = "/".join(segments[1:])
-    if not object_name:
-        return False
-    uploaded = UploadedFile.objects.filter(
-        bucket_name=bucket_name, object_name=object_name
-    ).first()
-    if not uploaded:
-        return False
-    uploaded.delete()
-    return True
+    try:
+        yield uploaded_file
+    except Exception:
+        uploaded_file.delete()
+        raise
+    else:
+        UploadedFile.objects.filter(pk=uploaded_file.pk).update(is_uploading=False)
 
 
 def gcs_bucket() -> "Bucket":

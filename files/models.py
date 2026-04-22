@@ -50,9 +50,7 @@ class FileMetadata(models.Model):
 
 
 class UploadedFileManager(models.Manager):
-    def from_gcs_blob(self, blob: Blob) -> QuerySet[UploadedFile] | None:
-        if not blob.name or not blob.bucket:
-            return None
+    def from_gcs_blob(self, blob: Blob) -> QuerySet[UploadedFile]:
         return self.filter(bucket_name=blob.bucket.name, object_name=blob.name)
 
 
