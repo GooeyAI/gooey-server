@@ -94,7 +94,8 @@ async def entrypoint(ctx: agents.JobContext):
         changed_attributes: dict, participant: rtc.Participant
     ):
         if changed_attributes.get("sip.callStatus") == "hangup":
-            dtmf_session.shutdown()
+            if dtmf_session:
+                dtmf_session.shutdown()
             ctx.shutdown()
             try:
                 await ctx.api.room.delete_room(
@@ -118,7 +119,7 @@ async def entrypoint(ctx: agents.JobContext):
     hold_player = None
 
     async def try_main(step):
-        nonlocal prev_convo, prev_session, hold_player
+        nonlocal dtmf_session, prev_convo, prev_session, hold_player
 
         input_text = "/extension " + "".join(dtmf_digits)
         dtmf_digits.clear()
@@ -160,6 +161,9 @@ async def entrypoint(ctx: agents.JobContext):
         if hold_player:
             await hold_player.aclose()
             hold_player = None
+        if dtmf_session:
+            await dtmf_session.aclose()
+            dtmf_session = None
 
         prev_session = await main(ctx, page, sr, request, agent, bi)
         return True
@@ -278,7 +282,7 @@ async def main(
     if bi.twilio_initial_text:
         await session.say(text=bi.twilio_initial_text)
     else:
-        await session.generate_reply(user_input="Hello")
+        await session.say(text="Hello")
 
     background_audio = BackgroundAudioPlayer(
         ambient_sound=AudioConfig(BuiltinAudioClip.OFFICE_AMBIENCE, volume=0.8),
@@ -356,11 +360,18 @@ async def create_audio_model_session(
     if "gemini" in llm_model.model_id:
         from livekit.plugins import google
 
+        if llm_model.api_key:
+            gemini_auth_kwargs = {"api_key": llm_model.api_key}
+        else:
+            gemini_auth_kwargs = {
+                "vertexai": True,
+                "project": settings.GCP_PROJECT,
+            }
+
         llm = google.beta.realtime.RealtimeModel(
             model=llm_model.model_id,
             temperature=request.sampling_temperature,
-            vertexai=True,
-            project=settings.GCP_PROJECT,
+            **gemini_auth_kwargs,
         )
         tts = google.TTS()
     else:
@@ -407,10 +418,18 @@ async def create_stt_llm_tts_session(
         case _ if "gemini" in llm_model.model_id:
             from livekit.plugins import google
 
+            if llm_model.api_key:
+                gemini_auth_kwargs = {"api_key": llm_model.api_key}
+            else:
+                gemini_auth_kwargs = {
+                    "vertexai": True,
+                    "project": settings.GCP_PROJECT,
+                }
+
             llm = google.LLM(
                 model=llm_model.model_id.removeprefix("google/"),
                 temperature=temperature,
-                vertexai=True,
+                **gemini_auth_kwargs,
             )
 
         case _ if "claude" in llm_model.model_id:
