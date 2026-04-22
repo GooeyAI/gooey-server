@@ -30,7 +30,7 @@ class UploadedFileAdmin(admin.ModelAdmin):
     )
     list_filter = ("created_at", "workspace")
     readonly_fields = (
-        "f_url",
+        "f_url_link",
         "bucket_name",
         "object_name",
         "metadata_link",
