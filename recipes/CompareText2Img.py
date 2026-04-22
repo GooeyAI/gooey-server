@@ -122,7 +122,7 @@ class CompareText2ImgPage(BasePage):
             • Nano Banana : 26 Cr
             • Nano Banana Pro : 30 Cr (1K/2K) · 40 Cr (4K)
             • Nano Banana 2 : 26 Cr (0.5K/1K) · 30 Cr (2K) · 35 Cr (4K)
-            • GPT Image 1.5 : 26 Cr (low) · 30 Cr (medium) · 40 Cr (high)
+            • GPT Image : 26 Cr (low) · 30 Cr (medium) · 40 Cr (high)
             • Dalle-3 : 15 Cr
             """
         )
@@ -287,7 +287,9 @@ class CompareText2ImgPage(BasePage):
                 case Text2ImgModels.dall_e.name | Text2ImgModels.dall_e_3.name:
                     total += 15
                 case (
-                    Text2ImgModels.gpt_image_1.name | Text2ImgModels.gpt_image_1_5.name
+                    Text2ImgModels.gpt_image_1.name
+                    | Text2ImgModels.gpt_image_1_5.name
+                    | Text2ImgModels.gpt_image_2.name
                 ):
                     grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
                     if cost := grouped_costs.get(Text2ImgModels[model].name):
