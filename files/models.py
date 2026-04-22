@@ -93,6 +93,12 @@ class UploadedFile(models.Model):
 
     objects = UploadedFileManager()
 
+    def __str__(self):
+        name = self.metadata.name or "Unnamed"
+        if self.metadata.total_bytes:
+            return f"{name} - {filesizeformat(self.metadata.total_bytes)}"
+        return name
+
     class Meta:
         indexes = [
             models.Index(
