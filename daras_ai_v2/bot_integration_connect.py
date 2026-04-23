@@ -32,6 +32,15 @@ def create_deployment(
     from routers.facebook_api import fb_connect_url, wa_connect_url
     from routers.slack_api import slack_connect_url
 
+    if platform == Platform.TELEGRAM:
+        if not telegram_bot_token:
+            raise UserError("Please provide a Telegram bot token.")
+        telegram_bot_id, telegram_bot_username = init_telegram_deployment(
+            telegram_bot_token
+        )
+    else:
+        telegram_bot_id = telegram_bot_username = None
+
     if not WorkflowAccessLevel.can_user_edit_published_run(
         workspace=workspace,
         user=user,
@@ -48,13 +57,14 @@ def create_deployment(
 
     match platform:
         case Platform.TELEGRAM:
-            if not telegram_bot_token:
-                raise UserError("Please provide a Telegram bot token.")
-            bi = create_telegram_deployment(
-                bot_token=telegram_bot_token,
+            bi = BotIntegration.objects.create(
                 name=published_run.title,
-                user=user,
+                created_by=user,
                 workspace=workspace,
+                platform=platform,
+                telegram_bot_token=telegram_bot_token,
+                telegram_bot_id=telegram_bot_id,
+                telegram_bot_user_name=telegram_bot_username,
             )
         case Platform.WEB:
             bi = BotIntegration.objects.create(
@@ -129,13 +139,7 @@ def create_shared_phone_number_deployment(
     raise RuntimeError("Unable to create unique 5-digit extension number")
 
 
-def create_telegram_deployment(
-    *,
-    bot_token: str,
-    name: str,
-    user: AppUser,
-    workspace: Workspace,
-) -> BotIntegration:
+def init_telegram_deployment(bot_token: str) -> tuple[str, str]:
     from daras_ai_v2.fastapi_tricks import get_api_route_url
     from daras_ai_v2.telegram_bot import (
         get_telegram_bot_info,
@@ -175,16 +179,7 @@ def create_telegram_deployment(
         set_telegram_commands(bot_token)
     except requests.exceptions.HTTPError as e:
         raise UserError(f"Failed to register Telegram commands: {e}") from e
-
-    return BotIntegration.objects.create(
-        name=name,
-        created_by=user,
-        workspace=workspace,
-        platform=Platform.TELEGRAM,
-        telegram_bot_token=bot_token,
-        telegram_bot_id=bot_id,
-        telegram_bot_user_name=bot_username,
-    )
+    return bot_id, bot_username
 
 
 def connect_bot_to_published_run(
