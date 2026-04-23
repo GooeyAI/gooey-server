@@ -42,7 +42,7 @@ from workspaces.widgets import get_current_workspace
 router = CustomAPIRouter()
 
 
-def slack_connect_url(pr_id: int):
+def slack_connect_url(pr_id: int) -> str:
     return furl(
         "https://slack.com/oauth/v2/authorize",
         query_params=dict(
@@ -77,7 +77,7 @@ def slack_connect_url(pr_id: int):
             ),
             state=json.dumps(dict(pr_id=pr_id)),
         ),
-    )
+    ).tostr()
 
 
 @router.get("/__/slack/redirect/")

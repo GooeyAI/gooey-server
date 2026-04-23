@@ -586,6 +586,16 @@ class BotIntegration(models.Model):
         else:
             return None
 
+    def get_deployment_url(self) -> str:
+        from recipes.VideoBots import VideoBotsPage
+        from routers.root import RecipeTabs
+
+        return VideoBotsPage.app_url(
+            tab=RecipeTabs.integrations,
+            example_id=self.published_run.published_run_id,
+            path_params=dict(integration_id=self.api_integration_id()),
+        )
+
     def api_integration_id(self) -> str:
         from routers.bots_api import api_hashids
 

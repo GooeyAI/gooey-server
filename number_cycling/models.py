@@ -25,8 +25,8 @@ class SharedPhoneNumberQuerySet(models.QuerySet):
             )
         return obj
 
-    def available_country_codes(self, platform: Platform) -> list[str]:
-        return list(
+    def available_country_codes(self, platform: Platform):
+        return (
             self.filter(platform=platform.value, is_active=True)
             .exclude(country_code="")
             .values_list("country_code", flat=True)

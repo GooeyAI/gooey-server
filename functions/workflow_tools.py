@@ -8,7 +8,7 @@ from django.utils.text import slugify
 
 from app_users.models import AppUser
 from daras_ai_v2.exceptions import UserError
-from functions.gooey_builder_tools import UpdateGuiStateLLMTool
+from functions.gooey_builder_tools import UpdateGuiStateLLMTool, DeployWorkflowLLMTool
 from functions.inbuilt_tools import (
     FeedbackCollectionLLMTool,
     VectorSearchLLMTool,
@@ -331,6 +331,7 @@ class DynamicLLMToolLoader(BaseLLMTool):
         VectorSearchLLMTool,
         FeedbackCollectionLLMTool,
         UpdateGuiStateLLMTool,
+        DeployWorkflowLLMTool,
     )
 
 

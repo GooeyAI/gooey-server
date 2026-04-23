@@ -102,6 +102,8 @@ def render_gooey_builder(
                     title=page.current_pr.title,
                     description=page.current_pr.notes,
                 ),
+                run_id=page.current_sr.run_id,
+                uid=page.current_sr.uid,
             ),
             sr=page.current_sr,
         )
@@ -148,6 +150,7 @@ def render_gooey_builder_inline(
     config["mode"] = "inline"
     config["showRunLink"] = True
     config["showToolCalls"] = True
+    config["enableSourcePreview"] = False
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 

@@ -6,7 +6,6 @@ from pydantic import BaseModel
 import gooey_gui as gui
 from bots.models import Workflow
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.enum_selector_widget import enum_multiselect
 from daras_ai_v2.img_model_settings_widgets import (
     negative_prompt_setting,
