@@ -1090,7 +1090,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             validate_glossary_document(output_glossary)
 
     def render_usage_guide(self):
-        youtube_video("-j2su1r8pEg")
+        youtube_video("4wGKQAGUm48")
 
     def render_settings(self):
         tts_provider = gui.session_state.get("tts_provider")
