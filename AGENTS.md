@@ -9,6 +9,7 @@
 - When building `selectbox` or `multiselect` options, prefer pre-rendered mappings like `options = {key: rendered_label}` and `format_func=options.__getitem__`.
 - In Django admin, prefer shared link helpers like `list_related_html_url` for related-object changelist links instead of hand-building admin URLs.
 - Prefer explicit early-return guards like `if not value: return` over wrapping the main body in conditionals when control flow allows it.
+- When a module would otherwise need a `typing.TYPE_CHECKING` guard (e.g. to avoid circular imports for type hints), add `from __future__ import annotations` at the top instead so annotations are lazily evaluated, and use unquoted forward references instead of string literals. Do NOT use `from __future__ import annotations` in FastAPI router modules: FastAPI inspects endpoint signatures at import time to derive dependency injection, request parsing, and OpenAPI schemas, and postponed string annotations can break or change that runtime type resolution
 - Always use the virtual environment referenced by `.venv` for Python commands in this repo.
 - `.venv` may be either a virtualenv directory or a text file containing the virtualenv name.
 - If `.venv` is a file, resolve the env before running Python tools. In this repo, for example, `cat .venv` returns the virtualenv name and the interpreter may live at a path like `/Users/<user>/.virtualenvs/$(cat .venv)/bin/python`.

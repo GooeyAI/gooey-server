@@ -45,29 +45,42 @@ class BaseLLMTool:
         self.label = label
         self.description = description
         self.properties = properties
+        self.required = required
+        self.await_audio_completed = await_audio_completed
 
-        self.spec_parameters = {
-            "type": "object",
-            "properties": self.properties,
-        }
-        if required:
-            self.spec_parameters["required"] = required
+    # Yes openai really does have 2 ways to specify tools in their own APIs
+    # https://platform.openai.com/docs/api-reference/chat/create
+    @property
+    def spec_openai(self) -> dict:
+        return {"type": "function", "function": self.spec_function}
 
-        self.spec_function = {
-            "name": name,
-            "description": description,
+    # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+    @property
+    def spec_openai_audio(self) -> dict:
+        return {"type": "function"} | self.spec_function
+
+    # https://platform.openai.com/docs/guides/tools?api-mode=responses&tool-type=function-calling
+    @property
+    def spec_openai_responses(self) -> dict:
+        return {"type": "function"} | self.spec_function
+
+    @property
+    def spec_function(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
             "parameters": self.spec_parameters,
         }
 
-        ## Yes openai really does have 2 ways to specify tools in their own APIs
-        # https://platform.openai.com/docs/api-reference/chat/create
-        self.spec_openai = {"type": "function", "function": self.spec_function}
-        # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
-        self.spec_openai_audio = {"type": "function"} | self.spec_function
-        # https://platform.openai.com/docs/guides/tools?api-mode=responses&tool-type=function-calling
-        self.spec_openai_responses = {"type": "function"} | self.spec_function
-
-        self.await_audio_completed = await_audio_completed
+    @property
+    def spec_parameters(self) -> dict:
+        params: dict = {
+            "type": "object",
+            "properties": self.properties,
+        }
+        if self.required:
+            params["required"] = self.required
+        return params
 
     def call_json(self, arguments: str) -> str:
         try:

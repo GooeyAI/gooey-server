@@ -20,7 +20,6 @@ from daras_ai.image_input import (
     cv2_img_to_bytes,
 )
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.descriptions import prompting101
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.img_model_settings_widgets import (
     output_resolution_setting,

@@ -1,12 +1,6 @@
 import re
 
 import phonenumbers
-from django.db import IntegrityError, transaction
-
-from bots.models.bot_integration import BotIntegration, Platform
-from number_cycling.models import SharedPhoneNumber
-from workspaces.models import Workspace
-import secrets
 
 EXTENSION_NUMBER_LENGTH = 5
 
@@ -26,40 +20,6 @@ def country_code_label(country_code: str) -> str:
     if not dial_code:
         return f"{flag} {cc}"
     return f"{flag} {cc} +{dial_code}"
-
-
-def create_bot_integration_with_extension(
-    name: str,
-    created_by,
-    workspace: Workspace,
-    platform: Platform,
-    country_code: str = "",
-) -> BotIntegration:
-    if platform != Platform.TWILIO and platform != Platform.WHATSAPP:
-        raise ValueError("Invalid platform")
-
-    with transaction.atomic():
-        shared_phone_number = SharedPhoneNumber.objects.any_active_number(
-            platform, country_code=country_code
-        )
-        for _ in range(10):
-            try:
-                return BotIntegration.objects.create(
-                    name=name,
-                    created_by=created_by,
-                    workspace=workspace,
-                    platform=platform.value,
-                    wa_phone_number_id=shared_phone_number.wa_phone_number_id,
-                    wa_phone_number=shared_phone_number.wa_phone_number,
-                    twilio_phone_number=shared_phone_number.twilio_phone_number,
-                    twilio_phone_number_sid=shared_phone_number.twilio_phone_number_sid,
-                    shared_phone_number=shared_phone_number,
-                    extension_number=10_000 + secrets.randbelow(90_000),
-                )
-            except IntegrityError:
-                # Retry with a different generated number
-                continue
-        raise RuntimeError("Unable to create unique 5-digit extension number")
 
 
 def parse_extension_number(message_text: str) -> int | None:

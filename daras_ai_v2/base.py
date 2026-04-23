@@ -66,7 +66,7 @@ from daras_ai_v2.variables_widget import variables_input
 from functions.composio_tools import ComposioLLMTool
 from functions.inbuilt_tools import (
     INBUILT_TOOLKITS,
-    get_inbuilt_tools_from_state,
+    get_inbuilt_tools,
 )
 from functions.models import (
     FunctionScopes,
@@ -1424,7 +1424,7 @@ class BasePage:
                 get_workflow_tools_from_state(
                     gui.session_state, FunctionTrigger.prompt
                 ),
-                get_inbuilt_tools_from_state(gui.session_state),
+                get_inbuilt_tools(self.current_sr),
             )
         }
 

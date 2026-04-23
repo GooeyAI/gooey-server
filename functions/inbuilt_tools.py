@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 
 from django.core.exceptions import ValidationError
@@ -9,7 +11,11 @@ from twilio.twiml.voice_response import VoiceResponse
 from bots.models import BotIntegration
 from bots.models.bot_integration import validate_phonenumber
 from functions.composio_tools import ComposioLLMTool
-from functions.gooey_builder_tools import UpdateGuiStateLLMTool, RunJS
+from functions.gooey_builder_tools import (
+    DeployWorkflowLLMTool,
+    RunJS,
+    UpdateGuiStateLLMTool,
+)
 from functions.memory_tools import (
     GooeyMemoryLLMToolRead,
     GooeyMemoryLLMToolWrite,
@@ -21,11 +27,16 @@ from functions.base_llm_tool import (
     get_external_tool_slug_from_url,
 )
 
+if typing.TYPE_CHECKING:
+    from bots.models import SavedRun
 
-def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
+
+def get_inbuilt_tools(saved_run: SavedRun) -> typing.Iterable[BaseLLMTool]:
     from composio import Composio
 
     from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
+
+    state = saved_run.state
 
     audio_url = state.get("input_audio")
     if is_realtime_audio_url(audio_url):
@@ -38,10 +49,15 @@ def get_inbuilt_tools_from_state(state: dict) -> typing.Iterable[BaseLLMTool]:
 
     update_gui_state_params = variables.get("update_gui_state_params")
     if update_gui_state_params:
-        yield UpdateGuiStateLLMTool(
-            builder_state=update_gui_state_params.get("state"),
-            page_slug=update_gui_state_params.get("page_slug"),
-        )
+        builder_state = update_gui_state_params.get("state")
+        page_slug = update_gui_state_params.get("page_slug")
+        if builder_state and page_slug:
+            yield UpdateGuiStateLLMTool(
+                builder_state=builder_state,
+                page_slug=page_slug,
+            )
+        if builder_state and builder_state.get("run_id") and builder_state.get("uid"):
+            yield DeployWorkflowLLMTool(builder_state)
         yield RunJS()
 
     collect_feedback = variables.get("collect_feedback")
