@@ -30,13 +30,14 @@ def render_integrations_tab(
     saved_run: SavedRun,
     published_run: PublishedRun,
 ):
+    from recipes.VideoBots import VideoBotsPage
+
     gui.newline()
 
     # make sure the user knows that they are on a saved run not the published run
     if published_run and published_run.saved_run_id != saved_run.id:
-        last_saved_url = copilot_app_url(
-            current_sr=saved_run,
-            current_pr=published_run,
+        last_saved_url = VideoBotsPage.app_url(
+            example_id=published_run.published_run_id,
             tab=RecipeTabs.integrations,
         )
         gui.caption(
