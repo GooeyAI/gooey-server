@@ -2,12 +2,12 @@ import gooey_gui as gui
 
 from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
-from routers.account import account_route
-from workspaces.widgets import set_current_workspace
 
 
 def insufficient_credits_error(error_params: dict):
     from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
+    from routers.account import account_route
+    from workspaces.widgets import set_current_workspace
 
     RERUN_KEY = "--insufficient-credits-rerun"
     UPGRADE_KEY = "--insufficient-credits-upgrade"

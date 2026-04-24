@@ -11,10 +11,7 @@ from starlette.status import HTTP_401_UNAUTHORIZED
 from starlette.status import HTTP_402_PAYMENT_REQUIRED
 
 from daras_ai_v2 import settings
-
-if typing.TYPE_CHECKING:
-    from app_users.models import AppUser
-    from bots.models import SavedRun
+from widgets.errors import insufficient_credits_error
 
 
 def raise_for_status(resp: requests.Response, is_user_url: bool = False):
@@ -85,8 +82,6 @@ class InsufficientCredits(UserError):
 
     @staticmethod
     def render(error_params: dict):
-        from widgets.errors import insufficient_credits_error
-
         insufficient_credits_error(error_params)
 
 
