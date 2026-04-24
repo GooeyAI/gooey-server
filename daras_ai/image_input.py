@@ -131,6 +131,7 @@ def register_blob(
 ) -> typing.Iterator[UploadedFile]:
     from app_users.models import AppUser
     from celeryapp.tasks import get_running_saved_run
+    from google.api_core import exceptions as gcs_exceptions
 
     saved_run = get_running_saved_run()
     if saved_run:
@@ -156,25 +157,43 @@ def register_blob(
             mime_type=content_type,
             total_bytes=total_bytes,
         )
-        uploaded_file = UploadedFile.objects.create(
+        uploaded_file, created = UploadedFile.objects.get_or_create(
             bucket_name=blob.bucket.name,
             object_name=blob.name,
-            metadata=metadata,
-            f_url=blob.public_url,
-            saved_run=saved_run,
-            workspace=workspace,
-            user=user,
-            is_user_uploaded=is_user_uploaded,
-            is_uploading=True,
+            defaults=dict(
+                metadata=metadata,
+                f_url=blob.public_url,
+                saved_run=saved_run,
+                workspace=workspace,
+                user=user,
+                is_user_uploaded=is_user_uploaded,
+                is_uploading=True,
+            ),
         )
 
     try:
         yield uploaded_file
     except Exception:
-        uploaded_file.delete()
+        if created:
+            uploaded_file.delete()
         raise
-    else:
-        UploadedFile.objects.filter(pk=uploaded_file.pk).update(is_uploading=False)
+
+    # Reload once so presigned-URL uploads commit the real etag/size/mime_type.
+    # In-process uploads already have these on the blob from upload_from_string.
+    if not blob.etag:
+        try:
+            blob.reload()
+        except gcs_exceptions.NotFound:
+            if created:
+                uploaded_file.delete()
+            return
+
+    FileMetadata.objects.filter(pk=uploaded_file.metadata_id).update(
+        etag=blob.etag,
+        mime_type=blob.content_type or content_type,
+        total_bytes=blob.size or 0,
+    )
+    UploadedFile.objects.filter(pk=uploaded_file.pk).update(is_uploading=False)
 
 
 def gcs_bucket() -> "Bucket":
