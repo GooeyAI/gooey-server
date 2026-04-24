@@ -17,6 +17,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
     SUPPORTED_SPREADSHEET_TYPES,
 )
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title, field_desc
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import run_language_model
@@ -65,7 +66,7 @@ class AggFunctionResult(typing_extensions.TypedDict):
     function: typing.Literal[tuple(AggFunctionsList)]
     count: int
     value: float
-    eval_prompt_name: str
+    eval_prompt_name: typing_extensions.NotRequired[str]
     lower_is_better: typing_extensions.NotRequired[bool]
 
 
@@ -402,6 +403,9 @@ def submit(
                     ep.get("prompt") or "",
                     gui.session_state | {"columns": prompt_columns},
                 )
+                if not prompt.strip():
+                    raise UserError("Please provide a prompt")
+
                 response.final_prompts[doc_ix].append(prompt)
                 futs.append(
                     pool.submit(
