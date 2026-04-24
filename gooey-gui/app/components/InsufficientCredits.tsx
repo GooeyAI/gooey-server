@@ -89,11 +89,6 @@ export function InsufficientCredits({
           Doh! <a href={accountUrl} target="_top">Please login</a> to run more
           Gooey.AI workflows.
         </div>
-        <div className="insufficient-credits__subtext">
-          You will receive {verifiedEmailUserFreeCredits} Credits when you sign
-          up via your phone #, Google, Apple or GitHub account and can{" "}
-          <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
-        </div>
       </div>
     );
   }

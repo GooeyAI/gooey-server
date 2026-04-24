@@ -1744,7 +1744,7 @@ class BasePage:
         raise NotImplementedError
 
     def main(self, sr: SavedRun, state: dict) -> typing.Iterator[str | None]:
-        yield from self.ensure_credits_and_auto_recharge(sr, state)
+        yield from self.ensure_credits_and_auto_recharge(state)
 
         yield from call_recipe_functions(
             saved_run=sr,
@@ -2454,7 +2454,7 @@ class BasePage:
 
         manage_api_keys(workspace=self.current_workspace, user=self.request.user)
 
-    def ensure_credits_and_auto_recharge(self, sr: SavedRun, state: dict):
+    def ensure_credits_and_auto_recharge(self, state: dict):
         if not settings.CREDITS_TO_DEDUCT_PER_RUN:
             return
         assert self.request.user, "request.user must be set to check credits"
@@ -2470,7 +2470,7 @@ class BasePage:
                 """)
             if membership.balance >= price:
                 return
-            raise exceptions.InsufficientCredits(self.request.user, sr)
+            raise exceptions.InsufficientCredits(price=price)
 
         if workspace.balance >= price:
             return
