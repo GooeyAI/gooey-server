@@ -13,56 +13,6 @@ type InsufficientCreditsProps = {
   rerunWorkspaceBalance: number | null;
 };
 
-const containerStyle: React.CSSProperties = {
-  background: "#fff7e8",
-  border: "1px solid rgba(198, 144, 0, 0.35)",
-  borderLeft: "6px solid #c69000",
-  borderRadius: "10px",
-  maxWidth: "560px",
-  padding: "16px 18px",
-};
-
-const iconBadgeStyle: React.CSSProperties = {
-  alignItems: "center",
-  background: "#fff1cf",
-  borderRadius: "8px",
-  color: "#9c6b00",
-  display: "inline-flex",
-  height: "28px",
-  justifyContent: "center",
-  width: "28px",
-};
-
-const titleRowStyle: React.CSSProperties = {
-  alignItems: "center",
-  color: "#2a2a2a",
-  display: "flex",
-  fontSize: "1.05rem",
-  fontWeight: 600,
-  gap: "10px",
-};
-
-const bodyTextStyle: React.CSSProperties = {
-  color: "#4a4a4a",
-  fontSize: "0.98rem",
-  marginTop: "8px",
-};
-
-const subTextStyle: React.CSSProperties = {
-  color: "#6b6b6b",
-  fontSize: "0.9rem",
-  marginTop: "8px",
-};
-
-const actionsRowStyle: React.CSSProperties = {
-  marginTop: "6px",
-  display: "flex",
-  gap: "8px",
-  flexWrap: "wrap",
-};
-
-const BTN_CLASS = "btn btn-theme p-2 m-0";
-
 function SubmitKeyBtn({
   name,
   label,
@@ -77,7 +27,7 @@ function SubmitKeyBtn({
       type="submit"
       name={name}
       value="1"
-      className={`${BTN_CLASS} btn-${variant}`}
+      className={`btn btn-theme p-2 m-0 btn-${variant}`}
     >
       {label}
     </button>
@@ -94,7 +44,7 @@ function CostLine({
   workspaceBalance: number | null;
 }) {
   return (
-    <div style={subTextStyle}>
+    <div className="insufficient-credits__subtext">
       This run will cost{" "}
       <strong>{price ? `${price} Cr` : ">1 Cr"}</strong> and your current{" "}
       <strong>{workspaceName}</strong> balance is{" "}
@@ -108,8 +58,8 @@ function CostLine({
 
 function Title({ children }: { children: React.ReactNode }) {
   return (
-    <div style={titleRowStyle}>
-      <span style={iconBadgeStyle}>
+    <div className="insufficient-credits__title">
+      <span className="insufficient-credits__icon">
         <i className="fa-regular fa-coin" />
       </span>
       <span>{children}</span>
@@ -133,13 +83,13 @@ export function InsufficientCredits({
 }: InsufficientCreditsProps) {
   if (isAnonymous) {
     return (
-      <div style={containerStyle} data-submitafterlogin>
+      <div className="insufficient-credits" data-submitafterlogin>
         <Title>{title}</Title>
-        <div style={bodyTextStyle}>
+        <div className="insufficient-credits__body">
           Doh! <a href={accountUrl} target="_top">Please login</a> to run more
           Gooey.AI workflows.
         </div>
-        <div style={subTextStyle}>
+        <div className="insufficient-credits__subtext">
           You will receive {verifiedEmailUserFreeCredits} Credits when you sign
           up via your phone #, Google, Apple or GitHub account and can{" "}
           <a href="/pricing/" target="_blank">purchase more</a> for $1/100 Credits.
@@ -149,14 +99,14 @@ export function InsufficientCredits({
   }
 
   return (
-    <div style={containerStyle}>
+    <div className="insufficient-credits">
       <Title>{title}</Title>
       <CostLine
         price={price}
         workspaceName={rerunWorkspaceName}
         workspaceBalance={rerunWorkspaceBalance}
       />
-      <div style={actionsRowStyle}>
+      <div className="insufficient-credits__actions">
         {showUpgrade && (
           <SubmitKeyBtn
             name={upgradeKey}
