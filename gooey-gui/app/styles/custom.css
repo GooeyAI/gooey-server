@@ -916,3 +916,51 @@ button {
 .ag-horizontal-left-spacer, .ag-body-viewport {
   background-color: #f7f7f7;
 }
+
+.insufficient-credits {
+  background: #fff7e8;
+  border: 1px solid rgba(198, 144, 0, 0.35);
+  border-left: 6px solid #c69000;
+  border-radius: 10px;
+  max-width: 560px;
+  padding: 16px 18px;
+}
+
+.insufficient-credits__title {
+  align-items: center;
+  color: #2a2a2a;
+  display: flex;
+  font-size: 1.05rem;
+  font-weight: 600;
+  gap: 10px;
+}
+
+.insufficient-credits__icon {
+  align-items: center;
+  background: #fff1cf;
+  border-radius: 8px;
+  color: #9c6b00;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.insufficient-credits__body {
+  color: #4a4a4a;
+  font-size: 0.98rem;
+  margin-top: 8px;
+}
+
+.insufficient-credits__subtext {
+  color: #6b6b6b;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
+.insufficient-credits__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
