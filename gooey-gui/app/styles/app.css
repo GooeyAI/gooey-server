@@ -130,6 +130,19 @@ div.code-toolbar {
   user-select: none;
 }
 
+.gui-input-checkbox label:has(h3, h5),
+.gui-input-radio label:has(h3, h5) {
+  display: inline-flex;
+  align-items: center;
+}
+
+.gui-input-checkbox label h3,
+.gui-input-checkbox label h5,
+.gui-input-radio label h3,
+.gui-input-radio label h5 {
+  margin: 0;
+}
+
 .inline-radio > .gui-input-radio {
   display: inline;
   margin-right: 1rem;

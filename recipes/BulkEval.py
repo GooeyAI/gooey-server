@@ -53,8 +53,6 @@ AggFunctionsList = [
 class EvalPrompt(typing_extensions.TypedDict):
     name: str
     prompt: str
-    graph_description: typing_extensions.NotRequired[str]
-    lower_is_better: typing_extensions.NotRequired[bool]
 
 
 class AggFunction(typing_extensions.TypedDict):
@@ -67,7 +65,7 @@ class AggFunctionResult(typing_extensions.TypedDict):
     function: typing.Literal[tuple(AggFunctionsList)]
     count: int
     value: float
-    graph_description: typing_extensions.NotRequired[str]
+    eval_prompt_name: str
     lower_is_better: typing_extensions.NotRequired[bool]
 
 
@@ -98,10 +96,13 @@ def _render_results(results: list[AggFunctionResult]):
     from plotly.colors import sample_colorscale
 
     for k, g in itertools.groupby(results, key=lambda d: d["function"]):
-        gui.write("---\n###### **Aggregate**: " + k.capitalize())
-
         g = list(g)
-        graph_description = g[0].get("graph_description") or ""
+        eval_prompt_name = g[0].get("eval_prompt_name") or ""
+        aggregate_heading = f"Aggregate:{k.capitalize()}"
+        heading = aggregate_heading
+        if eval_prompt_name:
+            heading = f"{eval_prompt_name} {heading}"
+        gui.write("---\n###### **" + heading + "**")
         lower_is_better = bool(g[0].get("lower_is_better"))
 
         columns = remove_common_prefix_suffix([d["column"] for d in g])
@@ -148,8 +149,8 @@ def _render_results(results: list[AggFunctionResult]):
         )
         with gui.div(className="d-flex flex-column align-items-center"):
             gui.plotly_chart(fig)
-            if graph_description:
-                gui.caption(graph_description, className="text-center")
+            if eval_prompt_name:
+                gui.caption(eval_prompt_name, className="text-center")
 
 
 class BulkEvalPage(BasePage):
@@ -203,6 +204,12 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
             """,
         )
 
+        lower_is_better: bool = Field(
+            False,
+            title="Lower values are better",
+            description="For metrics where lower values are better (e.g. error rate, latency, cost); tables and bar charts color green for lower aggregates when on.",
+        )
+
         selected_model: str = "gpt_4_turbo"
 
         array_columns: list[str] | None = Field(None)
@@ -243,18 +250,6 @@ Here's what you uploaded:
                 key=key + ":name",
                 value=d.get("name"),
             ).strip()
-            d["graph_description"] = gui.text_input(
-                label="",
-                label_visibility="collapsed",
-                placeholder="Graph Description (optional)",
-                key=key + ":graph_description",
-                value=d.get("graph_description"),
-            ).strip()
-            d["lower_is_better"] = gui.checkbox(
-                "Low scores are better",
-                key=key + ":lower_is_better",
-                value=bool(d.get("lower_is_better")),
-            )
             d["prompt"] = gui.code_editor(
                 label="",
                 label_visibility="collapsed",
@@ -286,9 +281,15 @@ Here's what you uploaded:
             "##### " + field_title(self.RequestModel, "eval_prompts"),
             help=field_desc(self.RequestModel, "eval_prompts"),
         )
+        gui.session_state.setdefault("eval_prompts", [{}])
         list_view_editor(
             key="eval_prompts",
             render_inputs=render_inputs,
+        )
+        gui.checkbox(
+            "##### " + field_title(self.RequestModel, "lower_is_better"),
+            key="lower_is_better",
+            help=field_desc(self.RequestModel, "lower_is_better"),
         )
 
         def render_agg_inputs(key: str, del_key: str, d: AggFunction):
@@ -481,15 +482,10 @@ def iterate(
             yield "Uploading Results..."
 
         result = fut.result()
-        metric_graph_settings: dict[str, dict[str, str | bool]] = {}
 
         for metric_name, metric_value in result.llm_output.items():
             col = f"{result.ep['name']} - {metric_name}"
             result.current_rec[col] = metric_value
-            metric_graph_settings[col] = {
-                "graph_description": result.ep.get("graph_description") or "",
-                "lower_is_better": bool(result.ep.get("lower_is_better")),
-            }
 
         out_df = pd.DataFrame.from_records(result.out_df_recs)
         f = upload_file_from_bytes(
@@ -500,7 +496,7 @@ def iterate(
         response.output_documents[result.doc_ix] = f
 
         aggs = []
-        for agg in request.agg_functions:
+        for agg in request.agg_functions or []:
             if agg.get("column"):
                 cols = [agg["column"]]
             else:
@@ -516,7 +512,8 @@ def iterate(
                         "function": agg["function"],
                         "count": len(col_values),
                         "value": agg_value,
-                        **metric_graph_settings.get(col, {}),
+                        "lower_is_better": request.lower_is_better,
+                        "eval_prompt_name": result.ep["name"],
                     }
                 )
         response.aggregations[result.doc_ix] = aggs
