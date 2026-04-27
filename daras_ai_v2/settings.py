@@ -300,7 +300,7 @@ EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
 DOCS_URL = config("DOCS_URL", "https://docs.gooey.ai")
 BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
-CONTACT_URL = config("CONTACT_URL", "https://www.help.gooey.ai/contact")
+CONTACT_URL = config("CONTACT_URL", "https://gooey.ai/contact")
 
 HEADER_LINKS = [
     (EXPLORE_URL, "Explore"),
@@ -405,8 +405,6 @@ PAYPAL_WEBHOOK_ID: str = config("PAYPAL_WEBHOOK_ID", "")  # type: ignore
 PAYPAL_DEFAULT_PRODUCT_NAME: str = config(
     "PAYPAL_DEFAULT_PRODUCT_NAME", "Gooey.AI Credits"
 )  # type: ignore
-
-WIX_SITE_URL = config("WIX_SITE_URL", "https://www.help.gooey.ai")
 
 DISCORD_INVITE_URL = "https://discord.gg/7C84UyzVDg"
 GRANT_URL = "https://forms.gle/asc3SAzvh1nMj5fq5"
