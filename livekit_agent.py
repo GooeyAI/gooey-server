@@ -31,6 +31,7 @@ from livekit.agents import (
     function_tool,
     stt,
     tts,
+    TurnHandlingOptions,
 )
 from livekit.agents.telemetry import set_tracer_provider
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, NotGivenOr
@@ -521,7 +522,7 @@ async def create_stt_llm_tts_session(
         llm=llm,
         tts=GooeyTTS(page=page, request=request),
         vad=silero.VAD.load(),
-        turn_detection=MultilingualModel(),
+        turn_handling=TurnHandlingOptions(turn_detection=MultilingualModel()),
     )
 
 
