@@ -2398,7 +2398,7 @@ class BasePage:
             or state.get("output_images")
             or state.get("output_image")
             or state.get("output_video")
-            # or state.get("output_videos") ## Enable later when fal.ai urls are migrated
+            or state.get("output_videos")
         )
         return extract_nested_str(out)
 

@@ -249,6 +249,15 @@ class VideoGenPage(BasePage):
         render_audio_gen_form(self.available_audio_models)
 
     @classmethod
+    def preview_output(cls, state: dict) -> str | None:
+        ret = super().preview_output(state)
+        if ret and "fal.media" in ret:
+            # fal.media urls dont have thumbnails, don't render in previews
+            return None
+        else:
+            return ret
+
+    @classmethod
     def get_tool_call_schema(cls, request: dict) -> dict[str, typing.Any]:
         properties = super().get_tool_call_schema(request)
 
