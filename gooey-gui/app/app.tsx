@@ -1,6 +1,7 @@
 import { withSentry } from "@sentry/remix";
 import { FormEvent, useEffect, useRef } from "react";
 
+import { cssBundleHref } from "@remix-run/css-bundle";
 import { json, LinksFunction, redirect } from "@remix-run/node";
 import type {
   ShouldRevalidateFunction,
@@ -22,8 +23,8 @@ import { handleRedirectResponse } from "~/handleRedirect";
 import { applyFormDataTransforms, RenderedChildren } from "~/renderer";
 
 import { gooeyGuiRouteHeader } from "~/consts";
-import appStyles from "~/styles/app.css";
-import customStyles from "~/styles/custom.css";
+import "~/styles/app.css";
+import "~/styles/custom.css";
 import { GlobalContextProvider } from "./globalContext";
 import settings from "./settings";
 
@@ -54,8 +55,7 @@ export const links: LinksFunction = () => {
     },
     ...require("~/gooeyFileInput.styles").links(),
     ...require("~/components/GooeyPopover.styles").links(),
-    { rel: "stylesheet", href: customStyles },
-    { rel: "stylesheet", href: appStyles },
+    ...(cssBundleHref ? [{ rel: "stylesheet", href: cssBundleHref }] : []),
   ];
 };
 
