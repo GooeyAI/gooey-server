@@ -29,7 +29,7 @@ from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
-from daras_ai_v2.exceptions import UserError, raise_for_status
+from daras_ai_v2.exceptions import InsufficientCredits, UserError, raise_for_status
 from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     CHATML_ROLE_ASSISTANT,
@@ -547,8 +547,8 @@ def _process_and_send_msg(
                 bot.run_status = state.get(StateKeys.run_status) or ""
                 # check for errors
                 if bot.recipe_run_state == RecipeRunState.failed:
-                    err_msg = state.get(StateKeys.error_msg)
-                    bot.send_msg(text=ERROR_MSG.format(err_msg))
+                    sr.refresh_from_db()
+                    bot.send_msg(text=format_bot_error(bot, sr))
                     return  # abort
                 if bot.recipe_run_state != RecipeRunState.running:
                     break  # we're done running, stop streaming
@@ -604,7 +604,7 @@ def _process_and_send_msg(
     # check for errors
     err_msg = state.get(StateKeys.error_msg)
     if err_msg:
-        bot.send_msg(text=ERROR_MSG.format(err_msg))
+        bot.send_msg(text=format_bot_error(bot, sr))
         return
 
     text = state.get("output_text") and state.get("output_text")[0]
@@ -647,6 +647,19 @@ def _process_and_send_msg(
         # bot output for human
         bot_msg_display_content=state.get("output_text") and state["output_text"][0],
     )
+
+
+def format_bot_error(bot: BotInterface, sr: SavedRun) -> str:
+    if (
+        sr.error_type == InsufficientCredits.__name__
+        and bot.platform == Platform.WHATSAPP
+    ):
+        integration_name = bot.bi.name
+        return (
+            f"⚠️ **{integration_name}** has run out of Gooey.AI credits."
+            "Please try again later."
+        )
+    return ERROR_MSG.format(sr.error_msg or "")
 
 
 def compute_prompt_delta(

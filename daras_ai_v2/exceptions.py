@@ -80,6 +80,7 @@ class InsufficientCredits(UserError):
     def __init__(self, user: AppUser, sr: SavedRun):
         from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
 
+        message = "Insufficient credits"
         account_url = furl(settings.APP_BASE_URL) / "account/"
         if user.is_anonymous:
             account_url.query.params["next"] = sr.get_app_url(
@@ -91,7 +92,7 @@ class InsufficientCredits(UserError):
             SUBMIT_AFTER_LOGIN_Q=SUBMIT_AFTER_LOGIN_Q,
         )
         super().__init__(
-            "Insufficient credits",
+            message,
             status_code=HTTP_402_PAYMENT_REQUIRED,
             error_params=error_params,
         )

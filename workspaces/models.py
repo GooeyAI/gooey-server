@@ -178,6 +178,7 @@ class Workspace(SafeDeleteModel):
         blank=True,
     )
     low_balance_email_sent_at = models.DateTimeField(null=True, blank=True)
+    out_of_credits_email_sent_at = models.DateTimeField(null=True, blank=True)
 
     is_personal = models.BooleanField(default=False)
 
