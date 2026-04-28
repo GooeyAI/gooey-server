@@ -42,7 +42,6 @@ from daras_ai_v2.gooey_builder import (
 )
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
-from daras_ai_v2.meta_preview_url import meta_preview_url
 from daras_ai_v2.profiles import get_meta_tags_for_profile, profile_page
 from daras_ai_v2.settings import templates
 from handles.models import Handle
@@ -327,9 +326,7 @@ def api_docs_page(request: Request):
             url=get_og_url_path(request),
             title="Gooey.AI API Platform",
             description="Explore resources, tutorials, API docs, and dynamic examples to get the most out of GooeyAI's developer platform.",
-            image=meta_preview_url(
-                "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e48d59be-aaee-11ee-b112-02420a000175/API%20Docs.png.png"
-            )[0],
+            image="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/e48d59be-aaee-11ee-b112-02420a000175/thumbs/API%20Docs.png_400x400.png",
         )
     )
 

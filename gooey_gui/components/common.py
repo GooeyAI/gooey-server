@@ -252,6 +252,7 @@ def image(
     alt: str = None,
     href: str = None,
     show_download_button: bool = False,
+    previewImg: str | None = None,
     **props,
 ):
     try:
@@ -277,6 +278,7 @@ def image(
             caption=dedent(caption),
             alt=alt or caption,
             href=href,
+            previewImg=previewImg,
             **props,
         ),
     ).mount()
@@ -305,28 +307,27 @@ def video(
     caption: str = None,
     autoplay: bool = False,
     show_download_button: bool = False,
+    previewImg: str | None = None,
+    **props,
 ):
-    autoplay_props = {}
-    if autoplay:
-        autoplay_props = {
-            "preload": "auto",
-            "controls": True,
-            "autoPlay": True,
-            "loop": True,
-            "muted": True,
-            "playsInline": True,
-        }
-
     if not src:
         return
     if isinstance(src, str):
         # https://muffinman.io/blog/hack-for-ios-safari-to-display-html-video-thumbnail/
-        f = furl(src)
-        f.fragment.args["t"] = "0.001"
-        src = f.url
+        src = furl(src).set(fragment_args=dict(t="0.001")).url
+    props.setdefault("controls", True)
+    if autoplay:
+        props.update(
+            dict(preload="auto", autoPlay=True, loop=True, muted=True, playsInline=True)
+        )
     core.RenderTreeNode(
         name="video",
-        props=dict(src=src, caption=dedent(caption), **autoplay_props),
+        props=dict(
+            src=src,
+            caption=dedent(caption),
+            previewImg=previewImg,
+            **props,
+        ),
     ).mount()
     if show_download_button:
         download_button(

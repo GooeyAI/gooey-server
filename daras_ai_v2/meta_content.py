@@ -3,7 +3,7 @@ import typing
 from bots.models import PublishedRun, SavedRun, WorkflowMetadata
 from daras_ai.text_format import unmarkdown
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.preview_img import media_preview_img
 
 if typing.TYPE_CHECKING:
     from routers.root import RecipeTabs
@@ -11,6 +11,14 @@ if typing.TYPE_CHECKING:
 
 SEP = " • "
 TITLE_SUFFIX = "Gooey.AI"
+
+DEFAULT_META_IMG = (
+    # Small
+    "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ec2100aa-1f6e-11ef-ba0b-02420a000159/thumbs/Main_400x400.jpg"
+    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_default_img.jpg"
+    # Big
+    # "https://storage.googleapis.com/dara-c1b52.appspot.com/meta_tag_gif.gif"
+)
 
 
 def build_meta_tags(
@@ -174,12 +182,14 @@ def meta_image_for_page(
     pr: PublishedRun | None,
 ) -> str | None:
     if pr and pr.saved_run == sr and pr.is_root():
-        file_url = metadata.meta_image or page.preview_image(state)
+        file_url = metadata.meta_image or page.preview_output(state)
     elif pr and pr.saved_run == sr and pr.photo_url:
         file_url = pr.photo_url
     else:
-        file_url = page.preview_image(state) or metadata.meta_image
-    return meta_preview_url(file_url)[0]
+        file_url = page.preview_output(state) or metadata.meta_image
+    if not file_url:
+        return DEFAULT_META_IMG
+    return media_preview_img(file_url) or file_url
 
 
 def canonical_url_for_page(

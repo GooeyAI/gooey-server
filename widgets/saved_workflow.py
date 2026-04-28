@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import datetime
 import html
+import mimetypes
 import typing
 
 import gooey_gui as gui
-from furl import furl
 
 from bots.models import PublishedRun, Workflow, Platform
 from daras_ai.image_input import truncate_text_words
@@ -13,7 +13,7 @@ from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import icons
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.fastapi_tricks import get_app_route_url
-from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.utils import get_relative_time
 from widgets.author import render_author_from_workspace, render_author_from_user
 from widgets.demo_button import get_demo_bots
@@ -37,7 +37,8 @@ def render_saved_workflow_preview(
     tb = get_title_breadcrumbs(page_cls, published_run.saved_run, published_run)
 
     output_url = (
-        page_cls.preview_image(published_run.saved_run.state) or published_run.photo_url
+        page_cls.preview_output(published_run.saved_run.state)
+        or published_run.photo_url
     )
 
     with gui.div(className="py-1 row"):
@@ -309,21 +310,9 @@ def render_workflow_media(output_url: str, published_run: PublishedRun):
     if not output_url:
         return
     with placeholder:
-        preview_url, is_video = meta_preview_url(output_url)
-        if is_video:
-            output_url = furl(output_url).add(fragment_args={"t": "0.001"}).url
-            gui.html(
-                f"""
-                <object data={preview_url!r} class="gui-video">
-                <video src={output_url!r} class="gui-video" autoplay playsInline loop muted>
-                </object>
-                """
-            )
+        content_type = mimetypes.guess_type(output_url)[0] or ""
+        preview_img = media_preview_img(output_url)
+        if "video/" in content_type:
+            gui.video(output_url, previewImg=preview_img, autoplay=True)
         else:
-            gui.html(
-                f"""
-                <object data={preview_url!r} class="gui-image">
-                <img src={output_url!r} class="gui-image" autoplay playsInline loop muted>
-                </object>
-                """
-            )
+            gui.image(output_url, previewImg=preview_img)

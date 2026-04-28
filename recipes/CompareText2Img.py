@@ -17,6 +17,7 @@ from daras_ai_v2.img_model_settings_widgets import (
     scheduler_setting,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
@@ -256,15 +257,18 @@ class CompareText2ImgPage(BasePage):
         with col1:
             gui.markdown("```properties\n" + state.get("text_prompt", "") + "\n```")
         with col2:
-            self._render_outputs(state)
+            self._render_outputs(state, preview=True)
 
-    def _render_outputs(self, state):
+    def _render_outputs(self, state, preview: bool = False):
         selected_models = state.get("selected_models") or []
         for key in selected_models:
             output_images: dict = state.get("output_images", {}).get(key, [])
             for img in output_images:
                 gui.image(
-                    img, caption=Text2ImgModels[key].value, show_download_button=True
+                    img,
+                    caption=Text2ImgModels[key].value,
+                    show_download_button=True,
+                    previewImg=media_preview_img(img) if preview else None,
                 )
 
     def get_raw_price(self, state: dict) -> int:
