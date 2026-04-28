@@ -34,6 +34,13 @@ function loadData() {
   if (conversation_data) {
     controller.setConversationData?.(conversation_data);
   }
+  controller.onConversationChange = function (conversationId) {
+    // avoid redundant redirect back to the same run.
+    if (conversationId === conversation_data?.id) return;
+    window.gui.update_session_state({
+      builder_selected_conversation: conversationId,
+    });
+  };
 }
 
 const script = document.getElementById("gooey-embed-script");
