@@ -1928,12 +1928,6 @@ class BasePage:
             err_msg = gui.session_state.get(StateKeys.error_msg)
             gui.error(err_msg, unsafe_allow_html=True)
 
-    def _get_default_error_params(self) -> dict[str, typing.Any]:
-        ret = {"request": self.request, "sr": self.current_sr}
-        if self.request.user:
-            ret.update({"current_workspace": self.current_workspace})
-        return ret
-
     def _render_custom_error(self) -> bool:
         if not self.current_sr or not self.current_sr.error_type:
             return False
@@ -1945,6 +1939,12 @@ class BasePage:
         error_params.update(self._get_default_error_params())
         render(error_params)
         return True
+
+    def _get_default_error_params(self) -> dict[str, typing.Any]:
+        ret = {"request": self.request, "sr": self.current_sr}
+        if self.request.user:
+            ret.update({"current_workspace": self.current_workspace})
+        return ret
 
     def click_preview_tab(self):
         # show the preview tab when running
