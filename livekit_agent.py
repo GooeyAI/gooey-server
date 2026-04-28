@@ -133,38 +133,70 @@ async def entrypoint(ctx: agents.JobContext):
             # if the extension number is invalid,
             # start the hold music, say the error and wait for the user to enter the correct extension number
             prev_convo = None
-            if prev_session:
-                await prev_session.aclose()
-                prev_session = None
+            await close_prev_session()
             if not hold_player:
-                hold_player = await start_hold_music(ctx, dtmf_session)
+                hold_player = await start_dtmf_hold_music()
             dtmf_digits.clear()
-            await dtmf_session.say(text=e.message, allow_interruptions=(step == 0))
+            await say_dtmf(text=e.message, allow_interruptions=(step == 0))
             return False
         except UserError as e:
-            await dtmf_session.say(text=e.message, allow_interruptions=False)
+            await say_dtmf(text=e.message, allow_interruptions=False)
             raise
 
         # if the extension number hasn't changed, don't do anything
         if prev_session and prev_convo and prev_convo == bot.convo:
             return True
 
-        if prev_session:
-            await prev_session.aclose()
-            prev_session = None
+        await close_prev_session()
 
         page, sr, request, agent, bi = await create_run(bot)
         prev_convo = bot.convo
 
         if step > 0:
             new_bot_name = bi.name or "the agent"
-            await dtmf_session.say(text=f"Connecting you to {new_bot_name}")
-        if hold_player:
-            await hold_player.aclose()
-            hold_player = None
+            await say_dtmf(text=f"Connecting you to {new_bot_name}")
+        await close_dtmf_session()
 
         prev_session = await main(ctx, page, sr, request, agent, bi)
         return True
+
+    async def start_dtmf_hold_music():
+        await close_prev_session()
+        session = await ensure_dtmf_session()
+        wait_audio = BackgroundAudioPlayer(
+            ambient_sound=AudioConfig(BuiltinAudioClip.HOLD_MUSIC, volume=0.1),
+        )
+        await wait_audio.start(room=ctx.room, agent_session=session)
+        return wait_audio
+
+    async def say_dtmf(text, **kwargs):
+        await close_prev_session()
+        session = await ensure_dtmf_session()
+        await session.say(text=text, **kwargs)
+
+    async def ensure_dtmf_session():
+        nonlocal dtmf_session
+
+        if dtmf_session is None:
+            dtmf_session = await start_dtmf_prompt_session(ctx)
+        return dtmf_session
+
+    async def close_prev_session():
+        nonlocal prev_session
+
+        if prev_session is not None:
+            await prev_session.aclose()
+            prev_session = None
+
+    async def close_dtmf_session():
+        nonlocal dtmf_session, hold_player
+
+        if hold_player is not None:
+            await hold_player.aclose()
+            hold_player = None
+        if dtmf_session is not None:
+            await dtmf_session.aclose()
+            dtmf_session = None
 
     for i in range(MAX_TRIES):
         if ctx.room.connection_state != ConnectionState.CONN_CONNECTED:
@@ -179,18 +211,15 @@ async def entrypoint(ctx: agents.JobContext):
 
         await wait_for_extension_code(dtmf_queue, dtmf_digits)
 
-    await dtmf_session.say(
+    await say_dtmf(
         text="You have exceeded the maximum number of attempts. Please try again later."
     )
 
 
 async def start_dtmf_session(ctx: agents.JobContext):
-    from livekit.plugins import google
-
     dtmf_queue = asyncio.Queue()
 
-    dtmf_session = AgentSession(tts=google.TTS())
-    await dtmf_session.start(room=ctx.room, agent=Agent(instructions=""), record=False)
+    dtmf_session = await start_dtmf_prompt_session(ctx)
 
     dtmf_digits = deque(maxlen=EXTENSION_NUMBER_LENGTH)
 
@@ -206,12 +235,12 @@ async def start_dtmf_session(ctx: agents.JobContext):
     return dtmf_queue, dtmf_digits, dtmf_session
 
 
-async def start_hold_music(ctx: agents.JobContext, session: AgentSession):
-    wait_audio = BackgroundAudioPlayer(
-        ambient_sound=AudioConfig(BuiltinAudioClip.HOLD_MUSIC, volume=0.1),
-    )
-    await wait_audio.start(room=ctx.room, agent_session=session)
-    return wait_audio
+async def start_dtmf_prompt_session(ctx: agents.JobContext):
+    from livekit.plugins import google
+
+    dtmf_session = AgentSession(tts=google.TTS())
+    await dtmf_session.start(room=ctx.room, agent=Agent(instructions=""), record=False)
+    return dtmf_session
 
 
 async def wait_for_extension_code(dtmf_queue: asyncio.Queue, dtmf_digits: deque):
