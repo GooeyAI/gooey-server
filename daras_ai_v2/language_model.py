@@ -177,7 +177,7 @@ def run_language_model(
 
     model: AIModelSpec = AIModelSpec.objects.get(name=model)
 
-    if "gemini_live" in model.name:
+    if model.name == "gemini_live" or model.name == "gemini_live_3_1":
         raise UserError(
             "Gemini Live is not supported for text generation. Please use this from a Voice Deployment instead."
         )

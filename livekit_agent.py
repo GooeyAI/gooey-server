@@ -119,7 +119,7 @@ async def entrypoint(ctx: agents.JobContext):
     hold_player = None
 
     async def try_main(step):
-        nonlocal prev_convo, prev_session, hold_player
+        nonlocal dtmf_session, prev_convo, prev_session, hold_player
 
         input_text = "/extension " + "".join(dtmf_digits)
         dtmf_digits.clear()
@@ -161,6 +161,9 @@ async def entrypoint(ctx: agents.JobContext):
         if hold_player:
             await hold_player.aclose()
             hold_player = None
+        if dtmf_session:
+            await dtmf_session.aclose()
+            dtmf_session = None
 
         prev_session = await main(ctx, page, sr, request, agent, bi)
         return True
@@ -278,10 +281,8 @@ async def main(
 
     if bi.twilio_initial_text:
         await session.say(text=bi.twilio_initial_text)
-    elif "gemini" in llm_model.name and llm_model.version >= 3.1:
-        await session.say(text="Hello")
     else:
-        await session.generate_reply(user_input="Hello")
+        await session.say(text="Hello")
 
     background_audio = BackgroundAudioPlayer(
         ambient_sound=AudioConfig(BuiltinAudioClip.OFFICE_AMBIENCE, volume=0.8),
