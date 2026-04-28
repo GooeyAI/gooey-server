@@ -7,6 +7,7 @@ from bots.models import Workflow
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import LipsyncSettings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -113,6 +114,7 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                 caption="#### Output Video",
                 autoplay=True,
                 show_download_button=True,
+                previewImg=media_preview_img(output_video),
             )
         else:
             gui.div()

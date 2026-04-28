@@ -4,7 +4,7 @@ from django.db import models
 from django.db.models import F, Q
 
 from bots.custom_fields import CustomURLField
-from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.preview_img import media_preview_img
 
 
 class AIModelCreator(models.Model):
@@ -20,18 +20,12 @@ class AIModelCreator(models.Model):
         return self.name
 
     def html_icon(self, size: str | None = None) -> str:
-        if not self.photo_url:
+        src = self.photo_url
+        if not src:
             return ""
         size = size or "1.1rem"
-        photo_url = self.thumbnail_photo_url()
-        return f'<img src="{photo_url}" alt="{html.escape(self.name)}" style="height: {size}; width: {size};">'
-
-    def thumbnail_photo_url(self, size: str = "40x40") -> str:
-        return meta_preview_url(
-            self.photo_url,
-            fallback_img=self.photo_url,
-            size=size,
-        )[0]
+        src = media_preview_img(src, size="40x40") or src
+        return f'<img src="{src}" alt="{html.escape(self.name)}" style="height: {size}; width: {size};">'
 
 
 class ModelProvider(models.IntegerChoices):

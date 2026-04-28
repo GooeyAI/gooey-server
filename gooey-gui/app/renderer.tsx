@@ -21,6 +21,7 @@ import CountdownTimer from "./components/countdown";
 import GooeySelect from "./components/GooeySelect";
 import GooeySwitch from "./components/GooeySwitch";
 import { GooeyTooltip } from "./components/GooeyTooltip";
+import { GooeyImg, GooeyVideo } from "./components/MediaTags";
 import { lazyImport } from "./lazyImports";
 
 const { DataTable } = lazyImport(() => import("~/dataTable"));
@@ -272,38 +273,10 @@ function RenderedTreeNode({
       );
     }
     case "img": {
-      const { caption, href, ...args } = props;
-      let child = (
-        <>
-          <RenderedMarkdown body={caption} />
-          <img
-            className="gui-img"
-            alt={caption}
-            {...args}
-            onClick={() => {
-              if (href || args.src.startsWith("data:")) return;
-              window.open(args.src);
-            }}
-          />
-        </>
-      );
-      if (href) {
-        child = (
-          <Link to={href}>
-            <div>{child}</div>
-          </Link>
-        );
-      }
-      return child;
+      return <GooeyImg {...props} />;
     }
     case "video": {
-      const { caption, ...args } = props;
-      return (
-        <>
-          <RenderedMarkdown body={caption} />
-          <video className="gui-video" controls {...args}></video>
-        </>
-      );
+      return <GooeyVideo {...props} />;
     }
     case "audio": {
       const { caption, ...args } = props;

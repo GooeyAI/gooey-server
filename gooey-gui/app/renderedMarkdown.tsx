@@ -11,7 +11,7 @@ export function RenderedMarkdown({
   ...attrs
 }: // allowUnsafeHTML,
 {
-  body: string;
+  body?: string;
   lineClamp?: number;
   help?: string;
   tooltipPlacement?: TooltipPlacement;

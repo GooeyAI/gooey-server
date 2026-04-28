@@ -10,6 +10,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.lipsync_api import run_wav2lip, run_sadtalker, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings, LipsyncModel
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr, HttpUrlStr
 from payments.plans import PricingPlan
 from workspaces.models import Workspace
@@ -105,7 +106,12 @@ class LipsyncPage(BasePage):
         output_video = state.get("output_video")
         if output_video:
             gui.write("#### Output Video")
-            gui.video(output_video, autoplay=True, show_download_button=True)
+            gui.video(
+                output_video,
+                autoplay=True,
+                show_download_button=True,
+                previewImg=media_preview_img(output_video),
+            )
         else:
             gui.div()
 

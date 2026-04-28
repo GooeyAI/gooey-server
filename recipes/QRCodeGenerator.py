@@ -2,6 +2,8 @@ import typing
 from enum import Enum
 
 import numpy as np
+
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr, HttpUrlStr
 import qrcode
 import requests
@@ -424,14 +426,20 @@ Here is the final output:
         self._render_outputs(state)
 
     def render_run_preview_output(self, state: dict):
-        self._render_outputs(state, max_count=1)
+        self._render_outputs(state, max_count=1, preview=True)
 
-    def _render_outputs(self, state: dict, max_count: int | None = None):
+    def _render_outputs(
+        self, state: dict, max_count: int | None = None, preview: bool = False
+    ):
         output_images = list(state.get("output_images", []))
         if max_count:
             output_images = output_images[:max_count]
         for img in output_images:
-            gui.image(img, show_download_button=True)
+            gui.image(
+                img,
+                show_download_button=True,
+                previewImg=media_preview_img(img) if preview else None,
+            )
             qr_code_data = (
                 state.get(QrSources.qr_code_data.name)
                 or state.get(QrSources.qr_code_input_image.name)

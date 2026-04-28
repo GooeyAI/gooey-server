@@ -9,6 +9,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.img_model_settings_widgets import img_model_settings
 from daras_ai_v2.loom_video_widget import youtube_video
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.stable_diffusion import (
@@ -134,12 +135,23 @@ class Img2ImgPage(BasePage):
     def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)
         with col2:
-            output_images = state.get("output_images", [])
+            output_images = state.get("output_images") or []
             for img in output_images:
-                gui.image(img, caption="Generated Image")
+                gui.image(
+                    img,
+                    caption="Generated Image",
+                    previewImg=media_preview_img(img),
+                )
         with col1:
-            input_image = state.get("input_image")
-            gui.image(input_image, caption="Input Image")
+            input_image = state.get("input_image") or []
+            if isinstance(input_image, str):
+                input_image = [input_image]
+            for img in input_image:
+                gui.image(
+                    img,
+                    caption="Input Image",
+                    previewImg=media_preview_img(img),
+                )
             gui.write("**Prompt**")
             gui.write("```properties\n" + state.get("text_prompt", "") + "\n```")
 

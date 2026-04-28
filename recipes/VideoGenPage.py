@@ -24,6 +24,7 @@ from daras_ai_v2.exceptions import PaymentRequired, UserError, ffmpeg, ffprobe
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.functional import get_initializer
 from daras_ai_v2.language_model_openai_realtime import yield_from
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG, safety_checker
 from daras_ai_v2.variables_widget import render_prompt_vars
@@ -196,20 +197,20 @@ class VideoGenPage(BasePage):
         prompt = state.get("inputs", {}).get("prompt", "")
 
         for model_name, video_url in output_videos.items():
-            try:
-                model = self.available_models[model_name]
-            except KeyError:
-                continue
             if not video_url:
                 continue
-
+            try:
+                label = self.available_models[model_name].label
+            except KeyError:
+                label = model_name
             # Render video first
             gui.video(
                 video_url,
                 autoplay=True,
                 show_download_button=show_download_button,
+                previewImg=media_preview_img(video_url),
             )
-            gui.caption(model.label)
+            gui.caption(label)
 
         if show_prompt and prompt:
             gui.write(

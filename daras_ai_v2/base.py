@@ -52,7 +52,7 @@ from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
-from daras_ai_v2.meta_preview_url import meta_preview_url
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.openapi_tricks import (
     get_full_pydantic_schema,
 )
@@ -476,22 +476,27 @@ class BasePage:
         else:
             img_style["borderRadius"] = "12px"
 
+        pr_photo = pr.photo_url
+        pr_photo_preview = media_preview_img(file_url=pr_photo, size="96x96")
+
         with gui.div(className="d-flex gap-4 w-100 mb-2"):
-            if pr.photo_url:
+            if pr_photo:
                 with gui.div(className="d-none d-md-inline"):
                     gui.image(
-                        src=pr.photo_url,
+                        src=pr_photo,
                         style=img_style | dict(width="96px", height="96px"),
+                        previewImg=pr_photo_preview,
                     )
 
             # desktop image and title, social buttons, extra and breadcrumbs
             with gui.div(className="w-100 d-flex flex-column gap-2"):
                 with gui.div(className="d-flex align-items-start w-100 my-auto"):
-                    if pr.photo_url:
+                    if pr_photo:
                         with gui.div(className="d-inline d-md-none me-2"):
                             gui.image(
-                                src=pr.photo_url,
+                                src=pr_photo,
                                 style=img_style | dict(width="56px", height="56px"),
+                                previewImg=pr_photo_preview,
                             )
 
                     with gui.div(
@@ -1191,7 +1196,7 @@ class BasePage:
     def get_explore_image(self) -> str:
         meta = self.workflow.get_or_create_metadata()
         img = meta.default_image or self.explore_image or ""
-        return meta_preview_url(img)[0]
+        return media_preview_img(img) or img
 
     def _user_disabled_check(self):
         if self.current_sr_user and self.current_sr_user.is_disabled:
@@ -2387,12 +2392,13 @@ class BasePage:
         )
 
     @classmethod
-    def preview_image(cls, state: dict) -> str | None:
+    def preview_output(cls, state: dict) -> str | None:
         out = (
             state.get("cutout_image")
             or state.get("output_images")
             or state.get("output_image")
             or state.get("output_video")
+            # or state.get("output_videos") ## Enable later when fal.ai urls are migrated
         )
         return extract_nested_str(out)
 
