@@ -20,7 +20,7 @@ from celeryapp.celeryconfig import app
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.base import BasePage, StateKeys
-from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.exceptions import StopRequested, UserError
 from daras_ai_v2.send_email import send_email_via_postmark, send_low_balance_email
 from daras_ai_v2.settings import templates
 from gooeysite.bg_db_conn import db_middleware
@@ -79,6 +79,7 @@ def runner_task(
             # extract status of the run
             {
                 StateKeys.error_msg: error_msg,
+                StateKeys.cancelled: sr.cancelled,
                 StateKeys.run_time: time() - start_time,
                 StateKeys.run_status: run_status,
             }
@@ -121,7 +122,14 @@ def runner_task(
     try:
         save_on_step()
         for val in page.main(sr, gui.session_state):
+            page.current_sr.refresh_from_db(fields=["cancelled"])
+            if page.current_sr.cancelled:
+                break
             save_on_step(val)
+
+    except StopRequested:
+        if deduct_credits:
+            sr.transaction, sr.price = page.deduct_credits(gui.session_state)
 
     # render errors nicely
     except Exception as e:
@@ -134,6 +142,7 @@ def runner_task(
             traceback.print_exc()
         sentry_sdk.capture_exception(e, level=sentry_level)
         error_msg = err_msg_for_exc(e)
+        sr.error_msg = error_msg
         sr.error_type = getattr(e, "error_type", None) or type(e).__qualname__
         sr.error_code = getattr(e, "status_code", None)
         sr.error_params = error_params or {}
