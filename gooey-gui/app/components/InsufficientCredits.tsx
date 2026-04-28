@@ -1,3 +1,5 @@
+import "./InsufficientCredits.css";
+
 type InsufficientCreditsProps = {
   accountUrl: string;
   isAnonymous: boolean;

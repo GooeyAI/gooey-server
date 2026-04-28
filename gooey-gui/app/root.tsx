@@ -1,4 +1,3 @@
-import { cssBundleHref } from "@remix-run/css-bundle";
 import type { LinksFunction } from "@remix-run/node";
 import { json } from "@remix-run/node"; // Depends on the runtime you choose
 import {
@@ -23,7 +22,6 @@ import settings from "./settings";
 import { ReactNode } from "react";
 
 export const links: LinksFunction = () => [
-  ...(cssBundleHref ? [{ rel: "stylesheet", href: cssBundleHref }] : []),
   ...globalProgressStyles(),
 ];
 
