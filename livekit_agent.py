@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from app_users.models import AppUser
-
 __import__("gooeysite.wsgi")
+
+from app_users.models import AppUser
 
 import asyncio
 import base64
@@ -786,7 +786,6 @@ def tts_step(
                 audio_url.split(settings.GS_BUCKET_NAME)[-1].strip("/")
             )
             UploadedFile.objects.from_gcs_blob(blob).delete()
-            blob.delete()
     return audio_wav_bytes, mime_type
 
 
