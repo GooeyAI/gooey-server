@@ -102,7 +102,10 @@ class LipsyncPage(BasePage):
                     max_frames=max_frames,
                 )
 
-    def render_run_preview_output(self, state: dict):
+    def render_output(self):
+        self.render_run_preview_output(gui.session_state, preview=False)
+
+    def render_run_preview_output(self, state: dict, preview=True):
         output_video = state.get("output_video")
         if output_video:
             gui.write("#### Output Video")
@@ -110,13 +113,10 @@ class LipsyncPage(BasePage):
                 output_video,
                 autoplay=True,
                 show_download_button=True,
-                previewImg=media_preview_img(output_video),
+                previewImg=media_preview_img(output_video) if preview else None,
             )
         else:
             gui.div()
-
-    def render_output(self):
-        self.render_run_preview_output(gui.session_state)
 
     def related_workflows(self) -> list:
         from recipes.DeforumSD import DeforumSDPage

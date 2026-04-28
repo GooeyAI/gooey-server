@@ -106,7 +106,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
         state["input_audio"] = state["audio_url"]
         yield from LipsyncPage(request=self.request).run(state)
 
-    def render_run_preview_output(self, state: dict):
+    def render_output(self):
+        self.render_run_preview_output(gui.session_state, preview=False)
+
+    def render_run_preview_output(self, state: dict, preview=True):
         output_video = state.get("output_video")
         if output_video:
             gui.video(
@@ -114,13 +117,10 @@ class LipsyncTTSPage(LipsyncPage, TextToSpeechPage):
                 caption="#### Output Video",
                 autoplay=True,
                 show_download_button=True,
-                previewImg=media_preview_img(output_video),
+                previewImg=media_preview_img(output_video) if preview else None,
             )
         else:
             gui.div()
-
-    def render_output(self):
-        self.render_run_preview_output(gui.session_state)
 
     def get_raw_price(self, state: dict):
         # _get_tts_provider comes from TextToSpeechPage

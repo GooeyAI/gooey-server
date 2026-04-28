@@ -18,7 +18,7 @@ from requests.utils import CaseInsensitiveDict
 from ai_models.llm_openapi import AudioModelMarker, VideoModelMarker
 from ai_models.models import AIModelSpec
 from bots.models import Workflow
-from daras_ai.image_input import upload_file_from_bytes
+from daras_ai.image_input import upload_file_from_bytes, truncate_text_words
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import PaymentRequired, UserError, ffmpeg, ffprobe
 from daras_ai_v2.fal_ai import generate_on_fal
@@ -182,13 +182,9 @@ class VideoGenPage(BasePage):
             gui.session_state["audio_inputs"] = None
 
     def render_output(self):
-        self.render_run_preview_output(
-            gui.session_state, show_download_button=True, show_prompt=False
-        )
+        self.render_run_preview_output(gui.session_state, preview=False)
 
-    def render_run_preview_output(
-        self, state: dict, show_download_button: bool = False, show_prompt: bool = True
-    ):
+    def render_run_preview_output(self, state: dict, preview=True):
         output_videos = state.get("output_videos", {})
         if not output_videos:
             return
@@ -207,14 +203,15 @@ class VideoGenPage(BasePage):
             gui.video(
                 video_url,
                 autoplay=True,
-                show_download_button=show_download_button,
-                previewImg=media_preview_img(video_url),
+                show_download_button=not preview,
+                previewImg=media_preview_img(video_url) if preview else None,
             )
             gui.caption(label)
 
-        if show_prompt and prompt:
+        if preview and prompt:
+            prompt_preview = truncate_text_words(html.escape(prompt), 200)
             gui.write(
-                f'<i class="fa-regular fa-lightbulb-on" style="fontSize: 0.8rem; vertical-align: 0.05rem"></i>&nbsp;{html.escape(prompt)}',
+                f'<i class="fa-regular fa-lightbulb-on" style="fontSize: 0.8rem; vertical-align: 0.05rem"></i>&nbsp;{prompt_preview}',
                 unsafe_allow_html=True,
             )
 
