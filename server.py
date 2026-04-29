@@ -61,6 +61,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="GOOEY.AI", docs_url=None, redoc_url=None, lifespan=lifespan)
 
+app.mount(
+    "/static/styles",
+    StaticFiles(directory="gooey-gui/app/styles"),
+    name="gooey-gui-styles",
+)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(bots_api.app)
 app.include_router(api.app)

@@ -478,7 +478,6 @@ textarea {
   width: 100%;
   padding: 12px;
   background-color: #fff;
-  border: 1px solid #000;
   border-radius: 6px;
 }
 textarea:disabled {
@@ -572,10 +571,6 @@ textarea:disabled {
   width: 30px;
   height: 40px;
   opacity: 0.7;
-}
-
-.accordion-button {
-  padding: 6px 20px;
 }
 
 .accordion-button:focus {
