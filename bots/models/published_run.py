@@ -315,7 +315,9 @@ class PublishedRun(models.Model):
         """
         Shown internally to workspace members. For example: share button on workflow page.
         """
-        if self.workspace.is_personal:
+        if self.workspace.is_personal or (
+            WorkflowAccessLevel(self.public_access) == WorkflowAccessLevel.FIND_AND_VIEW
+        ):
             return WorkflowAccessLevel(self.public_access).get_public_sharing_icon()
         else:
             return WorkflowAccessLevel(self.workspace_access).get_team_sharing_icon()
