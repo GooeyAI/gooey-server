@@ -7,6 +7,7 @@ from app_users import models
 from bots.admin_links import open_in_new_tab, list_related_html_url, change_obj_url
 from bots.models import SavedRun, PublishedRun
 from embeddings.models import EmbeddedFile
+from files.models import UploadedFile
 from gooeysite.admin import GooeyModelAdmin
 from usage_costs.models import UsageCost
 from workspaces.admin import WorkspaceAdmin, WorkspaceMembershipInline
@@ -43,6 +44,7 @@ class AppUserAdmin(GooeyModelAdmin):
                         "view_published_runs",
                         "view_api_keys",
                         "view_embedded_files",
+                        "view_uploaded_files",
                         "view_transactions",
                     ),
                     ("created_at", "updated_at", "upgraded_from_anonymous_at"),
@@ -101,6 +103,7 @@ class AppUserAdmin(GooeyModelAdmin):
         "view_published_runs",
         "view_api_keys",
         "view_embedded_files",
+        "view_uploaded_files",
         "view_transactions",
         "open_in_firebase",
         "open_in_stripe",
@@ -141,6 +144,15 @@ class AppUserAdmin(GooeyModelAdmin):
         return list_related_html_url(
             EmbeddedFile.objects.filter(created_by=user),
             query_param="created_by",
+            instance_id=user.id,
+            show_add=False,
+        )
+
+    @admin.display(description="Uploaded Files")
+    def view_uploaded_files(self, user: models.AppUser):
+        return list_related_html_url(
+            user.uploaded_files,
+            query_param="user__id__exact",
             instance_id=user.id,
             show_add=False,
         )

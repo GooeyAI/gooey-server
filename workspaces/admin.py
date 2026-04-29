@@ -8,6 +8,7 @@ from api_keys.models import ApiKey
 from bots.admin_links import change_obj_url, open_in_new_tab, list_related_html_url
 from bots.models import SavedRun, BotIntegration
 from bots.models.published_run import PublishedRun
+from files.models import UploadedFile
 from gooeysite.admin import GooeyModelAdmin, GooeySafeDeleteAdmin
 from payments.models import Subscription
 from usage_costs.models import UsageCost
@@ -102,6 +103,7 @@ class WorkspaceAdmin(GooeySafeDeleteAdmin):
             "view_published_runs",
             "view_api_keys",
             "view_bot_integrations",
+            "view_uploaded_files",
         ),
         ("created_at", "updated_at"),
         "open_in_stripe",
@@ -126,6 +128,7 @@ class WorkspaceAdmin(GooeySafeDeleteAdmin):
         "view_published_runs",
         "view_api_keys",
         "view_bot_integrations",
+        "view_uploaded_files",
         "total_payments",
         "total_charged",
         "total_usage_cost",
@@ -184,6 +187,15 @@ class WorkspaceAdmin(GooeySafeDeleteAdmin):
             BotIntegration.objects.filter(workspace=workspace),
             query_param="workspace__id__exact",
             instance_id=workspace.id,
+        )
+
+    @admin.display(description="Uploaded Files")
+    def view_uploaded_files(self, workspace: models.Workspace):
+        return list_related_html_url(
+            workspace.uploaded_files,
+            query_param="workspace__id__exact",
+            instance_id=workspace.id,
+            show_add=False,
         )
 
     @admin.display(description="Total Payments")

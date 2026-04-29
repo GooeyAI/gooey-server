@@ -7,19 +7,18 @@ from files.models import FileMetadata, UploadedFile
 @admin.register(FileMetadata)
 class FileMetadataAdmin(admin.ModelAdmin):
     search_fields = ("name", "etag", "mime_type")
-    list_display = ("id", "name", "mime_type", "total_bytes", "etag")
+    list_display = ("__str__", "name", "mime_type", "total_bytes", "etag")
 
 
 @admin.register(UploadedFile)
 class UploadedFileAdmin(admin.ModelAdmin):
     list_display = (
-        "uploaded_file",
+        "__str__",
         "workspace_link",
         "user_link",
         "f_url_link",
         "created_at",
     )
-    list_display_links = ("uploaded_file",)
     list_select_related = ("metadata", "workspace", "user")
     search_fields = (
         "f_url",
@@ -28,7 +27,7 @@ class UploadedFileAdmin(admin.ModelAdmin):
         "metadata__name",
         "metadata__etag",
     )
-    list_filter = ("created_at", "workspace")
+    list_filter = ("created_at",)
     readonly_fields = (
         "f_url_link",
         "bucket_name",
@@ -37,10 +36,6 @@ class UploadedFileAdmin(admin.ModelAdmin):
         "created_at",
     )
     autocomplete_fields = ("metadata", "saved_run", "workspace", "user")
-
-    @admin.display(description="Uploaded File")
-    def uploaded_file(self, obj: UploadedFile):
-        return str(obj)
 
     @admin.display(description="Metadata")
     def metadata_link(self, obj: UploadedFile):
