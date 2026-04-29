@@ -421,7 +421,7 @@ def render_search_results(
             show_workspace_author=show_workspace_author,
             show_run_count=show_run_count,
             hide_last_editor=hide_last_editor,
-            hide_access_level=True,
+            hide_access_level=not is_member,  # hide if not member
             search_filters=search_filters,
         )
 
