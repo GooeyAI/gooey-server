@@ -79,7 +79,7 @@ from routers.api import create_new_run
 
 DTMF_TIMEOUT = 30
 MAX_TRIES = 5
-
+LIVEKIT_GEMINI_VERTEX_LOCATION = "global"
 
 server = AgentServer(
     num_idle_processes=config("MAX_THREADS", default=1, cast=int),
@@ -397,18 +397,10 @@ async def create_audio_model_session(
     if "gemini" in llm_model.model_id:
         from livekit.plugins import google
 
-        if llm_model.api_key:
-            gemini_auth_kwargs = {"api_key": llm_model.api_key}
-        else:
-            gemini_auth_kwargs = {
-                "vertexai": True,
-                "project": settings.GCP_PROJECT,
-            }
-
         llm = google.beta.realtime.RealtimeModel(
             model=llm_model.model_id,
             temperature=request.sampling_temperature,
-            **gemini_auth_kwargs,
+            **gemini_auth_kwargs(llm_model),
         )
         tts = google.TTS()
     else:
@@ -455,18 +447,10 @@ async def create_stt_llm_tts_session(
         case _ if "gemini" in llm_model.model_id:
             from livekit.plugins import google
 
-            if llm_model.api_key:
-                gemini_auth_kwargs = {"api_key": llm_model.api_key}
-            else:
-                gemini_auth_kwargs = {
-                    "vertexai": True,
-                    "project": settings.GCP_PROJECT,
-                }
-
             llm = google.LLM(
                 model=llm_model.model_id.removeprefix("google/"),
                 temperature=temperature,
-                **gemini_auth_kwargs,
+                **gemini_auth_kwargs(llm_model),
             )
 
         case _ if "claude" in llm_model.model_id:
@@ -561,6 +545,17 @@ async def create_stt_llm_tts_session(
         vad=silero.VAD.load(),
         turn_handling=TurnHandlingOptions(turn_detection=MultilingualModel()),
     )
+
+
+def gemini_auth_kwargs(llm_model: AIModelSpec) -> dict:
+    if llm_model.api_key:
+        return {"api_key": llm_model.api_key}
+
+    return {
+        "vertexai": True,
+        "project": settings.GCP_PROJECT,
+        "location": LIVEKIT_GEMINI_VERTEX_LOCATION,
+    }
 
 
 @sync_to_async
