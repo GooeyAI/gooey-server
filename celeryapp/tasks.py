@@ -131,7 +131,7 @@ def runner_task(
 
     # render errors nicely
     except Exception as e:
-        if isinstance(e, SoftTimeLimitExceeded):
+        if is_task_cancelled(e):
             # SIGUSR1 from app.control.revoke(terminate=True, signal="SIGUSR1"); treat
             # as a graceful cancel only if the Stop button actually flipped the flag,
             # otherwise it's a real soft time limit and should surface as an error.
@@ -163,6 +163,16 @@ def runner_task(
         threadlocal.saved_run = None
 
     post_runner_tasks.delay(sr.id)
+
+
+def is_task_cancelled(e: BaseException | None) -> bool:
+    for _ in range(3):
+        if isinstance(e, SoftTimeLimitExceeded):
+            return True
+        if e is None:
+            break
+        e = e.__cause__
+    return False
 
 
 @app.task
