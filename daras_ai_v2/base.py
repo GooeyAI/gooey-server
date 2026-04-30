@@ -1671,7 +1671,7 @@ class BasePage:
             )
             if stopped:
                 self.current_sr.is_cancelled = True
-                self.current_sr.save(update_fields=["run_status", "is_cancelled"])
+                self.current_sr.save(update_fields=["is_cancelled"])
                 raise gui.RerunException
         else:
             submitted = gui.button(
@@ -2179,7 +2179,7 @@ class BasePage:
     ):
         from celeryapp.tasks import runner_task
 
-        return runner_task.delay(
+        result = runner_task.delay(
             page_cls=self.__class__,
             user_id=self.request.user.id,
             run_id=sr.run_id,
@@ -2188,6 +2188,10 @@ class BasePage:
             unsaved_state=unsaved_state,
             deduct_credits=deduct_credits,
         )
+        # persist task id so a Stop click can revoke it mid-run
+        sr.celery_task_id = result.id
+        sr.save(update_fields=["celery_task_id"])
+        return result
 
     @classmethod
     def realtime_channel_name(cls, run_id: str, uid: str) -> str:

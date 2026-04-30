@@ -132,7 +132,14 @@ class SavedRun(models.Model):
 
     is_api_call = models.BooleanField(default=False)
 
+    # see signals.py:revoke_saved_run_task_on_cancel
     is_cancelled = models.BooleanField(default=False)
+    celery_task_id = models.CharField(
+        max_length=255,
+        default="",
+        blank=True,
+        help_text="ID of the Celery task currently executing this run, used to revoke it on cancel.",
+    )
 
     platform = models.IntegerField(
         choices=Platform.choices, null=True, blank=True, default=None
