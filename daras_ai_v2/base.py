@@ -1605,6 +1605,15 @@ class BasePage:
     def render_settings(self):
         pass
 
+    def render_is_cancelled(self):
+        if not self.current_sr.is_cancelled:
+            return
+        if gui.session_state.get(StateKeys.run_status):
+            cancel_msg = "We're trying our best to cancel this run, please be patient"
+        else:
+            cancel_msg = "Run was stopped. Results may be incomplete."
+        gui.error(cancel_msg, icon="⚠️", color="#ffe8b2")
+
     def render_output(self):
         self.render_run_preview_output(gui.session_state)
 
@@ -1620,7 +1629,7 @@ class BasePage:
         else:
             return "/account/"
 
-    def render_submit_button(self, key="-submit-workflow"):
+    def render_submit_row(self):
         gui.write("---")
         with gui.div(
             className="position-sticky bottom-0 container-margin-reset p-2",
@@ -1647,22 +1656,37 @@ class BasePage:
             ):
                 self.render_run_cost()
             with col2:
-                submitted = gui.button(
-                    f"{icons.run} Run",
-                    key=key,
-                    type="primary",
-                    className="my-0 py-2",
-                    # disabled=bool(gui.session_state.get(StateKeys.run_status)),
-                )
-            if not submitted:
-                return False
-            try:
-                self.validate_form_v2()
-            except AssertionError as e:
-                gui.error(str(e))
-                return False
-            else:
-                return True
+                return self.render_submit_button()
+
+    def render_submit_button(self):
+        if (
+            gui.session_state.get(StateKeys.run_status)
+            and not self.current_sr.is_cancelled
+            and (self.is_current_user_owner() or self.is_current_user_admin())
+        ):
+            stopped = gui.button(
+                f"{icons.cancel} Stop",
+                key="-stop-workflow",
+                className="my-0 py-2 text-danger",
+            )
+            if stopped:
+                self.current_sr.is_cancelled = True
+                self.current_sr.save(update_fields=["run_status", "is_cancelled"])
+                raise gui.RerunException
+        else:
+            submitted = gui.button(
+                f"{icons.run} Run",
+                key="-submit-workflow",
+                type="primary",
+                className="my-0 py-2",
+            )
+            if submitted:
+                try:
+                    self.validate_form_v2()
+                    return True
+                except AssertionError as e:
+                    gui.error(str(e))
+        return False
 
     # Number of lines to clamp the run cost notes to
     run_cost_line_clamp: int = 1
@@ -1837,7 +1861,7 @@ class BasePage:
             with placeholder:
                 self.render_variables()
 
-            submitted = self.render_submit_button()
+            submitted = self.render_submit_row()
             with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
                 terms_caption = self.get_terms_caption()
                 gui.caption(f"_{terms_caption}_")
@@ -1918,6 +1942,7 @@ class BasePage:
 
             # render outputs
             if not is_deleted:
+                self.render_is_cancelled()
                 self.render_output()
 
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
