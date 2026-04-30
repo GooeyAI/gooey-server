@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import typing
 
@@ -55,8 +57,11 @@ class SortOptions(SortOption, GooeyEnum):
     )
 
     @classmethod
-    def get(cls, key=None):
-        return super().get(key, default=cls.featured)
+    def get(cls, key=None, *, search_filters: SearchFilters | None = None):
+        if search_filters and search_filters.workspace:
+            return super().get(key, default=cls.last_updated)
+        else:
+            return super().get(key, default=cls.featured)
 
     def html_icon_label(self) -> str:
         return f'{self.icon}<span class="hide-on-small-screens"> {self.label}</span>'
@@ -154,11 +159,12 @@ def render_search_filters(
                     gui.div(),
                 ):
                     sort_options = {
-                        opt.name if opt != SortOptions.get() else None: (
-                            opt.html_icon_label()
-                        )
-                        for opt in SortOptions
+                        option.name: option.html_icon_label() for option in SortOptions
                     }
+                    default_sort_option = SortOptions.get(search_filters=search_filters)
+                    if search_filters.sort != default_sort_option.name:
+                        sort_options[""] = sort_options.pop(default_sort_option.name)
+
                     search_filters.sort = (
                         gui.selectbox(
                             label="",
@@ -439,7 +445,7 @@ def get_filtered_published_runs(
 
 
 def build_sort_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
-    match SortOptions.get(search_filters.sort):
+    match SortOptions.get(search_filters.sort, search_filters=search_filters):
         case SortOptions.featured:
             qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
             fields = (
