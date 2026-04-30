@@ -8,6 +8,7 @@ from time import time
 import gooey_gui as gui
 import requests
 import sentry_sdk
+from celery.exceptions import SoftTimeLimitExceeded
 from django.db.models import Sum, F
 from django.utils import timezone
 from fastapi import HTTPException
@@ -104,6 +105,9 @@ def runner_task(
         # save to db
         page.dump_state_to_sr(saved_state, sr)
 
+        if not done and sr.is_cancelled:
+            raise SoftTimeLimitExceeded
+
     page = page_cls(
         user=AppUser.objects.get(id=user_id),
         query_params=dict(run_id=run_id, uid=uid),
@@ -122,15 +126,19 @@ def runner_task(
 
     try:
         save_on_step()
-        if sr.is_cancelled:
-            return
         for val in page.main(sr, gui.session_state):
             save_on_step(val)
-            if sr.is_cancelled:
-                return
 
     # render errors nicely
     except Exception as e:
+        if isinstance(e, SoftTimeLimitExceeded):
+            # SIGUSR1 from app.control.revoke(terminate=True, signal="SIGUSR1"); treat
+            # as a graceful cancel only if the Stop button actually flipped the flag,
+            # otherwise it's a real soft time limit and should surface as an error.
+            sr.refresh_from_db(fields=["is_cancelled"])
+            if sr.is_cancelled:
+                return
+
         if isinstance(e, UserError):
             sentry_level = e.sentry_level
             logger.warning("\n".join(map(str, [e, e.__cause__])))
