@@ -13,7 +13,7 @@ import aifail
 import gooey_gui as gui
 import requests
 import typing_extensions
-from aifail import openai_should_retry, retry_if, vertex_ai_should_retry, try_all
+from aifail import retry_if, vertex_ai_should_retry, try_all
 from django.conf import settings
 from furl import furl
 from loguru import logger
@@ -43,6 +43,13 @@ from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
 from functions.base_llm_tool import BaseLLMTool
+
+
+def openai_should_retry(e: Exception) -> bool:
+    from celeryapp.tasks import is_task_cancelled
+
+    return aifail.openai_should_retry(e) and not is_task_cancelled(e)
+
 
 DEFAULT_JSON_PROMPT = (
     "Please respond directly in JSON format. "

@@ -6,7 +6,6 @@ from functools import partial
 
 import numpy as np
 from aifail import (
-    openai_should_retry,
     retry_if,
     try_all,
 )
@@ -15,7 +14,7 @@ from loguru import logger
 
 from daras_ai_v2 import settings
 from daras_ai_v2.gpu_server import call_celery_task
-from daras_ai_v2.language_model import get_openai_client
+from daras_ai_v2.language_model import get_openai_client, openai_should_retry
 from daras_ai_v2.redis_cache import (
     get_redis_cache,
 )
