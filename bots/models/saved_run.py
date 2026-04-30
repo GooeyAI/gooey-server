@@ -132,6 +132,8 @@ class SavedRun(models.Model):
 
     is_api_call = models.BooleanField(default=False)
 
+    is_cancelled = models.BooleanField(default=False)
+
     platform = models.IntegerField(
         choices=Platform.choices, null=True, blank=True, default=None
     )

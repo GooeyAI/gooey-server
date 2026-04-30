@@ -64,13 +64,15 @@ def runner_task(
 
     @db_middleware
     def save_on_step(yield_val: str | tuple[str, dict] = None, *, done: bool = False):
+        sr.refresh_from_db(fields=["is_cancelled"])
+
         if isinstance(yield_val, tuple):
             run_status, extra_output = yield_val
         else:
             run_status = yield_val
             extra_output = {}
 
-        if done:
+        if done or sr.is_cancelled:
             run_status = None
         else:
             run_status = run_status or DEFAULT_RUN_STATUS
@@ -120,8 +122,12 @@ def runner_task(
 
     try:
         save_on_step()
+        if sr.is_cancelled:
+            return
         for val in page.main(sr, gui.session_state):
             save_on_step(val)
+            if sr.is_cancelled:
+                return
 
     # render errors nicely
     except Exception as e:
