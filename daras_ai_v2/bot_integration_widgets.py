@@ -449,7 +449,7 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
             dict(
                 mode="inline",
                 showSources=True,
-                enablePhotoUpload=False,
+                enablePhotoUpload=True,
                 autoPlayResponses=True,
                 enableAudioMessage=True,
                 enableConversations=True,
