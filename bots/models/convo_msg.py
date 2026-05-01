@@ -9,7 +9,7 @@ import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import OuterRef, Q, QuerySet, Subquery
+from django.db.models import Count, Max, Min, OuterRef, Q, QuerySet, Subquery
 from django.utils.text import Truncator
 
 from bots.custom_fields import CustomURLField
@@ -455,9 +455,44 @@ class MessageQuerySet(models.QuerySet):
                     }
                 )
 
+        # fetch per-conversation stats to enrich each exported row
+        now = datetime.datetime.now()
+        conv_stats = {}
+        for stat in Conversation.objects.filter(
+            id__in=list(conversations.keys())
+        ).annotate(
+            first_msg=Min("messages__created_at"),
+            last_msg=Max("messages__created_at"),
+            thumbs_up=Count(
+                "messages__feedbacks",
+                filter=Q(messages__feedbacks__rating=Feedback.Rating.POSITIVE),
+            ),
+            thumbs_down=Count(
+                "messages__feedbacks",
+                filter=Q(messages__feedbacks__rating=Feedback.Rating.NEGATIVE),
+            ),
+        ):
+            first = stat.first_msg and stat.first_msg.astimezone(tz).replace(
+                tzinfo=None
+            )
+            last = stat.last_msg and stat.last_msg.astimezone(tz).replace(tzinfo=None)
+            entry: dict = {
+                "thumbs_up": stat.thumbs_up,
+                "thumbs_down": stat.thumbs_down,
+            }
+            if first and last:
+                entry |= {
+                    "A7": last > now - datetime.timedelta(days=7),
+                    "A30": last > now - datetime.timedelta(days=30),
+                    "R1": last - first < datetime.timedelta(days=1),
+                    "R7": last - first < datetime.timedelta(days=7),
+                    "R30": last - first < datetime.timedelta(days=30),
+                }
+            conv_stats[stat.id] = entry
+
         return [
-            row
-            for rows in conversations.values()
+            row | conv_stats.get(conv_id, {})
+            for conv_id, rows in conversations.items()
             # reversed so that user message is first and easier to read
             for row in reversed(rows)
             # drop rows that have only one of user/assistant message
