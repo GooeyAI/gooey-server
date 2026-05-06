@@ -815,15 +815,16 @@ Translation Glossary for LLM Language (English) -> User Langauge
                 model=request.translation_model,
             )
             # save translated response for tts
-            response.raw_tts_text = [
+            tts_source = [
                 "".join(snippet for snippet, _ in parse_refs(text, response.references))
                 for text in output_text
             ]
+            response.raw_tts_text = tts_source
+        else:
+            tts_source = output_text
 
         # remove html tags from the output text for tts
-        raw_tts_text = [
-            parse_bot_html(text)[1] for text in response.raw_tts_text or output_text
-        ]
+        raw_tts_text = [parse_bot_html(text)[1].strip() for text in tts_source]
         if raw_tts_text != output_text:
             response.raw_tts_text = raw_tts_text
 
@@ -1589,8 +1590,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         total = get_non_ivr_price_credits(self.current_sr) + self.PROFIT_CREDITS
 
         if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            output_text_list = state.get(
-                "raw_tts_text", state.get("raw_output_text", [])
+            output_text_list = state.get("raw_tts_text") or state.get(
+                "raw_output_text", []
             )
             tts_state = {"text_prompt": "".join(output_text_list)}
             total += TextToSpeechPage().get_raw_price(tts_state)
