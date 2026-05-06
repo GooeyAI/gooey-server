@@ -378,7 +378,7 @@ def yt_info_to_video_metadata(data: dict) -> FileMetadata:
         etag=etag and str(etag) or None,
         # we will later convert & save as wav
         mime_type="audio/wav",
-        total_bytes=data.get("filesize_approx", 0),
+        total_bytes=data.get("filesize_approx") or 0,
     )
 
 
