@@ -202,7 +202,7 @@ class SlackBot(BotInterface):
         thread_ts: str = None,
         update_msg_ts: str = None,
     ) -> tuple[str | None, int]:
-        splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
+        splits = text_splitter(text or "", chunk_size=SLACK_MAX_SIZE, length_function=len)
         for doc in splits[:-1]:
             thread_ts = chat_post_message(
                 text=doc.text,
