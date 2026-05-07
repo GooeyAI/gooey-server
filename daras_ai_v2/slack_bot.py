@@ -157,8 +157,6 @@ class SlackBot(BotInterface):
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
-        text = text or "\u200b"  # handle empty text with zero-width space
-
         if self._read_rcpt_ts and self._read_rcpt_ts != self._msg_ts:
             delete_msg(
                 channel=self.bot_id,
@@ -192,9 +190,8 @@ class SlackBot(BotInterface):
         text: str | None = None,
         audio: list[str] | None = None,
         video: list[str] | None = None,
-        buttons: list[ReplyButton] = None,
-        documents: list[str] = None,
-        ## whatsapp specific
+        buttons: list[ReplyButton] | None = None,
+        documents: list[str] | None = None,
         channel: str,
         channel_is_personal: bool,
         username: str,
@@ -202,7 +199,9 @@ class SlackBot(BotInterface):
         thread_ts: str = None,
         update_msg_ts: str = None,
     ) -> tuple[str | None, int]:
-        splits = text_splitter(text, chunk_size=SLACK_MAX_SIZE, length_function=len)
+        splits = text_splitter(
+            text or "", chunk_size=SLACK_MAX_SIZE, length_function=len
+        )
         for doc in splits[:-1]:
             thread_ts = chat_post_message(
                 text=doc.text,
@@ -214,8 +213,12 @@ class SlackBot(BotInterface):
                 token=token,
             )
             update_msg_ts = None
+        if splits:
+            last_text = splits[-1].text
+        else:
+            last_text = ""
         thread_ts = chat_post_message(
-            text=splits[-1].text,
+            text=last_text or "\u200b",  # handle empty text with zero-width space
             audio=audio,
             video=video,
             buttons=buttons or [],
