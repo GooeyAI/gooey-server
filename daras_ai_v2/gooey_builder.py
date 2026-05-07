@@ -185,9 +185,10 @@ def can_launch_gooey_builder(
         return False
     if not request.user or request.user.is_anonymous:
         return False
-    if request.user.is_admin():
-        return True
-    return current_workspace and current_workspace.enable_bot_builder
+    return True
+    # if request.user.is_admin():
+    #     return True
+    # return current_workspace and current_workspace.enable_bot_builder
 
 
 def get_conversation_data_for_saved_run(
