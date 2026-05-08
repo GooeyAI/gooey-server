@@ -42,7 +42,7 @@ class ConversationQuerySet(models.QuerySet):
     ) -> pd.DataFrame:
         import pandas as pd
 
-        qs = self.all().select_related("bot_integration")
+        qs = self.all().select_related("bot_integration").with_stats()
         rows = []
         for convo in qs[:row_limit]:
             convo: Conversation
@@ -52,34 +52,18 @@ class ConversationQuerySet(models.QuerySet):
                 "Correct Answers": convo.messages.filter(
                     analysis_result__contains={"Answered": True}
                 ).count(),
-                "Thumbs up": convo.messages.filter(
-                    feedbacks__rating=Feedback.Rating.POSITIVE
-                ).count(),
-                "Thumbs down": convo.messages.filter(
-                    feedbacks__rating=Feedback.Rating.NEGATIVE
-                ).count(),
+                "Thumbs up": convo.thumbs_up,
+                "Thumbs down": convo.thumbs_down,
             }
-            try:
-                first_time = (
-                    convo.messages.earliest()
-                    .created_at.astimezone(tz)
-                    .replace(tzinfo=None)
-                )
-                last_time = (
-                    convo.messages.latest()
-                    .created_at.astimezone(tz)
-                    .replace(tzinfo=None)
-                )
+            if convo.first_msg and convo.last_msg:
+                now = datetime.datetime.now(tz=tz).replace(tzinfo=None)
+                first_time = convo.first_msg.astimezone(tz).replace(tzinfo=None)
+                last_time = convo.last_msg.astimezone(tz).replace(tzinfo=None)
                 row |= {
                     "Last Sent": last_time.strftime(settings.SHORT_DATETIME_FORMAT),
                     "First Sent": first_time.strftime(settings.SHORT_DATETIME_FORMAT),
-                    "A7": (
-                        last_time > datetime.datetime.now() - datetime.timedelta(days=7)
-                    ),
-                    "A30": (
-                        last_time
-                        > datetime.datetime.now() - datetime.timedelta(days=30)
-                    ),
+                    "A7": last_time > now - datetime.timedelta(days=7),
+                    "A30": last_time > now - datetime.timedelta(days=30),
                     "R1": last_time - first_time < datetime.timedelta(days=1),
                     "R7": last_time - first_time < datetime.timedelta(days=7),
                     "R30": last_time - first_time < datetime.timedelta(days=30),
@@ -87,8 +71,6 @@ class ConversationQuerySet(models.QuerySet):
                         convo.last_active_delta().total_seconds() / 3600
                     ),
                 }
-            except Message.DoesNotExist:
-                pass
             row |= {
                 "Created At": (
                     convo.created_at.astimezone(tz)
@@ -119,6 +101,20 @@ class ConversationQuerySet(models.QuerySet):
             ],
         )
         return df
+
+    def with_stats(self) -> "ConversationQuerySet":
+        return self.annotate(
+            first_msg=Min("messages__created_at"),
+            last_msg=Max("messages__created_at"),
+            thumbs_up=Count(
+                "messages__feedbacks",
+                filter=Q(messages__feedbacks__rating=Feedback.Rating.POSITIVE),
+            ),
+            thumbs_down=Count(
+                "messages__feedbacks",
+                filter=Q(messages__feedbacks__rating=Feedback.Rating.NEGATIVE),
+            ),
+        )
 
 
 class Conversation(models.Model):
@@ -395,6 +391,13 @@ class MessageQuerySet(models.QuerySet):
                 "User Message ID": row.get("user_message_id"),
                 "Conversation ID": row.get("conversation_id"),
                 "Integration Name": row.get("integration_name"),
+                "Thumbs Up": row.get("thumbs_up"),
+                "Thumbs Down": row.get("thumbs_down"),
+                "A7": row.get("A7"),
+                "A30": row.get("A30"),
+                "R1": row.get("R1"),
+                "R7": row.get("R7"),
+                "R30": row.get("R30"),
             }
             for row in self.to_json(tz=tz, row_limit=row_limit)
             if row.get("sent")
@@ -456,22 +459,11 @@ class MessageQuerySet(models.QuerySet):
                 )
 
         # fetch per-conversation stats to enrich each exported row
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(tz=tz).replace(tzinfo=None)
         conv_stats = {}
         for stat in Conversation.objects.filter(
             id__in=list(conversations.keys())
-        ).annotate(
-            first_msg=Min("messages__created_at"),
-            last_msg=Max("messages__created_at"),
-            thumbs_up=Count(
-                "messages__feedbacks",
-                filter=Q(messages__feedbacks__rating=Feedback.Rating.POSITIVE),
-            ),
-            thumbs_down=Count(
-                "messages__feedbacks",
-                filter=Q(messages__feedbacks__rating=Feedback.Rating.NEGATIVE),
-            ),
-        ):
+        ).with_stats():
             first = stat.first_msg and stat.first_msg.astimezone(tz).replace(
                 tzinfo=None
             )
