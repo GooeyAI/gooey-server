@@ -34,18 +34,12 @@ if typing.TYPE_CHECKING:
 def get_inbuilt_tools(saved_run: SavedRun) -> typing.Iterable[BaseLLMTool]:
     from composio import Composio
 
-    from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
-
     state = saved_run.state
-
-    audio_url = state.get("input_audio")
-    if is_realtime_audio_url(audio_url):
-        yield CallTransferLLMTool()
-
     variables = state.get("variables") or {}
 
     if variables.get("platform_medium") == "VOICE":
         yield VectorSearchLLMTool(state)
+        yield CallTransferLLMTool()
 
     update_gui_state_params = variables.get("update_gui_state_params")
     if update_gui_state_params:
