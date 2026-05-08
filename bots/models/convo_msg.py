@@ -55,18 +55,13 @@ class ConversationQuerySet(models.QuerySet):
                 "Thumbs up": convo.thumbs_up,
                 "Thumbs down": convo.thumbs_down,
             }
-            if convo.first_msg and convo.last_msg:
-                now = datetime.datetime.now(tz=tz).replace(tzinfo=None)
-                first_time = convo.first_msg.astimezone(tz).replace(tzinfo=None)
-                last_time = convo.last_msg.astimezone(tz).replace(tzinfo=None)
+            if convo.first_msg_at and convo.last_msg_at:
+                first_time = convo.first_msg_at.astimezone(tz).replace(tzinfo=None)
+                last_time = convo.last_msg_at.astimezone(tz).replace(tzinfo=None)
                 row |= {
                     "Last Sent": last_time.strftime(settings.SHORT_DATETIME_FORMAT),
                     "First Sent": first_time.strftime(settings.SHORT_DATETIME_FORMAT),
-                    "A7": last_time > now - datetime.timedelta(days=7),
-                    "A30": last_time > now - datetime.timedelta(days=30),
-                    "R1": last_time - first_time < datetime.timedelta(days=1),
-                    "R7": last_time - first_time < datetime.timedelta(days=7),
-                    "R30": last_time - first_time < datetime.timedelta(days=30),
+                    **activity_retention_stats(first_time, last_time),
                     "Delta Hours": round(
                         convo.last_active_delta().total_seconds() / 3600
                     ),
@@ -104,8 +99,8 @@ class ConversationQuerySet(models.QuerySet):
 
     def with_stats(self) -> "ConversationQuerySet":
         return self.annotate(
-            first_msg=Min("messages__created_at"),
-            last_msg=Max("messages__created_at"),
+            first_msg_at=Min("messages__created_at"),
+            last_msg_at=Max("messages__created_at"),
             thumbs_up=Count(
                 "messages__feedbacks",
                 filter=Q(messages__feedbacks__rating=Feedback.Rating.POSITIVE),
@@ -458,28 +453,19 @@ class MessageQuerySet(models.QuerySet):
                     }
                 )
 
-        # fetch per-conversation stats to enrich each exported row
-        now = datetime.datetime.now(tz=tz).replace(tzinfo=None)
         conv_stats = {}
         for stat in Conversation.objects.filter(
             id__in=list(conversations.keys())
         ).with_stats():
-            first = stat.first_msg and stat.first_msg.astimezone(tz).replace(
-                tzinfo=None
-            )
-            last = stat.last_msg and stat.last_msg.astimezone(tz).replace(tzinfo=None)
             entry: dict = {
                 "thumbs_up": stat.thumbs_up,
                 "thumbs_down": stat.thumbs_down,
             }
-            if first and last:
-                entry |= {
-                    "A7": last > now - datetime.timedelta(days=7),
-                    "A30": last > now - datetime.timedelta(days=30),
-                    "R1": last - first < datetime.timedelta(days=1),
-                    "R7": last - first < datetime.timedelta(days=7),
-                    "R30": last - first < datetime.timedelta(days=30),
-                }
+            if stat.first_msg_at and stat.last_msg_at:
+                entry |= activity_retention_stats(
+                    stat.first_msg_at.astimezone(tz).replace(tzinfo=None),
+                    stat.last_msg_at.astimezone(tz).replace(tzinfo=None),
+                )
             conv_stats[stat.id] = entry
 
         return [
@@ -503,6 +489,17 @@ class MessageQuerySet(models.QuerySet):
             self = self.filter(created_at__gt=reset_at)
         msgs = self.order_by("-created_at").prefetch_related("attachments")[:n]
         return list(reversed(msgs))
+
+
+def activity_retention_stats(first_msg_at, last_msg_at) -> dict:
+    now = datetime.datetime.now()
+    return {
+        "A7": last_msg_at > now - datetime.timedelta(days=7),
+        "A30": last_msg_at > now - datetime.timedelta(days=30),
+        "R1": last_msg_at - first_msg_at < datetime.timedelta(days=1),
+        "R7": last_msg_at - first_msg_at < datetime.timedelta(days=7),
+        "R30": last_msg_at - first_msg_at < datetime.timedelta(days=30),
+    }
 
 
 def db_msgs_to_entries(msgs: list["Message"]) -> list["ConversationEntry"]:
