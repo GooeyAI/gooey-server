@@ -758,8 +758,11 @@ def _render_plan_action_button(
         )
 
     elif plan.contact_us_link:
-        with gui.link(to=plan.contact_us_link, className="btn btn-theme btn-primary"):
-            gui.html("Let's Talk")
+        gui.anchor(
+            "Let's Talk",
+            href=plan.contact_us_link,
+            type="primary",
+        )
 
     elif (
         plan == PricingPlan.TEAM
