@@ -130,6 +130,8 @@ class ShortenedURL(models.Model):
     objects = ShortenedURLQuerySet.as_manager()
 
     def shortened_url(self) -> str:
+        if not self.id:
+            return ""
         return str(furl(settings.APP_BASE_URL) / "2" / _hashids.encode(self.id))
 
     shortened_url.short_description = "Shortened URL"
