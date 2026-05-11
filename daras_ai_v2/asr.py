@@ -9,6 +9,7 @@ import typing
 from enum import Enum
 from functools import lru_cache
 
+import aifail
 import gooey_gui as gui
 import requests
 import typing_extensions
@@ -1070,13 +1071,12 @@ def intron_asr(audio_url: str, language: str | None = None) -> dict:
     content_type = audio_r.headers.get("content-type") or "application/octet-stream"
     upload_url = str(intron_base_url / "file/v1/upload/sync")
 
-    response = requests.post(
-        upload_url,
-        headers={"Authorization": f"Bearer {settings.INTRON_API_KEY}"},
+    response = _upload_intron_audio(
+        upload_url=upload_url,
         data=data,
-        files={"audio_file_blob": ("audio.wav", audio_r.content, content_type)},
+        audio_content=audio_r.content,
+        content_type=content_type,
     )
-    raise_for_status(response)
 
     response_data = response.json().get("data") or {}
     file_id = response_data.get("file_id")
@@ -1101,6 +1101,24 @@ def intron_asr(audio_url: str, language: str | None = None) -> dict:
     raise TimeoutError(
         "Intron ASR timed out while waiting for the transcription to complete."
     )
+
+
+@aifail.retry_if(aifail.http_should_retry)
+def _upload_intron_audio(
+    *,
+    upload_url: str,
+    data: dict,
+    audio_content: bytes,
+    content_type: str,
+) -> requests.Response:
+    response = requests.post(
+        upload_url,
+        headers={"Authorization": f"Bearer {settings.INTRON_API_KEY}"},
+        data=data,
+        files={"audio_file_blob": ("audio.wav", audio_content, content_type)},
+    )
+    raise_for_status(response)
+    return response
 
 
 def run_asr(
