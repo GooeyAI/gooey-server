@@ -8,7 +8,6 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import (
     BooleanField,
-    F,
     FilteredRelation,
     Q,
     QuerySet,
@@ -62,6 +61,30 @@ class SortOptions(SortOption, GooeyEnum):
             return super().get(key, default=cls.last_updated)
         else:
             return super().get(key, default=cls.featured)
+
+    @classmethod
+    def get_qs_ordering(cls, search_filters: SearchFilters) -> list[str]:
+        """
+        Returns the ordering fields for the given sort option for a QuerySet[PublishedRun].
+        """
+        match cls.get(search_filters.sort, search_filters=search_filters):
+            case SortOptions.featured:
+                fields = [
+                    "-is_approved_example",
+                    "-example_priority",
+                    "-is_root_workflow",
+                    "is_created_by",
+                    "-updated_at",
+                ]
+                if search_filters.search:
+                    fields.insert(0, "-rank")
+            case SortOptions.last_updated:
+                fields = ["-updated_at"]
+            case SortOptions.created_at:
+                fields = ["-created_at"]
+            case SortOptions.most_runs:
+                fields = ["-run_count", "-updated_at"]
+        return fields
 
     def html_icon_label(self) -> str:
         return f'{self.icon}<span class="hide-on-small-screens"> {self.label}</span>'
@@ -409,12 +432,8 @@ def _render_selectbox(
 
 
 def render_search_results(
-    qs: QuerySet[PublishedRun], user: AppUser | None, search_filters: SearchFilters
+    runs: list[PublishedRun], user: AppUser | None, search_filters: SearchFilters
 ):
-    qs = qs.prefetch_related("tags", "versions").select_related(
-        "workspace", "last_edited_by", "saved_run"
-    )
-
     def _render_run(pr: PublishedRun):
         show_workspace_author = not bool(search_filters and search_filters.workspace)
         is_member = bool(getattr(pr, "is_member", False))
@@ -431,7 +450,7 @@ def render_search_results(
             search_filters=search_filters,
         )
 
-    grid_layout(1, qs, _render_run)
+    grid_layout(1, runs, _render_run)
 
 
 def get_filtered_published_runs(
@@ -441,34 +460,14 @@ def get_filtered_published_runs(
     qs = build_search_filter(qs, search_filters, user=user)
     qs = build_workflow_access_filter(qs, user)
     qs = build_sort_filter(qs, search_filters)
-    return qs[:25]
+    return qs.prefetch_related("tags", "versions").select_related(
+        "workspace", "last_edited_by", "saved_run"
+    )
 
 
 def build_sort_filter(qs: QuerySet, search_filters: SearchFilters) -> QuerySet:
-    match SortOptions.get(search_filters.sort, search_filters=search_filters):
-        case SortOptions.featured:
-            qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
-            fields = (
-                "-is_approved_example",
-                "-example_priority",
-                "-is_root_workflow",
-                F("is_created_by").desc(nulls_last=True),
-                "-updated_at",
-            )
-            if search_filters.search:
-                fields = ("-rank", *fields)
-        case SortOptions.last_updated:
-            fields = ("-updated_at",)
-        case SortOptions.created_at:
-            fields = ("-created_at",)
-        case SortOptions.most_runs:
-            fields = (
-                "-run_count",
-                F("is_created_by").desc(nulls_last=True),
-                "-updated_at",
-            )
-
-    return qs.order_by(*fields)
+    ordering = SortOptions.get_qs_ordering(search_filters)
+    return qs.order_by(*ordering)
 
 
 def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet:
@@ -476,6 +475,7 @@ def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet
     workflow_access_filter = Q(
         public_access__gt=WorkflowAccessLevel.VIEW_ONLY, is_approved_example=True
     )
+    qs = qs.annotate(is_root_workflow=Q(published_run_id=""))
     if user and not user.is_anonymous:
         qs = qs.annotate(
             membership=FilteredRelation(

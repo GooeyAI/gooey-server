@@ -10,10 +10,12 @@ from daras_ai_v2.all_pages import all_home_pages_by_category
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.meta_content import raw_build_meta_tags
+from daras_ai_v2.urls import paginate_button, paginate_queryset
 from widgets.workflow_search import (
     SearchFilters,
-    render_search_bar_with_redirect,
+    SortOptions,
     get_filtered_published_runs,
+    render_search_bar_with_redirect,
     render_search_filters,
     render_search_results,
     render_search_suggestions,
@@ -76,7 +78,7 @@ def render(request: Request, search_filters: SearchFilters | None):
             new_filters = render_search_filters(
                 current_user=request.user,
                 search_filters=copy(search_filters),
-                result_count=len(qs),
+                result_count=qs.count() if search_filters else None,
             )
             if new_filters != search_filters:
                 # if the search bar value has changed, redirect to the new search page
@@ -84,7 +86,15 @@ def render(request: Request, search_filters: SearchFilters | None):
 
     if search_filters:
         with gui.div(className="my-4"):
-            render_search_results(qs, request.user, search_filters)
+            ordering = SortOptions.get_qs_ordering(search_filters)
+            page, cursor = paginate_queryset(
+                qs=qs,
+                ordering=ordering,
+                cursor=request.query_params,
+                page_size=25,
+            )
+            render_search_results(page, request.user, search_filters)
+            paginate_button(url=request.url, cursor=cursor)
             return
 
     for category, pages in all_home_pages_by_category.items():
