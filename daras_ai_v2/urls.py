@@ -1,6 +1,7 @@
 import typing
 
 import gooey_gui as gui
+from django.core.exceptions import ValidationError
 from django.db.models import QuerySet
 from furl import furl
 from starlette.datastructures import QueryParams
@@ -44,6 +45,11 @@ def paginate_queryset(
         try:
             # filter the queryset based on previous cursor
             qs = qs.filter(**{param: cursor[param]})
+        except ValidationError:
+            # URL param contained invalid value for cursor, redirect to first page
+            query_params = dict(cursor)
+            query_params.pop(param, None)
+            raise gui.QueryParamsRedirectException(query_params)
         except KeyError:
             pass
     # always peek one more to see if there are more pages
