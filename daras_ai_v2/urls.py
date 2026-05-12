@@ -29,7 +29,8 @@ def paginate_queryset(
     cursor: dict[str, str] | QueryParams,
     page_size: int = 21,
 ) -> tuple[list[T], dict[str, str] | None]:
-    param_attrs = []
+    # mapping: cursor query param -> model attr e.g. "created_at__lte" -> "created_at"
+    param_attrs = {}
     for order in ordering:
         is_reversed = order.startswith("-")
         if is_reversed:
@@ -41,22 +42,27 @@ def paginate_queryset(
         # the queryset filter parameter, also used as query parameter
         param = attr + suffix
         # used to build the cursor later
-        param_attrs.append((param, attr))
+        param_attrs[param] = attr
+
+    for param in param_attrs:
         try:
             # filter the queryset based on previous cursor
             qs = qs.filter(**{param: cursor[param]})
         except ValidationError:
-            # error: URL param contains invalid value for a cursor param
-            # redirect to the first page (remove all ordering-related query params)
-            query_params = {k: v for k, v in cursor.items() if k not in ordering}
-            raise gui.QueryParamsRedirectException(query_params)
+            # cursor param has an invalid value: redirect to page 1
+            # strip all cursor params from query params and redirect
+            query_params = {k: v for k, v in cursor.items() if k not in param_attrs}
+            raise gui.QueryParamsRedirectException(query_params) from None
         except KeyError:
             pass
+
     # always peek one more to see if there are more pages
     page = list(qs.order_by(*ordering)[: page_size + 1])
     if len(page) > page_size:
         # build the next cursor from the first item in the next page
-        cursor = {param: str(getattr(page[-1], attr)) for param, attr in param_attrs}
+        cursor = {
+            param: str(getattr(page[-1], attr)) for param, attr in param_attrs.items()
+        }
         # remove the last item from the results
         page = page[:-1]
     else:
