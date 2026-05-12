@@ -1,5 +1,6 @@
 import mimetypes
 import random
+import re
 import traceback
 import typing
 from datetime import datetime
@@ -109,6 +110,7 @@ class BotInterface:
     ]
     user_msg_id: str | None = None
     can_update_message: bool = False
+    pass_thinking: bool = False
 
     page_cls: typing.Type[BasePage] | None = None
     query_params: dict
@@ -257,7 +259,9 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons, text, thinking, disable_feedback = parse_bot_html(text)
+        buttons, text, thinking, disable_feedback = parse_bot_html(
+            text, pass_thinking=self.pass_thinking
+        )
         if disable_feedback:
             send_feedback_buttons = False
 
@@ -344,7 +348,11 @@ class BotInterface:
             return text or ""
 
 
-def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]:
+def parse_bot_html(
+    text: str | None,
+    *,
+    pass_thinking: bool = False,
+) -> tuple[list[ReplyButton], str, str, bool]:
     from pyquery import PyQuery as pq
 
     if not text:
@@ -371,13 +379,22 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]
             )
         )
 
-    text = "".join(
-        s for elem in doc.contents() if isinstance(elem, str) and (s := elem)
-    )
-
-    thinking = "\n\n".join(elem.text for elem in (doc("think") or []) if elem.text)
+    if pass_thinking:
+        # avoid lxml — it auto-closes unclosed <think> mid-stream
+        text = BUTTON_RE.sub("", text)
+        thinking = ""
+    else:
+        text = "".join(
+            s for elem in doc.contents() if isinstance(elem, str) and (s := elem)
+        )
+        thinking = "\n\n".join(
+            elem.text for elem in (doc("think") or []) if elem.text
+        )
 
     return buttons, text, thinking, disable_feedback
+
+
+BUTTON_RE = re.compile(r"<button\b[^>]*>.*?</button>", re.DOTALL | re.IGNORECASE)
 
 
 def _echo(bot, input_text):

@@ -1361,18 +1361,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             text = output_text and output_text[0] or ""
 
             if text:
-                buttons, text, thinking, disable_feedback = parse_bot_html(text)
-                if thinking:
-                    thinking_duration = gui.session_state.get("metrics", {}).get(
-                        "thinking_duration_sec"
-                    )
-                    template = settings.templates.get_template("thinking_summary.html")
-                    context = dict(
-                        text=text,
-                        thinking=thinking,
-                        thinking_duration=thinking_duration,
-                    )
-                    text = template.render(context)
+                buttons, text, _, _ = parse_bot_html(text, pass_thinking=True)
             else:
                 buttons = []
 
