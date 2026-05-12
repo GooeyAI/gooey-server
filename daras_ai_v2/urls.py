@@ -25,7 +25,7 @@ T = typing.TypeVar("T")
 def paginate_queryset(
     *,
     qs: QuerySet[T],
-    ordering: typing.Iterable[str],
+    ordering: list[str],
     cursor: dict[str, str] | QueryParams,
     page_size: int = 21,
 ) -> tuple[list[T], dict[str, str] | None]:
@@ -46,9 +46,9 @@ def paginate_queryset(
             # filter the queryset based on previous cursor
             qs = qs.filter(**{param: cursor[param]})
         except ValidationError:
-            # URL param contained invalid value for cursor, redirect to first page
-            query_params = dict(cursor)
-            query_params.pop(param, None)
+            # error: URL param contains invalid value for a cursor param
+            # redirect to the first page (remove all ordering-related query params)
+            query_params = {k: v for k, v in cursor.items() if k not in ordering}
             raise gui.QueryParamsRedirectException(query_params)
         except KeyError:
             pass

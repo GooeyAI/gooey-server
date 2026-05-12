@@ -8,10 +8,12 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import (
     BooleanField,
+    Case,
     FilteredRelation,
     Q,
     QuerySet,
     Value,
+    When,
 )
 from django.utils.translation import ngettext
 from pydantic import BaseModel, field_validator
@@ -487,7 +489,11 @@ def build_workflow_access_filter(qs: QuerySet, user: AppUser | None) -> QuerySet
             ),
             is_member=Q(membership__role__isnull=False),
             is_admin=Q(membership__role__in=[WorkspaceRole.ADMIN, WorkspaceRole.OWNER]),
-            is_created_by=Q(created_by=user),
+            is_created_by=Case(
+                When(created_by=user, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            ),
         )
         workflow_access_filter |= (
             #  b) creator always sees it
