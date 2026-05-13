@@ -75,7 +75,7 @@ class SortOptions(SortOption, GooeyEnum):
                     "-is_approved_example",
                     "-example_priority",
                     "-is_root_workflow",
-                    "is_created_by",
+                    "-is_created_by",
                     "-updated_at",
                 ]
                 if search_filters.search:
