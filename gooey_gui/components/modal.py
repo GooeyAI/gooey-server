@@ -2,6 +2,21 @@ from gooey_gui import core
 from gooey_gui.components import common as gui
 
 
+MODAL_CLOSE_CLASS = "modal-close-btn"
+MODAL_ESC_HANDLER_JS = """
+document.removeEventListener('keydown', window._gooeyModalEscHandler);
+window._gooeyModalEscHandler = function(e) {
+    if (e.key !== 'Escape') return;
+    const modals = document.querySelectorAll('.modal.d-block');
+    const topModal = modals[modals.length - 1];
+    if (!topModal) return;
+    const closeBtn = topModal.querySelector('button.modal-close-btn');
+    if (closeBtn) closeBtn.click();
+};
+document.addEventListener('keydown', window._gooeyModalEscHandler);
+"""
+
+
 class AlertDialogRef:
     def __init__(self, key: str, is_open: bool = False):
         self.key = key
@@ -67,7 +82,7 @@ def alert_dialog(
             '<i class="fa fa-times fa-xl">',
             key=ref.close_btn_key,
             type="tertiary",
-            className="m-0 py-1 px-2",
+            className=f"m-0 py-1 px-2 {MODAL_CLOSE_CLASS}",
         )
     return body
 
@@ -125,7 +140,7 @@ def confirm_dialog(
         gui.button(
             label=cancel_label,
             key=ref.close_btn_key,
-            className=cancel_className,
+            className=f"{cancel_className} {MODAL_CLOSE_CLASS}".strip(),
             type="tertiary",
         )
         gui.button(
@@ -148,6 +163,7 @@ def modal_scaffold(
     else:
         large_cls = ""
     with core.current_root_ctx():
+        gui.js(MODAL_ESC_HANDLER_JS)
         with (
             gui.div(
                 className="modal d-block",
