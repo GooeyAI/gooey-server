@@ -82,15 +82,14 @@ def format_pricing_notes(models: dict[str, str], sku: ModelSku) -> str | None:
 
 
 def sync_fal_model_pricing(
-    model_id: str, *, model_name: str | None = None
+    *, model_id: str, model_name: str, category: int
 ) -> "ModelPricing | None":
     """Fetch the current unit price from fal's pricing API and upsert a
     ModelPricing row for (model_id, sku=fal_billable_units).
 
-    Resolves the display category and model_name from the matching AIModelSpec
-    row when one exists. For fal image-gen models that live in hardcoded enums
-    in `stable_diffusion.py` rather than as AIModelSpec rows, the caller should
-    pass `model_name` explicitly (typically the matching enum's `.name`).
+    `model_name` and `category` (a `ModelCategory` value) are display-only and
+    supplied by the caller — typically the `AIModelSpec` post_save signal,
+    which already has the instance in hand.
 
     Returns the upserted ModelPricing instance, or None if fal returned no
     pricing data (e.g. unknown endpoint_id, or pure GPU-time billing).
@@ -104,9 +103,7 @@ def sync_fal_model_pricing(
 
     unit_price = Decimal(str(price_info["unit_price"]))
     unit = price_info.get("unit") or ""
-    category, resolved_name = _resolve_fal_pricing_metadata(model_id)
     notes = f"${_format_unit_price(unit_price)} / {_singularize_unit(unit) or 'unit'}"
-    model_name = model_name or resolved_name
 
     pricing, _ = ModelPricing.objects.update_or_create(
         model_id=model_id,
@@ -139,38 +136,6 @@ def _singularize_unit(unit: str) -> str:
     if unit.endswith("s"):
         return unit[:-1]
     return unit
-
-
-def _resolve_fal_pricing_metadata(model_id: str) -> tuple[int, str]:
-    """Return (category, model_name) for a fal model_id, sourced from
-    AIModelSpec when available. Defaults to IMAGE_GENERATION otherwise
-    (fal image models live in hardcoded enums in stable_diffusion.py rather
-    than as AIModelSpec rows; category is display-only so this is harmless).
-    """
-    from ai_models.models import AIModelSpec
-    from usage_costs.models import ModelCategory
-
-    spec = (
-        AIModelSpec.objects.filter(model_id=model_id).only("name", "category").first()
-    )
-    if spec is None:
-        return ModelCategory.IMAGE_GENERATION, model_id
-    category = _category_from_aimodelspec(spec)
-    return category, spec.name
-
-
-def _category_from_aimodelspec(spec) -> "int | None":
-    """Map AIModelSpec.category to a ModelCategory for ModelPricing display."""
-    from ai_models.models import AIModelSpec
-    from usage_costs.models import ModelCategory
-
-    match spec.category:
-        case AIModelSpec.Categories.video:
-            return ModelCategory.VIDEO_GENERATION
-        case AIModelSpec.Categories.audio:
-            return ModelCategory.AUDIO_GENERATION
-        case AIModelSpec.Categories.llm:
-            return ModelCategory.LLM
 
 
 FAL_PRICING_API_URL = "https://api.fal.ai/v1/models/pricing"
