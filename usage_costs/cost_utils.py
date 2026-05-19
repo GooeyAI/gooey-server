@@ -14,7 +14,7 @@ if typing.TYPE_CHECKING:
 def record_cost_auto(
     model: str,
     sku: ModelSku,
-    quantity: int,
+    quantity: int | float | Decimal,
     unit_cost_multiplier: float = 1,
 ) -> UsageCost | None:
     from celeryapp.tasks import get_running_saved_run
@@ -48,17 +48,18 @@ def get_model_pricing(model_id: str, sku: ModelSku) -> ModelPricing | None:
 def create_usage_cost(
     sr: SavedRun,
     pricing: ModelPricing,
-    quantity: int,
+    quantity: int | float | Decimal,
     unit_cost: Decimal,
     unit_quantity: int,
 ) -> UsageCost:
     from usage_costs.models import UsageCost
 
+    quantity_dec = Decimal(str(quantity))
     return UsageCost.objects.create(
         saved_run=sr,
         pricing=pricing,
-        quantity=quantity,
+        quantity=quantity_dec,
         unit_cost=unit_cost,
         unit_quantity=unit_quantity,
-        dollar_amount=unit_cost * quantity / unit_quantity,
+        dollar_amount=unit_cost * quantity_dec / unit_quantity,
     )
