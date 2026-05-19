@@ -244,7 +244,6 @@ if not DEBUG:
     )
 
 service_account_key_path = str(BASE_DIR / "serviceAccountKey.json")
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
 # save json file from env var if available
 try:
     _json = config("GOOGLE_APPLICATION_CREDENTIALS_JSON")
@@ -254,10 +253,15 @@ else:
     with open(service_account_key_path, "w") as f:
         f.write(_json)
 
-import firebase_admin
+FIREBASE_ENABLED = config(
+    "FIREBASE_ENABLED", default=os.path.exists(service_account_key_path), cast=bool
+)
+if FIREBASE_ENABLED:
+    import firebase_admin
 
-if not firebase_admin._apps:
-    firebase_admin.initialize_app()
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app()
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"

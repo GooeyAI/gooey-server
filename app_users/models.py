@@ -1,11 +1,11 @@
 import hashlib
 import typing
+import uuid
 from functools import cached_property
 
 import requests
-from django.db import models, IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
-from firebase_admin import auth
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -17,6 +17,7 @@ from handles.models import Handle
 from payments.plans import PricingPlan
 
 if typing.TYPE_CHECKING:
+    from firebase_admin import auth as firebase_auth
     from workspaces.models import Workspace
     from phonenumber_field.phonenumber import PhoneNumber
 
@@ -32,22 +33,37 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            firebase_user = auth.get_user(uid)
-            # Try to create an object using passed params.
-            try:
-                user = self.model(**kwargs)
-                user.copy_from_firebase_user(firebase_user)
-                return user, True
-            except IntegrityError:
+            if settings.FIREBASE_ENABLED:
+                from firebase_admin import auth
+
+                firebase_user = auth.get_user(uid)
                 try:
-                    return self.get(**kwargs), False
-                except self.model.DoesNotExist:
-                    pass
-                raise
+                    user = self.model(**kwargs)
+                    user.copy_from_firebase_user(firebase_user)
+                    return user, True
+                except IntegrityError:
+                    try:
+                        return self.get(**kwargs), False
+                    except self.model.DoesNotExist:
+                        pass
+                    raise
+            else:
+                try:
+                    user = self.model(**kwargs)
+                    user.save()
+                    return user, True
+                except IntegrityError:
+                    try:
+                        return self.get(**kwargs), False
+                    except self.model.DoesNotExist:
+                        pass
+                    raise
 
     def get_or_create_from_email(
         self, email: str, defaults=None, **kwargs
     ) -> tuple["AppUser", bool]:
+        from daras_ai_v2 import settings
+
         kwargs.setdefault("email", email)
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
@@ -55,21 +71,38 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            firebase_user = get_or_create_firebase_user_by_email(email)[0]
-            # Try to create an object using passed params.
-            try:
-                user = self.model(**kwargs)
-                user.copy_from_firebase_user(firebase_user)
-                return user, True
-            except IntegrityError:
+            if settings.FIREBASE_ENABLED:
+                firebase_user = get_or_create_firebase_user_by_email(email)[0]
                 try:
-                    return self.get(**kwargs), False
-                except self.model.DoesNotExist:
-                    pass
-                raise
+                    user = self.model(**kwargs)
+                    user.copy_from_firebase_user(firebase_user)
+                    return user, True
+                except IntegrityError:
+                    try:
+                        return self.get(**kwargs), False
+                    except self.model.DoesNotExist:
+                        pass
+                    raise
+            else:
+                try:
+                    user = self.model(
+                        uid=str(uuid.uuid4()), is_anonymous=False, **kwargs
+                    )
+                    user.save()
+                    return user, True
+                except IntegrityError:
+                    try:
+                        return self.get(**kwargs), False
+                    except self.model.DoesNotExist:
+                        pass
+                    raise
 
 
-def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, bool]:
+def get_or_create_firebase_user_by_email(
+    email: str,
+) -> tuple["firebase_auth.UserRecord", bool]:
+    from firebase_admin import auth
+
     try:
         return auth.get_user_by_email(email), False
     except auth.UserNotFoundError:
@@ -84,6 +117,10 @@ def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, b
 
 
 def create_anonymous_app_user() -> "AppUser":
+    if not settings.FIREBASE_ENABLED:
+        raise RuntimeError("Anonymous users are not supported in local-auth mode")
+    from firebase_admin import auth
+
     uid = auth.create_user().uid
     return AppUser.objects.create(
         uid=uid,
@@ -155,6 +192,8 @@ class AppUser(models.Model):
     github_username = models.CharField(max_length=255, blank=True, default="")
     website_url = CustomURLField(blank=True, default="")
 
+    localauth_password = models.CharField(max_length=255, blank=True, default="")
+
     disable_rate_limits = models.BooleanField(default=False)
 
     objects = AppUserQuerySet.as_manager()
@@ -201,7 +240,7 @@ class AppUser(models.Model):
             name += " (You)"
         return name
 
-    def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
+    def copy_from_firebase_user(self, user: "firebase_auth.UserRecord") -> "AppUser":
         # copy data from firebase user
         self.uid = user.uid
         self.is_disabled = user.disabled
@@ -278,6 +317,8 @@ class AppUser(models.Model):
         return workspace.handle
 
     def get_anonymous_token(self):
+        from firebase_admin import auth
+
         return auth.create_custom_token(self.uid).decode()
 
     def get_photo(self) -> str:
