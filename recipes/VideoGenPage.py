@@ -21,14 +21,13 @@ from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, truncate_text_words
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import PaymentRequired, UserError, ffmpeg, ffprobe
-from daras_ai_v2.fal_ai import generate_on_fal
+from daras_ai_v2.fal_ai import generate_on_fal, format_pricing_notes
 from daras_ai_v2.functional import get_initializer
 from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG, safety_checker
 from daras_ai_v2.variables_widget import render_prompt_vars
-from usage_costs.cost_utils import record_cost_auto
 from usage_costs.models import ModelSku
 from widgets.switch_with_section import switch_with_section
 
@@ -155,18 +154,17 @@ class VideoGenPage(BasePage):
         return self.get_total_linked_usage_cost_in_credits(default=1000)
 
     def additional_notes(self) -> str | None:
-        ret = ""
-        selected_models = gui.session_state.get("selected_models", [])
-        for name in selected_models:
-            try:
-                model = self.available_models[name]
-            except KeyError:
-                continue
-            notes = model.pricing and model.pricing.notes
-            if not notes:
-                continue
-            ret += "\n" + notes
-        return ret
+        selected_names = gui.session_state.get("selected_models") or []
+        models = [self.available_models.get(name) for name in selected_names]
+
+        audio_model_name = gui.session_state.get("selected_audio_model")
+        if audio_model_name:
+            models.append(self.available_audio_models.get(audio_model_name))
+
+        return format_pricing_notes(
+            {model.model_id: model.label for model in models if model},
+            sku=ModelSku.fal_billable_units,
+        )
 
     def render_form_v2(self):
         render_video_gen_form(self.available_models)
@@ -301,7 +299,6 @@ def generate_video(
             raise UserError(SAFETY_CHECKER_MSG)
         elif not video_out:
             raise UserError(f"No video output: {out}")
-        record_cost_auto(model.model_id, ModelSku.video_generation, 1)
         video_url = get_url_from_result(video_out)
         output_videos[model.name] = video_url
         # print(f"{video_url=}")
@@ -340,7 +337,6 @@ def generate_audio(
     if not payload.get("prompt"):
         payload["prompt"] = inputs.get("prompt")
     res = yield_from(generate_on_fal(audio_model.model_id, payload))
-    record_cost_auto(audio_model.model_id, ModelSku.video_generation, 1)
     res_video = get_url_from_result(res.get("video"))
     res_audio = get_url_from_result(res.get("audio"))
 

@@ -15,7 +15,7 @@ class UsageCost(models.Model):
         "usage_costs.ModelPricing", on_delete=models.CASCADE, related_name="usage_costs"
     )
 
-    quantity = models.PositiveIntegerField()
+    quantity = models.DecimalField(max_digits=20, decimal_places=10)
     unit_cost = models.DecimalField(
         max_digits=max_digits,
         decimal_places=decimal_places,
@@ -48,6 +48,7 @@ class ModelCategory(models.IntegerChoices):
     IMAGE_GENERATION = 3, "Image Generation"
     IVR = 4, "IVR"
     VIDEO_GENERATION = 5, "Video Generation"
+    AUDIO_GENERATION = 6, "Audio Generation"
 
 
 class ModelSku(models.IntegerChoices):
@@ -61,6 +62,7 @@ class ModelSku(models.IntegerChoices):
 
     ivr_call = 7, "IVR Call"
     video_generation = 8, "Video Generation"
+    fal_billable_units = 9, "Fal Billable Units"
 
 
 class ModelPricing(models.Model):

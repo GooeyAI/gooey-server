@@ -1703,10 +1703,13 @@ class BasePage:
         if self.current_sr.price and not self._has_request_changed():
             run_cost = self.current_sr.price
         elif self.price_deferred:
-            return "Run cost = Calculating..."
+            run_cost = None
         else:
             run_cost = self.get_price_roundoff(gui.session_state)
-        ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
+        if run_cost:
+            ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
+        else:
+            ret = ""
 
         cost_note = self.get_cost_note()
         if cost_note:
