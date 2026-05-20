@@ -6,6 +6,7 @@ from functools import cached_property
 import requests
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
+from firebase_admin import auth as firebase_auth
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -17,7 +18,6 @@ from handles.models import Handle
 from payments.plans import PricingPlan
 
 if typing.TYPE_CHECKING:
-    from firebase_admin import auth as firebase_auth
     from workspaces.models import Workspace
     from phonenumber_field.phonenumber import PhoneNumber
 
@@ -33,37 +33,23 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            if settings.FIREBASE_ENABLED:
-                from firebase_admin import auth
-
-                firebase_user = auth.get_user(uid)
-                try:
-                    user = self.model(**kwargs)
-                    user.copy_from_firebase_user(firebase_user)
-                    return user, True
-                except IntegrityError:
-                    try:
-                        return self.get(**kwargs), False
-                    except self.model.DoesNotExist:
-                        pass
-                    raise
-            else:
-                try:
-                    user = self.model(**kwargs)
+            try:
+                user = self.model(**kwargs)
+                if settings.FIREBASE_ENABLED:
+                    user.copy_from_firebase_user(firebase_auth.get_user(uid))
+                else:
                     user.save()
-                    return user, True
-                except IntegrityError:
-                    try:
-                        return self.get(**kwargs), False
-                    except self.model.DoesNotExist:
-                        pass
-                    raise
+                return user, True
+            except IntegrityError:
+                try:
+                    return self.get(**kwargs), False
+                except self.model.DoesNotExist:
+                    pass
+                raise
 
     def get_or_create_from_email(
         self, email: str, defaults=None, **kwargs
     ) -> tuple["AppUser", bool]:
-        from daras_ai_v2 import settings
-
         kwargs.setdefault("email", email)
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
@@ -71,47 +57,38 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            if settings.FIREBASE_ENABLED:
-                firebase_user = get_or_create_firebase_user_by_email(email)[0]
-                try:
+            try:
+                if settings.FIREBASE_ENABLED:
                     user = self.model(**kwargs)
-                    user.copy_from_firebase_user(firebase_user)
-                    return user, True
-                except IntegrityError:
-                    try:
-                        return self.get(**kwargs), False
-                    except self.model.DoesNotExist:
-                        pass
-                    raise
-            else:
-                try:
+                    user.copy_from_firebase_user(
+                        get_or_create_firebase_user_by_email(email)[0]
+                    )
+                else:
                     user = self.model(
                         uid=str(uuid.uuid4()), is_anonymous=False, **kwargs
                     )
                     user.save()
-                    return user, True
-                except IntegrityError:
-                    try:
-                        return self.get(**kwargs), False
-                    except self.model.DoesNotExist:
-                        pass
-                    raise
+                return user, True
+            except IntegrityError:
+                try:
+                    return self.get(**kwargs), False
+                except self.model.DoesNotExist:
+                    pass
+                raise
 
 
 def get_or_create_firebase_user_by_email(
     email: str,
-) -> tuple["firebase_auth.UserRecord", bool]:
-    from firebase_admin import auth
-
+) -> tuple[firebase_auth.UserRecord, bool]:
     try:
-        return auth.get_user_by_email(email), False
-    except auth.UserNotFoundError:
+        return firebase_auth.get_user_by_email(email), False
+    except firebase_auth.UserNotFoundError:
         try:
-            return auth.create_user(email=email), True
-        except auth.EmailAlreadyExistsError:
+            return firebase_auth.create_user(email=email), True
+        except firebase_auth.EmailAlreadyExistsError:
             try:
-                return auth.get_user_by_email(email), False
-            except auth.UserNotFoundError:
+                return firebase_auth.get_user_by_email(email), False
+            except firebase_auth.UserNotFoundError:
                 pass
             raise
 
@@ -119,9 +96,7 @@ def get_or_create_firebase_user_by_email(
 def create_anonymous_app_user() -> "AppUser":
     if not settings.FIREBASE_ENABLED:
         raise RuntimeError("Anonymous users are not supported in local-auth mode")
-    from firebase_admin import auth
-
-    uid = auth.create_user().uid
+    uid = firebase_auth.create_user().uid
     return AppUser.objects.create(
         uid=uid,
         is_anonymous=True,
@@ -308,9 +283,7 @@ class AppUser(models.Model):
         return workspace.handle
 
     def get_anonymous_token(self):
-        from firebase_admin import auth
-
-        return auth.create_custom_token(self.uid).decode()
+        return firebase_auth.create_custom_token(self.uid).decode()
 
     def get_photo(self) -> str:
         return self.photo_url or get_placeholder_profile_image(self.uid)
