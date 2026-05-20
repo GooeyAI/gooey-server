@@ -30,11 +30,19 @@ DEFAULT_LOGIN_REDIRECT = "/explore/"
 DEFAULT_LOGOUT_REDIRECT = "/"
 
 
+def _safe_next_url(query_params, *, default: str) -> str:
+    next_url = query_params.get("next") or default
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        return default
+    return next_url
+
+
 @firebase_auth_router.get("/logout/")
 @local_auth_router.get("/logout/")
 async def logout_route(request: Request) -> Response:
     request.session.clear()
-    return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
+    next_url = _safe_next_url(request.query_params, default=DEFAULT_LOGOUT_REDIRECT)
+    return RedirectResponse(next_url)
 
 
 @firebase_auth_router.get("/login/")
@@ -42,9 +50,8 @@ def firebase_login_route(request: Request) -> Response:
     from routers.account import invitation_route, load_invite_from_hashid_or_404
 
     if request.user and not request.user.is_anonymous:
-        return RedirectResponse(
-            request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
-        )
+        next_url = _safe_next_url(request.query_params, default=DEFAULT_LOGIN_REDIRECT)
+        return RedirectResponse(next_url)
 
     login_sso_url = get_route_path(firebase_login_sso_route)
     if raw_next := request.query_params.get("next"):
@@ -70,9 +77,8 @@ def firebase_login_route(request: Request) -> Response:
 @firebase_auth_router.get("/login/sso/")
 def firebase_login_sso_route(request: Request) -> Response:
     if request.user and not request.user.is_anonymous:
-        return RedirectResponse(
-            request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
-        )
+        next_url = _safe_next_url(request.query_params, default=DEFAULT_LOGIN_REDIRECT)
+        return RedirectResponse(next_url)
 
     login_url = get_route_path(firebase_login_route)
     if raw_next := request.query_params.get("next"):
@@ -110,7 +116,7 @@ async def firebase_login_route_post(request: Request):
                 existing_user.last_login_at = timezone.now()
                 existing_user.save(update_fields=["last_login_at"])
             return RedirectResponse(
-                request.query_params.get("next", DEFAULT_LOGIN_REDIRECT),
+                _safe_next_url(request.query_params, default=DEFAULT_LOGIN_REDIRECT),
                 status_code=303,
             )
         # User did not sign in recently. To guard against ID token theft, require
@@ -129,11 +135,10 @@ def local_login_route(request: Request):
     from routers.root import get_og_url_path, page_wrapper
 
     if request.user and not request.user.is_anonymous:
-        return RedirectResponse(
-            request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
-        )
+        next_url = _safe_next_url(request.query_params, default=DEFAULT_LOGIN_REDIRECT)
+        return RedirectResponse(next_url)
 
-    next_url = request.query_params.get("next") or DEFAULT_LOGIN_REDIRECT
+    next_url = _safe_next_url(request.query_params, default=DEFAULT_LOGIN_REDIRECT)
     with page_wrapper(request):
         with gui.div(
             className="d-flex justify-content-center align-items-start pt-5 m-3"
