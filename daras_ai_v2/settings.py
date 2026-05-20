@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "ai_models",
     "number_cycling",
     "memory",
+    "cms",
 ]
 
 MIDDLEWARE = [
