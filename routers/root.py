@@ -230,6 +230,18 @@ def explore2_page(request: Request):
     }
 
 
+@gui.route(app, "/home/")
+def home_page(request: Request):
+    from widgets import home
+
+    with page_wrapper(request):
+        home.render(request)
+
+    return {
+        "meta": home.build_meta_tags(url=get_og_url_path(request)),
+    }
+
+
 @app.get("/tools/{toolkit_slug}/{tool_slug}")
 def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
     import composio_client

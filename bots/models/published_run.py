@@ -405,6 +405,7 @@ class Tag(models.Model):
         default=1,
         help_text="Higher priority tags are shown first. If 0, then the tag is not shown at all.",
     )
+    description = models.TextField(blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
