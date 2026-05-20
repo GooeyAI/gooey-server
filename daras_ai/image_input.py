@@ -131,7 +131,7 @@ def register_blob(
 ) -> typing.Iterator[UploadedFile]:
     from app_users.models import AppUser
     from celeryapp.tasks import get_running_saved_run
-    from google.api_core import exceptions as gcs_exceptions
+    from daras_ai_v2.storage_backends import StorageNotFound
 
     saved_run = get_running_saved_run()
     if saved_run:
@@ -183,7 +183,7 @@ def register_blob(
     if not blob.etag:
         try:
             blob.reload()
-        except gcs_exceptions.NotFound:
+        except StorageNotFound:
             if created:
                 uploaded_file.delete()
             return
@@ -197,9 +197,9 @@ def register_blob(
 
 
 def gcs_bucket() -> "Bucket":
-    from firebase_admin import storage
+    from daras_ai_v2.storage_backends import get_storage_bucket
 
-    return storage.bucket(settings.GS_BUCKET_NAME)
+    return get_storage_bucket()
 
 
 def cv2_img_to_bytes(img: np.ndarray) -> bytes:

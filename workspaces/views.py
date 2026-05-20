@@ -2,12 +2,13 @@ import html as html_lib
 from datetime import datetime
 from copy import copy
 
-from django.db import transaction
 import gooey_gui as gui
+from django.db import transaction
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.exceptions import ValidationError
 from django.db.models import F
 from django.utils.translation import ngettext
+from furl import furl
 
 from app_users.models import AppUser
 from daras_ai_v2 import icons, settings, urls
@@ -19,7 +20,6 @@ from daras_ai_v2.profiles import (
     update_handle,
 )
 from daras_ai_v2.user_date_widgets import render_local_date_attrs
-from payments.models import SeatType
 from payments.plans import PricingPlan
 from .models import (
     Workspace,
@@ -39,7 +39,6 @@ rounded_border = "w-100 border shadow-sm rounded p-3"
 def invitation_page(
     current_user: AppUser | None, session: dict, invite: WorkspaceInvite
 ):
-    from routers.root import login
     from routers.account import members_route
 
     if invite.status == WorkspaceInvite.Status.ACCEPTED:
@@ -105,9 +104,9 @@ def invitation_page(
             gui.caption(f"{members_count} {members_text}")
 
             if not current_user or current_user.is_anonymous:
-                login_url = get_app_route_url(
-                    login, query_params={"next": invite.get_invite_url()}
-                )
+                login_url = furl(
+                    "/login/", query_params={"next": invite.get_invite_url()}
+                ).url
                 with gui.tag(
                     "a",
                     className="my-2 w-100 btn btn-theme btn-primary",
@@ -133,16 +132,13 @@ def _handle_invite_accepted(
     invite: WorkspaceInvite, session: dict, current_user: AppUser | None
 ):
     from routers.account import account_route
-    from routers.root import login, logout
 
     workspace_redirect_url = get_route_path(account_route)
 
     if not current_user.email or invite.email.lower() != current_user.email.lower():
         # logout current user, and redirect to login
-        login_url = get_app_route_url(
-            login, query_params={"next": invite.get_invite_url()}
-        )
-        logout_url = get_app_route_url(logout, query_params={"next": login_url})
+        login_url = furl("/login/", query_params={"next": invite.get_invite_url()}).url
+        logout_url = furl("/logout/", query_params={"next": login_url}).url
         gui.error(
             f"""
             Doh! This invitation is for `{invite.email}`, and you \

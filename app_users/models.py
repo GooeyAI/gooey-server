@@ -152,7 +152,7 @@ class AppUser(models.Model):
     uid = models.CharField(max_length=255, unique=True)
 
     display_name = models.TextField("name", blank=True)
-    email = models.EmailField(null=True, blank=True)
+    email = models.EmailField(null=True, blank=True, unique=True)
     phone_number = PhoneNumberField(null=True, blank=True)
     is_anonymous = models.BooleanField()
     is_disabled = models.BooleanField(default=False)
@@ -197,15 +197,6 @@ class AppUser(models.Model):
     disable_rate_limits = models.BooleanField(default=False)
 
     objects = AppUserQuerySet.as_manager()
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["email"]),
-            # GinIndex(
-            #     SearchVector("display_name", config="english"),
-            #     name="appuser_search_vector_idx",
-            # ),
-        ]
 
     def __str__(self):
         return f"{self.display_name} ({self.email or self.phone_number or self.uid})"

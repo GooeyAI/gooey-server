@@ -253,15 +253,18 @@ else:
     with open(service_account_key_path, "w") as f:
         f.write(_json)
 
-FIREBASE_ENABLED = config(
-    "FIREBASE_ENABLED", default=os.path.exists(service_account_key_path), cast=bool
-)
+if os.path.exists(service_account_key_path):
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+
+FIREBASE_ENABLED = config("FIREBASE_ENABLED", default=True, cast=bool)
 if FIREBASE_ENABLED:
     import firebase_admin
 
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
     if not firebase_admin._apps:
         firebase_admin.initialize_app()
+
+MEDIA_ROOT = config("MEDIA_ROOT", default=str(BASE_DIR / "media"))
+MEDIA_URL = config("MEDIA_URL", default="/media/")
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"

@@ -16,7 +16,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, Response
 
 from app_users.models import ensure_request_app_user
-from auth.auth_ui import FirebaseAuthUI, LocalAuthUI
+from auth.auth_ui import firebase_auth_router, local_auth_router
 from bots.models import BotIntegration, PublishedRun, Workflow
 from bots.models.convo_msg import Conversation, db_msgs_to_api_json
 from daras_ai.image_input import safe_filename, upload_file_from_bytes
@@ -112,9 +112,9 @@ async def redoc_html():
 
 
 if settings.FIREBASE_ENABLED:
-    FirebaseAuthUI.setup(app)
+    app.include_router(firebase_auth_router)
 else:
-    LocalAuthUI.setup(app)
+    app.include_router(local_auth_router)
 
 
 @app.post("/__/file-upload/url/meta")

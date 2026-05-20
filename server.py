@@ -67,6 +67,15 @@ app.mount(
     name="gooey-gui-styles",
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
+if not settings.FIREBASE_ENABLED:
+    from pathlib import Path
+
+    Path(settings.MEDIA_ROOT).mkdir(parents=True, exist_ok=True)
+    app.mount(
+        settings.MEDIA_URL.rstrip("/") or "/media",
+        StaticFiles(directory=settings.MEDIA_ROOT),
+        name="media",
+    )
 app.include_router(bots_api.app)
 app.include_router(api.app)
 app.include_router(broadcast_api.app)

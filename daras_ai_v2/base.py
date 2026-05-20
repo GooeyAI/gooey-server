@@ -45,7 +45,6 @@ from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -2355,10 +2354,8 @@ class BasePage:
         return bool(self.request.user and not self.request.user.is_anonymous)
 
     def get_auth_url(self, next_url: str | None = None) -> str:
-        from routers.root import login
-
         next_url = str(furl(next_url or self.request.url).set(origin=None))
-        return str(furl(get_route_path(login), query_params=dict(next=next_url)))
+        return str(furl("/login/", query_params=dict(next=next_url)))
 
     def _render_run_preview(self, saved_run: SavedRun):
         from daras_ai_v2.billing import left_and_right

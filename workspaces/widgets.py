@@ -25,7 +25,6 @@ def global_workspace_selector(user: AppUser, session: dict):
         profile_route,
         explore_in_current_workspace,
     )
-    from routers.root import logout
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render
@@ -156,7 +155,7 @@ def global_workspace_selector(user: AppUser, session: dict):
             )
 
         workspace_selector_link(
-            url=get_route_path(logout), label="Log out", icon=icons.sign_out
+            url=furl("/logout/").url, label="Log out", icon=icons.sign_out
         )
 
     return current

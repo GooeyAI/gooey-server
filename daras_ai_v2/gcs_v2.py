@@ -35,10 +35,10 @@ dumb_content_types = ["application/octet-stream", "application/x-www-form-urlenc
 
 
 def private_url_to_blob(url: str) -> storage.Blob | None:
-    from firebase_admin import storage
-
     if not url.startswith(GCS_BUCKET_URL):
         return None
+    from firebase_admin import storage
+
     return storage.bucket(GCS_BUCKET_NAME).blob(
         url.removeprefix(GCS_BUCKET_URL).strip("/")
     )
