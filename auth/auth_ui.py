@@ -10,13 +10,15 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.utils import timezone
 from fastapi import Request
 from fastapi.responses import RedirectResponse
+from firebase_admin import auth as firebase_auth
+from firebase_admin import exceptions as firebase_exceptions
 from furl import furl
 from starlette.responses import PlainTextResponse, Response
 
 import gooey_gui as gui
 from app_users.models import AppUser
-from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, LOCAL_AUTH_SESSION_COOKIE
 from daras_ai_v2 import settings
+from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, LOCAL_AUTH_SESSION_COOKIE
 from daras_ai_v2.fastapi_tricks import get_route_path, resolve_url
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.settings import templates
@@ -90,26 +92,26 @@ def firebase_login_sso_route(request: Request) -> Response:
 
 @firebase_auth_router.post("/login/")
 async def firebase_login_route_post(request: Request):
-    from firebase_admin import auth, exceptions
-
     ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
     form = await request.form()
     id_token = form.get("idToken", "")
     # To ensure that cookies are set only on recently signed in users, check auth_time in
     # ID token before creating a cookie.
     try:
-        decoded_claims = auth.verify_id_token(id_token)
+        decoded_claims = firebase_auth.verify_id_token(id_token)
         # Only process if the user signed in within the last 5 minutes.
         if time() - decoded_claims["auth_time"] < 5 * 60:
             expires_in = datetime.timedelta(days=14)
-            session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
+            session_cookie = firebase_auth.create_session_cookie(
+                id_token, expires_in=expires_in
+            )
             request.session[FIREBASE_SESSION_COOKIE] = session_cookie
             uid = decoded_claims["uid"]
             # upgrade an anonymous account to a permanent account
             try:
                 existing_user = AppUser.objects.get(uid=uid)
                 if existing_user.is_anonymous:
-                    existing_user.copy_from_firebase_user(auth.get_user(uid))
+                    existing_user.copy_from_firebase_user(firebase_auth.get_user(uid))
             except AppUser.DoesNotExist:
                 pass
             else:
@@ -122,9 +124,9 @@ async def firebase_login_route_post(request: Request):
         # User did not sign in recently. To guard against ID token theft, require
         # re-authentication.
         return PlainTextResponse(status_code=401, content="Recent sign in required")
-    except auth.InvalidIdTokenError:
+    except firebase_auth.InvalidIdTokenError:
         return PlainTextResponse(status_code=401, content="Invalid ID token")
-    except exceptions.FirebaseError:
+    except firebase_exceptions.FirebaseError:
         return PlainTextResponse(
             status_code=401, content="Failed to create a session cookie"
         )

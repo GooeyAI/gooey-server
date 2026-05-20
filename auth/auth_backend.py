@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 
+from firebase_admin import auth as firebase_auth
 from starlette.authentication import AuthCredentials, AuthenticationBackend
 from starlette.concurrency import run_in_threadpool
 
@@ -59,13 +60,11 @@ def _authenticate(conn):
 
 
 def _verify_firebase_session_cookie(firebase_cookie: str) -> AppUser | None:
-    from firebase_admin import auth
-
     # Verify the session cookie. In this case an additional check is added to detect
     # if the user's Firebase session was revoked, user deleted/disabled, etc.
     try:
-        decoded_claims = auth.verify_session_cookie(firebase_cookie)
+        decoded_claims = firebase_auth.verify_session_cookie(firebase_cookie)
         return AppUser.objects.get_or_create_from_uid(decoded_claims["uid"])[0]
-    except (auth.UserNotFoundError, auth.InvalidSessionCookieError):
+    except (firebase_auth.UserNotFoundError, firebase_auth.InvalidSessionCookieError):
         # Session cookie is invalid, expired or revoked. Force user to login.
         return None

@@ -4,9 +4,11 @@ import functools
 import hashlib
 import mimetypes
 from datetime import datetime, timezone as dt_timezone
-from furl import furl
 from pathlib import Path
 from typing import Iterator
+
+from firebase_admin import storage as firebase_storage
+from furl import furl
 
 from daras_ai_v2 import settings
 
@@ -133,8 +135,6 @@ def get_storage_bucket(bucket_name: str = None):
     from django.conf import settings
 
     if settings.FIREBASE_ENABLED:
-        from firebase_admin import storage
-
-        return storage.bucket(bucket_name or settings.GS_BUCKET_NAME)
+        return firebase_storage.bucket(bucket_name or settings.GS_BUCKET_NAME)
     else:
         return _get_filesystem_bucket(bucket_name or settings.GS_BUCKET_NAME)
