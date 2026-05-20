@@ -5,6 +5,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app_users.models import AppUser
 from bots.models import get_default_published_run_workspace
+from daras_ai_v2 import settings
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, LOCAL_AUTH_SESSION_COOKIE
 from gooeysite.bg_db_conn import db_middleware
 from workspaces.models import Workspace
@@ -36,8 +37,6 @@ class SessionAuthBackend(AuthenticationBackend):
 
 @db_middleware
 def _authenticate(conn):
-    from daras_ai_v2 import settings
-
     if settings.FIREBASE_ENABLED:
         session_cookie = conn.session.get(FIREBASE_SESSION_COOKIE)
         if not session_cookie:
