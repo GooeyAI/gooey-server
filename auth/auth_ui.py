@@ -16,6 +16,7 @@ from starlette.responses import PlainTextResponse, Response
 import gooey_gui as gui
 from app_users.models import AppUser
 from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, LOCAL_AUTH_SESSION_COOKIE
+from daras_ai_v2 import settings
 from daras_ai_v2.fastapi_tricks import get_route_path, resolve_url
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.settings import templates
@@ -229,7 +230,7 @@ def local_login_route(request: Request):
                                     email=email,
                                     display_name=email.split("@")[0],
                                     is_anonymous=False,
-                                    balance=0,
+                                    balance=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
                                     localauth_password=make_password(password),
                                     last_login_at=timezone.now(),
                                 )
