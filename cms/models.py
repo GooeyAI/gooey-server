@@ -18,9 +18,6 @@ class WorkflowTab(models.Model):
     def __str__(self):
         return self.title
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
 
 class WorkflowCard(models.Model):
     workflow_tab = models.ForeignKey(
@@ -43,9 +40,6 @@ class WorkflowCard(models.Model):
     def __str__(self):
         return f"{self.workflow_tab.title} — {self.recipe}"
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
 
 class IndustryTile(models.Model):
     tag = models.ForeignKey(
@@ -65,9 +59,6 @@ class IndustryTile(models.Model):
     def __str__(self):
         return self.tag.name if self.tag_id else "Industry Tile"
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
 
 class NewsItem(models.Model):
     headline = models.CharField(max_length=200)
@@ -75,7 +66,7 @@ class NewsItem(models.Model):
         max_length=64,
         help_text='Freeform label, e.g. "Event", "Product", "Case Study".',
     )
-    photo_url=CustomURLField(default="", blank=True)
+    photo_url = CustomURLField(default="", blank=True)
     publish_date = models.DateField()
     url = models.CharField(
         max_length=500, help_text="Absolute URL the card links to."

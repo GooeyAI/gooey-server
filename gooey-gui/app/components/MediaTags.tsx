@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 import { Link } from "@remix-run/react";
 
@@ -8,7 +8,7 @@ export function GooeyImg({
   href,
   previewImg,
   ...props
-}: {
+}: React.ImgHTMLAttributes<HTMLImageElement> & {
   src: string;
   caption?: string;
   href?: string;
@@ -56,7 +56,7 @@ export function GooeyVideo({
   caption,
   previewImg,
   ...props
-}: {
+}: React.VideoHTMLAttributes<HTMLVideoElement> & {
   src: string;
   caption?: string;
   previewImg?: string;

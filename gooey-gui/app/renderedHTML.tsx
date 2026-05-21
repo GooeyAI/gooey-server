@@ -140,14 +140,14 @@ const reactParserOptions: HTMLReactParserOptions = {
   },
 };
 
-function LineClamp({
+export function LineClamp({
   lines,
   children,
   expandable = true,
 }: {
   lines?: number;
   children: React.ReactNode;
-  expandable: boolean;
+  expandable?: boolean;
 }) {
   const contentRef = useRef<HTMLSpanElement>(null);
 
