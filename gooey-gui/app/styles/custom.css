@@ -714,7 +714,10 @@ a.text-primary:hover {
   min-width: 0;
 }
 
-.hover-card:hover {
+.border-hover {
+  transition: border-color 0.10s ease;
+}
+.border-hover:hover {
   border-color: var(--bs-secondary, #dee2e6) !important;
 }
 

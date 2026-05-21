@@ -244,6 +244,9 @@ class Workflow(models.IntegerChoices):
 
         return workflow_map[self]
 
+    def get_metadata(self) -> "WorkflowMetadata | None":
+        return WorkflowMetadata.objects.filter(workflow=self).first()
+
     def get_or_create_metadata(self) -> "WorkflowMetadata":
         return get_or_create_lazy(
             WorkflowMetadata,

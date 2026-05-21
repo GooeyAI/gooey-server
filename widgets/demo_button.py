@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import typing
+from typing import TypedDict
 
 import gooey_gui as gui
 from furl import furl
@@ -19,6 +20,12 @@ from workspaces.models import Workspace
 
 if typing.TYPE_CHECKING:
     from recipes.VideoBots import PublishedRun
+
+
+class PlatformPillData(TypedDict):
+    iconHtml: str
+    title: str
+    bgColor: str | None
 
 
 def render_demo_buttons_header(pr: PublishedRun):
@@ -48,6 +55,37 @@ def get_demo_bots(pr: PublishedRun):
         .distinct("platform")
         .values_list("id", "platform")
     )
+
+
+def demo_platform_ids_by_pr_id(pr_ids: list[int]) -> dict[int, list[int]]:
+    if not pr_ids:
+        return {}
+    rows = (
+        BotIntegration.objects.filter(
+            published_run_id__in=pr_ids,
+            public_visibility__gt=WorkflowAccessLevel.VIEW_ONLY,
+        )
+        .order_by("published_run_id", "platform")
+        .distinct("published_run_id", "platform")
+        .values_list("published_run_id", "platform")
+    )
+    by_pr: dict[int, list[int]] = {}
+    for pr_id, platform_id in rows:
+        by_pr.setdefault(pr_id, []).append(platform_id)
+    return by_pr
+
+
+def platform_pill_data(platform_id: int) -> PlatformPillData:
+    platform = Platform(platform_id)
+    return {
+        "iconHtml": platform.get_icon(),
+        "title": platform.get_title(),
+        "bgColor": platform.get_demo_button_color(),
+    }
+
+
+def platform_pills_for_ids(platform_ids: list[int]) -> list[PlatformPillData]:
+    return [platform_pill_data(platform_id) for platform_id in platform_ids]
 
 
 def render_demo_button(bi_id: int, platform_id: int, className: str = ""):

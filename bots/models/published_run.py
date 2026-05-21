@@ -290,21 +290,27 @@ class PublishedRun(models.Model):
         else:
             return WorkflowAccessLevel(self.workspace_access).get_team_sharing_icon()
 
+    def get_share_badge_data(self) -> dict[str, str]:
+        icon_html, label = self._share_badge_icon_and_label()
+        return {"iconHtml": icon_html, "label": label}
+
     def get_share_badge_html(self):
         """
         Shown externally AND on listings. For example: saved list, profile page.
         """
+        icon_html, label = self._share_badge_icon_and_label()
+        return f"{icon_html} {label}"
+
+    def _share_badge_icon_and_label(self) -> tuple[str, str]:
         if self.workspace.is_personal or (
             self.public_access == WorkflowAccessLevel.FIND_AND_VIEW
         ):
             perm = WorkflowAccessLevel(self.public_access)
-            return f"{perm.get_public_sharing_icon()} {perm.get_public_sharing_label()}"
-
-        perm = WorkflowAccessLevel(self.workspace_access)
+            return perm.get_public_sharing_icon(), perm.get_public_sharing_label()
+        team_perm = WorkflowAccessLevel(self.workspace_access)
         if self.workspace_access == WorkflowAccessLevel.VIEW_ONLY:
-            return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
-        else:
-            return f"{self.workspace.html_icon(size='20px')} {perm.get_team_sharing_label()}"
+            return team_perm.get_team_sharing_icon(), team_perm.get_team_sharing_label()
+        return self.workspace.html_icon(size="20px"), team_perm.get_team_sharing_label()
 
     def submit_api_call(
         self,
