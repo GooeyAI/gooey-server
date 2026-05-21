@@ -17,7 +17,7 @@ export function SavedWorkflowCard({ card }: { card: CardData }) {
       <div className="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
         <div>
           <LineClamp lines={1} expandable={false}>
-            <span className="fw-bold text-break m-0 small">{card.title}</span>
+            <span className="fw-bold text-break m-0">{card.title}</span>
           </LineClamp>
           {card.description && (
             <div className="text-muted small line-clamp-2 text-break">
@@ -26,7 +26,7 @@ export function SavedWorkflowCard({ card }: { card: CardData }) {
           )}
         </div>
         {hasFooter && (
-          <div className="d-flex align-items-center gap-2 mt-2 small text-muted flex-wrap opacity-75">
+          <div className="d-flex align-items-center gap-2 mt-2 small text-muted flex-nowrap opacity-75">
             {hasAuthor && (
               <span className="d-inline-flex small align-items-center gap-2 min-w-0">
                 {card.authorPhotoUrl && (

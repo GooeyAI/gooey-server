@@ -33,7 +33,7 @@ export function WorkflowPicker({ tabs }: { tabs: WorkflowTab[] }) {
       {activeTab.cards.length === 0 ? (
         <p className="text-muted small">No workflows yet — check back soon.</p>
       ) : (
-        <div className="row row-cols-1 row-cols-md-3 g-3 d-flex align-items-stretch">
+        <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 d-flex align-items-stretch">
           {activeTab.cards.map((card) => (
             <div key={card.href} className="col">
               <SavedWorkflowCard card={card} />

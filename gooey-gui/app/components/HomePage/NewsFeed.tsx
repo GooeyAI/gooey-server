@@ -9,7 +9,7 @@ export function NewsFeed({ items }: { items: NewsItem[] }) {
           <div key={item.id} className="col">
             <a
               href={item.href}
-              className="d-flex flex-column h-100 border rounded-4 overflow-hidden text-decoration-none text-body border-hover"
+              className="d-flex flex-column h-100 border rounded-4 overflow-hidden text-decoration-none text-body hover-card"
             >
               <div className="ratio ratio-21x9 bg-light">
                 {item.photoUrl && (
