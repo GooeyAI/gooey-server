@@ -111,7 +111,7 @@ def _load_recent_workflows(
     }
     authors_by_uid = {u.uid: u for u in AppUser.objects.filter(uid__in=other_uids)}
     return [
-        _workflow_data(
+        _workflow_to_json(
             profile="history",
             sr=sr,
             author=_history_author(sr, user=user, authors_by_uid=authors_by_uid),
@@ -148,7 +148,7 @@ def _load_saved_workflows(
         .order_by("-updated_at")[:WORKFLOW_LIST_LIMIT]
     )
     return [
-        _workflow_data(
+        _workflow_to_json(
             profile="saved",
             pr=pr,
             author=(pr.last_edited_by if pr.last_edited_by_id != user.id else None),
@@ -173,7 +173,7 @@ def _load_workflow_tabs() -> list[WorkflowTabData]:
             "title": tab.title,
             "icon": tab.icon,
             "cards": [
-                _workflow_data(
+                _workflow_to_json(
                     profile="picker",
                     pr=card.recipe,
                     author=card.recipe.workspace,
@@ -185,7 +185,7 @@ def _load_workflow_tabs() -> list[WorkflowTabData]:
     ]
 
 
-def _workflow_data(
+def _workflow_to_json(
     *,
     profile: WorkflowCardProfile,
     pr: PublishedRun | None = None,
