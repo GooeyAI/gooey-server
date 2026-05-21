@@ -6,7 +6,7 @@ export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
       <h6 className="text-muted text-uppercase small mb-3">
         Browse by industry
       </h6>
-      <div className="row row-cols-2 row-cols-md-5 g-3 d-flex align-items-stretch">
+      <div className="row row-cols-2 row-cols-md-2 row-cols-lg-6 g-3 d-flex align-items-stretch">
         {tiles.map((tile) => (
           <div key={tile.id} className="col">
             <a
@@ -28,7 +28,7 @@ export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
                   {tile.workflowCount} workflows
                 </span>
                 <span className="fw-semibold small">
-                  Browse <i className="fa-solid fa-arrow-right"></i>
+                  <i className="fa-solid fa-arrow-right"></i>
                 </span>
               </div>
             </a>
