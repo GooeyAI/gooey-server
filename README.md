@@ -71,7 +71,7 @@ Specifically, this repo may be for you if:
    - Firebase Authentication Admin
    - Storage Admin
 5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
-6. Add your project & bucket name to `.env`
+6. Add your project & bucket name to `.env` (see [configuration.md](configuration.md) for all available settings)
 
 ### 🔓 Alternatively: run without Firebase (local auth + filesystem storage)
 
@@ -83,12 +83,26 @@ FIREBASE_ENABLED=False
 
 This replaces Firebase auth with a built-in username/password sign-in form, and stores uploaded files on the local filesystem instead of GCS. You can optionally configure where files are stored (the defaults work out of the box):
 
+> **Note:** The Google service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_CREDENTIALS_JSON`) is still required for Google Cloud services — Google TTS, Speech-to-Text, Translate, and Gemini models — even when `FIREBASE_ENABLED=False`. Setting this flag only disables Firebase auth and GCS storage.
+
 ```env
 MEDIA_ROOT=./media   # directory where uploaded files are stored
 MEDIA_URL=/media/    # URL path under which files are served
 ```
 
 > **Note:** Many AI models accept files by URL and fetch them directly from their own servers. If Gooey Server is only reachable on `localhost`, those fetches will fail. For any workflow that passes uploaded files or media to an AI model, you must deploy on a publicly accessible domain name. A tunnelling tool such as [ngrok](https://ngrok.com) works as a development workaround, but free-tier plans add an interstitial page that breaks non-browser clients and impose bandwidth limits on downloads.
+
+### ⚙️ Configuration reference
+
+Almost every setting has a sensible default and is optional for local development. The only exceptions:
+
+| Variable | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `SECRET_KEY` | Production only | `"xxxx"` (dev) | Must be set to a strong random value when `DEBUG=False` |
+| `SENTRY_DSN` | Production only | — | Required when `DEBUG=False` |
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGDATABASE` / `PGPASSWORD` | For PostgreSQL | — | If omitted, falls back to SQLite |
+
+For a full list of all available settings with defaults and descriptions, see [configuration.md](configuration.md).
 
 ### 💻 Setup (Mac)
 
@@ -102,7 +116,7 @@ MEDIA_URL=/media/    # URL path under which files are served
 - Use `sqlcreate` helper to create a user and database for gooey:
   - `./manage.py sqlcreate | psql postgres`
   - make sure you are able to access the database with `psql -W -U gooey gooey` (and when prompted for password, entering `gooey`)
-- Create an `.env` file from `.env.example` (Read [12factor.net/config](https://12factor.net/config))
+- Create an `.env` file from `.env.example` (see [configuration.md](configuration.md) for all available settings and [12factor.net/config](https://12factor.net/config))
 - Run `./manage.py migrate`
 - Install the zbar library (`brew install zbar`)
 - (optional) Install imagemagick - Needed for HEIC image support - https://docs.wand-py.org/en/0.5.7/guide/install.html
