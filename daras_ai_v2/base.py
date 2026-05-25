@@ -2335,7 +2335,7 @@ class BasePage:
             and self.request.user
             and not self.current_workspace.is_personal
         ):
-            qs = qs.filter(uid=self.request.user.uid)
+            qs = qs.filter(uid=self.request.user.uid, is_api_call=False)
 
         run_history, cursor = paginate_queryset(
             qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
