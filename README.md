@@ -73,6 +73,23 @@ Specifically, this repo may be for you if:
 5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
 6. Add your project & bucket name to `.env`
 
+### 🔓 Alternatively: run without Firebase (local auth + filesystem storage)
+
+Firebase is optional. To run without it, set `FIREBASE_ENABLED=False` in your `.env`:
+
+```env
+FIREBASE_ENABLED=False
+```
+
+This replaces Firebase auth with a built-in username/password sign-in form, and stores uploaded files on the local filesystem instead of GCS. You can optionally configure where files are stored (the defaults work out of the box):
+
+```env
+MEDIA_ROOT=./media   # directory where uploaded files are stored
+MEDIA_URL=/media/    # URL path under which files are served
+```
+
+> **Note:** Many AI models accept files by URL and fetch them directly from their own servers. If Gooey Server is only reachable on `localhost`, those fetches will fail. For any workflow that passes uploaded files or media to an AI model, you must deploy on a publicly accessible domain name. A tunnelling tool such as [ngrok](https://ngrok.com) works as a development workaround, but free-tier plans add an interstitial page that breaks non-browser clients and impose bandwidth limits on downloads.
+
 ### 💻 Setup (Mac)
 
 - Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
