@@ -6,6 +6,7 @@ import mimetypes
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import quote
 
 from firebase_admin import storage as firebase_storage
 from furl import furl
@@ -36,7 +37,7 @@ class FilesystemBlob:
     @property
     def public_url(self) -> str:
         base = furl(settings.APP_BASE_URL).add(path=settings.MEDIA_URL.strip("/")).url
-        return f"{base}/{self.name}"
+        return f"{base}/{quote(self.name)}"
 
     def _full_path(self) -> Path:
         from django.conf import settings
