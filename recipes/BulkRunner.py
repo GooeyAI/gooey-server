@@ -1,15 +1,17 @@
+import datetime
 import typing
 import uuid
 
 import gooey_gui as gui
 from furl import furl
 from pydantic import BaseModel, Field
+from typing_extensions import NotRequired, TypedDict
 
 from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import icons
 from daras_ai_v2 import breadcrumbs
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, StateKeys
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
@@ -36,6 +38,33 @@ from recipes.DocSearch import render_documents
 
 if typing.TYPE_CHECKING:
     import pandas as pd
+
+
+class BulkProgressCounts(TypedDict):
+    completed_unit_runs: int
+    total_unit_runs: int
+    completed_row_groups: int
+    total_row_groups: int
+    completed_rows: int
+    total_rows: int
+    current_row_number: int
+    current_workflow_number: int
+    total_workflows: int
+
+
+class BulkProgress(BulkProgressCounts):
+    workflow_title: str
+    workflow_url: str
+    input_prompt: str
+    input_audio: NotRequired[str]
+    credits_used: NotRequired[int]
+    workflow_run_time_seconds: NotRequired[float]
+    workflow_credits: NotRequired[int]
+    last_completed_workflow_title: NotRequired[str]
+    last_completed_workflow_url: NotRequired[str]
+    last_completed_run_time_seconds: NotRequired[float]
+    last_completed_credits: NotRequired[int]
+    error_msg: NotRequired[str]
 
 
 class BulkRunnerPage(BasePage):
@@ -87,6 +116,7 @@ _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the result
 
     class ResponseModel(BaseModel):
         output_documents: list[HttpUrlStr]
+        bulk_progress: BulkProgress | None = None
 
         eval_runs: list[HttpUrlStr] | None = Field(
             None,
@@ -242,6 +272,26 @@ To understand what each field represents, check out our [API docs](https://api.g
         render_documents(state)
 
     def render_output(self):
+        progress = gui.session_state.get("bulk_progress")
+        is_running = bool(gui.session_state.get(StateKeys.run_status))
+        is_cancelled = bool(self.current_sr and self.current_sr.is_cancelled)
+        render_bulk_progress(
+            progress,
+            state=get_bulk_progress_render_state(
+                progress=progress,
+                is_cancelled=is_cancelled,
+                is_running=is_running,
+                run_time=gui.session_state.get(StateKeys.run_time),
+                error_msg=gui.session_state.get(StateKeys.error_msg),
+            ),
+            stop_requested=is_cancelled and is_running,
+            elapsed_seconds=get_bulk_elapsed_seconds(
+                is_running=is_running,
+                run_time=gui.session_state.get(StateKeys.run_time),
+                created_at=gui.session_state.get(StateKeys.created_at),
+            ),
+        )
+
         eval_runs = gui.session_state.get("eval_runs")
 
         if eval_runs:
@@ -275,6 +325,17 @@ To understand what each field represents, check out our [API docs](https://api.g
                 )
                 gui.data_table(file)
 
+    def _render_running_output(self):
+        if gui.session_state.get("bulk_progress"):
+            return
+
+        super()._render_running_output()
+
+    def render_is_cancelled(self):
+        if gui.session_state.get("bulk_progress"):
+            return
+        super().render_is_cancelled()
+
     def run_v2(
         self,
         request: "BulkRunnerPage.RequestModel",
@@ -284,9 +345,24 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         response.output_documents = []
         array_columns = set()
+        dfs = [read_df_any(doc) for doc in request.documents]
+        total_rows = sum(len(df) for df in dfs)
+        total_row_groups = get_bulk_total_row_groups(dfs, request)
+        total_unit_runs = total_row_groups * len(request.run_urls)
+        current_progress: BulkProgressCounts = {
+            "completed_unit_runs": 0,
+            "total_unit_runs": total_unit_runs,
+            "completed_row_groups": 0,
+            "total_row_groups": total_row_groups,
+            "completed_rows": 0,
+            "total_rows": total_rows,
+            "current_row_number": 0,
+            "current_workflow_number": 0,
+            "total_workflows": len(request.run_urls),
+        }
 
-        for doc_ix, doc in enumerate(request.documents):
-            df = read_df_any(doc)
+        row_offset = 0
+        for doc_ix, df in enumerate(dfs):
             in_recs = df.to_dict(orient="records")
             out_recs = []
 
@@ -297,27 +373,37 @@ To understand what each field represents, check out our [API docs](https://api.g
             )
             response.output_documents.append(f)
 
-            df_slices = list(slice_request_df(df, request))
-            for slice_ix, (df_ix, arr_len) in enumerate(df_slices):
+            for df_ix, arr_len in slice_request_df(df, request):
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
+                current_row_number = row_offset + min(df_ix + arr_len, len(df))
 
                 used_col_names = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len, array_columns
                 ):
-                    progress = round(
-                        (slice_ix + url_ix)
-                        / (len(df_slices) + len(request.run_urls))
-                        * 100
+                    current_progress.update(
+                        current_row_number=current_row_number,
+                        current_workflow_number=url_ix + 1,
                     )
-                    yield f"{progress}%"
-
                     result, sr = sr.submit_api_call(
                         workspace=self.current_workspace,
                         current_user=self.request.user,
                         request_body=request_body,
                         parent_pr=pr,
+                    )
+                    response.bulk_progress = build_bulk_progress(
+                        progress=current_progress,
+                        page_cls=page_cls,
+                        sr=sr,
+                        pr=pr,
+                        request_body=request_body,
+                        current_workflow_completed=False,
+                        previous_progress=response.bulk_progress,
+                    )
+                    yield (
+                        f"{bulk_progress_percent(response.bulk_progress)}% Completed",
+                        {"bulk_progress": response.bulk_progress},
                     )
                     sr.wait_for_celery_result(result)
 
@@ -373,6 +459,34 @@ To understand what each field represents, check out our [API docs](https://api.g
                         content_type="text/csv",
                     )
                     response.output_documents[doc_ix] = f
+                    current_progress["completed_unit_runs"] += 1
+                    if url_ix == len(request.run_urls) - 1:
+                        current_progress["completed_row_groups"] += 1
+                    current_progress["completed_rows"] = get_completed_rows_from_unit_run(
+                        current_progress,
+                        arr_len,
+                    )
+                    credits_used = (response.bulk_progress or {}).get(
+                        "credits_used", 0
+                    ) + (sr.price or 0)
+                    response.bulk_progress = build_bulk_progress(
+                        progress=current_progress,
+                        page_cls=page_cls,
+                        sr=sr,
+                        pr=pr,
+                        request_body=request_body,
+                        credits_used=credits_used,
+                        workflow_run_time_seconds=state["run_time"],
+                        workflow_credits=sr.price,
+                        error_msg=sr.error_msg,
+                        previous_progress=response.bulk_progress,
+                    )
+                    yield (
+                        f"{bulk_progress_percent(response.bulk_progress)}% Completed",
+                        {"bulk_progress": response.bulk_progress},
+                    )
+
+            row_offset += len(df)
 
         if not request.eval_urls:
             return
@@ -470,6 +584,167 @@ To understand what each field represents, check out our [API docs](https://api.g
             del_key=del_key,
             current_user=self.request.user,
         )
+
+
+def render_bulk_progress(
+    progress: BulkProgress | None,
+    *,
+    state: str | None,
+    stop_requested: bool = False,
+    elapsed_seconds: float | None = None,
+    rerun_all_key: str | None = None,
+) -> None:
+    if not progress or not state:
+        return
+
+    gui.component(
+        "BulkProgressCard",
+        progress=progress,
+        progressState=state,
+        stopRequested=stop_requested,
+        elapsedSeconds=elapsed_seconds,
+        rerunAllKey=rerun_all_key,
+    )
+
+
+def get_bulk_progress_render_state(
+    *,
+    progress: BulkProgress | None,
+    is_cancelled: bool,
+    is_running: bool,
+    run_time: float | None,
+    error_msg: str | None,
+) -> str | None:
+    if not progress:
+        return None
+
+    if is_running:
+        return "running"
+
+    if error_msg:
+        return "error"
+
+    if run_time is not None and is_bulk_progress_complete(progress):
+        return "complete"
+
+    return "stopped"
+
+
+def get_bulk_elapsed_seconds(
+    *,
+    is_running: bool,
+    run_time: float | datetime.timedelta | None,
+    created_at: datetime.datetime | str | None,
+) -> float | None:
+    seconds = coerce_seconds(run_time)
+    if seconds is not None:
+        return seconds
+
+    if not is_running or not created_at:
+        return None
+
+    if isinstance(created_at, str):
+        created_at = datetime.datetime.fromisoformat(created_at)
+    now = datetime.datetime.now(created_at.tzinfo)
+    return max((now - created_at).total_seconds(), 0)
+
+
+def build_bulk_progress(
+    *,
+    progress: BulkProgressCounts,
+    page_cls: type[BasePage],
+    sr: SavedRun,
+    pr,
+    request_body: dict,
+    credits_used: int | None = None,
+    workflow_run_time_seconds: float | None = None,
+    workflow_credits: int | None = None,
+    error_msg: str | None = None,
+    current_workflow_completed: bool = True,
+    previous_progress: BulkProgress | None = None,
+) -> BulkProgress:
+    title = get_title_breadcrumbs(page_cls=page_cls, sr=sr, pr=pr).title_with_prefix()
+    input_prompt = page_cls.preview_input(request_body)
+    bulk_progress: BulkProgress = {
+        **progress,
+        "workflow_title": title,
+        "workflow_url": sr.get_app_url(),
+        "input_prompt": input_prompt[:500] if input_prompt else "",
+    }
+    if input_audio := request_body.get("input_audio"):
+        bulk_progress["input_audio"] = input_audio
+    if credits_used is not None:
+        bulk_progress["credits_used"] = credits_used
+    elif previous_progress and "credits_used" in previous_progress:
+        bulk_progress["credits_used"] = previous_progress["credits_used"]
+    if workflow_run_time_seconds is not None:
+        bulk_progress["workflow_run_time_seconds"] = workflow_run_time_seconds
+    if workflow_credits is not None:
+        bulk_progress["workflow_credits"] = workflow_credits
+    if error_msg:
+        bulk_progress["error_msg"] = error_msg
+
+    if current_workflow_completed:
+        bulk_progress["last_completed_workflow_title"] = title
+        bulk_progress["last_completed_workflow_url"] = sr.get_app_url()
+        if workflow_run_time_seconds is not None:
+            bulk_progress["last_completed_run_time_seconds"] = (
+                workflow_run_time_seconds
+            )
+        if workflow_credits is not None:
+            bulk_progress["last_completed_credits"] = workflow_credits
+    elif previous_progress:
+        for key in (
+            "last_completed_workflow_title",
+            "last_completed_workflow_url",
+            "last_completed_run_time_seconds",
+            "last_completed_credits",
+        ):
+            if key in previous_progress:
+                bulk_progress[key] = previous_progress[key]
+
+    return bulk_progress
+
+
+def get_bulk_total_row_groups(
+    dfs: list[typing.Any], request: BulkRunnerPage.RequestModel
+) -> int:
+    return sum(1 for df in dfs for _ in slice_request_df(df, request))
+
+
+def bulk_progress_percent(progress: BulkProgressCounts | None) -> int:
+    if not progress:
+        return 0
+
+    total_unit_runs = progress.get("total_unit_runs")
+    if not total_unit_runs:
+        return 0
+
+    completed_unit_runs = progress.get("completed_unit_runs", 0)
+    return round(completed_unit_runs / total_unit_runs * 100)
+
+
+def is_bulk_progress_complete(progress: BulkProgressCounts) -> bool:
+    total_unit_runs = progress.get("total_unit_runs")
+    if not total_unit_runs:
+        return False
+
+    return progress.get("completed_unit_runs", 0) >= total_unit_runs
+
+
+def coerce_seconds(seconds: float | datetime.timedelta | None) -> float | None:
+    if seconds is None:
+        return None
+    if isinstance(seconds, datetime.timedelta):
+        return seconds.total_seconds()
+    return seconds
+
+
+def get_completed_rows_from_unit_run(progress: BulkProgressCounts, arr_len: int) -> int:
+    if progress["current_workflow_number"] != progress["total_workflows"]:
+        return progress["completed_rows"]
+
+    return progress["completed_rows"] + arr_len
 
 
 def build_requests_for_df(df, request, df_ix, arr_len, array_columns):
