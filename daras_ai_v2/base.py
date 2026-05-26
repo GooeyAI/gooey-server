@@ -30,6 +30,7 @@ from ai_models.llm_openapi import patch_ai_model_schema_enums
 from app_users.models import AppUser, AppUserTransaction, ensure_request_app_user
 from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
 from bots.models import (
+    Platform,
     PublishedRun,
     PublishedRunVersion,
     RetentionPolicy,
@@ -2382,11 +2383,27 @@ class BasePage:
                     )
             gui.write(f"#### {tb.title_with_prefix()}")
 
-            author, _ = AppUser.objects.get_or_create_from_uid(saved_run.uid)
             updated_at = saved_run.updated_at
             left, right = left_and_right(className="container-margin-reset")
             with left:
-                render_author_from_user(author)
+                if saved_run.is_api_call:
+                    msg = saved_run.messages.select_related(
+                        "conversation__bot_integration"
+                    ).first()
+                    if saved_run.platform:
+                        platform = Platform(saved_run.platform)
+                        text = f"{platform.get_icon()} {platform.get_title()} user"
+                        if convo := (msg and msg.conversation):
+                            convo_name = convo.get_display_name()
+                            if len(convo_name) >= 12:
+                                convo_name = convo_name[:3] + "XXX" + convo_name[-3:]
+                            text += f": {convo_name}"
+                        gui.caption(text, unsafe_allow_html=True)
+                    else:
+                        gui.caption(f"{icons.api} API user", unsafe_allow_html=True)
+                else:
+                    author, _ = AppUser.objects.get_or_create_from_uid(saved_run.uid)
+                    render_author_from_user(author)
             with right:
                 if (
                     updated_at
@@ -2396,6 +2413,7 @@ class BasePage:
                     gui.caption(
                         f"{icons.time} {get_relative_time(updated_at)}",
                         unsafe_allow_html=True,
+                        className="text-muted text-nowrap",
                     )
 
             with gui.div(className="mt-2"):
