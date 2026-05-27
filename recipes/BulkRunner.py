@@ -33,6 +33,12 @@ from daras_ai_v2.workflow_url_input import (
     edit_done_button,
 )
 from recipes.DocSearch import render_documents
+from widgets.bulk_progress_display import render_bulk_runner_progress
+from widgets.bulk_progress_state import (
+    BulkEvalProgress,
+    BulkProgress,
+    BulkProgressTracker,
+)
 
 if typing.TYPE_CHECKING:
     import pandas as pd
@@ -87,6 +93,8 @@ _(optional)_ Add one or more Gooey.AI Evaluator Workflows to evaluate the result
 
     class ResponseModel(BaseModel):
         output_documents: list[HttpUrlStr]
+        bulk_progress: BulkProgress | None = None
+        eval_progress: BulkEvalProgress | None = None
 
         eval_runs: list[HttpUrlStr] | None = Field(
             None,
@@ -242,6 +250,10 @@ To understand what each field represents, check out our [API docs](https://api.g
         render_documents(state)
 
     def render_output(self):
+        render_bulk_runner_progress(
+            is_cancelled=bool(self.current_sr and self.current_sr.is_cancelled),
+        )
+
         eval_runs = gui.session_state.get("eval_runs")
 
         if eval_runs:
@@ -275,6 +287,38 @@ To understand what each field represents, check out our [API docs](https://api.g
                 )
                 gui.data_table(file)
 
+    def _render_running_output(self):
+        if gui.session_state.get("bulk_progress"):
+            return
+
+        super()._render_running_output()
+
+    def render_is_cancelled(self):
+        if gui.session_state.get("bulk_progress"):
+            return
+        super().render_is_cancelled()
+
+    def get_run_cost_display(self) -> str:
+        progress = gui.session_state.get("bulk_progress")
+        if not progress:
+            return ""
+        if progress["completed_unit_runs"] >= progress["total_unit_runs"]:
+            return ""
+
+        run_cost = progress.get("credits_used") or 0
+        url = self.get_credits_click_url()
+        ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
+
+        cost_note = self.get_cost_note()
+        if cost_note:
+            ret += f" ({cost_note.strip()})"
+
+        additional_notes = self.additional_notes()
+        if additional_notes:
+            ret += f" \n{additional_notes}"
+
+        return ret
+
     def run_v2(
         self,
         request: "BulkRunnerPage.RequestModel",
@@ -284,9 +328,17 @@ To understand what each field represents, check out our [API docs](https://api.g
 
         response.output_documents = []
         array_columns = set()
+        dfs = [read_df_any(doc) for doc in request.documents]
+        total_rows = sum(len(df) for df in dfs)
+        total_row_groups = get_bulk_total_row_groups(dfs, request)
+        progress = BulkProgressTracker(
+            total_rows=total_rows,
+            total_row_groups=total_row_groups,
+            total_workflows=len(request.run_urls),
+        )
 
-        for doc_ix, doc in enumerate(request.documents):
-            df = read_df_any(doc)
+        row_offset = 0
+        for doc_ix, df in enumerate(dfs):
             in_recs = df.to_dict(orient="records")
             out_recs = []
 
@@ -297,27 +349,29 @@ To understand what each field represents, check out our [API docs](https://api.g
             )
             response.output_documents.append(f)
 
-            df_slices = list(slice_request_df(df, request))
-            for slice_ix, (df_ix, arr_len) in enumerate(df_slices):
+            for df_ix, arr_len in slice_request_df(df, request):
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
+                current_row_number = row_offset + min(df_ix + arr_len, len(df))
 
                 used_col_names = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len, array_columns
                 ):
-                    progress = round(
-                        (slice_ix + url_ix)
-                        / (len(df_slices) + len(request.run_urls))
-                        * 100
-                    )
-                    yield f"{progress}%"
-
                     result, sr = sr.submit_api_call(
                         workspace=self.current_workspace,
                         current_user=self.request.user,
                         request_body=request_body,
                         parent_pr=pr,
+                    )
+                    yield progress.workflow_started(
+                        response,
+                        current_row_number=current_row_number,
+                        workflow_number=url_ix + 1,
+                        page_cls=page_cls,
+                        sr=sr,
+                        pr=pr,
+                        request_body=request_body,
                     )
                     sr.wait_for_celery_result(result)
 
@@ -373,14 +427,34 @@ To understand what each field represents, check out our [API docs](https://api.g
                         content_type="text/csv",
                     )
                     response.output_documents[doc_ix] = f
+                    yield progress.workflow_completed(
+                        response,
+                        page_cls=page_cls,
+                        sr=sr,
+                        pr=pr,
+                        request_body=request_body,
+                        arr_len=arr_len,
+                        workflow_run_time_seconds=state["run_time"],
+                        workflow_credits=sr.price,
+                        error_msg=sr.error_msg,
+                    )
+
+            row_offset += len(df)
 
         if not request.eval_urls:
             return
 
         response.eval_runs = []
-        for url in request.eval_urls:
+        total_evals = len(request.eval_urls)
+        for eval_ix, url in enumerate(request.eval_urls):
             page_cls, sr, pr = url_to_runs(url)
-            yield f"Running {get_title_breadcrumbs(page_cls, sr, pr).title_with_prefix()}..."
+            title = get_title_breadcrumbs(page_cls, sr, pr).title_with_prefix()
+            yield progress.eval_started(
+                response,
+                current=eval_ix + 1,
+                total=total_evals,
+                workflow_title=title,
+            )
             request_body = page_cls.RequestModel(
                 documents=response.output_documents,
                 array_columns=array_columns or None,
@@ -393,6 +467,8 @@ To understand what each field represents, check out our [API docs](https://api.g
             )
             sr.wait_for_celery_result(result)
             response.eval_runs.append(sr.get_app_url())
+
+        progress.evals_completed(response)
 
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
         from daras_ai_v2.all_pages import all_home_pages
@@ -470,6 +546,12 @@ To understand what each field represents, check out our [API docs](https://api.g
             del_key=del_key,
             current_user=self.request.user,
         )
+
+
+def get_bulk_total_row_groups(
+    dfs: list[typing.Any], request: BulkRunnerPage.RequestModel
+) -> int:
+    return sum(1 for df in dfs for _ in slice_request_df(df, request))
 
 
 def build_requests_for_df(df, request, df_ix, arr_len, array_columns):
