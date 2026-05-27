@@ -261,11 +261,28 @@ function buildDetail(
 ): DetailDisplay {
   const lastTitle = snapshot.lastCompletedWorkflowTitle;
   const lastUrl = snapshot.lastCompletedWorkflowUrl;
+  let workflow: WorkflowDisplay | null = null;
+
+  if (snapshot.currentWorkflowTitle && snapshot.currentWorkflowUrl) {
+    const workflowNumber = Math.max(snapshot.currentWorkflowNumber, 1);
+    let prefix: string;
+    if (capitalized) {
+      prefix = `Workflow ${workflowNumber} of ${snapshot.totalWorkflows}:`;
+    } else {
+      prefix = `workflow ${workflowNumber} of ${snapshot.totalWorkflows}`;
+    }
+    workflow = {
+      prefix,
+      title: snapshot.currentWorkflowTitle,
+      url: snapshot.currentWorkflowUrl,
+      failedAt,
+    };
+  }
 
   return {
     rowLabel,
     showStoppingMessage,
-    workflow: buildWorkflowDisplay(snapshot, { capitalized, failedAt }),
+    workflow,
     inputPrompt: snapshot.inputPrompt,
     inputAudioUrl: snapshot.inputAudioUrl,
     lastCompleted:
@@ -277,27 +294,6 @@ function buildDetail(
             runTimeSeconds: snapshot.lastCompletedRunTimeSeconds,
           }
         : undefined,
-  };
-}
-
-function buildWorkflowDisplay(
-  snapshot: BulkProgressSnapshot,
-  options: { capitalized: boolean; failedAt: number | null }
-): WorkflowDisplay | null {
-  if (!snapshot.currentWorkflowTitle || !snapshot.currentWorkflowUrl) {
-    return null;
-  }
-
-  const workflowNumber = Math.max(snapshot.currentWorkflowNumber, 1);
-  const prefix = options.capitalized
-    ? `Workflow ${workflowNumber} of ${snapshot.totalWorkflows}:`
-    : `workflow ${workflowNumber} of ${snapshot.totalWorkflows}`;
-
-  return {
-    prefix,
-    title: snapshot.currentWorkflowTitle,
-    url: snapshot.currentWorkflowUrl,
-    failedAt: options.failedAt,
   };
 }
 
@@ -313,27 +309,24 @@ function getEvalRingDisplay(
       ringLabel: `${evalCounts.current}/${evalCounts.total}`,
     };
   }
-  const ringPercent = Math.round((evalCounts.current / evalCounts.total) * 100);
+  const completedEvals = Math.max(evalCounts.current - 1, 0);
+  const ringPercent = Math.round((completedEvals / evalCounts.total) * 100);
   return {
     ringPercent,
-    ringLabel: `${evalCounts.current}/${evalCounts.total}`,
+    ringLabel: `${completedEvals}/${evalCounts.total}`,
   };
 }
 
 function unitRunRingFields(snapshot: BulkProgressSnapshot) {
-  const ringPercent = unitRunPercent(snapshot);
+  let ringPercent = 0;
+  if (snapshot.totalUnitRuns) {
+    ringPercent = Math.round(
+      (snapshot.completedUnitRuns / snapshot.totalUnitRuns) * 100
+    );
+  }
   return {
     ringPercent,
     ringLabel: `${ringPercent}%`,
     headline: `${ringPercent}% Completed`,
   };
-}
-
-function unitRunPercent(snapshot: BulkProgressSnapshot) {
-  if (!snapshot.totalUnitRuns) {
-    return 0;
-  }
-  return Math.round(
-    (snapshot.completedUnitRuns / snapshot.totalUnitRuns) * 100
-  );
 }

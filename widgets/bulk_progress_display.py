@@ -10,7 +10,6 @@ from daras_ai_v2.base import StateKeys
 from widgets.bulk_progress_state import (
     BulkEvalProgress,
     BulkProgress,
-    coerce_seconds,
     is_bulk_progress_complete,
 )
 
@@ -35,6 +34,7 @@ class BulkProgressSnapshot(TypedDict, total=False):
     currentWorkflowUrl: str
     currentWorkflowRunTimeSeconds: NotRequired[float | None]
     creditsUsed: NotRequired[int]
+    totalEvalRuns: NotRequired[int]
     evalCurrent: NotRequired[int]
     evalTotal: NotRequired[int]
     evalWorkflowTitle: NotRequired[str]
@@ -46,84 +46,31 @@ class BulkProgressSnapshot(TypedDict, total=False):
     lastCompletedCredits: NotRequired[int | None]
 
 
-def get_bulk_runner_run_state(
-    *,
-    progress: BulkProgress | None,
-    is_cancelled: bool,
-    is_running: bool,
-    error_msg: str | None,
-) -> BulkRunnerRunState | None:
-    if not progress:
-        return None
-
-    bulk_complete = is_bulk_progress_complete(progress)
-
-    if is_running and is_cancelled:
-        return "stopping"
-
-    if is_running and bulk_complete:
-        if progress["phase"] == "evaluating":
-            return progress["phase"]
-        return "complete"
-
-    if is_running:
-        return "running"
-
-    if error_msg:
-        return "error"
-
-    if bulk_complete and not is_running:
-        return "complete"
-
-    return "stopped"
-
-
-def get_bulk_elapsed_seconds(
-    *,
-    is_running: bool,
-    run_time: float | datetime.timedelta | None,
-    created_at: datetime.datetime | str | None,
-) -> float | None:
-    seconds = coerce_seconds(run_time)
-    if seconds is not None:
-        return seconds
-
-    if not is_running or not created_at:
-        return None
-
-    if isinstance(created_at, str):
-        created_at = datetime.datetime.fromisoformat(created_at)
-    now = datetime.datetime.now(created_at.tzinfo)
-    return max((now - created_at).total_seconds(), 0)
-
-
 def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
     session = gui.session_state
     progress = session.get("bulk_progress")
-    is_running = bool(session.get(StateKeys.run_status))
-    error_msg = session.get(StateKeys.error_msg)
-    run_state = get_bulk_runner_run_state(
-        progress=progress,
-        is_cancelled=is_cancelled,
-        is_running=is_running,
-        error_msg=error_msg,
-    )
-    if not progress or not run_state:
+    if not progress:
         return
 
-    elapsed_seconds = get_bulk_elapsed_seconds(
-        is_running=is_running,
-        run_time=session.get(StateKeys.run_time),
-        created_at=session.get(StateKeys.created_at),
-    )
+    run_time = session.get(StateKeys.run_time)
+    elapsed_seconds = None
+    if run_time is not None:
+        if isinstance(run_time, datetime.timedelta):
+            elapsed_seconds = run_time.total_seconds()
+        else:
+            elapsed_seconds = run_time
+
     snapshot = build_bulk_progress_snapshot(
         progress=progress,
-        run_state=run_state,
+        is_cancelled=is_cancelled,
+        is_running=bool(session.get(StateKeys.run_status)),
+        error_msg=session.get(StateKeys.error_msg),
         elapsed_seconds=elapsed_seconds,
-        eval_progress=session.get("eval_progress")
-        if run_state == "evaluating"
-        else None,
+        eval_progress=session.get("eval_progress"),
     )
+    if not snapshot:
+        return
+
     gui.component(
         "BulkProgressCard",
         snapshot=snapshot,
@@ -134,10 +81,21 @@ def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
 def build_bulk_progress_snapshot(
     *,
     progress: BulkProgress,
-    run_state: BulkRunnerRunState,
+    is_cancelled: bool,
+    is_running: bool,
+    error_msg: str | None,
     elapsed_seconds: float | None,
     eval_progress: BulkEvalProgress | None = None,
-) -> BulkProgressSnapshot:
+) -> BulkProgressSnapshot | None:
+    run_state = bulk_snapshot_run_state(
+        progress=progress,
+        is_cancelled=is_cancelled,
+        is_running=is_running,
+        error_msg=error_msg,
+    )
+    if not run_state:
+        return None
+
     snapshot: BulkProgressSnapshot = {
         "runState": run_state,
         "elapsedSeconds": elapsed_seconds,
@@ -156,7 +114,9 @@ def build_bulk_progress_snapshot(
         ]
     if "credits_used" in progress:
         snapshot["creditsUsed"] = progress["credits_used"]
-    if eval_progress:
+    if "total_eval_runs" in progress:
+        snapshot["totalEvalRuns"] = progress["total_eval_runs"]
+    if run_state == "evaluating" and eval_progress:
         snapshot["evalCurrent"] = eval_progress["current"]
         snapshot["evalTotal"] = eval_progress["total"]
         snapshot["evalWorkflowTitle"] = eval_progress["workflow_title"]
@@ -178,3 +138,32 @@ def build_bulk_progress_snapshot(
         if "last_completed_credits" in progress:
             snapshot["lastCompletedCredits"] = progress["last_completed_credits"]
     return snapshot
+
+
+def bulk_snapshot_run_state(
+    *,
+    progress: BulkProgress,
+    is_cancelled: bool,
+    is_running: bool,
+    error_msg: str | None,
+) -> BulkRunnerRunState | None:
+    if is_running and is_cancelled:
+        return "stopping"
+
+    bulk_complete = is_bulk_progress_complete(progress)
+    if is_running:
+        if not bulk_complete:
+            return "running"
+        if progress["phase"] == "evaluating":
+            return "evaluating"
+        if progress["phase"] == "complete":
+            return "complete"
+        return "complete"
+
+    if error_msg:
+        return "error"
+
+    if bulk_complete:
+        return "complete"
+
+    return "stopped"
