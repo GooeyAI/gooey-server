@@ -13,6 +13,7 @@ from functions.inbuilt_tools import (
     FeedbackCollectionLLMTool,
     VectorSearchLLMTool,
     CallTransferLLMTool,
+    NewConversationLLMTool,
 )
 from functions.models import CalledFunction, FunctionTrigger
 from functions.base_llm_tool import (
@@ -332,6 +333,7 @@ class DynamicLLMToolLoader(BaseLLMTool):
         FeedbackCollectionLLMTool,
         UpdateGuiStateLLMTool,
         DeployWorkflowLLMTool,
+        NewConversationLLMTool,
     )
 
 

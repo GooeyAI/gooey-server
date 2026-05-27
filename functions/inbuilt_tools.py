@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from loguru import logger
 from sentry_sdk import capture_exception
 from twilio.base.exceptions import TwilioRestException
@@ -53,6 +54,10 @@ def get_inbuilt_tools(saved_run: SavedRun) -> typing.Iterable[BaseLLMTool]:
         if builder_state and builder_state.get("run_id") and builder_state.get("uid"):
             yield DeployWorkflowLLMTool(builder_state)
         yield RunJS()
+
+    conversation_id = variables.get("conversation_id")
+    if conversation_id:
+        yield NewConversationLLMTool(conversation_id)
 
     collect_feedback = variables.get("collect_feedback")
     if collect_feedback:
@@ -308,6 +313,44 @@ class FeedbackCollectionLLMTool(BaseLLMTool):
         feedback.text_english = feedback_text
         feedback.save()
 
+        return {"success": True}
+
+
+class NewConversationLLMTool(BaseLLMTool):
+    """In-Built tool for starting a new conversation."""
+
+    def __init__(self, conversation_id: str):
+        self.conversation_id = conversation_id
+        super().__init__(
+            name="new_conversation",
+            label="New Conversation",
+            description=(
+                "Start a new conversation with the user. "
+                "Use this when the user wants to start a new conversation, reset the message history, or clear the chat."
+                "Keywords: /reset, /new, /restart, /clear"
+            ),
+            properties={},
+            required=[],
+        )
+
+    def call(self) -> dict:
+        from bots.models import Conversation
+        from routers.bots_api import api_hashids
+
+        try:
+            convo = Conversation.objects.get(
+                id=api_hashids.decode(self.conversation_id)[0]
+            )
+        except (IndexError, Conversation.DoesNotExist):
+            return {
+                "success": False,
+                "error": (
+                    f"Conversation not found for conversation_id={self.conversation_id}. "
+                    "Please call this tool from an active deployment."
+                ),
+            }
+        convo.reset_at = timezone.now()
+        convo.save(update_fields=["reset_at"])
         return {"success": True}
 
 
