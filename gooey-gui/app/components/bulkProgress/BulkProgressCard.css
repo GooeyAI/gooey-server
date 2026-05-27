@@ -269,7 +269,7 @@
   text-decoration: underline;
   text-overflow: ellipsis;
   text-underline-offset: 0.12em;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .bulk-progress-detail-link:link,
@@ -308,7 +308,7 @@
   line-clamp: 3;
   line-height: 1.35;
   overflow: hidden;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .bulk-progress-input-text span,

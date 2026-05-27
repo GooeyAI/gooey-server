@@ -218,6 +218,18 @@ function MetaRow({ parts }: { parts: string[] }) {
 }
 
 function ProgressDetail({ detail }: { detail: DetailDisplay }) {
+  let inputAudioSafeHref: string | null = null;
+  if (detail.inputAudioUrl) {
+    try {
+      const parsed = new URL(detail.inputAudioUrl);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        inputAudioSafeHref = parsed.href;
+      }
+    } catch {
+      inputAudioSafeHref = null;
+    }
+  }
+
   return (
     <div className="bulk-progress-detail">
       <div className="bulk-progress-current">
@@ -241,13 +253,13 @@ function ProgressDetail({ detail }: { detail: DetailDisplay }) {
       {detail.inputAudioUrl ? (
         <div className="bulk-progress-input">
           <span>input_audio:</span>{" "}
-          <a
-            href={detail.inputAudioUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            View audio &rarr;
-          </a>
+          {inputAudioSafeHref ? (
+            <a href={inputAudioSafeHref} target="_blank" rel="noopener noreferrer">
+              View audio &rarr;
+            </a>
+          ) : (
+            <span>{detail.inputAudioUrl}</span>
+          )}
         </div>
       ) : null}
       {detail.lastCompleted ? (

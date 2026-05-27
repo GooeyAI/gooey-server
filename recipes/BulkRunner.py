@@ -302,8 +302,6 @@ To understand what each field represents, check out our [API docs](https://api.g
         progress = gui.session_state.get("bulk_progress")
         if not progress:
             return ""
-        if progress["completed_unit_runs"] >= progress["total_unit_runs"]:
-            return ""
 
         run_cost = progress.get("credits_used") or 0
         url = self.get_credits_click_url()
@@ -330,7 +328,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         array_columns = set()
         dfs = [read_df_any(doc) for doc in request.documents]
         total_rows = sum(len(df) for df in dfs)
-        total_row_groups = get_bulk_total_row_groups(dfs, request)
+        total_row_groups = sum(1 for df in dfs for _ in slice_request_df(df, request))
         progress = BulkProgressTracker(
             total_rows=total_rows,
             total_row_groups=total_row_groups,
@@ -467,6 +465,7 @@ To understand what each field represents, check out our [API docs](https://api.g
             )
             sr.wait_for_celery_result(result)
             response.eval_runs.append(sr.get_app_url())
+            yield progress.eval_completed(response, eval_credits=sr.price)
 
         progress.evals_completed(response)
 
