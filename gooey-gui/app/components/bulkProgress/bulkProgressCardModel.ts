@@ -310,7 +310,10 @@ function getEvalRingDisplay(
     };
   }
   const completedEvals = Math.max(evalCounts.current - 1, 0);
-  const ringPercent = Math.round((completedEvals / evalCounts.total) * 100);
+  const ringPercent = Math.min(
+    Math.max(Math.round((completedEvals / evalCounts.total) * 100), 0),
+    100
+  );
   return {
     ringPercent,
     ringLabel: `${completedEvals}/${evalCounts.total}`,
@@ -320,8 +323,12 @@ function getEvalRingDisplay(
 function unitRunRingFields(snapshot: BulkProgressSnapshot) {
   let ringPercent = 0;
   if (snapshot.totalUnitRuns) {
-    ringPercent = Math.round(
-      (snapshot.completedUnitRuns / snapshot.totalUnitRuns) * 100
+    ringPercent = Math.min(
+      Math.max(
+        Math.round((snapshot.completedUnitRuns / snapshot.totalUnitRuns) * 100),
+        0
+      ),
+      100
     );
   }
   return {
