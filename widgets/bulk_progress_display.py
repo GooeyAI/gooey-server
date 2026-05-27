@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import datetime
-from typing import Literal
+from enum import Enum
 
 import gooey_gui as gui
 from typing_extensions import NotRequired, TypedDict
 
-from daras_ai_v2.base import StateKeys
+from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 from widgets.bulk_progress_state import (
     BulkEvalProgress,
     BulkProgress,
@@ -15,9 +15,14 @@ from widgets.bulk_progress_state import (
 
 BULK_RERUN_ALL_KEY = "-submit-workflow"
 
-BulkRunnerRunState = Literal[
-    "running", "stopping", "evaluating", "complete", "error", "stopped"
-]
+
+class BulkRunnerRunState(str, Enum):
+    running = "running"
+    stopping = "stopping"
+    evaluating = "evaluating"
+    complete = "complete"
+    error = "error"
+    stopped = "stopped"
 
 
 # Keep in sync with gooey-gui/app/components/bulkProgress/bulkProgress.types.ts (BulkProgressSnapshot).
@@ -63,8 +68,7 @@ def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
     snapshot = build_bulk_progress_snapshot(
         progress=progress,
         is_cancelled=is_cancelled,
-        is_running=bool(session.get(StateKeys.run_status)),
-        error_msg=session.get(StateKeys.error_msg),
+        recipe_run_state=BasePage.get_run_state(session),
         elapsed_seconds=elapsed_seconds,
         eval_progress=session.get("eval_progress"),
     )
@@ -82,16 +86,14 @@ def build_bulk_progress_snapshot(
     *,
     progress: BulkProgress,
     is_cancelled: bool,
-    is_running: bool,
-    error_msg: str | None,
+    recipe_run_state: RecipeRunState,
     elapsed_seconds: float | None,
     eval_progress: BulkEvalProgress | None = None,
 ) -> BulkProgressSnapshot | None:
     run_state = bulk_snapshot_run_state(
         progress=progress,
         is_cancelled=is_cancelled,
-        is_running=is_running,
-        error_msg=error_msg,
+        recipe_run_state=recipe_run_state,
     )
     if not run_state:
         return None
@@ -116,7 +118,7 @@ def build_bulk_progress_snapshot(
         snapshot["creditsUsed"] = progress["credits_used"]
     if "total_eval_runs" in progress:
         snapshot["totalEvalRuns"] = progress["total_eval_runs"]
-    if run_state == "evaluating" and eval_progress:
+    if run_state == BulkRunnerRunState.evaluating and eval_progress:
         snapshot["evalCurrent"] = eval_progress["current"]
         snapshot["evalTotal"] = eval_progress["total"]
         snapshot["evalWorkflowTitle"] = eval_progress["workflow_title"]
@@ -144,26 +146,22 @@ def bulk_snapshot_run_state(
     *,
     progress: BulkProgress,
     is_cancelled: bool,
-    is_running: bool,
-    error_msg: str | None,
+    recipe_run_state: RecipeRunState,
 ) -> BulkRunnerRunState | None:
-    if is_running and is_cancelled:
-        return "stopping"
+    is_active = recipe_run_state in {RecipeRunState.starting, RecipeRunState.running}
+    if is_active and is_cancelled:
+        return BulkRunnerRunState.stopping
+
+    if recipe_run_state == RecipeRunState.failed:
+        return BulkRunnerRunState.error
 
     bulk_complete = is_bulk_progress_complete(progress)
-    if is_running:
-        if not bulk_complete:
-            return "running"
-        if progress["phase"] == "evaluating":
-            return "evaluating"
-        if progress["phase"] == "complete":
-            return "complete"
-        return "complete"
+    if not bulk_complete:
+        if is_active:
+            return BulkRunnerRunState.running
+        return BulkRunnerRunState.stopped
 
-    if error_msg:
-        return "error"
+    if progress["phase"] == "evaluating":
+        return BulkRunnerRunState.evaluating
 
-    if bulk_complete:
-        return "complete"
-
-    return "stopped"
+    return BulkRunnerRunState.complete
