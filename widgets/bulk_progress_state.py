@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 from typing import Literal
 
 from typing_extensions import NotRequired, TypedDict
@@ -40,6 +39,7 @@ class BulkProgress(BulkProgressCounts):
     credits_used: NotRequired[int]
     workflow_run_time_seconds: NotRequired[float]
     workflow_credits: NotRequired[int]
+    total_eval_runs: NotRequired[int]
     last_completed_workflow_title: NotRequired[str]
     last_completed_workflow_url: NotRequired[str]
     last_completed_run_time_seconds: NotRequired[float]
@@ -135,8 +135,26 @@ class BulkProgressTracker:
         }
         if self.snapshot:
             self.snapshot["phase"] = "evaluating"
+            self.snapshot["total_eval_runs"] = total
             response.bulk_progress = self.snapshot
         return f"Running {workflow_title}..."
+
+    def eval_completed(
+        self,
+        response,
+        *,
+        eval_credits: int | None,
+    ) -> tuple[str, dict[str, BulkProgress]] | None:
+        self.credits_used += eval_credits or 0
+        if not self.snapshot:
+            return None
+
+        self.snapshot["credits_used"] = self.credits_used
+        response.bulk_progress = self.snapshot
+        return (
+            f"{bulk_progress_percent(self.snapshot)}% Completed",
+            {"bulk_progress": self.snapshot},
+        )
 
     def evals_completed(self, response) -> None:
         response.eval_progress = None
@@ -276,11 +294,3 @@ def bulk_progress_percent(progress: BulkProgressCounts | None) -> int:
     if not progress or not progress["total_unit_runs"]:
         return 0
     return round(progress["completed_unit_runs"] / progress["total_unit_runs"] * 100)
-
-
-def coerce_seconds(seconds: float | datetime.timedelta | None) -> float | None:
-    if seconds is None:
-        return None
-    if isinstance(seconds, datetime.timedelta):
-        return seconds.total_seconds()
-    return seconds
