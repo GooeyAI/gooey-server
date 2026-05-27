@@ -26,10 +26,11 @@ export function formatCredits(credits: number | null | undefined) {
 }
 
 export function formatAverageCredits(snapshot: BulkProgressSnapshot) {
-  if (snapshot.creditsUsed == null || snapshot.totalUnitRuns <= 0) {
+  const totalRuns = snapshot.totalUnitRuns + (snapshot.totalEvalRuns || 0);
+  if (snapshot.creditsUsed == null || totalRuns <= 0) {
     return "-";
   }
-  return `${(snapshot.creditsUsed / snapshot.totalUnitRuns).toFixed(1)} Cr / run`;
+  return `${(snapshot.creditsUsed / totalRuns).toFixed(1)} Cr / run`;
 }
 
 export function formatAverageRunTime(snapshot: BulkProgressSnapshot) {

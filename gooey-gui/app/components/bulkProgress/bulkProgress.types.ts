@@ -21,6 +21,7 @@ export type BulkProgressSnapshot = {
   currentWorkflowUrl: string;
   currentWorkflowRunTimeSeconds?: number | null;
   creditsUsed?: number | null;
+  totalEvalRuns?: number;
   evalCurrent?: number;
   evalTotal?: number;
   evalWorkflowTitle?: string;
