@@ -1,6 +1,7 @@
+import type { CustomComponentProps } from "~/components";
 import "./InsufficientCredits.css";
 
-type InsufficientCreditsProps = {
+type InsufficientCreditsProps = CustomComponentProps & {
   accountUrl: string;
   isAnonymous: boolean;
   verifiedEmailUserFreeCredits: number;
@@ -47,9 +48,8 @@ function CostLine({
 }) {
   return (
     <div className="insufficient-credits__subtext">
-      This run will cost{" "}
-      <strong>{price ? `${price} Cr` : ">1 Cr"}</strong> and your current{" "}
-      <strong>{workspaceName}</strong> balance is{" "}
+      This run will cost <strong>{price ? `${price} Cr` : ">1 Cr"}</strong> and
+      your current <strong>{workspaceName}</strong> balance is{" "}
       <strong>
         {workspaceBalance != null ? workspaceBalance.toLocaleString() : "—"}
       </strong>
@@ -88,8 +88,11 @@ export function InsufficientCredits({
       <div className="insufficient-credits" data-submitafterlogin>
         <Title>{title}</Title>
         <div className="insufficient-credits__body">
-          Doh! <a href={accountUrl} target="_top">Please login</a> to run more
-          Gooey.AI workflows.
+          Doh!{" "}
+          <a href={accountUrl} target="_top">
+            Please login
+          </a>{" "}
+          to run more Gooey.AI workflows.
         </div>
       </div>
     );
@@ -104,12 +107,7 @@ export function InsufficientCredits({
         workspaceBalance={rerunWorkspaceBalance}
       />
       <div className="insufficient-credits__actions">
-        {showUpgrade && (
-          <SubmitKeyBtn
-            name={upgradeKey}
-            label="Upgrade Team"
-          />
-        )}
+        {showUpgrade && <SubmitKeyBtn name={upgradeKey} label="Upgrade Team" />}
         {showRerun ? (
           <SubmitKeyBtn
             name={rerunKey}

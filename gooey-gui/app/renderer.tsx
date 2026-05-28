@@ -17,6 +17,7 @@ import {
 import { RenderedHTML } from "~/renderedHTML";
 import type { OnChange } from "./app";
 import * as allComponents from "./components";
+import type { CustomComponentProps } from "./components";
 import CountdownTimer from "./components/countdown";
 import GooeySelect from "./components/GooeySelect";
 import GooeySwitch from "./components/GooeySwitch";
@@ -474,7 +475,9 @@ function RenderedTreeNode({
     default: {
       let CustomComponent = allComponents[
         name as keyof typeof allComponents
-      ] as React.ComponentType<any> | undefined;
+      ] as
+        | React.ComponentType<CustomComponentProps & Record<string, any>>
+        | undefined;
       if (CustomComponent) {
         return (
           <CustomComponent

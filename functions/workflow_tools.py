@@ -7,15 +7,7 @@ import typing
 from django.utils.text import slugify
 
 from app_users.models import AppUser
-from daras_ai_v2 import exceptions
 from daras_ai_v2.exceptions import UserError
-from functions.gooey_builder_tools import UpdateGuiStateLLMTool, DeployWorkflowLLMTool
-from functions.inbuilt_tools import (
-    FeedbackCollectionLLMTool,
-    VectorSearchLLMTool,
-    CallTransferLLMTool,
-    NewConversationLLMTool,
-)
 from functions.models import CalledFunction, FunctionTrigger
 from functions.base_llm_tool import (
     BaseLLMTool,
@@ -137,27 +129,12 @@ class WorkflowLLMTool(BaseLLMTool):
         fn_sr.wait_for_celery_result(result)
 
         if fn_sr.error_msg:
-            if exceptions.get_error_renderer(fn_sr.error_type):
-                # bubble up error so the parent run's standard error pipeline renders it
-                raise CalledFunctionError(
-                    message=fn_sr.error_msg,
-                    status_code=fn_sr.error_code,
-                    error_params=fn_sr.error_params,
-                    error_type=fn_sr.error_type,
-                )
-            else:
-                # send error back to LLM so it can attempt to handle it
-                page_cls = Workflow(fn_sr.workflow).page_cls
-                response = extract_model_fields(page_cls.ResponseModel, fn_sr.state)
-                return dict(
-                    error=dict(
-                        msg=fn_sr.error_msg,
-                        code=fn_sr.error_code,
-                        params=fn_sr.error_params,
-                        type=fn_sr.error_type,
-                    ),
-                    response=response,
-                )
+            raise CalledFunctionError(
+                message=fn_sr.error_msg,
+                status_code=fn_sr.error_code,
+                error_params=fn_sr.error_params,
+                error_type=fn_sr.error_type,
+            )
 
         if fn_sr.workflow != Workflow.FUNCTIONS:
             page_cls = Workflow(fn_sr.workflow).page_cls
@@ -337,19 +314,10 @@ class DynamicLLMToolLoader(BaseLLMTool):
             return (
                 tool.name in self.active_tool_names
                 or tool.name == self.name
-                or isinstance(tool, self.excluded_tools)
+                or tool.disable_dynamic_loader
             )
         else:
             return tool.name != self.name
-
-    excluded_tools = (
-        CallTransferLLMTool,
-        VectorSearchLLMTool,
-        FeedbackCollectionLLMTool,
-        UpdateGuiStateLLMTool,
-        DeployWorkflowLLMTool,
-        NewConversationLLMTool,
-    )
 
 
 def _render_tool_catalog_entry(tool: BaseLLMTool) -> str:

@@ -1,4 +1,6 @@
-type PaymentRequiredProps = {
+import type { CustomComponentProps } from "~/components";
+
+type PaymentRequiredProps = CustomComponentProps & {
   discordInviteUrl: string;
   paidOnlyModels: string[];
 };

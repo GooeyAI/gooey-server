@@ -266,10 +266,10 @@ class VideoGenPage(BasePage):
             return ret
 
     @classmethod
-    def get_tool_call_schema(cls, request: dict) -> dict[str, typing.Any]:
-        properties = super().get_tool_call_schema(request)
+    def get_tool_call_schema(cls, state: dict) -> dict[str, typing.Any]:
+        properties = super().get_tool_call_schema(state)
 
-        selected_models = request.get("selected_models") or []
+        selected_models = state.get("selected_models") or []
         video_models = AIModelSpec.objects.filter(name__in=selected_models)
         if inputs_schema := build_combined_input_schema(video_models):
             properties["inputs"] = inputs_schema
@@ -278,7 +278,7 @@ class VideoGenPage(BasePage):
         else:
             properties.pop("inputs", None)
 
-        selected_audio_model = request.get("selected_audio_model")
+        selected_audio_model = state.get("selected_audio_model")
         if selected_audio_model:
             audio_models = AIModelSpec.objects.filter(name=selected_audio_model)
             if audio_inputs_schema := build_combined_input_schema(

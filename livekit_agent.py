@@ -383,7 +383,7 @@ def save_on_step(
     else:
         sr.state["input_prompt"] = ""
 
-    sr.save()
+    sr.save(update_fields=["run_time", "run_status", "state", "updated_at"])
 
 
 def format_timestamp(elapsed: float) -> str:

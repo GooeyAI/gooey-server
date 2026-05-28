@@ -1,6 +1,5 @@
-import type { TreeNode } from "~/renderer";
+import type { CustomComponentProps } from "~/components";
 import { RenderedChildren } from "~/renderer";
-import type { OnChange } from "~/app";
 import { useEffect, useState } from "react";
 import SidebarResizer from "./SidebarResizer";
 
@@ -12,11 +11,8 @@ export function Sidebar({
   defaultOpen,
   disabled,
   enableResize = true,
-}: {
+}: CustomComponentProps & {
   name: string;
-  children: Array<TreeNode>;
-  onChange: OnChange;
-  state: Record<string, any>;
   defaultOpen: boolean;
   disabled: boolean;
   enableResize?: boolean;

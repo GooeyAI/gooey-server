@@ -46,9 +46,7 @@ def render_integrations_tab(
         )
 
     # see which integrations are available to the user for the published run
-    integrations_q = Q(published_run=published_run) | Q(
-        saved_run__example_id=published_run.published_run_id
-    )
+    integrations_q = Q(published_run=published_run)
     if not (user and user.is_admin()):
         integrations_q &= Q(workspace=workspace)
 
