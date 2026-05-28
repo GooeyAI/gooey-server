@@ -53,6 +53,14 @@ def _response_preview(resp: requests.Response) -> bytes:
     return truncate_filename(resp.content, 500, sep=b"...")
 
 
+def get_error_renderer(error_type: str) -> typing.Callable[[dict], None] | None:
+    try:
+        exc_cls = globals()[error_type]
+        return exc_cls.render
+    except (KeyError, AttributeError):
+        return None
+
+
 class UserError(Exception):
     def __init__(
         self,

@@ -361,9 +361,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             raise UserError(
                 f"Model {request.selected_model} not found. Should be one of: "
                 + ", ".join(
-                    AIModelSpec.objects.filter(
-                        category=AIModelSpec.Categories.llm
-                    ).values_list("name", flat=True)
+                    AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm)
+                    .order_for_frontend()
+                    .values_list("name", flat=True)
                 )
             )
         user_input = (request.input_prompt or "").strip()

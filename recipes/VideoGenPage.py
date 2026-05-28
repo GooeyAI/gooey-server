@@ -66,6 +66,16 @@ class VideoGenPage(BasePage):
             q |= Q(name__iexact=model_name)
         models = AIModelSpec.objects.filter(q)
 
+        if not models.exists():
+            raise UserError(
+                f"Model {request.selected_models} not found. Should be one of: "
+                + ", ".join(
+                    AIModelSpec.objects.filter(category=AIModelSpec.Categories.video)
+                    .order_for_frontend()
+                    .values_list("name", flat=True)
+                )
+            )
+
         paid_only_models = models.filter(paid_only=True)
         if not self.current_workspace.is_paying and paid_only_models.exists():
             raise PaymentRequired(
@@ -263,6 +273,10 @@ class VideoGenPage(BasePage):
         video_models = AIModelSpec.objects.filter(name__in=selected_models)
         if inputs_schema := build_combined_input_schema(video_models):
             properties["inputs"] = inputs_schema
+            # since inputs depends on selected_models, we currently cannot allow the model to change it
+            properties.pop("selected_models", None)
+        else:
+            properties.pop("inputs", None)
 
         selected_audio_model = request.get("selected_audio_model")
         if selected_audio_model:
@@ -272,6 +286,10 @@ class VideoGenPage(BasePage):
                 skip_fields=SKIP_AUDIO_INPUT_FIELDS,
             ):
                 properties["audio_inputs"] = audio_inputs_schema
+            # since audio_inputs depends on selected_audio_model, we currently cannot allow the model to change it
+            properties.pop("selected_audio_model", None)
+        else:
+            properties.pop("audio_inputs", None)
 
         return properties
 

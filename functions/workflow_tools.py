@@ -7,6 +7,7 @@ import typing
 from django.utils.text import slugify
 
 from app_users.models import AppUser
+from daras_ai_v2 import exceptions
 from daras_ai_v2.exceptions import UserError
 from functions.gooey_builder_tools import UpdateGuiStateLLMTool, DeployWorkflowLLMTool
 from functions.inbuilt_tools import (
@@ -134,19 +135,33 @@ class WorkflowLLMTool(BaseLLMTool):
         if self.trigger == FunctionTrigger.post:
             return
         fn_sr.wait_for_celery_result(result)
-        # if failed, bubble up error so the parent run's standard error pipeline renders it
+
         if fn_sr.error_msg:
-            raise CalledFunctionError(
-                message=fn_sr.error_msg,
-                status_code=fn_sr.error_code,
-                error_params=fn_sr.error_params,
-                error_type=fn_sr.error_type,
-            )
+            if exceptions.get_error_renderer(fn_sr.error_type):
+                # bubble up error so the parent run's standard error pipeline renders it
+                raise CalledFunctionError(
+                    message=fn_sr.error_msg,
+                    status_code=fn_sr.error_code,
+                    error_params=fn_sr.error_params,
+                    error_type=fn_sr.error_type,
+                )
+            else:
+                # send error back to LLM so it can attempt to handle it
+                page_cls = Workflow(fn_sr.workflow).page_cls
+                response = extract_model_fields(page_cls.ResponseModel, fn_sr.state)
+                return dict(
+                    error=dict(
+                        msg=fn_sr.error_msg,
+                        code=fn_sr.error_code,
+                        params=fn_sr.error_params,
+                        type=fn_sr.error_type,
+                    ),
+                    response=response,
+                )
 
         if fn_sr.workflow != Workflow.FUNCTIONS:
             page_cls = Workflow(fn_sr.workflow).page_cls
-            return_value = extract_model_fields(page_cls.ResponseModel, fn_sr.state)
-            return return_value
+            return extract_model_fields(page_cls.ResponseModel, fn_sr.state)
 
         # save the output from the function
         return_value = fn_sr.state.get("return_value")

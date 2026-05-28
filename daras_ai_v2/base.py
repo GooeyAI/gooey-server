@@ -1962,9 +1962,8 @@ class BasePage:
     def _render_custom_error(self) -> bool:
         if not self.current_sr or not self.current_sr.error_type:
             return False
-        exc_cls = getattr(exceptions, self.current_sr.error_type, None)
-        render = getattr(exc_cls, "render", None)
-        if not callable(render):
+        render = exceptions.get_error_renderer(self.current_sr.error_type)
+        if not render:
             return False
         error_params = dict(self.current_sr.error_params or {})
         error_params.update(self._get_default_error_params())
