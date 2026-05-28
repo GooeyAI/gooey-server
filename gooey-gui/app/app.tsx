@@ -20,9 +20,9 @@ import path from "path";
 import { useDebouncedCallback } from "use-debounce";
 import { gooeyGuiRouteHeader, realtimeRefreshKey } from "~/consts";
 import { useEventSourceNullOk } from "~/event-source";
+import { fetchServerAPI } from "~/fetchServerAPI";
 import { handleRedirectResponse } from "~/handleRedirect";
 import { applyFormDataTransforms, RenderedChildren } from "~/renderer";
-
 import "~/styles/app.css";
 import "~/styles/custom.css";
 import { GlobalContextProvider } from "./globalContext";
@@ -260,9 +260,9 @@ function App() {
       submit({ state }, submitOptions);
     },
     rerun: onSubmit,
+    fetchServerAPI,
   };
   if (typeof window !== "undefined") {
-    // @ts-ignore
     window.gui = globalContext;
   }
 

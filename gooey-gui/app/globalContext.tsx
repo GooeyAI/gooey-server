@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef } from "react";
+import { fetchServerAPI } from "~/fetchServerAPI";
 
 export type GlobalContextType = {
   session_state: Record<string, any>;
@@ -6,6 +7,7 @@ export type GlobalContextType = {
   set_session_state: (newState: Record<string, any>) => void;
   rerun: () => void;
   navigate: (path: string) => void;
+  fetchServerAPI: typeof fetchServerAPI;
 };
 
 export const GlobalContext = createContext<{
@@ -17,6 +19,7 @@ export const GlobalContext = createContext<{
     set_session_state: () => {},
     rerun: () => {},
     navigate: () => {},
+    fetchServerAPI,
   },
 });
 
@@ -36,6 +39,12 @@ export function GlobalContextProvider({
   return (
     <GlobalContext.Provider value={ctx}>{children}</GlobalContext.Provider>
   );
+}
+
+declare global {
+  interface Window {
+    gui: GlobalContextType;
+  }
 }
 
 export function useGlobalContext() {

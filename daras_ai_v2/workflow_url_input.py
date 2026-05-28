@@ -126,6 +126,12 @@ def init_workflow_selector(
 def url_to_runs(
     url: str,
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun]:
+    page_cls, query_params = resolve_workflow_url(url)
+    sr, pr = page_cls.get_sr_pr_from_query_params(**query_params)
+    return page_cls, sr, pr
+
+
+def resolve_workflow_url(url: str) -> tuple[type[BasePage], dict]:
     from daras_ai_v2.all_pages import page_slug_map, normalize_slug
 
     assert url, "URL is required"
@@ -133,12 +139,9 @@ def url_to_runs(
     assert match, "Not a valid Gooey.AI URL"
     page_cls = page_slug_map[normalize_slug(match.matched_params["page_slug"])]
     example_id, run_id, uid = extract_query_params(furl(url).query.params)
-    sr, pr = page_cls.get_sr_pr_from_query_params(
-        example_id=example_id or match.matched_params.get("example_id") or "",
-        run_id=run_id,
-        uid=uid,
-    )
-    return page_cls, sr, pr
+    example_id = example_id or match.matched_params.get("example_id") or ""
+    query_params = dict(example_id=example_id, run_id=run_id, uid=uid)
+    return page_cls, query_params
 
 
 @gui.cache_in_session_state

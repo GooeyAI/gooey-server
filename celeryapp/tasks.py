@@ -143,6 +143,7 @@ def runner_task(
             sentry_level = e.sentry_level
             logger.warning("\n".join(map(str, [e, e.__cause__])))
             error_params = e.error_params
+            traceback.print_exc()
         else:
             sentry_level = "error"
             traceback.print_exc()
