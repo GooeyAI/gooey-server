@@ -55,11 +55,17 @@ class BulkProgressTracker:
         total_row_groups: int,
         total_workflows: int,
     ):
-        self.counts = init_bulk_progress_counts(
-            total_rows=total_rows,
-            total_row_groups=total_row_groups,
-            total_workflows=total_workflows,
-        )
+        self.counts: BulkProgressCounts = {
+            "completed_unit_runs": 0,
+            "total_unit_runs": total_row_groups * total_workflows,
+            "completed_row_groups": 0,
+            "total_row_groups": total_row_groups,
+            "completed_rows": 0,
+            "total_rows": total_rows,
+            "current_row_number": 0,
+            "current_workflow_number": 1,
+            "total_workflows": total_workflows,
+        }
         self.credits_used = 0
         self.snapshot: BulkProgress | None = None
 
@@ -197,25 +203,6 @@ class BulkProgressTracker:
             f"{bulk_progress_percent(self.snapshot)}% Completed",
             {"bulk_progress": self.snapshot},
         )
-
-
-def init_bulk_progress_counts(
-    *,
-    total_rows: int,
-    total_row_groups: int,
-    total_workflows: int,
-) -> BulkProgressCounts:
-    return {
-        "completed_unit_runs": 0,
-        "total_unit_runs": total_row_groups * total_workflows,
-        "completed_row_groups": 0,
-        "total_row_groups": total_row_groups,
-        "completed_rows": 0,
-        "total_rows": total_rows,
-        "current_row_number": 0,
-        "current_workflow_number": 1,
-        "total_workflows": total_workflows,
-    }
 
 
 def is_bulk_progress_complete(progress: BulkProgressCounts) -> bool:
