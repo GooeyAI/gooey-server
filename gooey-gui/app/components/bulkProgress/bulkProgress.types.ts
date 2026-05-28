@@ -43,6 +43,7 @@ export type WorkflowDisplay = {
   title: string;
   url: string;
   failedAt: number | null;
+  elapsedSeconds: number | null;
 };
 
 export type DetailDisplay = {
