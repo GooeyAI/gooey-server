@@ -9,10 +9,6 @@ if (settings.SENTRY_DSN) {
   Sentry.init({
     dsn: settings.SENTRY_DSN,
     environment: "server",
-    // Integrations:
-    //    e.g. new Sentry.Integrations.Prisma({ client: prisma })
-    // Performance Monitoring:
-    tracesSampleRate: settings.SENTRY_SAMPLE_RATE,
   });
 }
 

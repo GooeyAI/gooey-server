@@ -9,14 +9,8 @@ from sentry_sdk import capture_exception
 from twilio.base.exceptions import TwilioRestException
 from twilio.twiml.voice_response import VoiceResponse
 
-from bots.models import BotIntegration
 from bots.models.bot_integration import validate_phonenumber
 from functions.composio_tools import ComposioLLMTool
-from functions.gooey_builder_tools import (
-    DeployWorkflowLLMTool,
-    RunJS,
-    UpdateGuiStateLLMTool,
-)
 from functions.memory_tools import (
     GooeyMemoryLLMToolRead,
     GooeyMemoryLLMToolWrite,
@@ -28,32 +22,21 @@ from functions.base_llm_tool import (
     get_external_tool_slug_from_url,
 )
 
+
 if typing.TYPE_CHECKING:
     from bots.models import SavedRun
 
 
-def get_inbuilt_tools(saved_run: SavedRun) -> typing.Iterable[BaseLLMTool]:
+def get_inbuilt_tools(sr: SavedRun) -> typing.Iterable[BaseLLMTool]:
     from composio import Composio
+    import gooey_gui as gui
 
-    state = saved_run.state
+    state = gui.session_state
     variables = state.get("variables") or {}
 
     if variables.get("platform_medium") == "VOICE":
         yield VectorSearchLLMTool(state)
         yield CallTransferLLMTool()
-
-    update_gui_state_params = variables.get("update_gui_state_params")
-    if update_gui_state_params:
-        builder_state = update_gui_state_params.get("state")
-        page_slug = update_gui_state_params.get("page_slug")
-        if builder_state and page_slug:
-            yield UpdateGuiStateLLMTool(
-                builder_state=builder_state,
-                page_slug=page_slug,
-            )
-        if builder_state and builder_state.get("run_id") and builder_state.get("uid"):
-            yield DeployWorkflowLLMTool(builder_state)
-        yield RunJS()
 
     conversation_id = variables.get("conversation_id")
     if conversation_id:
@@ -91,6 +74,7 @@ def get_inbuilt_tools(saved_run: SavedRun) -> typing.Iterable[BaseLLMTool]:
 
 
 class VectorSearchLLMTool(BaseLLMTool):
+    disable_dynamic_loader = True
     system_prompt = """
 ## file_search
 Before answering a question, call this tool to lookup information from the knowledge base to inform your responses.
@@ -145,6 +129,8 @@ You should build well-written queries, including keywords as well as the context
 class CallTransferLLMTool(BaseLLMTool):
     """In-Built tool for transferring phone calls."""
 
+    disable_dynamic_loader = True
+
     system_prompt = """
 ## transfer_call
 You can transfer the user's call to another phone number using this tool. Some examples of when to use this tool:
@@ -190,6 +176,7 @@ You can transfer the user's call to another phone number using this tool. Some e
         from daras_ai_v2.fastapi_tricks import get_api_route_url
         from routers.bots_api import api_hashids
         from routers.twilio_api import twilio_voice_call_status
+        from bots.models import BotIntegration
 
         try:
             self.call_sid, self.bi_id
@@ -243,6 +230,8 @@ You can transfer the user's call to another phone number using this tool. Some e
 
 class FeedbackCollectionLLMTool(BaseLLMTool):
     """In-Built tool for collecting detailed feedback from users."""
+
+    disable_dynamic_loader = True
 
     system_prompt = (
         "If the user is providing any feedback, suggestions or corrections instead of a question, "
@@ -318,6 +307,8 @@ class FeedbackCollectionLLMTool(BaseLLMTool):
 
 class NewConversationLLMTool(BaseLLMTool):
     """In-Built tool for starting a new conversation."""
+
+    disable_dynamic_loader = True
 
     def __init__(self, conversation_id: str):
         self.conversation_id = conversation_id

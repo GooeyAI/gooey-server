@@ -16,9 +16,10 @@ from random import Random
 from textwrap import dedent
 from time import sleep
 
+
 import gooey_gui as gui
 import sentry_sdk
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Exists, OuterRef
 from django.utils.text import slugify
 from fastapi import HTTPException
 from furl import furl
@@ -355,12 +356,41 @@ class BasePage:
             )
         return event
 
-    def refresh_state(self):
-        sr = self.current_sr
-        channel = self.realtime_channel_name(sr.run_id, sr.uid)
-        output = gui.realtime_pull([channel])[0]
-        if output:
-            gui.session_state.update(output)
+    def load_state(self):
+        from recipes.VideoBots import VideoBotsPage
+
+        if not gui.session_state:
+            gui.session_state.update(self.current_sr_to_session_state())
+
+        is_running = gui.session_state.get(StateKeys.run_status)
+
+        builder_sr = self.current_sr.parent_builder_saved_run
+        is_builder_running = builder_sr and builder_sr.run_status
+
+        if not (is_running or is_builder_running):
+            gui.realtime_clear_subs()
+            return
+
+        if is_builder_running:
+            builder_channel = VideoBotsPage.realtime_channel_name(
+                builder_sr.run_id, builder_sr.uid
+            )
+            gui.realtime_pull([builder_channel])
+
+            new_state = self.current_sr_to_session_state()
+            for k in ["--prev-request-hash"]:
+                try:
+                    new_state[k] = gui.session_state[k]
+                except KeyError:
+                    pass
+            gui.session_state.clear()
+            gui.session_state.update(new_state)
+        else:
+            sr = self.current_sr
+            channel = self.realtime_channel_name(sr.run_id, sr.uid)
+            output = gui.realtime_pull([channel])[0]
+            if output:
+                gui.session_state.update(output)
 
     def render_unauthorized(self):
         with gui.div(className="d-flex flex-column align-items-center"):
@@ -389,14 +419,6 @@ class BasePage:
             return
 
         self.setup_sentry()
-
-        if self.get_run_state(gui.session_state) in (
-            RecipeRunState.starting,
-            RecipeRunState.running,
-        ):
-            self.refresh_state()
-        else:
-            gui.realtime_clear_subs()
 
         self._user_disabled_check()
         self._check_if_flagged()
@@ -1417,7 +1439,7 @@ class BasePage:
     def update_flag_for_run(self, is_flagged: bool):
         sr = self.current_sr
         sr.is_flagged = is_flagged
-        sr.save(update_fields=["is_flagged"])
+        sr.save(update_fields=["is_flagged", "updated_at"])
         gui.session_state["is_flagged"] = is_flagged
 
     def get_current_llm_tools(self) -> dict[str, BaseLLMTool]:
@@ -1671,7 +1693,7 @@ class BasePage:
             )
             if stopped:
                 self.current_sr.is_cancelled = True
-                self.current_sr.save(update_fields=["is_cancelled"])
+                self.current_sr.save(update_fields=["is_cancelled", "updated_at"])
                 raise gui.RerunException
         else:
             submitted = gui.button(
@@ -2138,19 +2160,16 @@ class BasePage:
         except PublishedRunVersion.DoesNotExist:
             parent_version = None
 
-        sr = self.get_sr_from_ids(
-            run_id,
-            uid,
-            create=True,
-            defaults=(
-                dict(
-                    parent=parent,
-                    parent_version=parent_version,
-                    workspace=self.current_workspace,
-                )
-                | defaults
-            ),
+        defaults = (
+            dict(
+                parent=parent,
+                parent_version=parent_version,
+                workspace=self.current_workspace,
+                parent_builder_saved_run=parent.parent_builder_saved_run,
+            )
+            | defaults
         )
+        sr = self.get_sr_from_ids(run_id, uid, create=True, defaults=defaults)
 
         self.dump_state_to_sr(self._get_validated_state(), sr)
 
@@ -2192,7 +2211,7 @@ class BasePage:
         )
         # persist task id so a Stop click can revoke it mid-run
         sr.celery_task_id = result.id
-        sr.save(update_fields=["celery_task_id"])
+        sr.save(update_fields=["celery_task_id", "updated_at"])
         return result
 
     @classmethod
@@ -2326,6 +2345,13 @@ class BasePage:
         qs = SavedRun.objects.filter(
             workflow=self.workflow, workspace=self.current_workspace
         )
+
+        if not self.is_current_user_admin():
+            qs = qs.exclude(
+                Exists(
+                    SavedRun.objects.filter(parent_builder_saved_run_id=OuterRef("pk"))
+                )
+            )
 
         # Apply user filter if specified
         for_param = self.request.query_params.get("for", "me")
@@ -2568,7 +2594,7 @@ class BasePage:
         return []
 
     @classmethod
-    def get_tool_call_schema(cls, request: dict) -> dict[str, typing.Any]:
+    def get_tool_call_schema(cls, state: dict) -> dict[str, typing.Any]:
         """Return top-level request properties for tool calling schema."""
         properties = get_full_pydantic_schema(cls.RequestModel)
         patch_ai_model_schema_enums(properties)

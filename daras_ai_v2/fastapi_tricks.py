@@ -2,7 +2,7 @@ import os.path
 import typing
 from urllib.parse import parse_qs
 
-from fastapi import Depends
+import fastapi
 from fastapi.routing import APIRoute
 from furl import furl
 from starlette.requests import Request
@@ -27,10 +27,10 @@ async def request_body(request: Request):
     return await request.body()
 
 
-fastapi_request_json = Depends(request_json)
-fastapi_request_urlencoded_body = Depends(request_urlencoded_body)
-fastapi_request_form = Depends(request_form)
-fastapi_request_body = Depends(request_body)
+fastapi_request_json = fastapi.Depends(request_json)
+fastapi_request_urlencoded_body = fastapi.Depends(request_urlencoded_body)
+fastapi_request_form = fastapi.Depends(request_form)
+fastapi_request_body = fastapi.Depends(request_body)
 
 
 class ResolverMatch(typing.NamedTuple):
@@ -78,3 +78,11 @@ def get_route_path(route_fn: typing.Callable, path_params: dict = None) -> str:
     from server import app
 
     return os.path.join(app.url_path_for(route_fn.__name__, **(path_params or {})), "")
+
+
+def _login_required(request: Request):
+    if not request.user or request.user.is_anonymous:
+        raise fastapi.HTTPException(status_code=401, detail="Not authenticated")
+
+
+fastapi_login_required = fastapi.Depends(_login_required)

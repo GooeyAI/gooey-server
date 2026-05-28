@@ -13,6 +13,7 @@ from django.db.models import IntegerChoices
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import PostgresJSONEncoder
+from daras_ai_v2.crypto import get_random_doc_id
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from . import Platform
@@ -23,7 +24,7 @@ if typing.TYPE_CHECKING:
     import pandas as pd
 
     from functions.models import CalledFunction
-    from .published_run import PublishedRun
+    from .published_run import PublishedRun, PublishedRunVersion
     from workspaces.models import Workspace
 
 
@@ -155,11 +156,15 @@ class SavedRun(models.Model):
         default=None,
         help_text="The Parent Gooey Builder SavedRun that created this run",
     )
+    redirect_url = models.TextField(
+        blank=True,
+        default="",
+        help_text="The URL to redirect the user to after the builder run is complete",
+    )
 
     objects = SavedRunQuerySet.as_manager()
 
     class Meta:
-        ordering = ["-updated_at"]
         unique_together = [
             ["workflow", "example_id"],
             ["run_id", "uid"],
@@ -226,15 +231,10 @@ class SavedRun(models.Model):
         return ret
 
     def set(self, state: dict):
-        if not state:
-            return
-
-        self.copy_from_firebase_state(state)
-        self.save()
-
-    def copy_from_firebase_state(self, state: dict) -> "SavedRun":
         from daras_ai_v2.base import StateKeys
 
+        if not state:
+            return
         state = state.copy()
         # ignore updated_at from firebase, we use auto_now=True
         state.pop(StateKeys.updated_at, None)
@@ -250,19 +250,30 @@ class SavedRun(models.Model):
         self.is_flagged = state.pop("is_flagged", False)
         self.state = state
 
-        return self
+        self.save(
+            update_fields=[
+                "created_at",
+                "updated_at",
+                "error_msg",
+                "run_time",
+                "run_status",
+                "is_flagged",
+                "state",
+            ]
+        )
 
     def submit_api_call(
         self,
         *,
-        workspace: "Workspace",
+        current_user: AppUser,
+        workspace: Workspace,
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
         parent_pr: PublishedRun | None = None,
-        current_user: AppUser | None = None,
         called_fn: CalledFunction | None = None,
-    ) -> tuple["celery.result.AsyncResult", "SavedRun"]:
+        **defaults,
+    ) -> tuple[celery.result.AsyncResult, SavedRun]:
         from routers.api import submit_api_call
 
         # run in a thread to avoid messing up threadlocals
@@ -286,10 +297,11 @@ class SavedRun(models.Model):
                     enable_rate_limits=enable_rate_limits,
                     deduct_credits=deduct_credits,
                     called_fn=called_fn,
+                    **defaults,
                 ),
             )
 
-    def wait_for_celery_result(self, result: "celery.result.AsyncResult"):
+    def wait_for_celery_result(self, result: celery.result.AsyncResult):
         get_celery_result_db_safe(result)
         self.refresh_from_db()
 
@@ -311,6 +323,41 @@ class SavedRun(models.Model):
                 for called_fn in self.called_functions.all()
             ]
         return state
+
+    def clone(
+        self,
+        *,
+        parent_pr: PublishedRun | None = None,
+        uid: str | None = None,
+        workspace_id: int | None = None,
+        **kwargs,
+    ) -> SavedRun:
+        parent_version_id = self.parent_version_id
+        if parent_pr:
+            try:
+                parent_version_id = parent_pr.versions.latest("id").id
+            except PublishedRunVersion.DoesNotExist:
+                pass
+        if uid is None:
+            uid = self.uid
+        if workspace_id is None:
+            workspace_id = self.workspace_id
+        return SavedRun(
+            parent_id=self.id,
+            parent_version_id=parent_version_id,
+            workflow=self.workflow,
+            run_id=get_random_doc_id(),
+            uid=uid,
+            workspace_id=workspace_id,
+            state=self.state,
+            error_msg=self.error_msg,
+            run_time=self.run_time,
+            error_code=self.error_code,
+            error_type=self.error_type,
+            error_params=self.error_params,
+            price=self.price,
+            **kwargs,
+        )
 
 
 def _parse_dt(dt) -> datetime.datetime | None:

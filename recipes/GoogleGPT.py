@@ -24,7 +24,6 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     SearchReference,
@@ -80,7 +79,7 @@ class GoogleGPTPage(BasePage):
             title="Search Query",
             description="The search query to be used for the Google search. You can use the full google search syntax to refine your search. [Learn more](https://support.google.com/websearch/answer/2466433)",
         )
-        site_filter: OptionalHttpUrlStr = Field(
+        site_filter: str = Field(
             None,
             title="Site Filter",
             description="Only show results from this site *(optional)*",

@@ -1,7 +1,10 @@
 import json
 import math
+import traceback
 import typing
 from itertools import zip_longest
+
+import sentry_sdk
 
 import gooey_gui as gui
 import typing_extensions
@@ -17,7 +20,7 @@ from bots.models import (
     Workflow,
 )
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, exceptions
 from daras_ai_v2.asr import (
     AsrModels,
     TranslationModels,
@@ -33,9 +36,8 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
-from daras_ai_v2.base import BasePage, RecipeRunState, RecipeTabs, StateKeys
+from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
-from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.doc_search_settings_widgets import (
     SUPPORTED_SPREADSHEET_TYPES,
@@ -62,7 +64,6 @@ from daras_ai_v2.language_model import (
     ConversationEntry,
     calc_appx_tokens,
     format_chat_entry,
-    get_entry_images,
     get_entry_text,
     run_language_model,
 )
@@ -83,7 +84,11 @@ from daras_ai_v2.search_ref import (
     apply_response_formattings_suffix,
     parse_refs,
 )
-from daras_ai_v2.web_widget_embed import load_web_widget_lib
+from daras_ai_v2.web_widget_embed import (
+    load_chat_widget_lib,
+    chat_widget_input_to_request_body,
+    get_chat_widget_messages,
+)
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -661,8 +666,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
         model: AIModelSpec,
         asr_msg: str | None = None,
         prev_output_text: list[str] | None = None,
-        tools_by_name: dict[str, BaseLLMTool] | None = None,
+        tools_by_name: dict[str, BaseLLMTool],
     ) -> typing.Iterator[str | None]:
+        from functions.gooey_builder_tools import get_current_builder_tools
+
         yield f"Summarizing with {model.label}..."
 
         audio_session_extra = None
@@ -670,6 +677,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
             audio_session_extra = {}
             if request.openai_voice_name:
                 audio_session_extra["voice"] = request.openai_voice_name
+
+        tools_by_name |= get_current_builder_tools(self.current_sr)
 
         loader = DynamicLLMToolLoader(tools_by_name, self.active_tool_names)
         tools_by_name[loader.name] = loader
@@ -781,8 +790,15 @@ Translation Glossary for LLM Language (English) -> User Langauge
             try:
                 output = tool.call_json(arguments)
             except Exception as e:
-                output = json.dumps({"error": str(e)})
-                raise
+                output = json.dumps(dict(error=str(e)))
+                if hasattr(e, "error_type") and exceptions.get_error_renderer(
+                    e.error_type
+                ):
+                    # bubble up error so the parent run's standard error pipeline renders it
+                    raise
+                else:
+                    traceback.print_exc()
+                    sentry_sdk.capture_exception(e)
             finally:
                 response.final_prompt.append(
                     dict(
@@ -1249,8 +1265,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
 
     def render_output(self):
-        from daras_ai_v2.bots import parse_bot_html
-
         gui.tag(
             "button",
             type="submit",
@@ -1265,14 +1279,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             except (json.JSONDecodeError, TypeError):
                 pass
             else:
-                self.on_send(
-                    input_data.get("input_prompt"),
-                    input_data.get("input_images"),
-                    input_data.get("input_audio"),
-                    input_data.get("input_documents"),
-                    input_data.get("button_pressed"),
-                    input_data.get("input_location"),
-                )
+                self.on_send(input_data)
 
         gui.tag(
             "button",
@@ -1294,107 +1301,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             gui.session_state["final_search_query"] = ""
             gui.rerun()
 
-        messages = []  # chat widget internal mishmash format
-        input_audio = gui.session_state.get("input_audio") or ""
-        input_images = gui.session_state.get("input_images") or []
-        input_documents = gui.session_state.get("input_documents") or []
-
-        if is_realtime_audio_url(input_audio):
-            entries = gui.session_state.get("final_prompt", []).copy()
-            input_audio = ""  # dont render ws audio url in chat widget
-        else:
-            entries = gui.session_state.get("messages", []).copy()
-
-        for entry in entries:
-            role = entry.get("role")
-            if role == CHATML_ROLE_USER:
-                messages.append(
-                    dict(
-                        role=role,
-                        input_prompt=get_entry_text(entry),
-                        input_images=get_entry_images(entry) or [],
-                    )
-                )
-            elif role == CHATML_ROLE_ASSISTANT:
-                messages.append(
-                    dict(
-                        role=role,
-                        type="final_response",
-                        status="completed",
-                        output_text=[parse_bot_html(get_entry_text(entry))[1]],
-                    )
-                )
-
-        # add last input to history if present
-        show_raw_msgs = False
-        if show_raw_msgs:
-            input_prompt = gui.session_state.get("raw_input_text") or ""
-        else:
-            input_prompt = gui.session_state.get("input_prompt") or ""
-
-        if input_prompt or input_images or input_audio or input_documents:
-            messages.append(
-                dict(
-                    role=CHATML_ROLE_USER,
-                    input_prompt=input_prompt,
-                    input_images=input_images,
-                    input_audio=input_audio,
-                    input_documents=input_documents,
-                ),
-            )
-
-            # add last output
-            run_status = self.get_run_state(gui.session_state)
-            match run_status:
-                case RecipeRunState.starting:
-                    event_type = "conversation_start"
-                case RecipeRunState.running:
-                    event_type = "message_part"
-                case RecipeRunState.failed:
-                    event_type = "error"
-                case _:
-                    event_type = "final_response"
-            raw_output_text = gui.session_state.get("raw_output_text") or []
-            output_text = gui.session_state.get("output_text") or []
-            output_video = gui.session_state.get("output_video") or []
-            output_audio = gui.session_state.get("output_audio") or []
-            text = output_text and output_text[0] or ""
-
-            if text:
-                buttons, text, thinking, disable_feedback = parse_bot_html(text)
-                if thinking:
-                    thinking_duration = gui.session_state.get("metrics", {}).get(
-                        "thinking_duration_sec"
-                    )
-                    template = settings.templates.get_template("thinking_summary.html")
-                    context = dict(
-                        text=text,
-                        thinking=thinking,
-                        thinking_duration=thinking_duration,
-                    )
-                    text = template.render(context)
-            else:
-                buttons = []
-
-            for child_sr in self.current_sr.child_builder_saved_runs.order_by().all():
-                text += f"\n\n[View Updated Workflow]({child_sr.get_app_url()})"
-
-            messages.append(
-                dict(
-                    role=CHATML_ROLE_ASSISTANT,
-                    type=event_type,
-                    status=run_status,
-                    detail=gui.session_state.get(StateKeys.run_status) or "",
-                    raw_output_text=raw_output_text,
-                    output_text=[text],
-                    text=text,
-                    output_video=output_video,
-                    output_audio=output_audio,
-                    references=gui.session_state.get("references") or [],
-                    buttons=buttons,
-                    final_prompt=gui.session_state.get("final_prompt"),
-                )
-            )
+        messages = get_chat_widget_messages(gui.session_state)
 
         # fill branding with bot integration data if available
         bot_integration = (
@@ -1420,7 +1327,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             style=dict(height="calc(100vh - 1rem)"),
             id="gooey-embed",
         )
-        load_web_widget_lib()
+        load_chat_widget_lib()
         gui.js(
             """
 async function loadGooeyEmbed() {
@@ -1440,6 +1347,7 @@ async function loadGooeyEmbed() {
         onNewConversation() {
           document.getElementById("onNewConversation").click();
         },
+        fetchConversations: () => gui.fetchServerAPI("/__/agent/fetch-conversations", { run_url }),
     };
     GooeyEmbed.copilotPreviewControl = controller;
     GooeyEmbed.mount(config, controller);
@@ -1449,7 +1357,6 @@ const script = document.getElementById("gooey-embed-script");
 if (script) script.onload = loadGooeyEmbed;
 loadGooeyEmbed();
 window.addEventListener("hydrated", loadGooeyEmbed);
-
 // once the widget is already mounted, update the messages and branding to latest
 if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
     GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
@@ -1462,7 +1369,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 mode="inline",
                 enableAudioMessage=True,
                 enablePhotoUpload=True,
-                enableConversations=False,
+                enableConversations=True,
                 showToolCalls=True,
                 branding=bot_branding,
                 fillParent=True,
@@ -1470,69 +1377,16 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
             ),
             messages=messages,
+            run_url=str(self.request.url),
         )
+
+    def on_send(self, input_data: dict):
+        ret = chat_widget_input_to_request_body(gui.session_state, input_data)
+        gui.session_state.update(ret)
+        self.submit_and_redirect()
 
     def _render_regenerate_button(self):
         pass
-
-    def on_send(
-        self,
-        new_input_prompt: str | None,
-        new_input_images: list[str] | None,
-        new_input_audio: str | None,
-        new_input_documents: list[str] | None,
-        button_pressed: list[str] | None,
-        input_location: dict[str, float] | None,
-    ):
-        if button_pressed:
-            # encoded by parse_html
-            target, title = None, None
-            parts = csv_decode_row(button_pressed.get("button_id", ""))
-            if len(parts) >= 3:
-                target = parts[1]
-                title = parts[-1]
-            value = title or button_pressed.get("button_title", "")
-            if target and target != "input_prompt":
-                gui.session_state[target] = value
-            else:
-                new_input_prompt = value
-
-        if input_location:
-            from daras_ai_v2.bots import handle_location_msg
-
-            new_input_prompt = handle_location_msg(input_location)
-
-        prev_input = gui.session_state.get("raw_input_text") or ""
-        prev_output = (gui.session_state.get("raw_output_text") or [""])[0]
-        prev_input_images = gui.session_state.get("input_images")
-        prev_input_audio = gui.session_state.get("input_audio")
-        prev_input_documents = gui.session_state.get("input_documents")
-
-        if (
-            prev_input or prev_input_images or prev_input_audio or prev_input_documents
-        ) and prev_output:
-            # append previous input to the history
-            gui.session_state["messages"] = gui.session_state.get("messages", []) + [
-                format_chat_entry(
-                    role=CHATML_ROLE_USER,
-                    content_text=prev_input,
-                    input_images=prev_input_images,
-                    # input_audio=prev_input_audio,
-                    input_documents=prev_input_documents,
-                ),
-                format_chat_entry(
-                    role=CHATML_ROLE_ASSISTANT,
-                    content_text=prev_output,
-                ),
-            ]
-
-        # add new input to the state
-        gui.session_state["input_prompt"] = new_input_prompt
-        gui.session_state["input_audio"] = new_input_audio or None
-        gui.session_state["input_images"] = new_input_images or None
-        gui.session_state["input_documents"] = new_input_documents or None
-
-        self.submit_and_redirect()
 
     def render_steps(self):
         if gui.session_state.get("tts_provider"):

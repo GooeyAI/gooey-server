@@ -300,7 +300,7 @@ def script_to_api(page_cls: typing.Type[BasePage]):
                 ret |= {"output": sr.api_output()}
                 if sr.retention_policy == RetentionPolicy.delete:
                     sr.state = {}
-                    sr.save(update_fields=["state"])
+                    sr.save(update_fields=["state", "updated_at"])
             return ret
 
 
@@ -455,7 +455,7 @@ def build_sync_api_response(
     sr.wait_for_celery_result(result)
     if sr.retention_policy == RetentionPolicy.delete:
         sr.state = {}
-        sr.save(update_fields=["state"])
+        sr.save(update_fields=["state", "updated_at"])
     # check for errors
     if sr.error_msg:
         return JSONResponse(

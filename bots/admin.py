@@ -487,6 +487,8 @@ class SavedRunAdmin(GooeyModelAdmin):
         "view_bot_message",
     ]
 
+    ordering = ["-updated_at"]
+
     actions = [export_to_csv, export_to_excel, "rerun_tasks"]
 
     formfield_overrides = {

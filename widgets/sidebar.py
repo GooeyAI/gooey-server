@@ -8,6 +8,7 @@ def sidebar_layout(*, key: str, session, disabled: bool = False):
     except KeyError:
         default_open = session.get(default_open_key)
 
+    gui.session_state.setdefault(key, default_open)
     with gui.component(
         "Sidebar", name=key, disabled=disabled, defaultOpen=default_open
     ):

@@ -341,11 +341,11 @@ class PublishedRun(models.Model):
     def submit_api_call(
         self,
         *,
+        current_user: AppUser,
         workspace: "Workspace",
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
-        current_user: AppUser | None = None,
         called_fn: CalledFunction | None = None,
     ) -> tuple[celery.result.AsyncResult, SavedRun]:
         return self.saved_run.submit_api_call(
