@@ -10,6 +10,7 @@ import typing
 from contextlib import ExitStack
 from unittest.mock import patch
 
+import pytest
 from starlette.testclient import TestClient
 
 from daras_ai_v2.all_pages import all_test_pages
@@ -106,3 +107,45 @@ def _test_api_async_without_keys(page_cls: typing.Type[BasePage], endpoint: str)
             follow_redirects=False,
         )
         assert r.status_code == 200, r.text
+
+
+def no_google_credentials():
+    """Context manager that removes the Google service account from the environment."""
+    return patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": ""})
+
+
+def test_google_tts_without_credentials(transactional_db):
+    from google.api_core.exceptions import GoogleAPICallError
+    from google.auth.exceptions import DefaultCredentialsError
+
+    from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
+    from recipes.TextToSpeech import TextToSpeechPage
+
+    state = {
+        "text_prompt": "Hello, world.",
+        "tts_provider": TextToSpeechProviders.GOOGLE_TTS.name,
+        "google_voice_name": "en-US-Neural2-F",
+    }
+
+    page = TextToSpeechPage()
+
+    with no_google_credentials():
+        with pytest.raises(
+            (GoogleAPICallError, DefaultCredentialsError, Exception)
+        ) as exc_info:
+            for _ in page.run(state):
+                pass
+
+    # Confirm the failure is credential-related, not an unexpected crash
+    err = str(exc_info.value).lower()
+    assert any(
+        kw in err
+        for kw in (
+            "credential",
+            "authentication",
+            "permission",
+            "unauthenticated",
+            "403",
+            "401",
+        )
+    ), f"Expected a credentials error, got: {exc_info.value}"
