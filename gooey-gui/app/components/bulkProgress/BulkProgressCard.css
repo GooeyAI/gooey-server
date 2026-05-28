@@ -113,7 +113,8 @@
 }
 
 .bulk-progress-meta,
-.bulk-progress-stat-caption {
+.bulk-progress-stat-caption,
+.bulk-progress-workflow-elapsed {
   color: #59617d;
 }
 
@@ -255,6 +256,19 @@
   white-space: nowrap;
 }
 
+.bulk-progress-workflow-link-group {
+  align-items: baseline;
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.bulk-progress-workflow-elapsed {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .bulk-progress-detail-link {
   color: #070b1a;
   display: inline-block;
@@ -339,11 +353,6 @@
 .bulk-progress-card-stopped .bulk-progress-last-completed-label,
 .bulk-progress-card-error .bulk-progress-last-completed-label {
   color: #9d7b1f;
-}
-
-.bulk-progress-last-completed-meta {
-  flex: 0 0 auto;
-  white-space: nowrap;
 }
 
 .bulk-progress-stop-pending {
