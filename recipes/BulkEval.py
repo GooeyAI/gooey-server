@@ -415,6 +415,7 @@ def submit(
 
 
 def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
+    array_columns = [col for col in array_columns or [] if col in df.columns]
     out_df_recs = []
     prev_group_ix = None
     prompt_columns = {}
