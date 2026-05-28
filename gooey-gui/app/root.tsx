@@ -1,5 +1,6 @@
 import type { LinksFunction } from "@remix-run/node";
 import { json } from "@remix-run/node"; // Depends on the runtime you choose
+import type { ShouldRevalidateFunction } from "@remix-run/react";
 import {
   isRouteErrorResponse,
   Links,
@@ -8,7 +9,6 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
-  ShouldRevalidateFunction,
   useLoaderData,
   useRouteError,
 } from "@remix-run/react";
@@ -19,22 +19,27 @@ import {
   HydrationUtilsPreRender,
 } from "~/useHydrated";
 import settings from "./settings";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 
-export const links: LinksFunction = () => [
-  ...globalProgressStyles(),
-];
+export const links: LinksFunction = () => [...globalProgressStyles()];
+
+declare global {
+  interface Window {
+    ENV: typeof settings;
+  }
+}
 
 // export env vars to the client
 export async function loader() {
   return json({
     ENV: {
       SENTRY_DSN: settings.SENTRY_DSN,
-      SENTRY_SAMPLE_RATE: settings.SENTRY_SAMPLE_RATE,
       SENTRY_RELEASE: settings.SENTRY_RELEASE,
+      SERVER_HOST: settings.SERVER_HOST,
     },
   });
 }
+
 export const shouldRevalidate: ShouldRevalidateFunction = () => false;
 
 export default function App() {

@@ -26,7 +26,7 @@ import url_shortener.routers as url_shortener
 from auth.auth_backend import (
     SessionAuthBackend,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import settings, gooey_builder
 from daras_ai_v2.github_tools import github_url_for_exc
 from daras_ai_v2.settings import templates
 from gooeysite.bg_db_conn import db_middleware
@@ -45,7 +45,6 @@ from routers import (
     static_pages,
     onedrive_api,
     workspace,
-    pycon,
 )
 from routers import twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
@@ -82,7 +81,7 @@ app.include_router(twilio_api.router, include_in_schema=False)
 app.include_router(telegram_api.router, include_in_schema=False)
 app.include_router(static_pages.app, include_in_schema=False)
 app.include_router(twilio_ws_api.app, include_in_schema=False)
-app.include_router(pycon.app, include_in_schema=False)
+app.include_router(gooey_builder.router, include_in_schema=False)
 app.include_router(root.app, include_in_schema=False)  # this has a catch-all route
 
 app.add_middleware(

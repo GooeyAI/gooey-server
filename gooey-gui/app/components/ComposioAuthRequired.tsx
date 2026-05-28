@@ -1,4 +1,8 @@
-export function ComposioAuthRequired({ redirectUrl }: { redirectUrl: string }) {
+import type { CustomComponentProps } from "~/components";
+
+export function ComposioAuthRequired({
+  redirectUrl,
+}: CustomComponentProps & { redirectUrl: string }) {
   return (
     <div
       style={{

@@ -11,7 +11,6 @@ from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
-from gooeysite.custom_create import get_or_create_lazy
 from .saved_run import SavedRun
 from .workflow import Workflow, WorkflowAccessLevel
 
@@ -23,37 +22,6 @@ if typing.TYPE_CHECKING:
 
 
 class PublishedRunQuerySet(models.QuerySet):
-    def get_or_create_with_version(
-        self,
-        *,
-        workflow: Workflow,
-        published_run_id: str,
-        saved_run: SavedRun,
-        user: AppUser | None,
-        workspace: typing.Optional["Workspace"],
-        title: str,
-        notes: str = "",
-        public_access: WorkflowAccessLevel | None = None,
-        photo_url: str = "",
-        tags: list[Tag] | None = None,
-    ):
-        return get_or_create_lazy(
-            PublishedRun,
-            workflow=workflow,
-            published_run_id=published_run_id,
-            create=lambda **kwargs: self.create_with_version(
-                **kwargs,
-                saved_run=saved_run,
-                user=user,
-                workspace=workspace,
-                title=title,
-                notes=notes,
-                public_access=public_access,
-                photo_url=photo_url,
-                tags=tags,
-            ),
-        )
-
     def create_with_version(
         self,
         *,
@@ -63,7 +31,7 @@ class PublishedRunQuerySet(models.QuerySet):
         user: AppUser | None,
         workspace: typing.Optional["Workspace"],
         title: str,
-        notes: str,
+        notes: str = "",
         public_access: WorkflowAccessLevel | None = None,
         photo_url: str = "",
         tags: list[Tag] | None = None,
@@ -341,11 +309,11 @@ class PublishedRun(models.Model):
     def submit_api_call(
         self,
         *,
+        current_user: AppUser,
         workspace: "Workspace",
         request_body: dict,
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
-        current_user: AppUser | None = None,
         called_fn: CalledFunction | None = None,
     ) -> tuple[celery.result.AsyncResult, SavedRun]:
         return self.saved_run.submit_api_call(

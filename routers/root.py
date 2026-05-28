@@ -321,6 +321,18 @@ def explore_page(
     }
 
 
+@gui.route(app, "/explore2/")
+def explore2_page(request: Request):
+    from widgets import explore2
+
+    with page_wrapper(request, show_search_bar=False):
+        explore2.render(request)
+
+    return {
+        "meta": explore2.build_meta_tags(url=get_og_url_path(request)),
+    }
+
+
 @app.get("/tools/{toolkit_slug}/{tool_slug}")
 def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
     import composio_client
@@ -785,8 +797,7 @@ def render_recipe_page(
         query_params=dict(request.query_params) | dict(example_id=example_id or ""),
     )
 
-    if not gui.session_state:
-        gui.session_state.update(page.current_sr_to_session_state())
+    page.load_state()
 
     with page_wrapper(request, page=page):
         page.render()
@@ -882,14 +893,13 @@ def page_wrapper(
                             render_gooey_builder_launcher(
                                 sidebar_key="builder-sidebar",
                                 request=request,
-                                current_workspace=current_workspace,
+                                workspace=current_workspace,
                             )
                         with sidebar:
                             render_gooey_builder(
                                 sidebar_key="builder-sidebar",
                                 request=request,
                                 page=page,
-                                current_workspace=current_workspace,
                             )
                 else:
                     current_workspace = None

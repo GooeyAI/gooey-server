@@ -31,6 +31,7 @@ before or after the workflow runs.
 class BaseLLMTool:
     icon: str = ""
     url: str = ""
+    disable_dynamic_loader: bool = False
 
     def __init__(
         self,

@@ -1,14 +1,32 @@
 from __future__ import annotations
 
 import typing
+from typing import Any
 
+from django.db.models import F
+import pydantic
+
+from bots.models.workflow import Workflow
 import gooey_gui as gui
-from starlette.requests import Request
+import fastapi
 
-from bots.models import BotIntegration, SavedRun, db_msgs_to_api_json
+from bots.models import (
+    BotIntegration,
+    SavedRun,
+    db_msgs_to_api_json,
+    PublishedRun,
+)
 from daras_ai_v2 import settings
-from daras_ai_v2.web_widget_embed import load_web_widget_lib
+from daras_ai_v2.fastapi_tricks import fastapi_login_required
+from daras_ai_v2.web_widget_embed import (
+    load_chat_widget_lib,
+    chat_widget_input_to_request_body,
+    get_chat_widget_messages,
+)
+from routers.custom_api_router import CustomAPIRouter
+
 from workspaces.models import Workspace
+from workspaces.widgets import get_current_workspace
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -18,10 +36,10 @@ DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.app
 
 def render_gooey_builder_launcher(
     sidebar_key: str,
-    request: Request,
-    current_workspace: Workspace | None,
+    request: fastapi.Request,
+    workspace: Workspace | None,
 ):
-    if not can_launch_gooey_builder(request, current_workspace):
+    if not can_launch_gooey_builder(request, workspace):
         return
 
     try:
@@ -68,118 +86,71 @@ def render_gooey_builder_launcher(
         )
 
 
+class GooeyBuilderWorkflow(typing.TypedDict):
+    current_url: str
+    current_user: str
+    current_workspace: str
+    state: dict
+
+
 def render_gooey_builder(
     *,
     sidebar_key: str,
-    request: Request,
-    page: BasePage | None,
-    current_workspace: Workspace | None,
+    request: fastapi.Request,
+    page: BasePage,
 ):
-    from daras_ai_v2.base import StateKeys, extract_model_fields
-
-    if not can_launch_gooey_builder(request, current_workspace):
+    if not can_launch_gooey_builder(request, page.current_workspace):
         return
-
-    handle_update_gui_state(page)
-
-    with gui.div(className="w-100 h-100"):
-        render_gooey_builder_inline(
-            sidebar_key=sidebar_key,
-            page_slug=page.slug_versions[-1],
-            builder_state=dict(
-                status=dict(
-                    error_msg=gui.session_state.get(StateKeys.error_msg),
-                    run_status=gui.session_state.get(StateKeys.run_status),
-                    run_time=gui.session_state.get(StateKeys.run_time),
-                ),
-                request=extract_model_fields(
-                    model=page.RequestModel, state=gui.session_state
-                ),
-                response=extract_model_fields(
-                    model=page.ResponseModel, state=gui.session_state
-                ),
-                metadata=dict(
-                    title=page.current_pr.title,
-                    description=page.current_pr.notes,
-                ),
-                run_id=page.current_sr.run_id,
-                uid=page.current_sr.uid,
-            ),
-            sr=page.current_sr,
-        )
-
-
-def handle_update_gui_state(page: BasePage):
-    from daras_ai_v2.workflow_url_input import url_to_runs
-
-    update_gui_state: dict | None = gui.session_state.pop("update_gui_state", None)
-    if not update_gui_state:
-        return
-
-    create_new_run: bool = update_gui_state.pop("create_new_run", True)
-    gooey_builder_web_url: str | None = update_gui_state.pop(
-        "gooey_builder_web_url", None
-    )
-
-    gui.session_state.update(update_gui_state)
-
-    if not create_new_run:
-        return
-    sr = page.create_and_validate_new_run(enable_rate_limits=True, run_status=None)
-    if not sr:
-        return
-
-    if gooey_builder_web_url:
-        sr.parent_builder_saved_run = url_to_runs(gooey_builder_web_url)[1]
-        sr.save(update_fields=["parent_builder_saved_run"])
-
-    raise gui.RedirectException(sr.get_app_url())
-
-
-def render_gooey_builder_inline(
-    *, sidebar_key: str, page_slug: str, builder_state: dict, sr: SavedRun
-):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
-
     bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     config = bi.get_web_widget_config(
         hostname="gooey.ai", target="#gooey-builder-embed"
     )
 
+    config["integration_id"] = "magic"
     config["mode"] = "inline"
     config["showRunLink"] = True
     config["showToolCalls"] = True
     config["enableSourcePreview"] = False
+    config["enableConversations"] = True
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 
-    config.setdefault("payload", {}).setdefault("variables", {})
-    # will be added later in the js code
-    variables = dict(
-        update_gui_state_params=dict(state=builder_state, page_slug=page_slug),
-    )
+    builder_sr = page.current_sr.parent_builder_saved_run
 
-    conversation_data = get_conversation_data_for_saved_run(bi, sr)
+    redirect_url = builder_sr and builder_sr.redirect_url
+    if redirect_url:
+        builder_sr.redirect_url = ""
+        builder_sr.save(update_fields=["redirect_url"])
+        raise gui.RedirectException(redirect_url)
 
-    gui.div(style=dict(height="100%"), id="gooey-builder-embed")
-    load_web_widget_lib()
-    gui.js(
-        GOOEY_BUILDER_INLINE_JS,
+    if builder_sr and not gui.session_state.get("builderOnNewConversation"):
+        builder_run_url = builder_sr.get_app_url()
+        messages = get_chat_widget_messages(
+            builder_sr.to_dict(), web_url=builder_sr.get_app_url()
+        )
+    else:
+        builder_run_url = bi.published_run.get_app_url()
+        messages = []
+
+    load_chat_widget_lib()
+    gui.component(
+        "GooeyBuilderInlineEmbed",
         config=config,
-        variables=variables,
         sidebar_key=sidebar_key,
-        conversation_data=conversation_data,
+        messages=messages,
+        builder_run_url=builder_run_url,
+        workflow_state={
+            field_name: gui.session_state[field_name]
+            for field_name in page.fields_to_save()
+            if field_name in gui.session_state
+        },
     )
-
-
-GOOEY_BUILDER_INLINE_JS = (
-    settings.BASE_DIR / "static/js/gooey_builder_inline_embed.js"
-).read_text()
 
 
 def can_launch_gooey_builder(
-    request: Request, current_workspace: Workspace | None
+    request: fastapi.Request, current_workspace: Workspace | None
 ) -> bool:
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return False
@@ -225,3 +196,120 @@ def get_conversation_data_for_saved_run(
     if last_message == conversation.messages.latest():
         data["id"] = api_hashids.encode(conversation.id)
     return data
+
+
+router = CustomAPIRouter()
+
+
+class GooeyBuilderSendMessage(pydantic.BaseModel):
+    workflow_url: str
+    builder_run_url: str | None = None
+    input_data: dict | None = None
+    workflow_state: dict = {}
+
+
+@router.post("/__/gooey-builder/send-message", dependencies=[fastapi_login_required])
+def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendMessage):
+    from daras_ai_v2.workflow_url_input import url_to_runs
+    from functions.gooey_builder_tools import insert_gooey_builder_variables
+
+    workspace = get_current_workspace(request.user, request.session)
+
+    # copy the workflow_url into a new run linked to
+    # builder_sr so the chat widget can navigate the user to a workflow page
+    # that knows which builder iteration produced it
+    workflow_page_cls, workflow_sr, workflow_pr = url_to_runs(body.workflow_url)
+    workflow_sr = workflow_sr.clone(
+        parent_pr=workflow_pr,
+        uid=request.user.uid,
+        workspace_id=workspace.id,
+    )
+    workflow_sr.state.update(body.workflow_state)
+    workflow_sr.save()
+
+    workflow_url = workflow_sr.get_app_url()
+    builder_run_url = body.builder_run_url or get_default_builder_pr().get_app_url()
+    builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
+    request_body = chat_widget_input_to_request_body(
+        builder_sr.state, body.input_data or builder_sr.state
+    )
+    insert_gooey_builder_variables(request_body, workflow_url)
+
+    workflow_sr.parent_builder_saved_run = builder_pr.submit_api_call(
+        current_user=request.user,
+        workspace=workspace,
+        request_body=request_body,
+    )[1]
+    workflow_sr.save(update_fields=["parent_builder_saved_run"])
+
+    return workflow_url
+
+
+def get_default_builder_pr() -> PublishedRun:
+    try:
+        bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
+    except BotIntegration.DoesNotExist:
+        raise fastapi.HTTPException(
+            status_code=404,
+            detail="gooey builder deployment not found",
+        )
+    return bi.published_run
+
+
+class FetchConversations(pydantic.BaseModel):
+    run_url: str
+    limit: int = 50
+
+
+@router.post(
+    "/__/gooey-builder/fetch-conversations", dependencies=[fastapi_login_required]
+)
+def fetch_builder_conversations(
+    request: fastapi.Request, body: FetchConversations
+) -> list[dict]:
+    qs = (
+        SavedRun.objects.filter(
+            workflow=Workflow.VIDEO_BOTS,
+            workspace=get_current_workspace(request.user, request.session),
+            uid=request.user.uid,
+            parent_builder_saved_run__isnull=False,
+        )
+        .annotate(title=F("parent_builder_saved_run__state__input_prompt"))
+        .order_by("-updated_at")[: body.limit]
+    )
+    return export_chat_qs(qs)
+
+
+@router.post("/__/agent/fetch-conversations", dependencies=[fastapi_login_required])
+def fetch_chat_conversations(
+    request: fastapi.Request, body: FetchConversations
+) -> list[dict]:
+    from daras_ai_v2.workflow_url_input import url_to_runs
+
+    try:
+        pr = url_to_runs(body.run_url)[2]
+    except (AssertionError, KeyError):
+        return []
+    if not pr:
+        return []
+    qs = (
+        SavedRun.objects.filter(
+            workflow=Workflow.VIDEO_BOTS,
+            workspace=get_current_workspace(request.user, request.session),
+            parent_version__published_run=pr,
+        )
+        .annotate(title=F("state__input_prompt"))
+        .order_by("-updated_at")[: body.limit]
+    )
+    return export_chat_qs(qs)
+
+
+def export_chat_qs(qs) -> list[dict[str, Any]]:
+    return [
+        dict(
+            title=sr.title or "",
+            timestamp=sr.updated_at.isoformat(),
+            url=sr.get_app_url(),
+        )
+        for sr in qs
+    ]
