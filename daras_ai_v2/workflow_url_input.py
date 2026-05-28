@@ -25,7 +25,7 @@ def workflow_url_input(
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun | None] | None:
     init_workflow_selector(internal_state, key)
 
-    with gui.div(className="d-flex"):
+    with gui.div(className="d-flex align-items-center"):
         if not internal_state.get("workflow") and internal_state.get("url"):
             with gui.div(className="flex-grow-1"):
                 url = gui.text_input(
