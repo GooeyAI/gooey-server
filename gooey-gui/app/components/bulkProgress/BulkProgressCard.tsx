@@ -173,7 +173,7 @@ function ProgressRing({
   return (
     <div
       className="bulk-progress-ring"
-      style={{ ["--bulk-progress-accent"]: ringAccent } as React.CSSProperties}
+      style={{ "--bulk-progress-accent": ringAccent } as React.CSSProperties}
     >
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <circle className="bulk-progress-ring-track" cx="50" cy="50" r="40" />
@@ -302,7 +302,7 @@ function LastCompleted({
     <div className="bulk-progress-last-completed">
       <span className="bulk-progress-last-completed-label">Last completed</span>
       <a
-        className="bulk-progress-detail-link bulk-progress-last-completed-title"
+        className="bulk-progress-detail-link bulk-progress-workflow-title"
         href={url}
         target="_blank"
         rel="noopener noreferrer"
@@ -311,9 +311,11 @@ function LastCompleted({
       </a>
       {runTimeSeconds != null || credits != null ? (
         <span className="bulk-progress-last-completed-meta">
-          {credits != null ? <> &middot; {formatCredits(credits)}</> : null}
+          {credits != null ? (
+            <span>&middot; {formatCredits(credits)}</span>
+          ) : null}
           {runTimeSeconds != null ? (
-            <> &middot; {formatElapsed(runTimeSeconds)}</>
+            <span>&middot; {formatElapsed(runTimeSeconds)}</span>
           ) : null}
         </span>
       ) : null}

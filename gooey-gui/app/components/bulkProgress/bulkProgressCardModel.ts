@@ -259,11 +259,12 @@ function buildDetail(
     failedAt: number | null;
   }
 ): DetailDisplay {
-  const lastTitle = snapshot.lastCompletedWorkflowTitle;
+  const currentTitle = snapshot.currentWorkflowTitle.trim();
+  const lastTitle = snapshot.lastCompletedWorkflowTitle?.trim();
   const lastUrl = snapshot.lastCompletedWorkflowUrl;
   let workflow: WorkflowDisplay | null = null;
 
-  if (snapshot.currentWorkflowTitle && snapshot.currentWorkflowUrl) {
+  if (currentTitle && snapshot.currentWorkflowUrl) {
     const workflowNumber = Math.max(snapshot.currentWorkflowNumber, 1);
     let prefix: string;
     if (capitalized) {
@@ -273,7 +274,7 @@ function buildDetail(
     }
     workflow = {
       prefix,
-      title: snapshot.currentWorkflowTitle,
+      title: currentTitle,
       url: snapshot.currentWorkflowUrl,
       failedAt,
     };
