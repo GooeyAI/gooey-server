@@ -168,6 +168,7 @@ function buildInProgressUnitRunModel(
       showStoppingMessage: variant.runState === "stopping",
       capitalized: false,
       failedAt: null,
+      workflowElapsedSeconds: 0,
     }),
   });
 }
@@ -252,11 +253,13 @@ function buildDetail(
     showStoppingMessage,
     capitalized,
     failedAt,
+    workflowElapsedSeconds = null,
   }: {
     rowLabel: string;
     showStoppingMessage: boolean;
     capitalized: boolean;
     failedAt: number | null;
+    workflowElapsedSeconds?: number | null;
   }
 ): DetailDisplay {
   const currentTitle = snapshot.currentWorkflowTitle.trim();
@@ -277,6 +280,7 @@ function buildDetail(
       title: currentTitle,
       url: snapshot.currentWorkflowUrl,
       failedAt,
+      elapsedSeconds: workflowElapsedSeconds,
     };
   }
 

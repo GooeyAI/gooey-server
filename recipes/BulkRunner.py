@@ -549,12 +549,6 @@ To understand what each field represents, check out our [API docs](https://api.g
         )
 
 
-def get_bulk_total_row_groups(
-    dfs: list[typing.Any], request: BulkRunnerPage.RequestModel
-) -> int:
-    return sum(1 for df in dfs for _ in slice_request_df(df, request))
-
-
 def build_requests_for_df(df, request, df_ix, arr_len, array_columns):
     for url_ix, url in enumerate(request.run_urls):
         page_cls, sr, pr = url_to_runs(url)

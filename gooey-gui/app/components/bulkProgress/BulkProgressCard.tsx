@@ -37,14 +37,14 @@ export function BulkProgressCard({
           <SummaryStat label="Total runs" value={model.totalRuns}>
             all completed
           </SummaryStat>
-          <SummaryStat label="Total time" value={model.totalTime}>
-            {model.averageRunTime}
+          <SummaryStat label="Rows" value={model.totalRows}>
+            {model.rowsCaption}
           </SummaryStat>
           <SummaryStat label="Credits" value={model.credits}>
             {model.averageCredits}
           </SummaryStat>
-          <SummaryStat label="Rows" value={model.totalRows}>
-            {model.rowsCaption}
+          <SummaryStat label="Total time" value={model.totalTime}>
+            {model.averageRunTime}
           </SummaryStat>
         </div>
         <RerunAllActions rerunAllKey={rerunAllKey} showRerun={model.showRerun} />
@@ -241,7 +241,10 @@ function ProgressDetail({ detail }: { detail: DetailDisplay }) {
         </div>
       ) : null}
       {detail.workflow ? (
-        <WorkflowRow workflow={detail.workflow} />
+        <WorkflowRow
+          key={`${detail.rowLabel}:${detail.workflow.url}`}
+          workflow={detail.workflow}
+        />
       ) : null}
       {detail.inputPrompt ? (
         <div className="bulk-progress-input">
@@ -270,18 +273,31 @@ function ProgressDetail({ detail }: { detail: DetailDisplay }) {
 }
 
 function WorkflowRow({ workflow }: { workflow: WorkflowDisplay }) {
+  const showElapsed = workflow.elapsedSeconds != null;
+  const liveElapsedSeconds = useLiveElapsedSeconds(
+    workflow.elapsedSeconds ?? 0,
+    showElapsed
+  );
+
   return (
     <div className="bulk-progress-workflow">
       <span className="bulk-progress-workflow-main">
         <span className="bulk-progress-workflow-prefix">{workflow.prefix}</span>
-        <a
-          className="bulk-progress-detail-link bulk-progress-workflow-title"
-          href={workflow.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {workflow.title}
-        </a>
+        <span className="bulk-progress-workflow-link-group">
+          <a
+            className="bulk-progress-detail-link bulk-progress-workflow-title"
+            href={workflow.url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {workflow.title}
+          </a>
+          {showElapsed ? (
+            <span className="bulk-progress-workflow-elapsed">
+              &middot; {formatElapsed(liveElapsedSeconds ?? 0)}
+            </span>
+          ) : null}
+        </span>
       </span>
       {workflow.failedAt != null ? (
         <span className="bulk-progress-workflow-status">
@@ -301,24 +317,26 @@ function LastCompleted({
   return (
     <div className="bulk-progress-last-completed">
       <span className="bulk-progress-last-completed-label">Last completed</span>
-      <a
-        className="bulk-progress-detail-link bulk-progress-workflow-title"
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {title}
-      </a>
-      {runTimeSeconds != null || credits != null ? (
-        <span className="bulk-progress-last-completed-meta">
-          {credits != null ? (
-            <span>&middot; {formatCredits(credits)}</span>
-          ) : null}
-          {runTimeSeconds != null ? (
-            <span>&middot; {formatElapsed(runTimeSeconds)}</span>
-          ) : null}
-        </span>
-      ) : null}
+      <span className="bulk-progress-workflow-link-group">
+        <a
+          className="bulk-progress-detail-link bulk-progress-workflow-title"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {title}
+        </a>
+        {runTimeSeconds != null || credits != null ? (
+          <span className="bulk-progress-workflow-elapsed">
+            {credits != null ? (
+              <span>&middot; {formatCredits(credits)}</span>
+            ) : null}
+            {runTimeSeconds != null ? (
+              <span>&middot; {formatElapsed(runTimeSeconds)}</span>
+            ) : null}
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }
