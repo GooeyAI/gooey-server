@@ -257,10 +257,7 @@
 
 .bulk-progress-detail-link {
   color: #070b1a;
-  display: -webkit-inline-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  display: inline-block;
   flex: 0 1 auto;
   font-size: 0.95rem;
   font-weight: 700;
@@ -281,9 +278,9 @@
 }
 
 .bulk-progress-workflow-title {
-  max-width: 100%;
+  max-width: 34ch;
   vertical-align: bottom;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .bulk-progress-workflow-status {
@@ -342,10 +339,6 @@
 .bulk-progress-card-stopped .bulk-progress-last-completed-label,
 .bulk-progress-card-error .bulk-progress-last-completed-label {
   color: #9d7b1f;
-}
-
-.bulk-progress-last-completed-title {
-  max-width: 34ch;
 }
 
 .bulk-progress-last-completed-meta {
