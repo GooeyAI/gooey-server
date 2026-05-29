@@ -35,7 +35,7 @@ class AppUserQuerySet(models.QuerySet):
         except self.model.DoesNotExist:
             try:
                 user = self.model(**kwargs)
-                if settings.FIREBASE_ENABLED:
+                if settings.SOVEREIGN_DEPLOY:
                     user.copy_from_firebase_user(firebase_auth.get_user(uid))
                 else:
                     user.save()
@@ -58,7 +58,7 @@ class AppUserQuerySet(models.QuerySet):
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
             try:
-                if settings.FIREBASE_ENABLED:
+                if settings.SOVEREIGN_DEPLOY:
                     user = self.model(**kwargs)
                     user.copy_from_firebase_user(
                         get_or_create_firebase_user_by_email(email)[0]
@@ -94,7 +94,7 @@ def get_or_create_firebase_user_by_email(
 
 
 def create_anonymous_app_user() -> "AppUser":
-    if not settings.FIREBASE_ENABLED:
+    if not settings.SOVEREIGN_DEPLOY:
         raise RuntimeError("Anonymous users are not supported in local-auth mode")
     uid = firebase_auth.create_user().uid
     return AppUser.objects.create(

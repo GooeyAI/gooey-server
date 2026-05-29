@@ -115,9 +115,7 @@ def no_google_credentials():
 
 
 def test_google_tts_without_credentials(transactional_db):
-    from google.api_core.exceptions import GoogleAPICallError
-    from google.auth.exceptions import DefaultCredentialsError
-
+    from daras_ai_v2.exceptions import UserError
     from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
     from recipes.TextToSpeech import TextToSpeechPage
 
@@ -130,22 +128,9 @@ def test_google_tts_without_credentials(transactional_db):
     page = TextToSpeechPage()
 
     with no_google_credentials():
-        with pytest.raises(
-            (GoogleAPICallError, DefaultCredentialsError, Exception)
-        ) as exc_info:
+        with pytest.raises(UserError) as exc_info:
             for _ in page.run(state):
                 pass
 
-    # Confirm the failure is credential-related, not an unexpected crash
-    err = str(exc_info.value).lower()
-    assert any(
-        kw in err
-        for kw in (
-            "credential",
-            "authentication",
-            "permission",
-            "unauthenticated",
-            "403",
-            "401",
-        )
-    ), f"Expected a credentials error, got: {exc_info.value}"
+    assert "GOOGLE_APPLICATION_CREDENTIALS" in str(exc_info.value)
+    assert "needed to run this workflow" in str(exc_info.value)

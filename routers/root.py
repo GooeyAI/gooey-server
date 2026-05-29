@@ -111,7 +111,7 @@ async def redoc_html():
     )
 
 
-if settings.FIREBASE_ENABLED:
+if settings.SOVEREIGN_DEPLOY:
     app.include_router(firebase_auth_router)
 else:
     app.include_router(local_auth_router)

@@ -75,15 +75,15 @@ Specifically, this repo may be for you if:
 
 ### 🔓 Alternatively: run without Firebase (local auth + filesystem storage)
 
-Firebase is optional. To run without it, set `FIREBASE_ENABLED=False` in your `.env`:
+Firebase is optional. To run without it, set `SOVEREIGN_DEPLOY=False` in your `.env`:
 
 ```env
-FIREBASE_ENABLED=False
+SOVEREIGN_DEPLOY=False
 ```
 
 This replaces Firebase auth with a built-in username/password sign-in form, and stores uploaded files on the local filesystem instead of GCS. You can optionally configure where files are stored (the defaults work out of the box):
 
-> **Note:** The Google service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_CREDENTIALS_JSON`) is still required for Google Cloud services — Google TTS, Speech-to-Text, Translate, and Gemini models — even when `FIREBASE_ENABLED=False`. Setting this flag only disables Firebase auth and GCS storage.
+> **Note:** The Google service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_CREDENTIALS_JSON`) is still required for Google Cloud services — Google TTS, Speech-to-Text, Translate, and Gemini models — even when `SOVEREIGN_DEPLOY=False`. Setting this flag only disables Firebase auth and GCS storage.
 
 ```env
 MEDIA_ROOT=./media   # directory where uploaded files are stored

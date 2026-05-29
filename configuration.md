@@ -59,24 +59,24 @@ If none of these are set, the server falls back to SQLite (suitable for developm
 
 ## Google Cloud / Firebase
 
-A Google Cloud service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_CREDENTIALS_JSON`) is used by multiple parts of the system: Firebase auth, GCS file storage, Google TTS, Google Speech-to-Text, Google Translate, and Gemini models. Set `FIREBASE_ENABLED=False` to disable Firebase auth and GCS storage (the server will use local auth and filesystem storage instead), but note that Google TTS, STT, Translate, and Gemini will still require valid credentials. See [README](README.md#-alternatively-run-without-firebase-local-auth--filesystem-storage) for details on the local auth/storage mode.
+A Google Cloud service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_CREDENTIALS_JSON`) is used by multiple parts of the system: Firebase auth, GCS file storage, Google TTS, Google Speech-to-Text, Google Translate, and Gemini models. Set `SOVEREIGN_DEPLOY=False` to disable Firebase auth and GCS storage (the server will use local auth and filesystem storage instead), but note that Google TTS, STT, Translate, and Gemini will still require valid credentials. See [README](README.md#-alternatively-run-without-firebase-local-auth--filesystem-storage) for details on the local auth/storage mode.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `FIREBASE_ENABLED` | No | `True` | Enable Firebase auth and GCS storage |
-| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | No | — | Service account key as a JSON string (alternative to `serviceAccountKey.json`). Required for Google TTS, STT, Translate, Gemini, and (when `FIREBASE_ENABLED=True`) Firebase auth and GCS storage. |
+| `SOVEREIGN_DEPLOY` | No | `True` | Enable Firebase auth and GCS storage |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | No | — | Service account key as a JSON string (alternative to `serviceAccountKey.json`). Required for Google TTS, STT, Translate, Gemini, and (when `SOVEREIGN_DEPLOY=True`) Firebase auth and GCS storage. |
 | `GCP_PROJECT` | No | `dara-c1b52` | Google Cloud project ID |
 | `GCP_REGION` | No | `us-central1` | Google Cloud region |
 | `GOOGLE_CLIENT_ID` | No | `""` | Google OAuth client ID (for Firebase Google sign-in) |
 | `FIREBASE_CONFIG` | No | `""` | Firebase web app config JSON string |
-| `GS_BUCKET_NAME` | No | `{GCP_PROJECT}.appspot.com` | GCS bucket for file storage (only used when `FIREBASE_ENABLED=True`) |
+| `GS_BUCKET_NAME` | No | `{GCP_PROJECT}.appspot.com` | GCS bucket for file storage (only used when `SOVEREIGN_DEPLOY=True`) |
 | `GS_MEDIA_PATH` | No | `daras_ai/media` | Path prefix inside the GCS bucket |
 
 ---
 
 ## Local auth + filesystem storage
 
-Only used when `FIREBASE_ENABLED=False`.
+Only used when `SOVEREIGN_DEPLOY=False`.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|

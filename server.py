@@ -65,7 +65,7 @@ app.mount(
     name="gooey-gui-styles",
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
-if not settings.FIREBASE_ENABLED:
+if not settings.SOVEREIGN_DEPLOY:
     from pathlib import Path
 
     Path(settings.MEDIA_ROOT).mkdir(parents=True, exist_ok=True)

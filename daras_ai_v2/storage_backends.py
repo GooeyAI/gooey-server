@@ -13,7 +13,7 @@ from furl import furl
 
 from daras_ai_v2 import settings
 
-if settings.FIREBASE_ENABLED:
+if settings.SOVEREIGN_DEPLOY:
     from google.api_core.exceptions import NotFound as StorageNotFound
 else:
 
@@ -135,7 +135,7 @@ def _get_filesystem_bucket(name: str) -> FilesystemBucket:
 def get_storage_bucket(bucket_name: str = None):
     from django.conf import settings
 
-    if settings.FIREBASE_ENABLED:
+    if settings.SOVEREIGN_DEPLOY:
         return firebase_storage.bucket(bucket_name or settings.GS_BUCKET_NAME)
     else:
         return _get_filesystem_bucket(bucket_name or settings.GS_BUCKET_NAME)

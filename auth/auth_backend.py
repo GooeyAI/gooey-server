@@ -38,7 +38,7 @@ class SessionAuthBackend(AuthenticationBackend):
 
 @db_middleware
 def _authenticate(conn):
-    if settings.FIREBASE_ENABLED:
+    if settings.SOVEREIGN_DEPLOY:
         session_cookie = conn.session.get(FIREBASE_SESSION_COOKIE)
         if not session_cookie:
             return AuthCredentials(), None

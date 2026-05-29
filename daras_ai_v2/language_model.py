@@ -224,7 +224,7 @@ def run_language_model(
             messages = list(
                 filter(None, (remove_images_from_entry(entry) for entry in messages))
             )
-        elif not settings.FIREBASE_ENABLED:
+        elif not settings.SOVEREIGN_DEPLOY:
             # using local filesystem storage: convert images to base64
             messages = local_image_urls_to_base64(messages)
         if (
