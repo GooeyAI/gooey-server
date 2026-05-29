@@ -13,6 +13,7 @@ from jinja2.lexer import whitespace_re
 from loguru import logger
 
 from daras_ai_v2 import settings
+from daras_ai_v2.exceptions import ensure_config_key
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model import get_openai_client, openai_should_retry
 from daras_ai_v2.redis_cache import (
@@ -119,6 +120,7 @@ def create_embeddings(texts: list[str], model: EmbeddingModels) -> np.ndarray:
     if "openai" in model.name:
         ret = _run_openai_embedding(texts=texts, model_id=model.model_id)
     elif "mistral" in model.name:
+        ensure_config_key("MISTRAL_API_KEY")
         ret = _run_openai_embedding(
             texts=texts,
             model_id=model.model_id,

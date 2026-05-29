@@ -14,7 +14,7 @@ from loguru import logger
 
 from daras_ai.image_input import get_mimetype_from_response, upload_file_from_bytes
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import ensure_config_key, raise_for_status
 
 if typing.TYPE_CHECKING:
     from usage_costs.models import ModelPricing, ModelSku
@@ -201,6 +201,7 @@ def stream_sse_json(response: requests.Response) -> typing.Iterator[dict]:
 
 
 def _fal_auth_headers():
+    ensure_config_key("FAL_API_KEY")
     return {
         "Authorization": f"Key {settings.FAL_API_KEY}",
         "X-Fal-Object-Lifecycle-Preference": json.dumps(

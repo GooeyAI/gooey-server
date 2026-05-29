@@ -16,6 +16,7 @@ def enum_multiselect(
     label: str = "",
     checkboxes=True,
     allow_none=True,
+    exclude: list[E] | None = None,
 ):
     try:
         deprecated = enum_cls._deprecated()
@@ -25,6 +26,8 @@ def enum_multiselect(
     value = gui.session_state.get(key) or []
     for e in enum_cls:
         if e in deprecated and e.name not in value:
+            continue
+        if exclude and e in exclude and e.name not in value:
             continue
         enums.append(e)
     enum_names = [e.name for e in enums]

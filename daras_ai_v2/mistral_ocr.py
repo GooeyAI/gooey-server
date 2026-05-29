@@ -2,7 +2,7 @@ import requests
 from aifail import retry_if
 
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import UserError, raise_for_status
+from daras_ai_v2.exceptions import ensure_config_key, raise_for_status
 
 MISTRAL_OCR_URL = "https://api.mistral.ai/v1/ocr"
 MISTRAL_OCR_TABLE_FORMAT = "markdown"
@@ -25,8 +25,7 @@ def mistral_should_retry(e: Exception) -> bool:
 def run_mistral_ocr_on_page(
     url: str, page_num: int, model_id: str = "mistral-ocr-latest"
 ) -> str:
-    if not settings.MISTRAL_API_KEY:
-        raise UserError("Mistral OCR is not configured: missing MISTRAL_API_KEY")
+    ensure_config_key("MISTRAL_API_KEY")
 
     payload = {
         "model": model_id,

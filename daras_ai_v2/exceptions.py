@@ -148,6 +148,24 @@ class PaymentRequired(UserError):
         )
 
 
+def is_key_set(key: str) -> bool:
+    return bool(getattr(settings, key, None))
+
+
+def ensure_config_key(*keys: str):
+    """Raises UserError if none of the given API keys are configured.
+    When multiple keys are passed, any one being set is sufficient.
+
+        ensure_config_key("OPENAI_API_KEY")
+        ensure_config_key("AZURE_OPENAI_KEY_CA", "AZURE_OPENAI_KEY_EASTUS2")
+    """
+    if not any(is_key_set(k) for k in keys):
+        raise UserError(
+            f"`{keys[0]}` is needed to run this workflow. "
+            "Please change the model or add the API key."
+        )
+
+
 FFMPEG_ERR_MSG = (
     "Unsupported File Format\n\n"
     "We encountered an issue processing your file as it appears to be in a format not supported by our system or may be corrupted. "

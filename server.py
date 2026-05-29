@@ -23,9 +23,7 @@ from starlette.status import (
 )
 
 import url_shortener.routers as url_shortener
-from auth.auth_backend import (
-    SessionAuthBackend,
-)
+from auth.auth_backend import SessionAuthBackend
 from daras_ai_v2 import settings
 from daras_ai_v2.github_tools import github_url_for_exc
 from daras_ai_v2.settings import templates

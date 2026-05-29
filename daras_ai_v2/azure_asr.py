@@ -5,9 +5,7 @@ import requests
 from furl import furl
 
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import (
-    raise_for_status,
-)
+from daras_ai_v2.exceptions import ensure_config_key, raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 
 # 20 mins timeout
@@ -16,6 +14,8 @@ POLL_INTERVAL = 6
 
 
 def azure_asr(audio_url: str, language: str):
+    ensure_config_key("AZURE_SPEECH_KEY")
+
     # Start by initializing a request
     # https://eastus.dev.cognitive.microsoft.com/docs/services/speech-to-text-api-v3-1/operations/Transcriptions_Create
     language = language or "en-US"

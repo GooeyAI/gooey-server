@@ -36,7 +36,7 @@ from bots.models import Platform
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import audio_url_to_wav, get_google_auth_session
 from daras_ai_v2.custom_enum import GooeyEnum
-from daras_ai_v2.exceptions import raise_for_status, UserError
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
@@ -76,6 +76,7 @@ class _ReasoningEffort(typing.NamedTuple):
 
 class ReasoningEffort(_ReasoningEffort, GooeyEnum):
     minimal = _ReasoningEffort(name="minimal", label="Minimal", thinking_budget=1024)
+    none = _ReasoningEffort(name="none", label="None", thinking_budget=0)
     low = _ReasoningEffort(name="low", label="Low", thinking_budget=4096)
     medium = _ReasoningEffort(name="medium", label="Medium", thinking_budget=8192)
     high = _ReasoningEffort(name="high", label="High", thinking_budget=24576)
@@ -365,6 +366,11 @@ def _run_text_model(
     quality: float,
 ) -> list[str]:
     logger.info(f"{api=} {model=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
+    if not api.keys_available():
+        raise UserError(
+            f"`{api.required_keys[0]}` is needed to run this workflow. "
+            "Please change the model or add the API key."
+        )
     match api:
         case ModelProvider.openai:
             return _run_openai_text(
@@ -423,6 +429,12 @@ def _run_chat_model(
     logger.info(
         f"{model.provider=} {model.model_id=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
+    if not model.is_available:
+        raise UserError(
+            f"`{model.provider.required_keys[0]}` is needed to run this workflow. "
+            "Please change the model or add the API key."
+        )
+
     match model.provider:
         case ModelProvider.mistral:
             return _run_mistral_chat(

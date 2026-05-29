@@ -1083,12 +1083,18 @@ Translation Glossary for LLM Language (English) -> User Langauge
             )
 
     def validate_form_v2(self):
-        input_glossary = gui.session_state.get("input_glossary_document", "")
-        output_glossary = gui.session_state.get("output_glossary_document", "")
-        if input_glossary:
-            validate_glossary_document(input_glossary)
-        if output_glossary:
-            validate_glossary_document(output_glossary)
+        user_language = gui.session_state.get("user_language")
+        if (
+            user_language
+            and should_translate_lang(user_language)
+            and not gui.session_state.get("asr_task") == "translate"
+        ):
+            input_glossary = gui.session_state.get("input_glossary_document", "")
+            output_glossary = gui.session_state.get("output_glossary_document", "")
+            if input_glossary:
+                validate_glossary_document(input_glossary)
+            if output_glossary:
+                validate_glossary_document(output_glossary)
 
     def render_usage_guide(self):
         youtube_video("4wGKQAGUm48")
