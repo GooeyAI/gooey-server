@@ -59,7 +59,7 @@ class TextToSpeechProviders(TTSProvider, GooeyEnum):
     def _unavailable(cls):
         from daras_ai_v2.exceptions import is_key_set
 
-        return {p for p in cls if not is_key_set(p.required_key) if p.required_key}
+        return {p for p in cls if p.required_key and not is_key_set(p.required_key)}
 
 
 UBERDUCK_VOICES = {

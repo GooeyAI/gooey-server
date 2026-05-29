@@ -63,7 +63,7 @@ A Google Cloud service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SOVEREIGN_DEPLOY` | No | `True` | Enable Firebase auth and GCS storage |
+| `SOVEREIGN_DEPLOY` | No | `False` | Disable Firebase, GCS, ... for a sovereign deployment |
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | No | — | Service account key as a JSON string (alternative to `serviceAccountKey.json`). Required for Google TTS, STT, Translate, Gemini, and (when `SOVEREIGN_DEPLOY=True`) Firebase auth and GCS storage. |
 | `GCP_PROJECT` | No | `dara-c1b52` | Google Cloud project ID |
 | `GCP_REGION` | No | `us-central1` | Google Cloud region |
@@ -197,25 +197,9 @@ All optional. Needed only for workflows using Azure-hosted models or moderation.
 
 ---
 
-## Functions runtime
+## Functions runtime (Deno)
 
-The Functions recipe executes user-supplied JavaScript in a sandboxed Deno HTTP server (`functions/executor.js`). By default Gooey.AI runs this on [Deno Deploy](https://deno.com/deploy), but you can self-host it with Docker:
-
-```bash
-docker run --rm \
-  -e GOOEY_AUTH_TOKEN=your-secret \
-  -p 8000:8000 \
-  -v "$(pwd)/functions/executor.js:/executor.js" \
-  denoland/deno:latest \
-  run --allow-env --allow-net /executor.js
-```
-
-Then point Gooey Server at it in `.env`:
-
-```env
-DENO_FUNCTIONS_URL=http://localhost:8000
-DENO_FUNCTIONS_AUTH_TOKEN=your-secret
-```
+See [README.md § Sovereign Deployment](README.md#%EF%B8%8F-functions-runtime-deno) for self-hosting instructions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

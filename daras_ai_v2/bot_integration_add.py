@@ -10,7 +10,7 @@ from bots.models import Platform, PublishedRun, SavedRun, WorkflowAccessLevel
 from daras_ai_v2 import icons
 from daras_ai_v2.base import RecipeTabs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
-from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.exceptions import UserError, ensure_config_key
 from workspaces.models import Workspace
 
 
@@ -131,6 +131,16 @@ def handle_bot_integration_add(
 ) -> None:
     from celeryapp.tasks import send_integration_attempt_email
     from daras_ai_v2.bot_integration_connect import create_deployment
+
+    match platform:
+        case Platform.WHATSAPP | Platform.FACEBOOK:
+            ensure_config_key("FB_APP_ID")
+        case Platform.SLACK:
+            ensure_config_key("SLACK_CLIENT_ID")
+        case Platform.TWILIO:
+            ensure_config_key("TWILIO_ACCOUNT_SID")
+        case Platform.TELEGRAM:
+            ensure_config_key("TELEGRAM_WEBHOOK_SECRET")
 
     dialog = gui.use_confirm_dialog(
         key="bot-integration-connect", close_on_confirm=False

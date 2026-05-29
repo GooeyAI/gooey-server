@@ -18,6 +18,7 @@ from daras_ai.image_input import gcs_bucket, upload_gcs_blob_from_bytes
 from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from routers.custom_api_router import CustomAPIRouter
@@ -26,6 +27,8 @@ app = CustomAPIRouter()
 
 
 def serve_static_file(request: Request) -> Response | None:
+    from routers.root import explore_page
+
     bucket = gcs_bucket()
 
     relpath = request.url.path.strip("/") or "index"
@@ -57,6 +60,9 @@ def serve_static_file(request: Request) -> Response | None:
         return RedirectResponse(
             blob.public_url, status_code=HTTP_308_PERMANENT_REDIRECT
         )
+
+    if relpath == "index":  # root
+        return RedirectResponse(get_route_path(explore_page))
 
     raise HTTPException(status_code=404)
 

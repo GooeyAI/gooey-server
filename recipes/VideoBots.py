@@ -103,7 +103,7 @@ from functions.base_llm_tool import (
 )
 from functions.workflow_tools import DynamicLLMToolLoader
 from recipes.DocExtract import (
-    document_intelligence_models_available,
+    get_available_document_intelligence_models,
     document_intelligence_settings,
 )
 from recipes.DocSearch import get_top_k_references, references_as_prompt
@@ -946,7 +946,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         if not text_to_speech_enabled:
             gui.session_state["tts_provider"] = None
 
-        if document_intelligence_models_available():
+        if get_available_document_intelligence_models():
             document_intelligence_enabled = switch_with_section(
                 label="##### 🩻 Photo & Document Intelligence",
                 key="_document_intelligence_enabled",

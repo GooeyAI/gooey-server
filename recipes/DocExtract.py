@@ -607,7 +607,7 @@ def get_spreadsheet_service():
         return threadlocal.spreadsheets
 
 
-def document_intelligence_models_available() -> dict:
+def get_available_document_intelligence_models() -> dict:
     document_models = {}
     if settings.AZURE_FORM_RECOGNIZER_KEY:
         document_models |= azure_document_intelligence_models()
@@ -617,7 +617,7 @@ def document_intelligence_models_available() -> dict:
 
 
 def document_intelligence_settings(title: str, help: str | None = None):
-    document_models = document_intelligence_models_available()
+    document_models = get_available_document_intelligence_models()
     gui.selectbox(
         title,
         key="document_model",

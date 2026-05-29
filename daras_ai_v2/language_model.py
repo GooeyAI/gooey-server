@@ -316,28 +316,28 @@ def local_image_urls_to_base64(
 ) -> list[ConversationEntry]:
     ret = []
     for message in messages:
-        content = []
-        if img_urls := get_entry_images(message):
-            img_bytes = [requests.get(img_url).content for img_url in img_urls]
-            img_cv2s = [bytes_to_cv2_img(img) for img in img_bytes]
-            img_b64s = [
-                base64.b64encode(cv2_img_to_bytes(img)).decode() for img in img_cv2s
-            ]
-            content.extend(
-                [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{img_b64}"},
-                    }
-                    for img_b64 in img_b64s
-                ]
-            )
-            text_content = get_entry_text(message)
-            content.append({"type": "text", "text": text_content})
-            ret.append(message | {"content": content})
-        else:
+        parts = message.get("content")
+        if not isinstance(parts, list):
             ret.append(message)
-
+            continue
+        new_parts = []
+        for part in parts:
+            if part.get("type") == "image_url":
+                url = part.get("image_url", {}).get("url", "")
+                if url and not url.startswith("data:"):
+                    img_bytes = requests.get(url).content
+                    img_b64 = base64.b64encode(
+                        cv2_img_to_bytes(bytes_to_cv2_img(img_bytes))
+                    ).decode()
+                    new_parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+                        }
+                    )
+                    continue
+            new_parts.append(part)
+        ret.append(message | {"content": new_parts})
     return ret
 
 

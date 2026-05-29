@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import typing
 
@@ -149,7 +150,7 @@ class PaymentRequired(UserError):
 
 
 def is_key_set(key: str) -> bool:
-    return bool(getattr(settings, key, None))
+    return bool(getattr(settings, key, None) or os.environ.get(key))
 
 
 def ensure_config_key(*keys: str):
