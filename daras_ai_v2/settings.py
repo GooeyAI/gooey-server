@@ -256,8 +256,8 @@ else:
 if os.path.exists(service_account_key_path):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
 
-SOVEREIGN_DEPLOY = config("SOVEREIGN_DEPLOY", default=True, cast=bool)
-if SOVEREIGN_DEPLOY:
+SOVEREIGN_DEPLOY = config("SOVEREIGN_DEPLOY", default=False, cast=bool)
+if not SOVEREIGN_DEPLOY:
     import firebase_admin
 
     if not firebase_admin._apps:
