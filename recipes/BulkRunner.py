@@ -622,7 +622,7 @@ def list_view_editor(
         list_key = f"--list-view:{key}"
         gui.session_state.setdefault(
             list_key,
-            [{flatten_dict_key: val} for val in gui.session_state.get(key, [])],
+            [{flatten_dict_key: val} for val in gui.session_state.get(key) or []],
         )
         new_lst = list_view_editor(
             add_btn_label=add_btn_label,

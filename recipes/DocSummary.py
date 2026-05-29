@@ -15,7 +15,7 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     run_language_model,
-    calc_gpt_tokens,
+    calc_appx_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -210,7 +210,7 @@ def _map_reduce(request: "DocSummaryPage.RequestModel", full_text: str, state: d
 
     safety_buffer = 100
     prompt_token_count = (
-        calc_gpt_tokens(task_instructions + merge_instructions) + safety_buffer
+        calc_appx_tokens(task_instructions + merge_instructions) + safety_buffer
     )
 
     # to merge 2 outputs, we need to have at least 1/3 of the max tokens available

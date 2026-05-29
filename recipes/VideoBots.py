@@ -60,7 +60,7 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_USER,
     SUPERSCRIPT,
     ConversationEntry,
-    calc_gpt_tokens,
+    calc_appx_tokens,
     format_chat_entry,
     get_entry_images,
     get_entry_text,
@@ -539,7 +539,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # truncate the history to fit the model's max tokens
         max_history_tokens = (
             model.llm_context_window
-            - calc_gpt_tokens(filter(None, [system_prompt, user_input]))
+            - calc_appx_tokens(filter(None, [system_prompt, user_input]))
             - request.max_tokens
             - SAFETY_BUFFER
         )
@@ -552,7 +552,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             filter(None, [system_prompt, *history_prompt, user_prompt])
         )
         # ensure input script is not too big
-        max_allowed_tokens = model.llm_context_window - calc_gpt_tokens(
+        max_allowed_tokens = model.llm_context_window - calc_appx_tokens(
             response.final_prompt
         )
         if max_allowed_tokens < 0:
@@ -1707,6 +1707,6 @@ def convo_window_clipper(
     step=2,
 ):
     for i in range(len(window) - 2, -1, -step):
-        if calc_gpt_tokens(window[i:]) > max_tokens:
+        if calc_appx_tokens(window[i:]) > max_tokens:
             return i + step
     return 0

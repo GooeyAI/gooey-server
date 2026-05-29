@@ -17,7 +17,7 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import (
     run_language_model,
-    calc_gpt_tokens,
+    calc_appx_tokens,
 )
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_settings,
@@ -346,7 +346,7 @@ def _gen_final_prompt(
     max_allowed_tokens = (
         AIModelSpec.objects.get(name=request.selected_model).llm_context_window
         - request.max_tokens
-        - calc_gpt_tokens(end_input_prompt)
+        - calc_appx_tokens(end_input_prompt)
     )
 
     state["final_prompt"] = request.task_instructions.strip() + "\n\n"
@@ -374,7 +374,7 @@ def _gen_final_prompt(
 
         # used too many tokens, abort!
         if (
-            calc_gpt_tokens(state["final_prompt"] + next_prompt_part)
+            calc_appx_tokens(state["final_prompt"] + next_prompt_part)
             > max_allowed_tokens
         ):
             continue

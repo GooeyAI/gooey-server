@@ -85,7 +85,7 @@ class ReasoningEffort(_ReasoningEffort, GooeyEnum):
         return {cls.minimal}
 
 
-def calc_gpt_tokens(
+def calc_appx_tokens(
     prompt: str | list[str] | dict | list[dict],
 ) -> int:
     if isinstance(prompt, (str, dict)):
@@ -93,7 +93,7 @@ def calc_gpt_tokens(
     else:
         messages = prompt
     combined = msgs_to_prompt_str(messages)
-    return default_length_function(combined)
+    return int(len(combined) * 3 / 4)
 
 
 class FunctionParam(typing_extensions.TypedDict):
