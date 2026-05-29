@@ -6,7 +6,7 @@ export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
       <h6 className="text-muted text-uppercase small mb-3">
         Browse by industry
       </h6>
-      <div className="row row-cols-2 row-cols-md-2 row-cols-lg-6 g-3 d-flex align-items-stretch">
+      <div className="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 d-flex align-items-stretch">
         {tiles.map((tile) => (
           <div key={tile.id} className="col">
             <a
