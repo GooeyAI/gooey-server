@@ -102,7 +102,10 @@ from functions.base_llm_tool import (
     get_tool_from_call,
 )
 from functions.workflow_tools import DynamicLLMToolLoader
-from recipes.DocExtract import document_intelligence_settings
+from recipes.DocExtract import (
+    document_intelligence_models_available,
+    document_intelligence_settings,
+)
 from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
@@ -943,13 +946,16 @@ Translation Glossary for LLM Language (English) -> User Langauge
         if not text_to_speech_enabled:
             gui.session_state["tts_provider"] = None
 
-        document_intelligence_enabled = switch_with_section(
-            label="##### 🩻 Photo & Document Intelligence",
-            key="_document_intelligence_enabled",
-            control_keys=["document_model"],
-            render_section=self.document_intelligence_settings,
-        )
-        if not document_intelligence_enabled:
+        if document_intelligence_models_available():
+            document_intelligence_enabled = switch_with_section(
+                label="##### 🩻 Photo & Document Intelligence",
+                key="_document_intelligence_enabled",
+                control_keys=["document_model"],
+                render_section=self.document_intelligence_settings,
+            )
+            if not document_intelligence_enabled:
+                gui.session_state["document_model"] = None
+        else:
             gui.session_state["document_model"] = None
 
         switch_with_section(

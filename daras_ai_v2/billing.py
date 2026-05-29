@@ -867,6 +867,8 @@ def render_change_subscription_button(
     plan: PricingPlan,
     seat_selection: SeatSelection | None = None,
 ):
+    if not settings.STRIPE_SECRET_KEY:
+        return
     # subscription exists, show upgrade/downgrade button
     if plan in [PricingPlan.TEAM, PricingPlan.PRO]:
         assert seat_selection is not None
@@ -1404,6 +1406,8 @@ def render_paypal_addon_buttons():
 
 
 def render_stripe_addon_buttons(workspace: Workspace):
+    if not settings.STRIPE_SECRET_KEY:
+        return
     if not (workspace.subscription and workspace.subscription.payment_provider):
         save_pm = gui.checkbox(
             "Save payment method for future purchases & auto-recharge", value=True
@@ -1510,8 +1514,7 @@ def render_stripe_subscription_button(
     seat_selection: SeatSelection | None = None,
     pressed: bool = False,
 ):
-    if not plan.supports_stripe():
-        gui.write("Stripe subscription not available")
+    if not settings.STRIPE_SECRET_KEY or not plan.supports_stripe():
         return
 
     # Get pricing based on selected seat configuration.

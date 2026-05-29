@@ -3,6 +3,7 @@ from loguru import logger
 
 from app_users.models import PaymentProvider, TransactionReason
 from celeryapp.celeryconfig import app
+from daras_ai_v2 import settings
 from payments.models import Subscription
 from payments.plans import PricingPlan
 from payments.webhooks import set_workspace_subscription
@@ -16,6 +17,8 @@ def save_stripe_default_payment_method(
     workspace_id: int,
     reason: TransactionReason,
 ):
+    if not settings.STRIPE_SECRET_KEY:
+        return
     pi = stripe.PaymentIntent.retrieve(payment_intent_id, expand=["payment_method"])
     pm = pi.payment_method
     if not (pm and pm.customer):
