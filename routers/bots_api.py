@@ -299,8 +299,8 @@ class ApiInterface(BotInterface):
             ConversationStart(
                 conversation_id=api_hashids.encode(self.convo.id),
                 user_id=self.convo.web_user_id,
-                user_message_id=self.user_msg_id.lstrip(MSG_ID_PREFIX),
-                bot_message_id=self.bot_message_id.lstrip(MSG_ID_PREFIX),
+                user_message_id=self.user_msg_id.removeprefix(MSG_ID_PREFIX),
+                bot_message_id=self.bot_message_id.removeprefix(MSG_ID_PREFIX),
                 created_at=self.convo.created_at.isoformat(),
             )
         )
@@ -313,7 +313,9 @@ class ApiInterface(BotInterface):
         elif request.input_documents:
             self.input_type = "document"
         elif button := request.button_pressed:
-            button.context_msg_id = MSG_ID_PREFIX + button.context_msg_id
+            button.context_msg_id = MSG_ID_PREFIX + button.context_msg_id.removeprefix(
+                MSG_ID_PREFIX
+            )
             self.input_type = "interactive"
         elif request.input_location:
             self.input_type = "location"
