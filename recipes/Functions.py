@@ -286,39 +286,40 @@ class FunctionsPage(BasePage):
                 help=field_desc(self.RequestModel, "python_requirements"),
             )
 
-        options = set(gui.session_state.get("secrets") or [])
-        with gui.div(className="d-flex align-items-center gap-3 mb-2"):
-            gui.markdown(
-                "###### "
-                + '<i class="fa-regular fa-shield-keyhole"></i> '
-                + field_title(self.RequestModel, "secrets"),
-                help=field_desc(self.RequestModel, "secrets"),
-                unsafe_allow_html=True,
-            )
-            try:
-                workspace = self.current_workspace
-            except Workspace.DoesNotExist:
-                pass
-            else:
-                edit_secret_button_with_dialog(
-                    workspace,
-                    self.request.user,
-                    trigger_label=f"{icons.add} Add",
-                    trigger_type="tertiary",
-                    trigger_className="p-1 mb-2",
+        if settings.AZURE_KEY_VAULT_ENDPOINT:
+            options = set(gui.session_state.get("secrets") or [])
+            with gui.div(className="d-flex align-items-center gap-3 mb-2"):
+                gui.markdown(
+                    "###### "
+                    + '<i class="fa-regular fa-shield-keyhole"></i> '
+                    + field_title(self.RequestModel, "secrets"),
+                    help=field_desc(self.RequestModel, "secrets"),
+                    unsafe_allow_html=True,
                 )
-                options |= set(
-                    workspace.managed_secrets.order_by("-created_at").values_list(
-                        "name", flat=True
+                try:
+                    workspace = self.current_workspace
+                except Workspace.DoesNotExist:
+                    pass
+                else:
+                    edit_secret_button_with_dialog(
+                        workspace,
+                        self.request.user,
+                        trigger_label=f"{icons.add} Add",
+                        trigger_type="tertiary",
+                        trigger_className="p-1 mb-2",
                     )
+                    options |= set(
+                        workspace.managed_secrets.order_by("-created_at").values_list(
+                            "name", flat=True
+                        )
+                    )
+            with gui.div(className="font-monospace"):
+                gui.multiselect(
+                    label="",
+                    options=list(options),
+                    key="secrets",
+                    allow_none=True,
                 )
-        with gui.div(className="font-monospace"):
-            gui.multiselect(
-                label="",
-                options=list(options),
-                key="secrets",
-                allow_none=True,
-            )
 
     def render_output(self):
         self._render_calling_run_note()

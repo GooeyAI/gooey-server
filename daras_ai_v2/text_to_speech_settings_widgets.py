@@ -434,16 +434,19 @@ Note: You need to be [Signed In]({page.get_auth_url()}) to use ElevenLabs voices
             """
         )
     else:
-        elevenlabs_use_custom_key = gui.checkbox(
-            "Use custom API Key & Voice",
-            value=bool(gui.session_state.get("elevenlabs_api_key")),
-            help="""
+        if settings.AZURE_KEY_VAULT_ENDPOINT:
+            elevenlabs_use_custom_key = gui.checkbox(
+                "Use custom API Key & Voice",
+                value=bool(gui.session_state.get("elevenlabs_api_key")),
+                help="""
 Your ElevenLabs API key
 - Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a> to know how to obtain an API key from ElevenLabs.
 - [Learn how](https://gooey.ai/docs/guides/lipsync-videos-with-custom-voices) to add custom voices!
 - Manage your secrets in the [account keys](/account/api-keys/) section.
-            """,
-        )
+                """,
+            )
+        else:
+            elevenlabs_use_custom_key = False
         if not (
             elevenlabs_use_custom_key
             or page.is_current_user_paying()
