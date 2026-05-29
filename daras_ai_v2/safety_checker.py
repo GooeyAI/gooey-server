@@ -54,6 +54,8 @@ def safety_checker_text(text_input: str):
 
 
 def safety_checker_image(image_url: str, cache: bool = False) -> None:
+    if not settings.AZURE_IMAGE_MODERATION_KEY:
+        return
     if is_image_nsfw(image_url=image_url, cache=cache):
         raise UserError(SAFETY_CHECKER_MSG)
 
