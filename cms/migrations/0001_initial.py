@@ -28,14 +28,20 @@ class Migration(migrations.Migration):
                 ),
                 ("title", models.CharField(max_length=64)),
                 ("icon", models.TextField(blank=True, default="")),
-                ("order", models.IntegerField(default=0)),
+                (
+                    "priority",
+                    models.IntegerField(
+                        default=1,
+                        help_text="Higher priority tabs are shown first. If 0, then the tab is not shown at all.",
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
                 "verbose_name": "Workflow Tab",
                 "verbose_name_plural": "Workflow Tabs",
-                "ordering": ["order", "id"],
+                "ordering": ["-priority", "id"],
             },
         ),
         migrations.CreateModel(
@@ -50,7 +56,13 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("order", models.IntegerField(default=0)),
+                (
+                    "priority",
+                    models.IntegerField(
+                        default=1,
+                        help_text="Higher priority tiles are shown first. If 0, then the tile is not shown at all.",
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
@@ -64,7 +76,7 @@ class Migration(migrations.Migration):
                 ),
             ],
             options={
-                "ordering": ["order", "id"],
+                "ordering": ["-priority", "id"],
             },
         ),
         migrations.CreateModel(
@@ -124,7 +136,13 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("order", models.IntegerField(default=0)),
+                (
+                    "priority",
+                    models.IntegerField(
+                        default=1,
+                        help_text="Higher priority cards are shown first. If 0, then the card is not shown at all.",
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
@@ -145,7 +163,7 @@ class Migration(migrations.Migration):
                 ),
             ],
             options={
-                "ordering": ["order", "id"],
+                "ordering": ["-priority", "id"],
             },
         ),
     ]
