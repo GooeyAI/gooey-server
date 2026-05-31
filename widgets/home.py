@@ -204,15 +204,17 @@ def _load_saved_workflows(
 
 
 def _load_workflow_tabs() -> list[WorkflowTabData]:
-    qs = WorkflowTab.objects.prefetch_related(
+    qs = WorkflowTab.objects.filter(priority__gte=1).prefetch_related(
         Prefetch(
             "cards",
-            queryset=WorkflowCard.objects.select_related(
+            queryset=WorkflowCard.objects.filter(priority__gte=1)
+            .select_related(
                 "recipe__workspace__created_by",
                 "recipe__saved_run",
-            ).order_by("order"),
+            )
+            .order_by("-priority"),
         )
-    ).order_by("order")
+    ).order_by("-priority")
     return [
         {
             "id": tab.id,
@@ -401,7 +403,8 @@ def _preview_text(text: str | None, maxlen: int) -> str | None:
 
 def _load_industry_tiles() -> list[dict]:
     qs = (
-        IndustryTile.objects.select_related("tag")
+        IndustryTile.objects.filter(priority__gte=1)
+        .select_related("tag")
         .annotate(
             workflow_count=Count(
                 "tag__published_runs",
@@ -412,7 +415,7 @@ def _load_industry_tiles() -> list[dict]:
                 distinct=True,
             ),
         )
-        .order_by("order")
+        .order_by("-priority")
     )
     return [
         {
