@@ -3,12 +3,12 @@ from datetime import date
 from typing import Literal, TypedDict
 
 import gooey_gui as gui
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from furl import furl
 from starlette.requests import Request
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, SavedRun, Workflow
+from bots.models import PublishedRun, PublishedRunVersion, SavedRun, Workflow
 from bots.models.workflow import WorkflowAccessLevel, WorkflowMetadata
 from cms.models import IndustryTile, NewsItem, WorkflowCard, WorkflowTab
 from daras_ai.image_input import truncate_text_words
@@ -57,6 +57,13 @@ class WorkflowTabData(TypedDict):
     cards: list[WorkflowCardData]
 
 
+class WorkspaceHeaderData(TypedDict):
+    name: str
+    photoUrl: str
+    description: str | None
+    settingsHref: str | None
+
+
 def render(request: Request):
     is_anonymous = request.user is None or request.user.is_anonymous
     workspace = (
@@ -64,15 +71,44 @@ def render(request: Request):
         if not is_anonymous
         else None
     )
+    workspace_header = _get_workspace_header(request.user, workspace)
     gui.component(
         "HomePage",
-        greeting=_get_greeting(request.user) if not is_anonymous else None,
+        greeting=(
+            _get_greeting(request.user)
+            if not is_anonymous and workspace_header is None
+            else None
+        ),
+        workspaceHeader=workspace_header,
         recentWorkflows=_load_recent_workflows(request.user, workspace),
         savedWorkflows=_load_saved_workflows(request.user, workspace),
         workflowTabs=_load_workflow_tabs(),
         industryTiles=_load_industry_tiles(),
         newsItems=_load_news_items(),
     )
+
+
+def _get_workspace_header(
+    user: AppUser | None, workspace: Workspace | None
+) -> WorkspaceHeaderData | None:
+    if user is None or workspace is None or workspace.is_personal:
+        return None
+
+    from routers.account import members_route
+    from daras_ai_v2.fastapi_tricks import get_route_path
+
+    membership = workspace.memberships.filter(user=user).first()
+    settings_href = (
+        get_route_path(members_route)
+        if membership and membership.can_edit_workspace()
+        else None
+    )
+    return {
+        "name": workspace.display_name(user),
+        "photoUrl": workspace.get_photo(),
+        "description": workspace.description or None,
+        "settingsHref": settings_href,
+    }
 
 
 def build_meta_tags(url: str):
@@ -92,12 +128,15 @@ def _load_recent_workflows(
 ) -> list[WorkflowCardData]:
     if workspace is None:
         return []
+    runs = SavedRun.objects.filter(
+        workspace=workspace,
+        parent_version__published_run__isnull=False,
+    )
+    if user and not workspace.is_personal:
+        # in a team workspace, show only the current user's history
+        runs = runs.filter(uid=user.uid)
     latest_ids = (
-        SavedRun.objects.filter(
-            workspace=workspace,
-            parent_version__published_run__isnull=False,
-        )
-        .order_by("parent_version__published_run_id", "-updated_at")
+        runs.order_by("parent_version__published_run_id", "-updated_at")
         .distinct("parent_version__published_run_id")
         .values("id")
     )
@@ -142,16 +181,23 @@ def _load_saved_workflows(
     pr_filter = Q(workspace=workspace)
     if workspace.is_personal:
         pr_filter |= Q(created_by=user, workspace__isnull=True)
+    latest_change_notes = (
+        PublishedRunVersion.objects.filter(published_run=OuterRef("pk"))
+        .order_by("-created_at")
+        .values("change_notes")[:1]
+    )
     prs = list(
         PublishedRun.objects.filter(pr_filter)
         .select_related("last_edited_by", "saved_run", "workspace")
+        .annotate(latest_change_notes=Subquery(latest_change_notes))
         .order_by("-updated_at")[:WORKFLOW_LIST_LIMIT]
     )
     return [
         _workflow_to_json(
             profile="saved",
             pr=pr,
-            author=(pr.last_edited_by if pr.last_edited_by_id != user.id else None),
+            author=pr.last_edited_by,
+            current_user=user,
         )
         for pr in prs
     ]
@@ -249,6 +295,9 @@ def _workflow_to_json(
         if pr.run_count:
             data["runCount"] = pr.run_count
         data["accessBadge"] = pr.get_share_badge_data()
+        change_notes = getattr(pr, "latest_change_notes", None)
+        if change_notes:
+            data["changeNotes"] = change_notes
 
     return data
 
