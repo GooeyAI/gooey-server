@@ -36,6 +36,7 @@ export type CardData = {
   updatedAt?: string;
   runCount?: number;
   accessBadge?: AccessBadge;
+  changeNotes?: string;
 };
 
 export type WorkflowTab = {
@@ -43,6 +44,13 @@ export type WorkflowTab = {
   title: string;
   icon: string;
   cards: CardData[];
+};
+
+export type WorkspaceHeader = {
+  name: string;
+  photoUrl: string;
+  description: string | null;
+  settingsHref: string | null;
 };
 
 export type IndustryTile = {

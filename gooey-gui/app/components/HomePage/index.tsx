@@ -1,19 +1,24 @@
 import "./HomePage.css";
 
-import { HistoryWorkflowCard } from "./HistoryWorkflowCard";
 import { IndustryBrowser } from "./IndustryBrowser";
 import { NewsFeed } from "./NewsFeed";
-import { SavedWorkflowCard } from "./SavedWorkflowCard";
-import { WorkflowPicker } from "./WorkflowPicker";
+import {
+  HistoryWorkflowCard,
+  SavedWorkflowCard,
+  WorkflowPicker,
+} from "./workflows";
+import { WorkspaceHeader } from "./WorkspaceHeader";
 import type {
   CardData,
   IndustryTile,
   NewsItem,
   WorkflowTab,
+  WorkspaceHeader as WorkspaceHeaderData,
 } from "./types";
 
 type HomePageProps = {
   greeting: string | null;
+  workspaceHeader: WorkspaceHeaderData | null;
   workflowTabs: WorkflowTab[];
   recentWorkflows: CardData[];
   savedWorkflows: CardData[];
@@ -23,6 +28,7 @@ type HomePageProps = {
 
 export function HomePage({
   greeting,
+  workspaceHeader,
   workflowTabs,
   recentWorkflows,
   savedWorkflows,
@@ -31,6 +37,7 @@ export function HomePage({
 }: HomePageProps) {
   return (
     <div className="container-xxl my-4">
+      {workspaceHeader && <WorkspaceHeader header={workspaceHeader} />}
       {greeting && <h1 className="mb-5">Welcome, {greeting}.</h1>}
 
       {recentWorkflows.length > 0 && (
@@ -56,7 +63,7 @@ export function HomePage({
               </span>
             </a>
           </div>
-          <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 d-flex align-items-stretch">
+          <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 align-items-start">
             {savedWorkflows.map((card) => (
               <div key={card.href} className="col">
                 <SavedWorkflowCard card={card} />
