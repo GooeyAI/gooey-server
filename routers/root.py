@@ -878,9 +878,9 @@ def page_wrapper(
 
                 if request.user and not request.user.is_anonymous:
                     render_header_link(
-                        url=get_route_path(explore_in_current_workspace),
-                        label="Saved",
-                        icon=icons.save,
+                        url=get_route_path(home_page),
+                        label="Home",
+                        icon=icons.home,
                     )
 
                     launcher_div = gui.div()
