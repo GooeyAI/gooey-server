@@ -6,12 +6,15 @@ from bots.custom_fields import CustomURLField
 class WorkflowTab(models.Model):
     title = models.CharField(max_length=64)
     icon = models.TextField(blank=True, default="")
-    order = models.IntegerField(default=0)
+    priority = models.IntegerField(
+        default=1,
+        help_text="Higher priority tabs are shown first. If 0, then the tab is not shown at all.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["order", "id"]
+        ordering = ["-priority", "id"]
         verbose_name = "Workflow Tab"
         verbose_name_plural = "Workflow Tabs"
 
@@ -30,12 +33,15 @@ class WorkflowCard(models.Model):
         on_delete=models.PROTECT,
         related_name="+",
     )
-    order = models.IntegerField(default=0)
+    priority = models.IntegerField(
+        default=1,
+        help_text="Higher priority cards are shown first. If 0, then the card is not shown at all.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["order", "id"]
+        ordering = ["-priority", "id"]
 
     def __str__(self):
         return f"{self.workflow_tab.title} — {self.recipe}"
@@ -48,13 +54,16 @@ class IndustryTile(models.Model):
         related_name="+",
         help_text="Workflows tagged with this Tag are counted on the tile.",
     )
-    order = models.IntegerField(default=0)
+    priority = models.IntegerField(
+        default=1,
+        help_text="Higher priority tiles are shown first. If 0, then the tile is not shown at all.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["order", "id"]
+        ordering = ["-priority", "id"]
 
     def __str__(self):
         return self.tag.name if self.tag_id else "Industry Tile"

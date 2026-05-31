@@ -11,23 +11,23 @@ from gooeysite.admin import GooeyModelAdmin
 
 class WorkflowCardInline(admin.TabularInline):
     model = WorkflowCard
-    fields = ["order", "recipe"]
+    fields = ["priority", "recipe"]
     extra = 1
     autocomplete_fields = ["recipe"]
 
 
 @admin.register(WorkflowTab)
 class WorkflowTabAdmin(GooeyModelAdmin):
-    list_display = ["title", "order"]
-    fields = ["title", "icon", "order"]
+    list_display = ["title", "priority"]
+    fields = ["title", "icon", "priority"]
     inlines = [WorkflowCardInline]
     search_fields = ["title"]
 
 
 @admin.register(IndustryTile)
 class IndustryTileAdmin(GooeyModelAdmin):
-    list_display = ["tag", "order"]
-    fields = ["tag", "order"]
+    list_display = ["tag", "priority"]
+    fields = ["tag", "priority"]
     search_fields = ["tag__name"]
     autocomplete_fields = ["tag"]
 
