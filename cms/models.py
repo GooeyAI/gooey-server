@@ -77,9 +77,7 @@ class NewsItem(models.Model):
     )
     photo_url = CustomURLField(default="", blank=True)
     publish_date = models.DateField()
-    url = models.CharField(
-        max_length=500, help_text="Absolute URL the card links to."
-    )
+    url = models.CharField(max_length=500, help_text="Absolute URL the card links to.")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
