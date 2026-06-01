@@ -91,8 +91,11 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
               alt=""
               className="recent-card-icon-img"
             />
-          ) : preview.emoji ? (
-            <span className="recent-card-icon-emoji">{preview.emoji}</span>
+          ) : preview.icon ? (
+            <span
+              className="recent-card-icon"
+              dangerouslySetInnerHTML={{ __html: preview.icon }}
+            />
           ) : null}
         </div>
       );
@@ -107,10 +110,13 @@ export function HistoryWorkflowCard({ card }: { card: CardData }) {
       className="d-flex flex-column h-100 border rounded-4 overflow-hidden text-decoration-none text-body border-hover"
     >
       <div className="position-relative recent-card-preview bg-light p-0">
-        {(card.workflowLabel || card.workflowEmoji) && (
+        {(card.workflowLabel || card.workflowIcon) && (
           <span className="badge bg-white text-body rounded-pill px-2 py-1 small d-inline-flex align-items-center gap-1 fw-normal position-absolute top-0 start-0 m-2 shadow-lg z-1">
-            {card.workflowEmoji && (
-              <span aria-hidden="true">{card.workflowEmoji}</span>
+            {card.workflowIcon && (
+              <span
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{ __html: card.workflowIcon }}
+              />
             )}
           </span>
         )}

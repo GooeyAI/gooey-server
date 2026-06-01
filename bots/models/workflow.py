@@ -283,6 +283,20 @@ class WorkflowMetadata(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     price_multiplier = models.FloatField(default=1)
     emoji = models.TextField(blank=True, default="")
+    fa_icon = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "Font Awesome icon HTML, e.g. "
+            '&lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
+        ),
+    )
+    color = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Hex color associated with this workflow, e.g. #4d8af0",
+    )
 
     def __str__(self):
         return self.meta_title

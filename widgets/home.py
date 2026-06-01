@@ -40,7 +40,7 @@ class WorkflowCardData(TypedDict, total=False):
     title: str
     href: str
     workflowLabel: str
-    workflowEmoji: str
+    workflowIcon: str
     description: str
     authorName: str
     authorPhotoUrl: str | None
@@ -273,7 +273,10 @@ def _workflow_to_json(
 
     if profile == "history":
         data["workflowLabel"] = workflow.label
-        data["workflowEmoji"] = (metadata.emoji if metadata else "") or ""
+        if metadata:
+            data["workflowIcon"] = metadata.fa_icon or metadata.emoji or ""
+        else:
+            data["workflowIcon"] = ""
 
     if isinstance(author, Workspace):
         data["authorName"] = author.display_name()
@@ -349,12 +352,14 @@ def _icon_preview(
     workflow: Workflow, *, metadata: WorkflowMetadata | None
 ) -> dict | None:
     metadata = metadata or workflow.get_metadata()
-    if not metadata or not (metadata.default_image or metadata.emoji):
+    if not metadata or not (
+        metadata.default_image or metadata.fa_icon or metadata.emoji
+    ):
         return None
     return {
         "type": "icon",
         "imageUrl": metadata.default_image or None,
-        "emoji": metadata.emoji or None,
+        "icon": metadata.fa_icon or metadata.emoji or None,
     }
 
 
