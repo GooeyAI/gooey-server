@@ -23,9 +23,7 @@ from starlette.status import (
 )
 
 import url_shortener.routers as url_shortener
-from auth.auth_backend import (
-    SessionAuthBackend,
-)
+from auth.auth_backend import SessionAuthBackend
 from daras_ai_v2 import settings
 from daras_ai_v2.github_tools import github_url_for_exc
 from daras_ai_v2.settings import templates
@@ -67,6 +65,15 @@ app.mount(
     name="gooey-gui-styles",
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
+if settings.SOVEREIGN_DEPLOY:
+    from pathlib import Path
+
+    Path(settings.MEDIA_ROOT).mkdir(parents=True, exist_ok=True)
+    app.mount(
+        settings.MEDIA_URL.rstrip("/") or "/media",
+        StaticFiles(directory=settings.MEDIA_ROOT),
+        name="media",
+    )
 app.include_router(bots_api.app)
 app.include_router(api.app)
 app.include_router(broadcast_api.app)

@@ -1,26 +1,22 @@
 import datetime
 import json
 import tempfile
-import traceback
 import typing
 from contextlib import contextmanager
 from enum import Enum
-from time import time
 
 import gooey_gui as gui
-import sentry_sdk
-from django.utils import timezone
-from fastapi import Depends, HTTPException, Query
+from fastapi import HTTPException, Query
 from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import JSONResponse, RedirectResponse
-from firebase_admin import auth, exceptions
 from furl import furl
 from loguru import logger
 from starlette.datastructures import FormData
 from starlette.requests import Request
-from starlette.responses import FileResponse, PlainTextResponse, Response
+from starlette.responses import FileResponse, Response
 
-from app_users.models import AppUser, ensure_request_app_user
+from app_users.models import ensure_request_app_user
+from auth.auth_ui import firebase_auth_router, local_auth_router
 from bots.models import BotIntegration, PublishedRun, Workflow
 from bots.models.convo_msg import Conversation, db_msgs_to_api_json
 from daras_ai.image_input import safe_filename, upload_file_from_bytes
@@ -28,13 +24,11 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
-from daras_ai_v2.db import FIREBASE_SESSION_COOKIE
 from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_form,
     fastapi_request_json,
     get_route_path,
-    resolve_url,
 )
 from daras_ai_v2.gooey_builder import (
     render_gooey_builder,
@@ -60,9 +54,6 @@ if typing.TYPE_CHECKING:
 
 
 app = CustomAPIRouter()
-
-DEFAULT_LOGIN_REDIRECT = "/explore/"
-DEFAULT_LOGOUT_REDIRECT = "/"
 
 
 @app.get("/sitemap.xml/")
@@ -120,101 +111,10 @@ async def redoc_html():
     )
 
 
-@app.get("/login/")
-def login(request: Request):
-    from routers.account import invitation_route, load_invite_from_hashid_or_404
-
-    if request.user and not request.user.is_anonymous:
-        return RedirectResponse(
-            request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
-        )
-
-    login_sso_url = get_route_path(login_sso)
-    next_url = request.query_params.get("next") or ""
-    if next_url:
-        login_sso_url = str(furl(login_sso_url, query_params={"next": next_url}))
-
-    context = {"request": request, "login_sso_url": login_sso_url}
-
-    try:
-        if (
-            (next_url := request.query_params.get("next"))
-            and (match := resolve_url(next_url))
-            and match.route.name == invitation_route.__name__
-            and (invite_id := match.matched_params.get("invite_id"))
-        ):
-            context["invite"] = load_invite_from_hashid_or_404(invite_id)
-    except Exception as e:
-        traceback.print_exc()
-        sentry_sdk.capture_exception(e)
-
-    return templates.TemplateResponse("login_options.html", context=context)
-
-
-@app.get("/login/sso/")
-def login_sso(request: Request):
-    if request.user and not request.user.is_anonymous:
-        return RedirectResponse(
-            request.query_params.get("next", DEFAULT_LOGIN_REDIRECT)
-        )
-
-    login_url = get_route_path(login)
-    next_url = request.query_params.get("next") or ""
-    if next_url:
-        login_url = str(furl(login_url, query_params={"next": next_url}))
-
-    context = {"request": request, "login_url": login_url}
-    return templates.TemplateResponse("login_sso.html", context=context)
-
-
-async def form_id_token(request: Request):
-    form = await request.form()
-    return form.get("idToken", "")
-
-
-@app.post("/login/")
-def authentication(request: Request, id_token: bytes = Depends(form_id_token)):
-    ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
-
-    # To ensure that cookies are set only on recently signed in users, check auth_time in
-    # ID token before creating a cookie.
-    try:
-        decoded_claims = auth.verify_id_token(id_token)
-        # Only process if the user signed in within the last 5 minutes.
-        if time() - decoded_claims["auth_time"] < 5 * 60:
-            expires_in = datetime.timedelta(days=14)
-            session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
-            request.session[FIREBASE_SESSION_COOKIE] = session_cookie
-            uid = decoded_claims["uid"]
-            # upgrade an anonymous account to a permanent account
-            try:
-                existing_user = AppUser.objects.get(uid=uid)
-                if existing_user.is_anonymous:
-                    existing_user.copy_from_firebase_user(auth.get_user(uid))
-            except AppUser.DoesNotExist:
-                pass
-            else:
-                existing_user.last_login_at = timezone.now()
-                existing_user.save(update_fields=["last_login_at"])
-            return RedirectResponse(
-                request.query_params.get("next", DEFAULT_LOGIN_REDIRECT),
-                status_code=303,
-            )
-        # User did not sign in recently. To guard against ID token theft, require
-        # re-authentication.
-        return PlainTextResponse(status_code=401, content="Recent sign in required")
-    except auth.InvalidIdTokenError:
-        return PlainTextResponse(status_code=401, content="Invalid ID token")
-    except exceptions.FirebaseError:
-        return PlainTextResponse(
-            status_code=401, content="Failed to create a session cookie"
-        )
-
-
-@app.get("/logout/")
-async def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse(request.query_params.get("next", DEFAULT_LOGOUT_REDIRECT))
+if not settings.SOVEREIGN_DEPLOY:
+    app.include_router(firebase_auth_router)
+else:
+    app.include_router(local_auth_router)
 
 
 @app.post("/__/file-upload/url/meta")

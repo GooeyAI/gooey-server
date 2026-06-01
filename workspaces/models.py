@@ -88,7 +88,7 @@ class WorkspaceQuerySet(SafeDeleteQueryset):
                     # Try to create an object using passed params.
                     obj = self.model(
                         # copy fields from existing user
-                        balance=user.balance,
+                        balance=user.balance or 0,  # balance should be non-null
                         stripe_customer_id=user.stripe_customer_id,
                         subscription=user.subscription,
                         low_balance_email_sent_at=user.low_balance_email_sent_at,

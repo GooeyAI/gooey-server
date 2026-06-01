@@ -1,7 +1,7 @@
 import typing
 
 import gooey_gui as gui
-from daras_ai_v2 import icons
+from daras_ai_v2 import icons, settings
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
@@ -14,6 +14,8 @@ if typing.TYPE_CHECKING:
 
 
 def manage_secrets_table(workspace: "Workspace", user: "AppUser"):
+    if not settings.AZURE_KEY_VAULT_ENDPOINT:
+        return
     gui.write(
         "Secrets are protected environment variables that allow you to share Gooey Workflows with private keys that are hidden from viewers of the workflow."
     )

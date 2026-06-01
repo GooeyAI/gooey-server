@@ -25,7 +25,7 @@
                             Sign in
                         </a>
                     {% endif %}
-                    {% include 'google_one_tap_button.html' %}
+                    {% if settings.FIREBASE_ENABLED %}{% include 'google_one_tap_button.html' %}{% endif %}
                 {% endif %}
             </div>
         </div>

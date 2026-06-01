@@ -8,7 +8,7 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import ensure_config_key, raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from managed_secrets.models import ManagedSecret
 from managed_secrets.widgets import edit_secret_button_with_dialog
@@ -22,17 +22,44 @@ if typing.TYPE_CHECKING:
 class TTSProvider(typing.NamedTuple):
     value: str
     sample_rate: int
+    required_key: str | None = None
 
 
 class TextToSpeechProviders(TTSProvider, GooeyEnum):
-    GOOGLE_TTS = TTSProvider(value="Google Text-to-Speech", sample_rate=24000)
-    ELEVEN_LABS = TTSProvider(value="Eleven Labs", sample_rate=44100)
-    UBERDUCK = TTSProvider(value="Uberduck.ai", sample_rate=22050)
+    GOOGLE_TTS = TTSProvider(
+        value="Google Text-to-Speech",
+        sample_rate=24000,
+        required_key="GOOGLE_APPLICATION_CREDENTIALS",
+    )
+    ELEVEN_LABS = TTSProvider(
+        value="Eleven Labs", sample_rate=44100, required_key="ELEVEN_LABS_API_KEY"
+    )
+    UBERDUCK = TTSProvider(
+        value="Uberduck.ai", sample_rate=22050, required_key="UBERDUCK_KEY"
+    )
     BARK = TTSProvider(value="Bark (suno-ai)", sample_rate=24000)
-    AZURE_TTS = TTSProvider(value="Azure Text-to-Speech", sample_rate=16000)
-    OPEN_AI = TTSProvider(value="OpenAI", sample_rate=24000)
-    GHANA_NLP = TTSProvider(value="GhanaNLP Text-To-Speech", sample_rate=16000)
-    MMS_TTS = TTSProvider(value="MMS TTS (Meta)", sample_rate=16000)
+    AZURE_TTS = TTSProvider(
+        value="Azure Text-to-Speech",
+        sample_rate=16000,
+        required_key="AZURE_SPEECH_KEY",
+    )
+    OPEN_AI = TTSProvider(
+        value="OpenAI", sample_rate=24000, required_key="OPENAI_API_KEY"
+    )
+    GHANA_NLP = TTSProvider(
+        value="GhanaNLP Text-To-Speech",
+        sample_rate=16000,
+        required_key="GHANA_NLP_SUBKEY",
+    )
+    MMS_TTS = TTSProvider(
+        value="MMS TTS (Meta)", sample_rate=16000, required_key="MODAL_TOKEN_ID"
+    )
+
+    @classmethod
+    def _unavailable(cls):
+        from daras_ai_v2.exceptions import is_key_set
+
+        return {p for p in cls if p.required_key and not is_key_set(p.required_key)}
 
 
 UBERDUCK_VOICES = {
@@ -158,6 +185,7 @@ def text_to_speech_provider_selector(page):
             "###### Text-to-Speech Provider",
             key="tts_provider",
             use_selectbox=True,
+            exclude=list(TextToSpeechProviders._unavailable()),
         )
     with col2:
         match tts_provider:
@@ -406,16 +434,19 @@ Note: You need to be [Signed In]({page.get_auth_url()}) to use ElevenLabs voices
             """
         )
     else:
-        elevenlabs_use_custom_key = gui.checkbox(
-            "Use custom API Key & Voice",
-            value=bool(gui.session_state.get("elevenlabs_api_key")),
-            help="""
+        if settings.AZURE_KEY_VAULT_ENDPOINT:
+            elevenlabs_use_custom_key = gui.checkbox(
+                "Use custom API Key & Voice",
+                value=bool(gui.session_state.get("elevenlabs_api_key")),
+                help="""
 Your ElevenLabs API key
 - Read <a target="_blank" href="https://docs.elevenlabs.io/api-reference/authentication">this</a> to know how to obtain an API key from ElevenLabs.
 - [Learn how](https://gooey.ai/docs/guides/lipsync-videos-with-custom-voices) to add custom voices!
 - Manage your secrets in the [account keys](/account/api-keys/) section.
-            """,
-        )
+                """,
+            )
+        else:
+            elevenlabs_use_custom_key = False
         if not (
             elevenlabs_use_custom_key
             or page.is_current_user_paying()
@@ -569,11 +600,15 @@ def elevenlabs_settings():
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def google_tts_voices() -> dict[str, str]:
+    from google.auth.exceptions import DefaultCredentialsError
     from google.cloud import texttospeech
 
-    voices: list[texttospeech.Voice] = list(
-        texttospeech.TextToSpeechClient().list_voices().voices
-    )
+    try:
+        voices: list[texttospeech.Voice] = list(
+            texttospeech.TextToSpeechClient().list_voices().voices
+        )
+    except DefaultCredentialsError:
+        return {}
     voices.sort(key=_voice_sort_key)
     return {voice.name: _pretty_voice(voice) for voice in voices}
 
@@ -622,6 +657,7 @@ def fetch_elevenlabs_voices(
             managed_secret.load_value()
             api_key = managed_secret.value
     else:
+        ensure_config_key("ELEVEN_LABS_API_KEY")
         api_key = settings.ELEVEN_LABS_API_KEY
     r = requests.get(
         "https://api.elevenlabs.io/v1/voices",

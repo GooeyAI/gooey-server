@@ -607,11 +607,17 @@ def get_spreadsheet_service():
         return threadlocal.spreadsheets
 
 
-def document_intelligence_settings(title: str, help: str | None = None):
+def get_available_document_intelligence_models() -> dict:
     document_models = {}
     if settings.AZURE_FORM_RECOGNIZER_KEY:
         document_models |= azure_document_intelligence_models()
-    document_models |= {"mistral-ocr": "Mistral OCR"}
+    if settings.MISTRAL_API_KEY:
+        document_models |= {"mistral-ocr": "Mistral OCR"}
+    return document_models
+
+
+def document_intelligence_settings(title: str, help: str | None = None):
+    document_models = get_available_document_intelligence_models()
     gui.selectbox(
         title,
         key="document_model",

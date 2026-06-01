@@ -6,6 +6,7 @@ if typing.TYPE_CHECKING:
 
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
+LOCAL_AUTH_SESSION_COOKIE = "local_auth_user_id"
 
 DEFAULT_COLLECTION = "daras-ai-v2"
 USERS_COLLECTION = "users"

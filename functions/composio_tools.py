@@ -74,6 +74,9 @@ class ComposioLLMTool(BaseLLMTool):
 
 
 def render_inbuilt_tools_selector(key="inbuilt_tools_selector"):
+    if not settings.COMPOSIO_API_KEY:
+        return
+
     dialog_ref = gui.use_alert_dialog(key)
 
     if gui.button(

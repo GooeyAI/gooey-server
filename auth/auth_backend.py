@@ -1,13 +1,13 @@
 from contextlib import contextmanager
 
-from firebase_admin import auth
-from firebase_admin.auth import UserRecord
+from firebase_admin import auth as firebase_auth
 from starlette.authentication import AuthCredentials, AuthenticationBackend
 from starlette.concurrency import run_in_threadpool
 
 from app_users.models import AppUser
 from bots.models import get_default_published_run_workspace
-from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, ANONYMOUS_USER_COOKIE
+from daras_ai_v2 import settings
+from daras_ai_v2.db import FIREBASE_SESSION_COOKIE, LOCAL_AUTH_SESSION_COOKIE
 from gooeysite.bg_db_conn import db_middleware
 from workspaces.models import Workspace
 
@@ -38,36 +38,33 @@ class SessionAuthBackend(AuthenticationBackend):
 
 @db_middleware
 def _authenticate(conn):
-    session_cookie = conn.session.get(FIREBASE_SESSION_COOKIE)
-    if not session_cookie:
-        # Session cookie is unavailable. Check if anonymous user is available.
-        anon_uid = conn.session.get(ANONYMOUS_USER_COOKIE, {}).get("uid")
-        if anon_uid:
-            try:
-                anon_user = AppUser.objects.get(uid=anon_uid)
-                if anon_user.is_anonymous:
-                    return AuthCredentials(["authenticated"]), anon_user
-            except AppUser.DoesNotExist:
-                # Anonymous user was deleted
-                conn.session.pop(ANONYMOUS_USER_COOKIE, None)
-        # Session cookie is unavailable. Force user to login.
-        return AuthCredentials(), None
-
-    user = _verify_session_cookie(session_cookie)
-    if not user:
-        # Session cookie was invalid
-        conn.session.pop(FIREBASE_SESSION_COOKIE, None)
-        return AuthCredentials(), None
-
-    return AuthCredentials(["authenticated"]), user
+    if not settings.SOVEREIGN_DEPLOY:
+        session_cookie = conn.session.get(FIREBASE_SESSION_COOKIE)
+        if not session_cookie:
+            return AuthCredentials(), None
+        user = _verify_firebase_session_cookie(session_cookie)
+        if not user:
+            conn.session.pop(FIREBASE_SESSION_COOKIE, None)
+            return AuthCredentials(), None
+        return AuthCredentials(["authenticated"]), user
+    else:
+        user_id = conn.session.get(LOCAL_AUTH_SESSION_COOKIE)
+        if not user_id:
+            return AuthCredentials(), None
+        try:
+            user = AppUser.objects.get(pk=user_id)
+            return AuthCredentials(["authenticated"]), user
+        except AppUser.DoesNotExist:
+            conn.session.pop(LOCAL_AUTH_SESSION_COOKIE, None)
+            return AuthCredentials(), None
 
 
-def _verify_session_cookie(firebase_cookie: str) -> UserRecord | None:
+def _verify_firebase_session_cookie(firebase_cookie: str) -> AppUser | None:
     # Verify the session cookie. In this case an additional check is added to detect
     # if the user's Firebase session was revoked, user deleted/disabled, etc.
     try:
-        decoded_claims = auth.verify_session_cookie(firebase_cookie)
+        decoded_claims = firebase_auth.verify_session_cookie(firebase_cookie)
         return AppUser.objects.get_or_create_from_uid(decoded_claims["uid"])[0]
-    except (auth.UserNotFoundError, auth.InvalidSessionCookieError):
+    except (firebase_auth.UserNotFoundError, firebase_auth.InvalidSessionCookieError):
         # Session cookie is invalid, expired or revoked. Force user to login.
         return None

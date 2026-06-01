@@ -12,7 +12,7 @@ def test_default_length_function():
     models = []
     for llm in AIModelSpec.objects.filter(
         category=AIModelSpec.Categories.llm, provider=ModelProvider.openai
-    ).exclude_deprecated():
+    ).filter_available():
         if llm.model_id.startswith(AZURE_OPENAI_MODEL_PREFIX):
             continue
         models.append(llm.model_id)

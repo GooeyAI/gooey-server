@@ -36,7 +36,7 @@ from bots.models import Platform
 from daras_ai.image_input import gs_url_to_uri, bytes_to_cv2_img, cv2_img_to_bytes
 from daras_ai_v2.asr import audio_url_to_wav, get_google_auth_session
 from daras_ai_v2.custom_enum import GooeyEnum
-from daras_ai_v2.exceptions import raise_for_status, UserError
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
@@ -76,6 +76,7 @@ class _ReasoningEffort(typing.NamedTuple):
 
 class ReasoningEffort(_ReasoningEffort, GooeyEnum):
     minimal = _ReasoningEffort(name="minimal", label="Minimal", thinking_budget=1024)
+    none = _ReasoningEffort(name="none", label="None", thinking_budget=0)
     low = _ReasoningEffort(name="low", label="Low", thinking_budget=4096)
     medium = _ReasoningEffort(name="medium", label="Medium", thinking_budget=8192)
     high = _ReasoningEffort(name="high", label="High", thinking_budget=24576)
@@ -223,6 +224,9 @@ def run_language_model(
             messages = list(
                 filter(None, (remove_images_from_entry(entry) for entry in messages))
             )
+        elif settings.SOVEREIGN_DEPLOY:
+            # using local filesystem storage: convert images to base64
+            messages = local_image_urls_to_base64(messages)
         if (
             messages
             and response_format_type == "json_object"
@@ -307,6 +311,36 @@ def run_language_model(
         return ret
 
 
+def local_image_urls_to_base64(
+    messages: list[ConversationEntry],
+) -> list[ConversationEntry]:
+    ret = []
+    for message in messages:
+        parts = message.get("content")
+        if not isinstance(parts, list):
+            ret.append(message)
+            continue
+        new_parts = []
+        for part in parts:
+            if part.get("type") == "image_url":
+                url = part.get("image_url", {}).get("url", "")
+                if url and not url.startswith("data:"):
+                    img_bytes = requests.get(url).content
+                    img_b64 = base64.b64encode(
+                        cv2_img_to_bytes(bytes_to_cv2_img(img_bytes))
+                    ).decode()
+                    new_parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+                        }
+                    )
+                    continue
+            new_parts.append(part)
+        ret.append(message | {"content": new_parts})
+    return ret
+
+
 def output_stream_generator(
     result: list | typing.Generator[list[ConversationEntry], None, None],
 ):
@@ -332,6 +366,11 @@ def _run_text_model(
     quality: float,
 ) -> list[str]:
     logger.info(f"{api=} {model=}, {len(prompt)=}, {max_tokens=}, {temperature=}")
+    if not api.keys_available():
+        raise UserError(
+            f"`{api.required_keys[0]}` is needed to run this workflow. "
+            "Please change the model or add the API key."
+        )
     match api:
         case ModelProvider.openai:
             return _run_openai_text(
@@ -390,6 +429,12 @@ def _run_chat_model(
     logger.info(
         f"{model.provider=} {model.model_id=}, {len(messages)=}, {max_tokens=}, {temperature=} {stop=} {stream=}"
     )
+    if not model.is_available:
+        raise UserError(
+            f"`{model.provider.required_keys[0]}` is needed to run this workflow. "
+            "Please change the model or add the API key."
+        )
+
     match model.provider:
         case ModelProvider.mistral:
             return _run_mistral_chat(
@@ -1007,7 +1052,7 @@ def chat_completion_msg_to_responses_input_msg(msg: dict) -> list[dict]:
     if isinstance(content, list):
         for part in content:
             match part.get("type"):
-                case "image_url":
+                case "image_url" if isinstance(part["image_url"], dict):
                     part["type"] = "input_image"
                     part["image_url"] = part["image_url"]["url"]
                 case "text":

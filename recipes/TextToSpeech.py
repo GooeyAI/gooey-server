@@ -16,7 +16,7 @@ from daras_ai.text_format import unmarkdown
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
 from daras_ai_v2.base import BasePage
-from daras_ai_v2.exceptions import UserError, raise_for_status
+from daras_ai_v2.exceptions import UserError, ensure_config_key, raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import HttpUrlStr
@@ -179,6 +179,7 @@ class TextToSpeechPage(BasePage):
                 )[0]
 
             case TextToSpeechProviders.UBERDUCK:
+                ensure_config_key("UBERDUCK_KEY")
                 voicemodel_uuid = (
                     UBERDUCK_VOICES.get(state.get("uberduck_voice_name"))
                     or UBERDUCK_VOICES["Aiden Botha"]
@@ -219,6 +220,8 @@ class TextToSpeechPage(BasePage):
                 import emoji
                 from google.cloud import texttospeech
 
+                ensure_config_key("GOOGLE_APPLICATION_CREDENTIALS")
+
                 voice_name = (
                     state["google_voice_name"]
                     if "google_voice_name" in state
@@ -247,8 +250,6 @@ class TextToSpeechPage(BasePage):
                     audio_config.pitch = pitch  # optional
                     audio_config.speaking_rate = speaking_rate  # optional
 
-                # Perform the text-to-speech request on the text input with the selected
-                # voice parameters and audio file type
                 client = texttospeech.TextToSpeechClient()
                 response = client.synthesize_speech(
                     input=synthesis_input, voice=voice, audio_config=audio_config
@@ -261,6 +262,8 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.ELEVEN_LABS:
                 xi_api_key, is_custom_key = self._get_elevenlabs_api_key(state)
+                if not is_custom_key:
+                    ensure_config_key("ELEVEN_LABS_API_KEY")
                 if not (
                     is_custom_key
                     or self.is_current_user_paying()
@@ -313,6 +316,8 @@ class TextToSpeechPage(BasePage):
                 import azure.cognitiveservices.speech as speechsdk
                 import emoji
 
+                ensure_config_key("AZURE_SPEECH_KEY")
+
                 voice_name = state.get("azure_voice_name", "en-US")
                 try:
                     voice = azure_tts_voices()[voice_name]["ShortName"]
@@ -353,6 +358,8 @@ class TextToSpeechPage(BasePage):
             case TextToSpeechProviders.OPEN_AI:
                 from openai import OpenAI
 
+                ensure_config_key("OPENAI_API_KEY")
+
                 client = OpenAI()
 
                 model = (
@@ -374,6 +381,8 @@ class TextToSpeechPage(BasePage):
                     "openai_tts.mp3", response.content
                 )
             case TextToSpeechProviders.GHANA_NLP:
+                ensure_config_key("GHANA_NLP_SUBKEY")
+
                 response = requests.post(
                     "https://translation-api.ghananlp.org/tts/v1/tts",
                     headers=GHANA_API_AUTH_HEADERS,

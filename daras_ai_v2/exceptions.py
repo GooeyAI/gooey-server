@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import typing
 
@@ -145,6 +146,24 @@ class PaymentRequired(UserError):
             "PaymentRequired",
             discordInviteUrl=settings.DISCORD_INVITE_URL,
             paidOnlyModels=error_params.get("paid_only_models") or [],
+        )
+
+
+def is_key_set(key: str) -> bool:
+    return bool(getattr(settings, key, None) or os.environ.get(key))
+
+
+def ensure_config_key(*keys: str):
+    """Raises UserError if none of the given API keys are configured.
+    When multiple keys are passed, any one being set is sufficient.
+
+        ensure_config_key("OPENAI_API_KEY")
+        ensure_config_key("AZURE_OPENAI_KEY_CA", "AZURE_OPENAI_KEY_EASTUS2")
+    """
+    if not any(is_key_set(k) for k in keys):
+        raise UserError(
+            f"`{keys[0]}` is needed to run this workflow. "
+            "Please change the model or add the API key."
         )
 
 

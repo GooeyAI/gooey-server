@@ -12,7 +12,7 @@ from ai_models.models import AIModelSpec
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import audio_url_to_wav
-from daras_ai_v2.exceptions import ffmpeg
+from daras_ai_v2.exceptions import ensure_config_key, ffmpeg
 from daras_ai_v2.language_model_openai_realtime import RealtimeSession
 from daras_ai_v2.utils import clamp
 from functions.base_llm_tool import BaseLLMTool
@@ -110,6 +110,7 @@ def get_or_create_ws(model) -> tuple[ClientConnection, bool]:
         ws = threadlocal._realtime_ws
         created = False
     except AttributeError:
+        ensure_config_key("OPENAI_API_KEY")
         ws = connect(
             furl(
                 "wss://api.openai.com/v1/realtime",

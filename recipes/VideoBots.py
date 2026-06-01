@@ -102,7 +102,10 @@ from functions.base_llm_tool import (
     get_tool_from_call,
 )
 from functions.workflow_tools import DynamicLLMToolLoader
-from recipes.DocExtract import document_intelligence_settings
+from recipes.DocExtract import (
+    get_available_document_intelligence_models,
+    document_intelligence_settings,
+)
 from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
@@ -943,13 +946,16 @@ Translation Glossary for LLM Language (English) -> User Langauge
         if not text_to_speech_enabled:
             gui.session_state["tts_provider"] = None
 
-        document_intelligence_enabled = switch_with_section(
-            label="##### 🩻 Photo & Document Intelligence",
-            key="_document_intelligence_enabled",
-            control_keys=["document_model"],
-            render_section=self.document_intelligence_settings,
-        )
-        if not document_intelligence_enabled:
+        if get_available_document_intelligence_models():
+            document_intelligence_enabled = switch_with_section(
+                label="##### 🩻 Photo & Document Intelligence",
+                key="_document_intelligence_enabled",
+                control_keys=["document_model"],
+                render_section=self.document_intelligence_settings,
+            )
+            if not document_intelligence_enabled:
+                gui.session_state["document_model"] = None
+        else:
             gui.session_state["document_model"] = None
 
         switch_with_section(
@@ -1083,12 +1089,18 @@ Translation Glossary for LLM Language (English) -> User Langauge
             )
 
     def validate_form_v2(self):
-        input_glossary = gui.session_state.get("input_glossary_document", "")
-        output_glossary = gui.session_state.get("output_glossary_document", "")
-        if input_glossary:
-            validate_glossary_document(input_glossary)
-        if output_glossary:
-            validate_glossary_document(output_glossary)
+        user_language = gui.session_state.get("user_language")
+        if (
+            user_language
+            and should_translate_lang(user_language)
+            and not gui.session_state.get("asr_task") == "translate"
+        ):
+            input_glossary = gui.session_state.get("input_glossary_document", "")
+            output_glossary = gui.session_state.get("output_glossary_document", "")
+            if input_glossary:
+                validate_glossary_document(input_glossary)
+            if output_glossary:
+                validate_glossary_document(output_glossary)
 
     def render_usage_guide(self):
         youtube_video("4wGKQAGUm48")

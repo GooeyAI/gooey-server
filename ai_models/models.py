@@ -51,11 +51,48 @@ class ModelProvider(models.IntegerChoices):
     def _deprecated(cls):
         return {cls.anthropic}
 
+    @property
+    def required_keys(self) -> tuple[str, ...]:
+        match self:
+            case (
+                ModelProvider.openai
+                | ModelProvider.openai_audio
+                | ModelProvider.openai_responses
+            ):
+                return ("OPENAI_API_KEY",)
+            case ModelProvider.anthropic:
+                return ("ANTHROPIC_API_KEY",)
+            case ModelProvider.google:
+                return ("GOOGLE_APPLICATION_CREDENTIALS",)
+            case ModelProvider.groq:
+                return ("GROQ_API_KEY",)
+            case ModelProvider.fireworks:
+                return ("FIREWORKS_API_KEY",)
+            case ModelProvider.mistral:
+                return ("MISTRAL_API_KEY",)
+            case ModelProvider.sarvam:
+                return ("SARVAM_API_KEY",)
+            case ModelProvider.azure_openai:
+                return ("AZURE_OPENAI_KEY_CA", "AZURE_OPENAI_KEY_EASTUS2")
+            case ModelProvider.fal_ai:
+                return ("FAL_API_KEY",)
+            case ModelProvider.sea_lion:
+                return ("SEA_LION_API_KEY",)
+            case ModelProvider.publicai:
+                return ("PUBLICAI_API_KEY",)
+            case _:
+                return ()
+
+    def keys_available(self) -> bool:
+        from daras_ai_v2.exceptions import is_key_set
+
+        return not self.required_keys or any(is_key_set(k) for k in self.required_keys)
+
 
 class AIModelSpecQuerySet(models.QuerySet):
     def order_for_frontend(self, *, selected_models: list[str] | str | None = None):
         return (
-            self.exclude_deprecated(selected_models=selected_models)
+            self.filter_available(selected_models=selected_models)
             .select_related("creator")
             .order_by(
                 F("creator__priority").desc(nulls_last=True),
@@ -65,8 +102,17 @@ class AIModelSpecQuerySet(models.QuerySet):
             )
         )
 
-    def exclude_deprecated(self, *, selected_models: list[str] | str | None = None):
-        q = Q(is_deprecated=False)
+    def filter_available(self, *, selected_models: list[str] | str | None = None):
+        """Exclude deprecated models and those whose provider API keys are not configured.
+
+        A model is always included if it is currently selected, deprecated but
+        explicitly chosen, or has its own base_url/api_key (self-hosted or custom
+        credentials).
+        """
+        available_providers = [p.value for p in ModelProvider if p.keys_available()]
+        q = Q(is_deprecated=False) & (
+            Q(provider__in=available_providers) | Q(base_url__gt="") | Q(api_key__gt="")
+        )
         if selected_models:
             if isinstance(selected_models, str):
                 q |= Q(name=selected_models)
@@ -170,6 +216,12 @@ class AIModelSpec(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     objects = AIModelSpecQuerySet.as_manager()
+
+    @property
+    def is_available(self) -> bool:
+        if self.base_url or self.api_key:
+            return True
+        return ModelProvider(self.provider).keys_available()
 
     class Meta:
         verbose_name = "AI Model Spec"

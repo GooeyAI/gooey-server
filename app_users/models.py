@@ -1,11 +1,12 @@
 import hashlib
 import typing
+import uuid
 from functools import cached_property
 
 import requests
-from django.db import models, IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
-from firebase_admin import auth
+from firebase_admin import auth as firebase_auth
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
 
@@ -32,11 +33,12 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            firebase_user = auth.get_user(uid)
-            # Try to create an object using passed params.
             try:
                 user = self.model(**kwargs)
-                user.copy_from_firebase_user(firebase_user)
+                if not settings.SOVEREIGN_DEPLOY:
+                    user.copy_from_firebase_user(firebase_auth.get_user(uid))
+                else:
+                    user.save()
                 return user, True
             except IntegrityError:
                 try:
@@ -55,11 +57,17 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            firebase_user = get_or_create_firebase_user_by_email(email)[0]
-            # Try to create an object using passed params.
             try:
-                user = self.model(**kwargs)
-                user.copy_from_firebase_user(firebase_user)
+                if not settings.SOVEREIGN_DEPLOY:
+                    user = self.model(**kwargs)
+                    user.copy_from_firebase_user(
+                        get_or_create_firebase_user_by_email(email)[0]
+                    )
+                else:
+                    user = self.model(
+                        uid=str(uuid.uuid4()), is_anonymous=False, **kwargs
+                    )
+                    user.save()
                 return user, True
             except IntegrityError:
                 try:
@@ -69,22 +77,26 @@ class AppUserQuerySet(models.QuerySet):
                 raise
 
 
-def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, bool]:
+def get_or_create_firebase_user_by_email(
+    email: str,
+) -> tuple[firebase_auth.UserRecord, bool]:
     try:
-        return auth.get_user_by_email(email), False
-    except auth.UserNotFoundError:
+        return firebase_auth.get_user_by_email(email), False
+    except firebase_auth.UserNotFoundError:
         try:
-            return auth.create_user(email=email), True
-        except auth.EmailAlreadyExistsError:
+            return firebase_auth.create_user(email=email), True
+        except firebase_auth.EmailAlreadyExistsError:
             try:
-                return auth.get_user_by_email(email), False
-            except auth.UserNotFoundError:
+                return firebase_auth.get_user_by_email(email), False
+            except firebase_auth.UserNotFoundError:
                 pass
             raise
 
 
 def create_anonymous_app_user() -> "AppUser":
-    uid = auth.create_user().uid
+    if settings.SOVEREIGN_DEPLOY:
+        raise RuntimeError("Anonymous users are not supported in local-auth mode")
+    uid = firebase_auth.create_user().uid
     return AppUser.objects.create(
         uid=uid,
         is_anonymous=True,
@@ -115,7 +127,7 @@ class AppUser(models.Model):
     uid = models.CharField(max_length=255, unique=True)
 
     display_name = models.TextField("name", blank=True)
-    email = models.EmailField(null=True, blank=True)
+    email = models.EmailField(null=True, blank=True, unique=True)
     phone_number = PhoneNumberField(null=True, blank=True)
     is_anonymous = models.BooleanField()
     is_disabled = models.BooleanField(default=False)
@@ -155,18 +167,11 @@ class AppUser(models.Model):
     github_username = models.CharField(max_length=255, blank=True, default="")
     website_url = CustomURLField(blank=True, default="")
 
+    localauth_password = models.CharField(max_length=255, blank=True, default="")
+
     disable_rate_limits = models.BooleanField(default=False)
 
     objects = AppUserQuerySet.as_manager()
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["email"]),
-            # GinIndex(
-            #     SearchVector("display_name", config="english"),
-            #     name="appuser_search_vector_idx",
-            # ),
-        ]
 
     def __str__(self):
         return f"{self.display_name} ({self.email or self.phone_number or self.uid})"
@@ -201,7 +206,7 @@ class AppUser(models.Model):
             name += " (You)"
         return name
 
-    def copy_from_firebase_user(self, user: auth.UserRecord) -> "AppUser":
+    def copy_from_firebase_user(self, user: "firebase_auth.UserRecord") -> "AppUser":
         # copy data from firebase user
         self.uid = user.uid
         self.is_disabled = user.disabled
@@ -278,7 +283,7 @@ class AppUser(models.Model):
         return workspace.handle
 
     def get_anonymous_token(self):
-        return auth.create_custom_token(self.uid).decode()
+        return firebase_auth.create_custom_token(self.uid).decode()
 
     def get_photo(self) -> str:
         return self.photo_url or get_placeholder_profile_image(self.uid)

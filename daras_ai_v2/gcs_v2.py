@@ -1,10 +1,8 @@
 from __future__ import annotations
 import datetime
 import os
-import typing
 
-if typing.TYPE_CHECKING:
-    from firebase_admin import storage
+from firebase_admin import storage
 
 
 GCS_BASE_URL = "https://storage.googleapis.com"
@@ -35,8 +33,6 @@ dumb_content_types = ["application/octet-stream", "application/x-www-form-urlenc
 
 
 def private_url_to_blob(url: str) -> storage.Blob | None:
-    from firebase_admin import storage
-
     if not url.startswith(GCS_BUCKET_URL):
         return None
     return storage.bucket(GCS_BUCKET_NAME).blob(

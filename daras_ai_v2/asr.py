@@ -23,6 +23,7 @@ from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import (
     raise_for_status,
     UserError,
+    ensure_config_key,
     ffmpeg,
     call_cmd,
     ffprobe,
@@ -328,6 +329,32 @@ class AsrModels(Enum):
             self.ghana_nlp_asr_v2,
         }
 
+    @property
+    def required_key(self) -> str | None:
+        match self:
+            case AsrModels.whisper_large_v2 | AsrModels.whisper_large_v3:
+                return "REPLICATE_API_TOKEN"
+            case AsrModels.gpt_4_o_audio | AsrModels.gpt_4_o_mini_audio:
+                return "OPENAI_API_KEY"
+            case AsrModels.gcp_v1 | AsrModels.usm:
+                return "GOOGLE_APPLICATION_CREDENTIALS"
+            case AsrModels.deepgram:
+                return "DEEPGRAM_API_KEY"
+            case AsrModels.azure:
+                return "AZURE_SPEECH_KEY"
+            case AsrModels.elevenlabs:
+                return "ELEVEN_LABS_API_KEY"
+            case AsrModels.intron:
+                return "INTRON_API_KEY"
+            case AsrModels.ghana_nlp_asr_v2:
+                return "GHANA_NLP_SUBKEY"
+            case AsrModels.lelapa:
+                return "LELAPA_API_KEY"
+            case AsrModels.voxtral_mini:
+                return "MISTRAL_API_KEY"
+            case _:
+                return None
+
     @classmethod
     def _deprecated(cls):
         return {
@@ -339,6 +366,12 @@ class AsrModels(Enum):
             cls.whisper_telugu_large_v2,
             cls.vakyansh_bhojpuri,
         }
+
+    @classmethod
+    def _unavailable(cls):
+        from daras_ai_v2.exceptions import is_key_set
+
+        return {m for m in cls if m.required_key and not is_key_set(m.required_key)}
 
     @classmethod
     def get(cls, key, default=None):
@@ -444,6 +477,7 @@ class TranslationModel(typing.NamedTuple):
     supports_glossary: bool = False
     supports_auto_detect: bool = False
     is_asr_model: bool = False
+    required_key: str | None = None
 
 
 class TranslationModels(TranslationModel, Enum):
@@ -451,9 +485,16 @@ class TranslationModels(TranslationModel, Enum):
         label="Google Translate",
         supports_glossary=True,
         supports_auto_detect=True,
+        required_key="GOOGLE_APPLICATION_CREDENTIALS",
     )
-    ghana_nlp = TranslationModel(label="Ghana NLP Translate")
-    lelapa = TranslationModel(label="Vulavula (Lelapa AI)")
+    ghana_nlp = TranslationModel(
+        label="Ghana NLP Translate",
+        required_key="GHANA_NLP_SUBKEY",
+    )
+    lelapa = TranslationModel(
+        label="Vulavula (Lelapa AI)",
+        required_key="LELAPA_API_KEY",
+    )
     whisper_large_v2 = TranslationModel(
         label="Whisper Large v2 (inbuilt)", is_asr_model=True
     )
@@ -463,6 +504,12 @@ class TranslationModels(TranslationModel, Enum):
     seamless_m4t_v2 = TranslationModel(
         label="Seamless M4T v2 (inbuilt)", is_asr_model=True
     )
+
+    @classmethod
+    def _unavailable(cls):
+        from daras_ai_v2.exceptions import is_key_set
+
+        return {m for m in cls if m.required_key and not is_key_set(m.required_key)}
 
     @classmethod
     def get(cls, key, default=None):
@@ -568,6 +615,7 @@ def translation_model_selector(
         allow_none=allow_none,
         use_selectbox=True,
         key=key,
+        exclude=list(TranslationModels._unavailable()),
     )
     if model:
         return TranslationModels[model]
@@ -677,6 +725,7 @@ def asr_model_selector(
         label=label,
         key=key,
         use_selectbox=use_selectbox,
+        exclude=list(AsrModels._unavailable()),
         **kwargs,
     )
     if model:
@@ -815,6 +864,7 @@ def run_translate(
 def run_ghana_nlp_translate(
     texts: list[str], target_language: str, source_language: str
 ) -> list[str]:
+    ensure_config_key("GHANA_NLP_SUBKEY")
     assert source_language and target_language, (
         "Both Source & Target language is required for Ghana NLP"
     )
@@ -858,6 +908,7 @@ def _call_ghana_nlp_raw(text: str, source_language: str, target_language: str) -
 def run_lelapa_translate(
     texts: list[str], target_language: str, source_language: str
 ) -> list[str]:
+    ensure_config_key("LELAPA_API_KEY")
     assert source_language and target_language, (
         "Both Source & Target language are required"
     )
@@ -890,16 +941,8 @@ def run_google_translate(
     source_language: str | None = None,
     glossary_url: str | None = None,
 ) -> list[str]:
-    """
-    Translate text using the Google Translate API.
-    Args:
-        texts (list[str]): Text to be translated.
-        target_language (str): Language code to translate to.
-        source_language (str): Language code to translate from.
-        glossary_url (str): URL of glossary file.
-    Returns:
-        list[str]: Translated text.
-    """
+    """Translate text using the Google Translate API."""
+    ensure_config_key("GOOGLE_APPLICATION_CREDENTIALS")
     from google.cloud import translate_v2 as translate
 
     supported_languages = google_translate_target_languages()
@@ -1019,6 +1062,7 @@ _session_lock = threading.Lock()
 
 @lru_cache
 def get_google_auth_session(*scopes: str) -> tuple[AuthorizedSession, str]:
+    ensure_config_key("GOOGLE_APPLICATION_CREDENTIALS")
     if not scopes:
         scopes = ("https://www.googleapis.com/auth/cloud-platform",)
     with _session_lock:
@@ -1034,6 +1078,8 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
     """
     Call ElevenLabs Speech-to-Text API
     """
+    ensure_config_key("ELEVEN_LABS_API_KEY")
+
     audio_r = requests.get(audio_url)
     raise_for_status(audio_r, is_user_url=True)
 
@@ -1058,8 +1104,7 @@ def elevenlabs_asr(audio_url: str, language: str = None) -> dict:
 
 
 def intron_asr(audio_url: str, language: str | None = None) -> dict:
-    if not settings.INTRON_API_KEY:
-        raise UserError("Intron ASR is not configured: missing INTRON_API_KEY")
+    ensure_config_key("INTRON_API_KEY")
 
     intron_base_url = furl("https://infer.voice.intron.io")
     audio_r = requests.get(audio_url)
@@ -1175,6 +1220,7 @@ def run_asr(
     elif selected_model == AsrModels.whisper_large_v3:
         import replicate
 
+        ensure_config_key("REPLICATE_API_TOKEN")
         config = {
             "audio": audio_url,
             "return_timestamps": output_format != AsrOutputFormat.text,
@@ -1189,6 +1235,7 @@ def run_asr(
             input=config,
         )
     elif selected_model == AsrModels.deepgram:
+        ensure_config_key("DEEPGRAM_API_KEY")
         r = requests.post(
             "https://api.deepgram.com/v1/listen",
             headers={
@@ -1242,8 +1289,10 @@ def run_asr(
             ),
         )
     elif selected_model == AsrModels.gcp_v1:
+        ensure_config_key("GOOGLE_APPLICATION_CREDENTIALS")
         return gcp_asr_v1(audio_url, language)
     elif selected_model == AsrModels.usm:
+        ensure_config_key("GOOGLE_APPLICATION_CREDENTIALS")
         location = settings.GCP_REGION
 
         # Create a client
@@ -1325,6 +1374,7 @@ def run_asr(
             # queue_prefix="gooey-gpu/short" if is_short else "gooey-gpu/long",
         )
     elif selected_model == AsrModels.ghana_nlp_asr_v2:
+        ensure_config_key("GHANA_NLP_SUBKEY")
         audio_r = requests.get(audio_url)
         raise_for_status(audio_r, is_user_url=True)
         r = requests.post(
@@ -1342,6 +1392,7 @@ def run_asr(
         raise_for_status(r)
         data = r.json()
     elif selected_model == AsrModels.lelapa:
+        ensure_config_key("LELAPA_API_KEY")
         audio_r = requests.get(audio_url)
         params = language and {"lang_code": language} or None
         r = requests.post(
@@ -1357,6 +1408,8 @@ def run_asr(
         import modal
         from modal_functions.meta_omnilingual_asr import app as modal_app
 
+        ensure_config_key("MODAL_TOKEN_SECRET")
+
         # Ensure language is in the correct format (e.g., "eng_Latn")
         if language and language not in OMNILINGUAL_ASR_SUPPORTED:
             raise UserError(f"Unsupported language: {language}")
@@ -1368,6 +1421,7 @@ def run_asr(
             )
         return transcription
     elif selected_model in {AsrModels.gpt_4_o_audio, AsrModels.gpt_4_o_mini_audio}:
+        ensure_config_key("OPENAI_API_KEY")
         from daras_ai_v2.language_model import get_openai_client
 
         audio_r = requests.get(audio_url)
@@ -1383,6 +1437,7 @@ def run_asr(
             response_format="text",
         )
     elif selected_model in {AsrModels.voxtral_mini}:
+        ensure_config_key("MISTRAL_API_KEY")
         from daras_ai_v2.language_model import get_openai_client
 
         audio_r = requests.get(audio_url)
