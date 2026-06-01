@@ -204,17 +204,21 @@ def _load_saved_workflows(
 
 
 def _load_workflow_tabs() -> list[WorkflowTabData]:
-    qs = WorkflowTab.objects.filter(priority__gte=1).prefetch_related(
-        Prefetch(
-            "cards",
-            queryset=WorkflowCard.objects.filter(priority__gte=1)
-            .select_related(
-                "recipe__workspace__created_by",
-                "recipe__saved_run",
+    qs = (
+        WorkflowTab.objects.filter(priority__gte=1)
+        .prefetch_related(
+            Prefetch(
+                "cards",
+                queryset=WorkflowCard.objects.filter(priority__gte=1)
+                .select_related(
+                    "recipe__workspace__created_by",
+                    "recipe__saved_run",
+                )
+                .order_by("-priority"),
             )
-            .order_by("-priority"),
         )
-    ).order_by("-priority")
+        .order_by("-priority")
+    )
     return [
         {
             "id": tab.id,
