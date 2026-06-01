@@ -8,6 +8,7 @@ from django.contrib import admin
 from django.db.models import Count, F, Max, Sum
 from django.template import loader
 from django.utils import dateformat
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
@@ -997,12 +998,47 @@ class WorkflowMetadataAdmin(GooeyModelAdmin):
     readonly_fields = ["created_at", "updated_at"]
 
 
+class ColorPickerWidget(forms.TextInput):
+    """A hex text input paired with a native color picker, kept in sync."""
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = attrs or {}
+        text_id = attrs.get("id") or f"id_{name}"
+        picker_id = f"{text_id}_picker"
+        attrs.setdefault("placeholder", "#4d8af0")
+        attrs["oninput"] = (
+            f"document.getElementById('{picker_id}').value = "
+            f"/^#[0-9a-fA-F]{{6}}$/.test(this.value) ? this.value : '#000000';"
+        )
+        text_html = super().render(name, value, attrs, renderer)
+        picker_value = value if value and value.startswith("#") else "#000000"
+        picker_html = format_html(
+            '<input type="color" id="{}" value="{}" '
+            "oninput=\"document.getElementById('{}').value = this.value;\" "
+            'style="margin-right: 8px; vertical-align: middle;">',
+            picker_id,
+            picker_value,
+            text_id,
+        )
+        return mark_safe(picker_html + text_html)
+
+
+class TagAdminForm(forms.ModelForm):
+    class Meta:
+        model = Tag
+        fields = "__all__"
+        widgets = {"color": ColorPickerWidget()}
+
+
 @admin.register(Tag)
 class TagAdmin(GooeyModelAdmin):
+    form = TagAdminForm
     list_display = [
         "name",
         "category",
         "icon",
+        "fa_icon",
+        "color",
         "featured_priority",
         "created_at",
         "updated_at",

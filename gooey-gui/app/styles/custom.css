@@ -718,7 +718,13 @@ a.text-primary:hover {
   transition: border-color 0.10s ease;
 }
 .border-hover:hover {
-  border-color: var(--bs-secondary, #dee2e6) !important;
+  border-color: var(--tile-hover-color, var(--bs-secondary, #dee2e6)) !important;
+}
+.tile-icon {
+  transition: color 0.1s ease;
+}
+.border-hover:hover .tile-icon {
+  color: var(--tile-hover-color, inherit);
 }
 
 .footer a,
