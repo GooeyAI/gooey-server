@@ -219,9 +219,6 @@ export function WorkflowPickerCard({ card }: { card: CardData }) {
   const hasAuthor = !!(card.authorPhotoUrl || card.authorName);
   const fallbackLetter = (card.title.trim().charAt(0) || "?").toUpperCase();
 
-  const hasFooter =
-    hasAuthor || card.updatedAt || card.runCount || card.accessBadge;
-
   return (
     <a
       href={card.href}
@@ -238,7 +235,7 @@ export function WorkflowPickerCard({ card }: { card: CardData }) {
             </div>
           )}
         </div>
-        {hasFooter && (
+        {hasAuthor && (
           <div className="d-flex align-items-center gap-2 mt-2 small text-muted flex-nowrap opacity-75">
             <CardAuthor card={card} />
             {card.updatedAt && (
