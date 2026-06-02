@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -108,8 +107,10 @@ class Migration(migrations.Migration):
                 ("publish_date", models.DateField()),
                 (
                     "url",
-                    models.CharField(
-                        help_text="Absolute URL the card links to.", max_length=500
+                    bots.custom_fields.CustomURLField(
+                        default="",
+                        help_text="Absolute URL the card links to.",
+                        max_length=2048,
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
