@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import mimetypes
-from datetime import date
 from typing import TYPE_CHECKING, TypedDict
 
 import gooey_gui as gui
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.utils import timezone
 from furl import furl
 from pydantic import BaseModel
 from starlette.requests import Request
@@ -493,7 +493,7 @@ def _load_industry_tiles() -> list[dict]:
 
 
 def _load_news_items() -> list[dict]:
-    qs = NewsItem.objects.filter(publish_date__lte=date.today()).order_by(
+    qs = NewsItem.objects.filter(publish_date__lte=timezone.now()).order_by(
         "-publish_date"
     )[:NEWS_ITEM_LIST_LIMIT]
     return [
@@ -502,19 +502,8 @@ def _load_news_items() -> list[dict]:
             "headline": item.headline,
             "tag": item.tag,
             "photoUrl": item.photo_url or None,
-            "age": _format_news_age(item.publish_date),
+            "age": get_relative_time(item.publish_date),
             "href": item.url,
         }
         for item in qs
     ]
-
-
-def _format_news_age(publish_date: date) -> str:
-    delta_days = (date.today() - publish_date).days
-    if delta_days < 7:
-        return f"{delta_days}d"
-    if delta_days < 30:
-        return f"{delta_days // 7}w"
-    if delta_days < 365:
-        return f"{delta_days // 30}mo"
-    return f"{delta_days // 365}y"
