@@ -155,7 +155,6 @@ export function SavedWorkflowCard({ card }: { card: CardData }) {
 
         <div className="flex-grow-1 min-w-0">
           <div className="d-flex align-items-center gap-1 min-w-0">
-            
             {card.accessBadge && (
               <GooeyTooltip content={card.accessBadge.label}>
                 <span
@@ -180,9 +179,7 @@ export function SavedWorkflowCard({ card }: { card: CardData }) {
 
       {hasFooter && (
         <div className="d-flex align-items-center gap-2 mt-1 small flex-nowrap">
-          <span className="fw-bolder">
-            <CardAuthor card={card} />
-          </span>
+          <CardAuthor card={card} />
           {hasAuthor && card.updatedAt && <span>·</span>}
           {card.updatedAt && (
             <span className="d-inline-flex small align-items-center gap-1 text-nowrap text-muted">
@@ -234,30 +231,8 @@ export function WorkflowPickerCard({ card }: { card: CardData }) {
           )}
         </div>
         {hasAuthor && (
-          <div className="d-flex align-items-center gap-2 mt-2 small text-muted flex-nowrap opacity-75">
+          <div className="small text-muted">
             <CardAuthor card={card} />
-            {card.updatedAt && (
-              <span className="d-inline-flex small align-items-center gap-1 text-nowrap">
-                <i className="far fa-clock" aria-hidden="true" />
-                {card.updatedAt}
-              </span>
-            )}
-            {card.runCount ? (
-              <span className="d-inline-flex small align-items-center gap-1 text-nowrap">
-                <i className="fas fa-person-running" aria-hidden="true" />
-                {card.runCount.toLocaleString()} runs
-              </span>
-            ) : null}
-            {card.accessBadge && (
-              <span className="d-inline-flex small align-items-center gap-1 text-nowrap">
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: card.accessBadge.iconHtml,
-                  }}
-                />
-                <span>{card.accessBadge.label}</span>
-              </span>
-            )}
           </div>
         )}
       </div>
