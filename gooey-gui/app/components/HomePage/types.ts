@@ -27,7 +27,6 @@ export type AccessBadge = {
 export type CardData = {
   title: string;
   href: string;
-  workflowLabel?: string;
   workflowEmoji?: string;
   description?: string;
   authorName?: string;

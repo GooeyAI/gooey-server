@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import mimetypes
 from datetime import date
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 import gooey_gui as gui
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
@@ -18,7 +20,15 @@ from daras_ai_v2.utils import get_relative_time
 from workspaces.models import Workspace
 from workspaces.widgets import get_current_workspace
 
+if TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
+
 WorkflowCardProfile = Literal["history", "saved", "picker"]
+
+# request-scoped cache of Workflow value -> its metadata row (or None when the
+# workflow has none), populated lazily so each workflow is queried at most once
+# per render instead of once per card.
+MetadataByWorkflow = dict[Workflow, WorkflowMetadata | None]
 
 META_TITLE = "Home | Gooey.AI"
 META_DESCRIPTION = "Build AI workflows on Gooey.AI"
@@ -39,7 +49,6 @@ class AccessBadgeData(TypedDict):
 class WorkflowCardData(TypedDict, total=False):
     title: str
     href: str
-    workflowLabel: str
     workflowEmoji: str
     description: str
     authorName: str
@@ -72,6 +81,7 @@ def render(request: Request):
         else None
     )
     workspace_header = _get_workspace_header(request.user, workspace)
+    metadata_by_workflow: MetadataByWorkflow = {}
     gui.component(
         "HomePage",
         greeting=(
@@ -80,9 +90,13 @@ def render(request: Request):
             else None
         ),
         workspaceHeader=workspace_header,
-        recentWorkflows=_load_recent_workflows(request.user, workspace),
-        savedWorkflows=_load_saved_workflows(request.user, workspace),
-        workflowTabs=_load_workflow_tabs(),
+        recentWorkflows=_load_recent_workflows(
+            request.user, workspace, metadata_by_workflow
+        ),
+        savedWorkflows=_load_saved_workflows(
+            request.user, workspace, metadata_by_workflow
+        ),
+        workflowTabs=_load_workflow_tabs(metadata_by_workflow),
         industryTiles=_load_industry_tiles(),
         newsItems=_load_news_items(),
     )
@@ -124,7 +138,9 @@ def _get_greeting(user: AppUser) -> str | None:
 
 
 def _load_recent_workflows(
-    user: AppUser | None, workspace: Workspace | None
+    user: AppUser | None,
+    workspace: Workspace | None,
+    metadata_by_workflow: MetadataByWorkflow,
 ) -> list[WorkflowCardData]:
     if workspace is None:
         return []
@@ -155,6 +171,7 @@ def _load_recent_workflows(
             sr=sr,
             author=_history_author(sr, user=user, authors_by_uid=authors_by_uid),
             current_user=user,
+            metadata_by_workflow=metadata_by_workflow,
         )
         for sr in saved_runs
     ]
@@ -174,7 +191,9 @@ def _history_author(
 
 
 def _load_saved_workflows(
-    user: AppUser | None, workspace: Workspace | None
+    user: AppUser | None,
+    workspace: Workspace | None,
+    metadata_by_workflow: MetadataByWorkflow,
 ) -> list[WorkflowCardData]:
     if user is None or workspace is None:
         return []
@@ -198,12 +217,15 @@ def _load_saved_workflows(
             pr=pr,
             author=pr.last_edited_by,
             current_user=user,
+            metadata_by_workflow=metadata_by_workflow,
         )
         for pr in prs
     ]
 
 
-def _load_workflow_tabs() -> list[WorkflowTabData]:
+def _load_workflow_tabs(
+    metadata_by_workflow: MetadataByWorkflow,
+) -> list[WorkflowTabData]:
     qs = (
         WorkflowTab.objects.filter(priority__gte=1)
         .prefetch_related(
@@ -229,6 +251,7 @@ def _load_workflow_tabs() -> list[WorkflowTabData]:
                     profile="picker",
                     pr=card.recipe,
                     author=card.recipe.workspace,
+                    metadata_by_workflow=metadata_by_workflow,
                 )
                 for card in tab.cards.all()
             ],
@@ -240,6 +263,7 @@ def _load_workflow_tabs() -> list[WorkflowTabData]:
 def _workflow_to_json(
     *,
     profile: WorkflowCardProfile,
+    metadata_by_workflow: MetadataByWorkflow,
     pr: PublishedRun | None = None,
     sr: SavedRun | None = None,
     author: AppUser | Workspace | None = None,
@@ -253,7 +277,7 @@ def _workflow_to_json(
         title = (parent_pr and parent_pr.title) or workflow.label
         href = sr.get_app_url()
         updated_at = sr.updated_at
-        metadata = workflow.get_metadata()
+        metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
         preview = _sr_preview(
             workflow=workflow,
             sr=sr,
@@ -269,14 +293,13 @@ def _workflow_to_json(
         title = pr.title or workflow.label
         href = pr.get_app_url()
         updated_at = pr.updated_at
-        metadata = workflow.get_metadata()
+        metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
         preview = _pr_preview(pr, workflow=workflow, metadata=metadata)
         notes = pr.notes
 
     data: WorkflowCardData = {"title": title, "href": href}
 
     if profile == "history":
-        data["workflowLabel"] = workflow.label
         data["workflowEmoji"] = (metadata.emoji if metadata else "") or ""
 
     if isinstance(author, Workspace):
@@ -308,6 +331,14 @@ def _workflow_to_json(
     return data
 
 
+def _get_workflow_metadata(
+    workflow: Workflow, cache: MetadataByWorkflow
+) -> WorkflowMetadata | None:
+    if workflow not in cache:
+        cache[workflow] = workflow.get_metadata()
+    return cache[workflow]
+
+
 def _sr_preview(
     *,
     workflow: Workflow,
@@ -323,12 +354,12 @@ def _sr_preview(
         if chat:
             return chat
 
-    page_cls = workflow.page_cls
+    page_cls: type[BasePage] = workflow.page_cls
     output_url = page_cls.preview_output(state) or (pr and pr.photo_url) or None
     if output_url:
         return _media_preview(output_url=output_url, state=state, page_cls=page_cls)
 
-    return _icon_preview(workflow, metadata=metadata)
+    return _icon_preview(metadata)
 
 
 def _pr_preview(
@@ -340,19 +371,16 @@ def _pr_preview(
     if pr.photo_url:
         return _media_preview(output_url=pr.photo_url, caption=None)
 
-    page_cls = workflow.page_cls
+    page_cls: type[BasePage] = workflow.page_cls
     state = pr.saved_run.state if pr.saved_run_id else {}
     output_url = page_cls.preview_output(state) if state else None
     if output_url:
         return _media_preview(output_url=output_url, state=state, page_cls=page_cls)
 
-    return _icon_preview(workflow, metadata=metadata)
+    return _icon_preview(metadata)
 
 
-def _icon_preview(
-    workflow: Workflow, *, metadata: WorkflowMetadata | None
-) -> dict | None:
-    metadata = metadata or workflow.get_metadata()
+def _icon_preview(metadata: WorkflowMetadata | None) -> dict | None:
     if not metadata or not (metadata.default_image or metadata.emoji):
         return None
     return {
@@ -379,7 +407,7 @@ def _media_preview(
     *,
     output_url: str,
     state: dict | None = None,
-    page_cls=None,
+    page_cls: type[BasePage] | None = None,
     caption: str | None = None,
 ) -> dict:
     if caption is None and page_cls is not None and state is not None:
