@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import mimetypes
 from datetime import date
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import gooey_gui as gui
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from furl import furl
+from pydantic import BaseModel
 from starlette.requests import Request
 
 from app_users.models import AppUser
@@ -22,8 +23,6 @@ from workspaces.widgets import get_current_workspace
 
 if TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
-
-WorkflowCardProfile = Literal["history", "saved", "picker"]
 
 # request-scoped cache of Workflow value -> its metadata row (or None when the
 # workflow has none), populated lazily so each workflow is queried at most once
@@ -57,6 +56,7 @@ class WorkflowCardData(TypedDict, total=False):
     updatedAt: str
     runCount: int
     accessBadge: AccessBadgeData
+    changeNotes: str
 
 
 class WorkflowTabData(TypedDict):
@@ -166,11 +166,12 @@ def _load_recent_workflows(
     }
     authors_by_uid = {u.uid: u for u in AppUser.objects.filter(uid__in=other_uids)}
     return [
-        _workflow_to_json(
-            profile="history",
-            sr=sr,
-            author=_history_author(sr, user=user, authors_by_uid=authors_by_uid),
-            current_user=user,
+        _history_card(
+            sr,
+            author=author_from_user(
+                _history_author(sr, user=user, authors_by_uid=authors_by_uid),
+                current_user=user,
+            ),
             metadata_by_workflow=metadata_by_workflow,
         )
         for sr in saved_runs
@@ -212,11 +213,9 @@ def _load_saved_workflows(
         .order_by("-updated_at")[:WORKFLOW_LIST_LIMIT]
     )
     return [
-        _workflow_to_json(
-            profile="saved",
-            pr=pr,
-            author=pr.last_edited_by,
-            current_user=user,
+        _saved_card(
+            pr,
+            author=author_from_user(pr.last_edited_by, current_user=user),
             metadata_by_workflow=metadata_by_workflow,
         )
         for pr in prs
@@ -247,10 +246,9 @@ def _load_workflow_tabs(
             "title": tab.title,
             "icon": tab.icon,
             "cards": [
-                _workflow_to_json(
-                    profile="picker",
-                    pr=card.recipe,
-                    author=card.recipe.workspace,
+                pr_to_json(
+                    card.recipe,
+                    author=author_from_workspace(card.recipe.workspace),
                     metadata_by_workflow=metadata_by_workflow,
                 )
                 for card in tab.cards.all()
@@ -260,75 +258,107 @@ def _load_workflow_tabs(
     ]
 
 
-def _workflow_to_json(
+class AuthorData(BaseModel):
+    name: str
+    photo_url: str | None = None
+
+
+def author_from_user(
+    user: AppUser | None, current_user: AppUser | None
+) -> AuthorData | None:
+    if user is None:
+        return None
+    if current_user is not None and user.uid == current_user.uid:
+        return AuthorData(name="You", photo_url=current_user.photo_url or None)
+    return AuthorData(name=user.display_name or "", photo_url=user.photo_url or None)
+
+
+def author_from_workspace(workspace: Workspace) -> AuthorData:
+    return AuthorData(
+        name=workspace.display_name(),
+        photo_url=workspace.get_photo() or None,
+    )
+
+
+def _history_card(
+    sr: SavedRun,
     *,
-    profile: WorkflowCardProfile,
+    author: AuthorData | None,
     metadata_by_workflow: MetadataByWorkflow,
-    pr: PublishedRun | None = None,
-    sr: SavedRun | None = None,
-    author: AppUser | Workspace | None = None,
-    current_user: AppUser | None = None,
 ) -> WorkflowCardData:
-    if profile == "history":
-        if sr is None:
-            raise ValueError("history profile requires sr")
-        parent_pr = pr or sr.parent_published_run()
-        workflow = Workflow(sr.workflow)
-        title = (parent_pr and parent_pr.title) or workflow.label
-        href = sr.get_app_url()
-        updated_at = sr.updated_at
-        metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
-        preview = _sr_preview(
-            workflow=workflow,
-            sr=sr,
-            pr=parent_pr,
-            metadata=metadata,
-            include_chat=True,
-        )
-        notes = parent_pr and parent_pr.notes
-    elif profile in ("saved", "picker"):
-        if pr is None:
-            raise ValueError(f"{profile} profile requires pr")
-        workflow = Workflow(pr.workflow)
-        title = pr.title or workflow.label
-        href = pr.get_app_url()
-        updated_at = pr.updated_at
-        metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
-        preview = _pr_preview(pr, workflow=workflow, metadata=metadata)
-        notes = pr.notes
+    data = sr_to_json(sr, author=author, metadata_by_workflow=metadata_by_workflow)
+    if sr.updated_at:
+        data["updatedAt"] = get_relative_time(sr.updated_at)
+    return data
 
-    data: WorkflowCardData = {"title": title, "href": href}
 
-    if profile == "history":
-        data["workflowEmoji"] = (metadata.emoji if metadata else "") or ""
+def _saved_card(
+    pr: PublishedRun,
+    *,
+    author: AuthorData | None,
+    metadata_by_workflow: MetadataByWorkflow,
+) -> WorkflowCardData:
+    data = pr_to_json(pr, author=author, metadata_by_workflow=metadata_by_workflow)
+    if pr.updated_at:
+        data["updatedAt"] = get_relative_time(pr.updated_at)
+    if pr.run_count:
+        data["runCount"] = pr.run_count
+    data["accessBadge"] = pr.get_share_badge_data()
+    change_notes = getattr(pr, "latest_change_notes", None)
+    if change_notes:
+        data["changeNotes"] = change_notes
+    return data
 
-    if isinstance(author, Workspace):
-        data["authorName"] = author.display_name()
-        data["authorPhotoUrl"] = author.get_photo() or None
-    elif isinstance(author, AppUser):
-        if current_user is not None and author.uid == current_user.uid:
-            data["authorName"] = "You"
-            data["authorPhotoUrl"] = current_user.photo_url or None
-        else:
-            data["authorName"] = author.display_name or ""
-            data["authorPhotoUrl"] = author.photo_url or None
 
+def sr_to_json(
+    sr: SavedRun,
+    *,
+    author: AuthorData | None,
+    metadata_by_workflow: MetadataByWorkflow,
+) -> WorkflowCardData:
+    parent_pr = sr.parent_published_run()
+    workflow = Workflow(sr.workflow)
+    metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
+    data: WorkflowCardData = {
+        "title": (parent_pr and parent_pr.title) or workflow.label,
+        "href": sr.get_app_url(),
+        "workflowEmoji": (metadata.emoji if metadata else "") or "",
+        **_author_fields(author),
+    }
+    notes = parent_pr and parent_pr.notes
     if notes:
         data["description"] = notes
+    preview = _sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata)
     if preview is not None:
         data["preview"] = preview
-    if updated_at and profile != "picker":
-        data["updatedAt"] = get_relative_time(updated_at)
-
-    if profile == "saved":
-        if pr.run_count:
-            data["runCount"] = pr.run_count
-        data["accessBadge"] = pr.get_share_badge_data()
-        change_notes = getattr(pr, "latest_change_notes", None)
-        if change_notes:
-            data["changeNotes"] = change_notes
-
     return data
+
+
+def pr_to_json(
+    pr: PublishedRun,
+    *,
+    author: AuthorData | None,
+    metadata_by_workflow: MetadataByWorkflow,
+) -> WorkflowCardData:
+    workflow = Workflow(pr.workflow)
+    metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
+    data: WorkflowCardData = {
+        "title": pr.title or workflow.label,
+        "href": pr.get_app_url(),
+        **_author_fields(author),
+    }
+    if pr.notes:
+        data["description"] = pr.notes
+    preview = _pr_preview(pr, workflow=workflow, metadata=metadata)
+    if preview is not None:
+        data["preview"] = preview
+    return data
+
+
+def _author_fields(author: AuthorData | None) -> WorkflowCardData:
+    if author is None:
+        return {}
+    return {"authorName": author.name, "authorPhotoUrl": author.photo_url}
 
 
 def _get_workflow_metadata(
@@ -345,11 +375,10 @@ def _sr_preview(
     sr: SavedRun,
     pr: PublishedRun | None,
     metadata: WorkflowMetadata | None,
-    include_chat: bool,
 ) -> dict | None:
     state = sr.state
 
-    if include_chat and workflow == Workflow.VIDEO_BOTS:
+    if workflow == Workflow.VIDEO_BOTS:
         chat = _chat_preview(state)
         if chat:
             return chat
