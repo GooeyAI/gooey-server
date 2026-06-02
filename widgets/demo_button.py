@@ -57,24 +57,6 @@ def get_demo_bots(pr: PublishedRun):
     )
 
 
-def demo_platform_ids_by_pr_id(pr_ids: list[int]) -> dict[int, list[int]]:
-    if not pr_ids:
-        return {}
-    rows = (
-        BotIntegration.objects.filter(
-            published_run_id__in=pr_ids,
-            public_visibility__gt=WorkflowAccessLevel.VIEW_ONLY,
-        )
-        .order_by("published_run_id", "platform")
-        .distinct("published_run_id", "platform")
-        .values_list("published_run_id", "platform")
-    )
-    by_pr: dict[int, list[int]] = {}
-    for pr_id, platform_id in rows:
-        by_pr.setdefault(pr_id, []).append(platform_id)
-    return by_pr
-
-
 def platform_pill_data(platform_id: int) -> PlatformPillData:
     platform = Platform(platform_id)
     return {
@@ -173,13 +155,15 @@ def render_demo_button_settings(
     *, workspace: Workspace, user: AppUser, bi: BotIntegration
 ) -> None:
     with (
-        gui.styled("""
+        gui.styled(
+            """
         @media (min-width: 768px) {
             & {
                 max-width: 55%;
             }
         }
-        """),
+        """
+        ),
         gui.div(),
     ):
         enabled = bi.public_visibility > WorkflowAccessLevel.VIEW_ONLY
@@ -190,8 +174,10 @@ def render_demo_button_settings(
 
         workspace_url = bi.workspace.handle_id and bi.workspace.handle.get_app_url()
 
-        gui.caption(f"""Add a {Platform(bi.platform).get_title()} button to your [{bi.published_run.title}]({bi.published_run.get_app_url()}) workflow for easy demos.
-                      Please note all credit charges will be paid by the [{bi.workspace}]({workspace_url}) workspace.""")
+        gui.caption(
+            f"""Add a {Platform(bi.platform).get_title()} button to your [{bi.published_run.title}]({bi.published_run.get_app_url()}) workflow for easy demos.
+                      Please note all credit charges will be paid by the [{bi.workspace}]({workspace_url}) workspace."""
+        )
 
         if new_value != enabled:
             enabled = new_value
