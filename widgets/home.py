@@ -134,13 +134,14 @@ def render(request: Request):
     )
     workspace_header = _get_workspace_header(request.user, workspace)
     metadata_by_workflow: MetadataByWorkflow = {}
+    if not is_anonymous and workspace_header is None:
+        greeting = _get_greeting(request.user)
+    else:
+        greeting = None
+
     gui.component(
         "HomePage",
-        greeting=(
-            _get_greeting(request.user)
-            if not is_anonymous and workspace_header is None
-            else None
-        ),
+        greeting=greeting,
         workspaceHeader=workspace_header,
         recentWorkflows=_load_recent_workflows(
             request.user, workspace, metadata_by_workflow
