@@ -930,7 +930,6 @@ button {
   background-color: #f7f7f7;
 }
 
-/* Bootstrap 5.3 object-fit utilities (we're on 5.2.3) */
 .object-fit-contain {
   object-fit: contain;
 }
