@@ -279,6 +279,7 @@ export function WorkflowPicker({ tabs }: { tabs: WorkflowTab[] }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const activeTab = tabs[activeIdx];
 
+  if (tabs.length === 0) return null;
   return (
     <section className="mb-5">
       <h4 className="mb-4">What will you build today?</h4>
