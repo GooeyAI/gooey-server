@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import mimetypes
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import gooey_gui as gui
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.utils import timezone
 from furl import furl
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 from starlette.requests import Request
 
 from app_users.models import AppUser
@@ -40,37 +41,88 @@ CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
 
 
-class AccessBadgeData(TypedDict):
-    iconHtml: str
+class CamelModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        extra="forbid",
+    )
+
+
+class ChatPreview(CamelModel):
+    type: Literal["chat"] = "chat"
+    user_message: str | None = None
+    bot_message: str | None = None
+
+
+class MediaPreview(CamelModel):
+    type: Literal["image", "video", "audio"]
+    url: str
+    preview_img: str | None = None
+    caption: str | None = None
+
+
+class IconPreview(CamelModel):
+    type: Literal["icon"] = "icon"
+    image_url: str | None = None
+    emoji: str | None = None
+
+
+CardPreview = Annotated[
+    ChatPreview | MediaPreview | IconPreview, Field(discriminator="type")
+]
+
+
+class AccessBadgeData(CamelModel):
+    icon_html: str
     label: str
 
 
-class WorkflowCardData(TypedDict, total=False):
+class WorkflowCardData(CamelModel):
     title: str
     href: str
-    workflowEmoji: str
-    description: str
-    authorName: str
-    authorPhotoUrl: str | None
-    preview: dict
-    updatedAt: str
-    runCount: int
-    accessBadge: AccessBadgeData
-    changeNotes: str
+    workflow_emoji: str | None = None
+    description: str | None = None
+    author_name: str | None = None
+    author_photo_url: str | None = None
+    preview: CardPreview | None = None
+    updated_at: str | None = None
+    run_count: int | None = None
+    access_badge: AccessBadgeData | None = None
+    change_notes: str | None = None
 
 
-class WorkflowTabData(TypedDict):
+class WorkflowTabData(CamelModel):
     id: int
     title: str
     icon: str
     cards: list[WorkflowCardData]
 
 
-class WorkspaceHeaderData(TypedDict):
+class WorkspaceHeaderData(CamelModel):
     name: str
-    photoUrl: str
-    description: str | None
-    settingsHref: str | None
+    photo_url: str
+    description: str | None = None
+    settings_href: str | None = None
+
+
+class IndustryTileData(CamelModel):
+    id: int
+    tag_id: int
+    name: str
+    icon: str
+    description: str
+    workflow_count: int
+    href: str
+
+
+class NewsItemData(CamelModel):
+    id: int
+    headline: str
+    tag: str
+    photo_url: str | None = None
+    age: str
+    href: str
 
 
 def render(request: Request):
@@ -117,12 +169,12 @@ def _get_workspace_header(
         if membership and membership.can_edit_workspace()
         else None
     )
-    return {
-        "name": workspace.display_name(user),
-        "photoUrl": workspace.get_photo(),
-        "description": workspace.description or None,
-        "settingsHref": settings_href,
-    }
+    return WorkspaceHeaderData(
+        name=workspace.display_name(user),
+        photo_url=workspace.get_photo(),
+        description=workspace.description or None,
+        settings_href=settings_href,
+    )
 
 
 def build_meta_tags(url: str):
@@ -241,11 +293,11 @@ def _load_workflow_tabs(
         .order_by("-priority")
     )
     return [
-        {
-            "id": tab.id,
-            "title": tab.title,
-            "icon": tab.icon,
-            "cards": [
+        WorkflowTabData(
+            id=tab.id,
+            title=tab.title,
+            icon=tab.icon,
+            cards=[
                 pr_to_json(
                     card.recipe,
                     author=author_from_workspace(card.recipe.workspace),
@@ -253,7 +305,7 @@ def _load_workflow_tabs(
                 )
                 for card in tab.cards.all()
             ],
-        }
+        )
         for tab in qs
     ]
 
@@ -288,7 +340,7 @@ def _history_card(
 ) -> WorkflowCardData:
     data = sr_to_json(sr, author=author, metadata_by_workflow=metadata_by_workflow)
     if sr.updated_at:
-        data["updatedAt"] = get_relative_time(sr.updated_at)
+        data.updated_at = get_relative_time(sr.updated_at)
     return data
 
 
@@ -300,13 +352,13 @@ def _saved_card(
 ) -> WorkflowCardData:
     data = pr_to_json(pr, author=author, metadata_by_workflow=metadata_by_workflow)
     if pr.updated_at:
-        data["updatedAt"] = get_relative_time(pr.updated_at)
+        data.updated_at = get_relative_time(pr.updated_at)
     if pr.run_count:
-        data["runCount"] = pr.run_count
-    data["accessBadge"] = pr.get_share_badge_data()
+        data.run_count = pr.run_count
+    data.access_badge = AccessBadgeData.model_validate(pr.get_share_badge_data())
     change_notes = getattr(pr, "latest_change_notes", None)
     if change_notes:
-        data["changeNotes"] = change_notes
+        data.change_notes = change_notes
     return data
 
 
@@ -319,19 +371,14 @@ def sr_to_json(
     parent_pr = sr.parent_published_run()
     workflow = Workflow(sr.workflow)
     metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
-    data: WorkflowCardData = {
-        "title": (parent_pr and parent_pr.title) or workflow.label,
-        "href": sr.get_app_url(),
-        "workflowEmoji": (metadata.emoji if metadata else "") or "",
+    return WorkflowCardData(
+        title=(parent_pr and parent_pr.title) or workflow.label,
+        href=sr.get_app_url(),
+        workflow_emoji=(metadata.emoji if metadata else "") or "",
+        description=(parent_pr and parent_pr.notes) or None,
+        preview=_sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata),
         **_author_fields(author),
-    }
-    notes = parent_pr and parent_pr.notes
-    if notes:
-        data["description"] = notes
-    preview = _sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata)
-    if preview is not None:
-        data["preview"] = preview
-    return data
+    )
 
 
 def pr_to_json(
@@ -342,23 +389,19 @@ def pr_to_json(
 ) -> WorkflowCardData:
     workflow = Workflow(pr.workflow)
     metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
-    data: WorkflowCardData = {
-        "title": pr.title or workflow.label,
-        "href": pr.get_app_url(),
+    return WorkflowCardData(
+        title=pr.title or workflow.label,
+        href=pr.get_app_url(),
+        description=pr.notes or None,
+        preview=_pr_preview(pr, workflow=workflow, metadata=metadata),
         **_author_fields(author),
-    }
-    if pr.notes:
-        data["description"] = pr.notes
-    preview = _pr_preview(pr, workflow=workflow, metadata=metadata)
-    if preview is not None:
-        data["preview"] = preview
-    return data
+    )
 
 
-def _author_fields(author: AuthorData | None) -> WorkflowCardData:
+def _author_fields(author: AuthorData | None) -> dict:
     if author is None:
         return {}
-    return {"authorName": author.name, "authorPhotoUrl": author.photo_url}
+    return {"author_name": author.name, "author_photo_url": author.photo_url}
 
 
 def _get_workflow_metadata(
@@ -375,7 +418,7 @@ def _sr_preview(
     sr: SavedRun,
     pr: PublishedRun | None,
     metadata: WorkflowMetadata | None,
-) -> dict | None:
+) -> CardPreview | None:
     state = sr.state
 
     if workflow == Workflow.VIDEO_BOTS:
@@ -396,7 +439,7 @@ def _pr_preview(
     *,
     workflow: Workflow,
     metadata: WorkflowMetadata | None,
-) -> dict | None:
+) -> CardPreview | None:
     if pr.photo_url:
         return _media_preview(output_url=pr.photo_url, caption=None)
 
@@ -409,27 +452,25 @@ def _pr_preview(
     return _icon_preview(metadata)
 
 
-def _icon_preview(metadata: WorkflowMetadata | None) -> dict | None:
+def _icon_preview(metadata: WorkflowMetadata | None) -> IconPreview | None:
     if not metadata or not (metadata.default_image or metadata.emoji):
         return None
-    return {
-        "type": "icon",
-        "imageUrl": metadata.default_image or None,
-        "emoji": metadata.emoji or None,
-    }
+    return IconPreview(
+        image_url=metadata.default_image or None,
+        emoji=metadata.emoji or None,
+    )
 
 
-def _chat_preview(state: dict) -> dict | None:
+def _chat_preview(state: dict) -> ChatPreview | None:
     user_message = state.get("input_prompt") or state.get("raw_input_text")
     output_text = state.get("output_text") or []
     bot_message = output_text[0] if output_text else None
     if not user_message and not bot_message:
         return None
-    return {
-        "type": "chat",
-        "userMessage": _preview_text(user_message, CHAT_PREVIEW_MAXLEN),
-        "botMessage": _preview_text(bot_message, CHAT_PREVIEW_MAXLEN),
-    }
+    return ChatPreview(
+        user_message=_preview_text(user_message, CHAT_PREVIEW_MAXLEN),
+        bot_message=_preview_text(bot_message, CHAT_PREVIEW_MAXLEN),
+    )
 
 
 def _media_preview(
@@ -438,7 +479,7 @@ def _media_preview(
     state: dict | None = None,
     page_cls: type[BasePage] | None = None,
     caption: str | None = None,
-) -> dict:
+) -> MediaPreview:
     if caption is None and page_cls is not None and state is not None:
         caption = _preview_text(page_cls.preview_input(state), MEDIA_CAPTION_MAXLEN)
     content_type = mimetypes.guess_type(output_url)[0] or ""
@@ -448,12 +489,12 @@ def _media_preview(
         media_type = "audio"
     else:
         media_type = "image"
-    return {
-        "type": media_type,
-        "url": output_url,
-        "previewImg": media_preview_img(output_url),
-        "caption": caption,
-    }
+    return MediaPreview(
+        type=media_type,
+        url=output_url,
+        preview_img=media_preview_img(output_url),
+        caption=caption,
+    )
 
 
 def _preview_text(text: str | None, maxlen: int) -> str | None:
@@ -462,7 +503,7 @@ def _preview_text(text: str | None, maxlen: int) -> str | None:
     return truncate_text_words(text, maxlen=maxlen).replace("\n", " ")
 
 
-def _load_industry_tiles() -> list[dict]:
+def _load_industry_tiles() -> list[IndustryTileData]:
     qs = (
         IndustryTile.objects.filter(priority__gte=1)
         .select_related("tag")
@@ -479,31 +520,31 @@ def _load_industry_tiles() -> list[dict]:
         .order_by("-priority")
     )
     return [
-        {
-            "id": tile.id,
-            "tagId": tile.tag_id,
-            "name": tile.tag.name,
-            "icon": tile.tag.icon,
-            "description": tile.tag.description,
-            "workflowCount": tile.workflow_count,
-            "href": str(furl("/explore/", query_params={"search": tile.tag.name})),
-        }
+        IndustryTileData(
+            id=tile.id,
+            tag_id=tile.tag_id,
+            name=tile.tag.name,
+            icon=tile.tag.icon,
+            description=tile.tag.description,
+            workflow_count=tile.workflow_count,
+            href=str(furl("/explore/", query_params={"search": tile.tag.name})),
+        )
         for tile in qs
     ]
 
 
-def _load_news_items() -> list[dict]:
+def _load_news_items() -> list[NewsItemData]:
     qs = NewsItem.objects.filter(publish_date__lte=timezone.now()).order_by(
         "-publish_date"
     )[:NEWS_ITEM_LIST_LIMIT]
     return [
-        {
-            "id": item.id,
-            "headline": item.headline,
-            "tag": item.tag,
-            "photoUrl": item.photo_url or None,
-            "age": get_relative_time(item.publish_date),
-            "href": item.url,
-        }
+        NewsItemData(
+            id=item.id,
+            headline=item.headline,
+            tag=item.tag,
+            photo_url=item.photo_url or None,
+            age=get_relative_time(item.publish_date),
+            href=item.url,
+        )
         for item in qs
     ]
