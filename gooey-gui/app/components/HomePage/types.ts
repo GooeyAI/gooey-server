@@ -67,6 +67,6 @@ export type NewsItem = {
   headline: string;
   tag: string;
   photoUrl: string | null;
-  age: string;
+  publishDate: string;
   href: string;
 };

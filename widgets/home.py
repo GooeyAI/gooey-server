@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import gooey_gui as gui
@@ -122,7 +123,7 @@ class NewsItemData(CamelModel):
     headline: str
     tag: str
     photo_url: str | None = None
-    age: str
+    publish_date: str
     href: str
 
 
@@ -550,8 +551,15 @@ def _load_news_items() -> list[NewsItemData]:
             headline=item.headline,
             tag=item.tag,
             photo_url=item.photo_url or None,
-            age=get_relative_time(item.publish_date),
+            publish_date=_format_news_date(item.publish_date),
             href=item.url,
         )
         for item in qs
     ]
+
+
+def _format_news_date(publish_date: datetime) -> str:
+    label = publish_date.strftime("%-d %b").upper()
+    if publish_date.year != timezone.now().year:
+        label += f" {publish_date.year}"
+    return label
