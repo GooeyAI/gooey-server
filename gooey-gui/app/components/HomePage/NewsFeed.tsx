@@ -22,7 +22,7 @@ export function NewsFeed({ items }: { items: NewsItem[] }) {
               </div>
               <div className="p-3 d-flex flex-column flex-grow-1">
                 <div className="text-uppercase text-muted small mb-2">
-                  {item.tag} · {item.age}
+                  {item.tag} · {item.publishDate}
                 </div>
                 <div className="fw-semibold line-clamp-2">{item.headline}</div>
               </div>
