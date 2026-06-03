@@ -19,9 +19,11 @@ export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
                   dangerouslySetInnerHTML={{ __html: tile.icon }}
                 />
               )}
-              <div className="fw-semibold">{tile.name}</div>
+              <span className="bold">{tile.name}</span>
               {tile.description && (
-                <div className="text-muted small mt-1">{tile.description}</div>
+                <span className="text-muted small mt-1">
+                  {tile.description}
+                </span>
               )}
               <div className="d-flex align-items-center justify-content-between mt-auto pt-2 small">
                 <span className="text-muted">
