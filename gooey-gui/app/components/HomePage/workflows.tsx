@@ -116,9 +116,7 @@ export function HistoryWorkflowCard({ card }: { card: CardData }) {
       </div>
 
       <div className="d-flex flex-column p-3 gap-2 border-top">
-        <span className="fw-bold text-break line-clamp-1 m-0 small">
-          {card.title}
-        </span>
+        <span className="text-break line-clamp-1 m-0">{card.title}</span>
         <div className="d-flex align-items-center gap-1 small">
           <CardAuthor card={card} />
           {hasAuthor && card.updatedAt && <span>·</span>}
@@ -165,7 +163,7 @@ export function SavedWorkflowCard({ card }: { card: CardData }) {
                 />
               </GooeyTooltip>
             )}
-            <span className="fw-bold text-break text-truncate m-0">
+            <span className="bold text-break text-truncate m-0">
               {card.title}
             </span>
           </div>
@@ -222,7 +220,7 @@ export function WorkflowPickerCard({ card }: { card: CardData }) {
       <div className="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
         <div>
           <LineClamp lines={1} expandable={false}>
-            <span className="fw-bold text-break m-0">{card.title}</span>
+            <span className="fw-bold text-break m-0 bold">{card.title}</span>
           </LineClamp>
           {card.description && (
             <div className="text-muted small line-clamp-2 text-break">

@@ -2807,6 +2807,9 @@ NAV_TABS_CSS = """
 }
 & .nav-item {
     font-size: smaller;
+}
+
+& .nav-item > .active {
     font-weight: bold;
 }
 & button {
