@@ -1,7 +1,6 @@
 from django.contrib import admin
 
 from cms.models import (
-    IndustryTile,
     NewsItem,
     WorkflowCard,
     WorkflowTab,
@@ -22,14 +21,6 @@ class WorkflowTabAdmin(GooeyModelAdmin):
     fields = ["title", "icon", "priority"]
     inlines = [WorkflowCardInline]
     search_fields = ["title"]
-
-
-@admin.register(IndustryTile)
-class IndustryTileAdmin(GooeyModelAdmin):
-    list_display = ["tag", "priority"]
-    fields = ["tag", "priority"]
-    search_fields = ["tag__name"]
-    autocomplete_fields = ["tag"]
 
 
 @admin.register(NewsItem)

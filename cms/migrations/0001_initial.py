@@ -86,41 +86,6 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name="IndustryTile",
-            fields=[
-                (
-                    "id",
-                    models.BigAutoField(
-                        auto_created=True,
-                        primary_key=True,
-                        serialize=False,
-                        verbose_name="ID",
-                    ),
-                ),
-                (
-                    "priority",
-                    models.IntegerField(
-                        default=1,
-                        help_text="Higher priority tiles are shown first. If 0, then the tile is not shown at all.",
-                    ),
-                ),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("updated_at", models.DateTimeField(auto_now=True)),
-                (
-                    "tag",
-                    models.ForeignKey(
-                        help_text="Workflows tagged with this Tag are counted on the tile.",
-                        on_delete=django.db.models.deletion.PROTECT,
-                        related_name="+",
-                        to="bots.tag",
-                    ),
-                ),
-            ],
-            options={
-                "ordering": ["-priority", "id"],
-            },
-        ),
-        migrations.CreateModel(
             name="WorkflowCard",
             fields=[
                 (
