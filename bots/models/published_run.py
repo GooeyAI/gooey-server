@@ -409,9 +409,22 @@ class Tag(models.Model):
     )
     featured_priority = models.IntegerField(
         default=1,
-        help_text="Higher priority tags are shown first. If 0, then the tag is not shown at all.",
+        help_text="Higher priority tags are shown first.",
     )
     description = models.TextField(blank=True, default="")
+    hide = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is hidden and not shown anywhere.",
+    )
+    featured = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is featured, ordered by priority.",
+    )
+    landing_page = CustomURLField(
+        blank=True,
+        default="",
+        help_text="Optional landing page URL for this tag.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -424,7 +437,7 @@ class Tag(models.Model):
 
     @classmethod
     def get_options(cls) -> list["Tag"]:
-        return list(cls.objects.filter(featured_priority__gte=1))
+        return list(cls.objects.filter(hide=False))
 
     class Meta:
         constraints = [

@@ -1005,10 +1005,12 @@ class TagAdmin(GooeyModelAdmin):
         "name",
         "category",
         "icon",
+        "featured",
         "featured_priority",
+        "hide",
         "created_at",
         "updated_at",
     ]
     search_fields = ["name", "category"]
-    list_filter = ["category"]
+    list_filter = ["category", "featured", "hide"]
     readonly_fields = ["created_at", "updated_at"]

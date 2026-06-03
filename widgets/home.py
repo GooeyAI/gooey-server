@@ -13,8 +13,9 @@ from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVersion, SavedRun, Workflow
+from bots.models.published_run import Tag
 from bots.models.workflow import WorkflowAccessLevel, WorkflowMetadata
-from cms.models import IndustryTile, NewsItem, WorkflowCard, WorkflowTab
+from cms.models import NewsItem, WorkflowCard, WorkflowTab
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.preview_img import media_preview_img
@@ -506,32 +507,37 @@ def _preview_text(text: str | None, maxlen: int) -> str | None:
 
 def _load_industry_tiles() -> list[IndustryTileData]:
     qs = (
-        IndustryTile.objects.filter(priority__gte=1)
-        .select_related("tag")
+        Tag.objects.filter(featured=True, hide=False)
         .annotate(
             workflow_count=Count(
-                "tag__published_runs",
+                "published_runs",
                 filter=Q(
-                    tag__published_runs__public_access__gt=WorkflowAccessLevel.VIEW_ONLY,
-                    tag__published_runs__is_approved_example=True,
+                    published_runs__public_access__gt=WorkflowAccessLevel.VIEW_ONLY,
+                    published_runs__is_approved_example=True,
                 ),
                 distinct=True,
             ),
         )
-        .order_by("-priority")
+        .order_by("-featured_priority")
     )
     return [
         IndustryTileData(
-            id=tile.id,
-            tag_id=tile.tag_id,
-            name=tile.tag.name,
-            icon=tile.tag.icon,
-            description=tile.tag.description,
-            workflow_count=tile.workflow_count,
-            href=str(furl("/explore/", query_params={"search": tile.tag.name})),
+            id=tag.id,
+            tag_id=tag.id,
+            name=tag.name,
+            icon=tag.icon,
+            description=tag.description,
+            workflow_count=tag.workflow_count,
+            href=_industry_tile_href(tag),
         )
-        for tile in qs
+        for tag in qs
     ]
+
+
+def _industry_tile_href(tag: Tag) -> str:
+    if tag.landing_page:
+        return tag.landing_page
+    return str(furl("/explore/", query_params={"search": tag.name}))
 
 
 def _load_news_items() -> list[NewsItemData]:
