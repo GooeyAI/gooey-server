@@ -10,19 +10,19 @@ import type {
 } from "@remix-run/react";
 import {
   useActionData,
-  useFetcher,
   useLoaderData,
   useNavigate,
+  useNavigation,
   useSearchParams,
   useSubmit,
 } from "@remix-run/react";
 import path from "path";
 import { useDebouncedCallback } from "use-debounce";
+import { gooeyGuiRouteHeader, realtimeRefreshKey } from "~/consts";
 import { useEventSourceNullOk } from "~/event-source";
 import { handleRedirectResponse } from "~/handleRedirect";
 import { applyFormDataTransforms, RenderedChildren } from "~/renderer";
 
-import { gooeyGuiRouteHeader } from "~/consts";
 import "~/styles/app.css";
 import "~/styles/custom.css";
 import { GlobalContextProvider } from "./globalContext";
@@ -152,7 +152,8 @@ function App() {
   const { base64Body, children, state, channels } = actionData ?? loaderData;
   const formRef = useRef<HTMLFormElement>(null);
   const realtimeEvent = useRealtimeChannels({ channels });
-  const fetcher = useFetcher();
+  const lastRealtimeEventRef = useRef<string | null>(null);
+  const navigation = useNavigation();
   const submit = useSubmit();
   const navigate = useNavigate();
 
@@ -165,10 +166,16 @@ function App() {
   }, [base64Body]);
 
   useEffect(() => {
-    if (realtimeEvent && fetcher.state === "idle" && formRef.current) {
-      onSubmit();
-    }
-  }, [fetcher.state, realtimeEvent, submit]);
+    if (
+      !realtimeEvent ||
+      !formRef.current ||
+      navigation.state != "idle" ||
+      lastRealtimeEventRef.current == realtimeEvent
+    )
+      return;
+    lastRealtimeEventRef.current = realtimeEvent;
+    onSubmit(undefined, { [realtimeRefreshKey]: realtimeEvent });
+  }, [navigation.state, realtimeEvent]);
 
   const onChange: OnChange = (event) => {
     const target = event?.target;
@@ -223,7 +230,7 @@ function App() {
     encType: "application/json",
   };
 
-  const onSubmit = (event?: FormEvent) => {
+  const onSubmit = (event?: FormEvent, extraData: Record<string, any> = {}) => {
     if (!formRef.current) return;
     let formData = Object.fromEntries(new FormData(formRef.current));
     if (event) {
@@ -235,7 +242,7 @@ function App() {
       }
     }
     applyFormDataTransforms({ children, formData });
-    let body = { state: { ...state, ...formData } };
+    let body = { state: { ...state, ...formData }, ...extraData };
     submit(body, submitOptions);
   };
 
