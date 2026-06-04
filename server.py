@@ -46,6 +46,7 @@ from routers import (
     onedrive_api,
     workspace,
     pycon,
+    published_run_options,
 )
 from routers import twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
@@ -83,6 +84,7 @@ app.include_router(telegram_api.router, include_in_schema=False)
 app.include_router(static_pages.app, include_in_schema=False)
 app.include_router(twilio_ws_api.app, include_in_schema=False)
 app.include_router(pycon.app, include_in_schema=False)
+app.include_router(published_run_options.app, include_in_schema=False)
 app.include_router(root.app, include_in_schema=False)  # this has a catch-all route
 
 app.add_middleware(

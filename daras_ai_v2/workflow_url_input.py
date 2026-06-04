@@ -1,7 +1,6 @@
 import typing
 
 import gooey_gui as gui
-from django.db.models import Q
 from furl import furl
 
 from app_users.models import AppUser
@@ -10,6 +9,12 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.fastapi_tricks import resolve_url
+from daras_ai_v2.published_run_options import (
+    AsyncSelectProps,
+    get_published_run_options_page,
+    get_published_run_options_url,
+    iter_published_run_options,
+)
 from daras_ai_v2.query_params_util import extract_query_params
 
 
@@ -38,21 +43,17 @@ def workflow_url_input(
         else:
             internal_state["workflow"] = page_cls.workflow
             with gui.div(className="flex-grow-1"):
-                options = get_published_run_options(
-                    page_cls, current_user=current_user, include_root=include_root
+                url = render_published_run_selectbox(
+                    page_cls=page_cls,
+                    key=key,
+                    value=internal_state.get("url"),
+                    current_user=current_user,
+                    include_root=include_root,
+                    selected_options=internal_state.get("--added_workflows", {}),
+                    allow_none=allow_none,
                 )
-                options.update(internal_state.get("--added_workflows", {}))
-                with gui.div(className="pt-1"):
-                    url = gui.selectbox(
-                        "",
-                        key=key,
-                        options=options,
-                        value=internal_state.get("url"),
-                        format_func=lambda x: options[x] if x else BLANK_OPTION,
-                        allow_none=allow_none,
-                    )
-                    if not url:
-                        return
+                if not url:
+                    return
             edit_button(key)
         gui.url_button(url)
         if del_key:
@@ -65,6 +66,46 @@ def workflow_url_input(
         gui.error(repr(e))
     internal_state["url"] = url
     return ret
+
+
+def render_published_run_selectbox(
+    *,
+    page_cls: typing.Type[BasePage],
+    key: str,
+    value: str | None,
+    current_user: AppUser | None = None,
+    include_root: bool = True,
+    selected_options: dict[str, str] | None = None,
+    lazy_options: bool = False,
+    allow_none: bool = False,
+) -> str | None:
+    options, async_props = get_published_run_selectbox_props(
+        page_cls=page_cls,
+        current_user=current_user,
+        include_root=include_root,
+        selected_url=value,
+        selected_options=selected_options,
+        lazy_options=lazy_options,
+    )
+    if allow_none:
+
+        def format_func(option_key):
+            if option_key:
+                return options[option_key]
+            return BLANK_OPTION
+
+    else:
+        format_func = options.__getitem__
+    with gui.div(className="pt-1"):
+        return gui.selectbox(
+            "",
+            key=key,
+            options=options,
+            value=value,
+            format_func=format_func,
+            allow_none=allow_none,
+            **async_props,
+        )
 
 
 def edit_done_button(key: str):
@@ -88,6 +129,111 @@ def del_button(key: str):
         '<i class="fa-regular fa-trash text-danger"></i>',
         key=key,
         type="tertiary",
+    )
+
+
+def get_published_run_selectbox_props(
+    *,
+    page_cls: typing.Type[BasePage],
+    current_user: AppUser | None = None,
+    include_root: bool = True,
+    selected_url: str | None = None,
+    selected_options: dict[str, str] | None = None,
+    lazy_options: bool = False,
+) -> tuple[dict[str, str], AsyncSelectProps | dict]:
+    extra_options = selected_options or {}
+
+    if not lazy_options:
+        options = get_cached_all_published_run_options(
+            page_cls=page_cls,
+            current_user=current_user,
+            include_root=include_root,
+        )
+        return merge_extra_published_run_options(options, extra_options), {}
+
+    if selected_url:
+        options = {
+            selected_url: get_selected_run_option_label(
+                page_cls=page_cls,
+                selected_url=selected_url,
+                selected_options=extra_options,
+            )
+        }
+        next_options_page = 0
+    else:
+        options, next_options_page = get_cached_published_run_options_first_page(
+            page_cls=page_cls,
+            current_user=current_user,
+            include_root=include_root,
+        )
+
+    return merge_extra_published_run_options(options, extra_options), AsyncSelectProps(
+        asyncOptionsUrl=get_published_run_options_url(
+            page_cls=page_cls,
+            include_root=include_root,
+        ),
+        nextOptionsPage=next_options_page,
+    )
+
+
+@gui.cache_in_session_state
+def get_cached_all_published_run_options(
+    page_cls: typing.Type[BasePage],
+    current_user: AppUser | None,
+    include_root: bool,
+) -> dict[str, str]:
+    return dict(
+        iter_published_run_options(
+            page_cls=page_cls,
+            current_user=current_user,
+            include_root=include_root,
+            query="",
+        )
+    )
+
+
+@gui.cache_in_session_state
+def get_cached_published_run_options_first_page(
+    page_cls: typing.Type[BasePage],
+    current_user: AppUser | None,
+    include_root: bool,
+) -> tuple[dict[str, str], int | None]:
+    return get_published_run_options_page(
+        page_cls=page_cls,
+        current_user=current_user,
+        include_root=include_root,
+        page=0,
+    )
+
+
+def merge_extra_published_run_options(
+    options: dict[str, str],
+    extra_options: dict[str, str] | None,
+) -> dict[str, str]:
+    merged = dict(options)
+    for url, label in (extra_options or {}).items():
+        merged.setdefault(url, label)
+    return merged
+
+
+def get_selected_run_option_label(
+    *,
+    page_cls: typing.Type[BasePage],
+    selected_url: str,
+    selected_options: dict[str, str] | None = None,
+) -> str:
+    label = (selected_options or {}).get(selected_url)
+    if label:
+        return label
+    try:
+        selected_page_cls, sr, pr = url_to_runs(selected_url)
+    except (AssertionError, KeyError, PublishedRun.DoesNotExist, SavedRun.DoesNotExist):
+        return selected_url
+    if selected_page_cls.workflow != page_cls.workflow:
+        return selected_url
+    return (
+        get_title_breadcrumbs(selected_page_cls, sr, pr).title_with_prefix()
+        or selected_url
     )
 
 
@@ -139,44 +285,3 @@ def url_to_runs(
         uid=uid,
     )
     return page_cls, sr, pr
-
-
-@gui.cache_in_session_state
-def get_published_run_options(
-    page_cls: typing.Type[BasePage],
-    current_user: AppUser | None = None,
-    include_root: bool = True,
-) -> dict[str, str]:
-    # approved examples
-    pr_query = PublishedRun.approved_example_q()
-    if current_user:
-        # user's saved runs
-        pr_query |= Q(created_by=current_user)
-    saved_runs_and_examples = PublishedRun.objects.filter(
-        pr_query,
-        workflow=page_cls.workflow,
-    )
-    saved_runs_and_examples = sorted(
-        saved_runs_and_examples,
-        reverse=True,
-        key=lambda pr: (
-            # user's saved first
-            int(bool(current_user and pr.created_by_id == current_user.id)),
-            pr.example_priority,  # higher priority first
-            pr.updated_at,  # newer first
-        ),
-    )
-    options_dict = {
-        pr.get_app_url(): get_title_breadcrumbs(
-            page_cls, pr.saved_run, pr
-        ).title_with_prefix()
-        for pr in saved_runs_and_examples
-    }
-
-    if include_root:
-        # include root recipe if requested
-        options_dict = {
-            page_cls.get_root_pr().get_app_url(): "Default",
-        } | options_dict
-
-    return options_dict

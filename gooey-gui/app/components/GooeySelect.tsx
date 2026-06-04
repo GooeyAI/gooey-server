@@ -8,6 +8,11 @@ import type {
   MenuProps,
 } from "react-select";
 import Select, { components } from "react-select";
+import {
+  optionSelected,
+  useAsyncSelectOptions,
+  type AsyncOption,
+} from "~/asyncSelectOptions";
 import { InputLabel } from "~/gooeyInput";
 import { useJsonFormInput } from "~/jsonFormInput";
 import { ClientOnlySuspense } from "~/lazyImports";
@@ -24,18 +29,31 @@ export default function GooeySelect({
 }) {
   let { defaultValue, name, label, styles, help, tooltipPlacement, ...args } =
     props;
+  let {
+    options: initialOptions = [],
+    asyncOptionsUrl,
+    nextOptionsPage: initialNextOptionsPage = null,
+    ...selectArgs
+  } = args;
   let [JsonFormInput, value, setValue] = useJsonFormInput({
     defaultValue,
     name,
     state,
-    args,
+    args: selectArgs,
+  });
+
+  let { isAsync, options, loading, loadMore, search } = useAsyncSelectOptions({
+    asyncOptionsUrl,
+    initialOptions,
+    initialNextOptionsPage,
+    keepOnSearch: (option) => optionSelected(option, value, selectArgs.isMulti),
   });
 
   let onSelectChange = (newValue: any) => {
     if (newValue === undefined) return;
     if (!newValue) {
       setValue(newValue);
-    } else if (args.isMulti) {
+    } else if (selectArgs.isMulti) {
       setValue(newValue.map((opt: any) => opt.value));
     } else {
       setValue(newValue.value);
@@ -43,15 +61,15 @@ export default function GooeySelect({
     onChange();
   };
 
-  let selectValue = args.options.filter((opt: any) =>
-    args.isMulti ? value.includes(opt.value) : opt.value === value
+  let selectValue = options.filter((opt: AsyncOption) =>
+    optionSelected(opt, value, selectArgs.isMulti)
   );
   // if selectedValue is not in options, then set it to the first option
   useEffect(() => {
-    if (!selectValue.length && !args.allow_none) {
-      setValue(args.isMulti ? [args.options[0].value] : args.options[0].value);
+    if (!isAsync && !selectValue.length && !selectArgs.allow_none && options.length) {
+      setValue(selectArgs.isMulti ? [options[0].value] : options[0].value);
     }
-  }, [args.isMulti, args.options, selectValue, setValue]);
+  }, [isAsync, selectArgs.isMulti, selectArgs.allow_none, options, selectValue, setValue]);
 
   styles = {
     ...styles,
@@ -87,7 +105,7 @@ export default function GooeySelect({
                 />
               </option>
             )}
-            {args.options.map((opt: any) => (
+            {options.map((opt: AsyncOption) => (
               <option key={opt.value}>
                 <RenderedMarkdown
                   body={opt.label}
@@ -100,7 +118,7 @@ export default function GooeySelect({
       >
         {() => (
           <Select
-            value={selectValue[0]?.value ? selectValue : null}
+            value={selectValue.length ? selectValue : null}
             onChange={onSelectChange}
             components={{
               Option,
@@ -121,7 +139,18 @@ export default function GooeySelect({
               ),
             }}
             placeholder={selectValue[0]?.label}
-            {...args}
+            {...selectArgs}
+            options={options}
+            onMenuOpen={loadMore}
+            onMenuScrollToBottom={loadMore}
+            isLoading={loading}
+            {...(isAsync && {
+              filterOption: null,
+              onInputChange: (newInputValue, actionMeta) => {
+                if (actionMeta.action === "input-change") search(newInputValue);
+                return newInputValue;
+              },
+            })}
           />
         )}
       </ClientOnlySuspense>

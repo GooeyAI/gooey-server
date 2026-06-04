@@ -29,8 +29,8 @@ from daras_ai_v2.workflow_url_input import (
     edit_button,
     del_button,
     workflow_url_input,
-    get_published_run_options,
     edit_done_button,
+    render_published_run_selectbox,
 )
 from recipes.DocSearch import render_documents
 
@@ -395,8 +395,6 @@ To understand what each field represents, check out our [API docs](https://api.g
             response.eval_runs.append(sr.get_app_url())
 
     def render_run_url_inputs(self, key: str, del_key: str, d: dict):
-        from daras_ai_v2.all_pages import all_home_pages
-
         init_workflow_selector(d, key)
 
         col1, col2, col3, col4 = gui.columns([9, 1, 1, 1], responsive=False)
@@ -411,6 +409,8 @@ To understand what each field represents, check out our [API docs](https://api.g
             with col2:
                 edit_done_button(key)
         else:
+            from daras_ai_v2.all_pages import all_home_pages
+
             with col1:
                 scol1, scol2 = gui.columns([1, 1], responsive=False)
             with scol1:
@@ -428,25 +428,21 @@ To understand what each field represents, check out our [API docs](https://api.g
                             or gui.session_state.get(last_workflow_key)
                         ),
                         options=options,
-                        format_func=lambda x: options[x],
+                        format_func=options.__getitem__,
                     )
                     d["workflow"] = workflow
                     # use this to set default for next time
                     gui.session_state[last_workflow_key] = workflow
             with scol2:
                 page_cls = Workflow(workflow).page_cls
-                options = get_published_run_options(
-                    page_cls, current_user=self.request.user
+                url = render_published_run_selectbox(
+                    page_cls=page_cls,
+                    key=key,
+                    value=d.get("url"),
+                    current_user=self.request.user,
+                    selected_options=d.get("--added_workflows", {}),
+                    lazy_options=True,
                 )
-                options.update(d.get("--added_workflows", {}))
-                with gui.div(className="pt-1"):
-                    url = gui.selectbox(
-                        "",
-                        key=key,
-                        options=options,
-                        value=d.get("url"),
-                        format_func=lambda x: options[x],
-                    )
             with col2:
                 edit_button(key)
         with col3:
