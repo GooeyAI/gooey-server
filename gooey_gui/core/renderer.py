@@ -12,7 +12,13 @@ from .pubsub import (
     get_subscriptions,
     realtime_clear_subs,
 )
-from .state import get_session_state, set_session_state, set_query_params, threadlocal
+from .state import (
+    clear_render_caches,
+    get_session_state,
+    set_session_state,
+    set_query_params,
+    threadlocal,
+)
 
 Style = dict[str, str | None]
 ReactHTMLProps = dict[str, typing.Any]
@@ -123,6 +129,7 @@ def renderer(
     set_session_state(state or {})
     set_query_params(query_params or {})
     realtime_clear_subs()
+    clear_render_caches()
     threadlocal.use_state_count = 0
     threadlocal.styles = {}
     while True:

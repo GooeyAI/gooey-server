@@ -114,57 +114,9 @@ List of URLs to the evaluation runs that you requested.
             accept=SUPPORTED_SPREADSHEET_TYPES,
         )
 
-        preferred_input_fields = {}
-        other_input_fields = {}
-        output_fields = {}
-
-        for url in run_urls:
-            try:
-                page_cls, sr, _ = url_to_runs(url)
-            except Exception:
-                continue
-
-            schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
-            for field_name, field_info in page_cls.RequestModel.model_fields.items():
-                if (
-                    field_info.is_required()
-                    or field_name in page_cls.get_example_preferred_fields(sr.state)
-                ):
-                    input_fields = preferred_input_fields
-                else:
-                    input_fields = other_input_fields
-                field_props = schema["properties"][field_name]
-                title = field_props.get(
-                    "title", field_name.replace("_", " ").capitalize()
-                )
-                keys = None
-                if is_arr(field_props):
-                    try:
-                        ref = field_props["items"]["$ref"]
-                        props = schema["definitions"][ref]["properties"]
-                        keys = {k: prop["title"] for k, prop in props.items()}
-                    except KeyError:
-                        try:
-                            keys = {k: k for k in sr.state[field_name][0].keys()}
-                        except (KeyError, IndexError, AttributeError, TypeError):
-                            pass
-                elif is_obj(field_props):
-                    try:
-                        keys = {k: k for k in sr.state[field_name].keys()}
-                    except (KeyError, AttributeError, TypeError):
-                        pass
-
-                if keys:
-                    for k, ktitle in keys.items():
-                        input_fields[f"{field_name}.{k}"] = f"{title}.{ktitle}"
-                else:
-                    input_fields[field_name] = title
-
-            schema = page_cls.ResponseModel.model_json_schema()
-            output_fields |= {
-                field: schema["properties"][field]["title"]
-                for field in page_cls.ResponseModel.model_fields
-            }
+        preferred_input_fields, other_input_fields, output_fields = (
+            collect_bulk_runner_field_maps(tuple(run_urls))
+        )
 
         gui.write(
             "###### Input Columns",
@@ -454,10 +406,14 @@ To understand what each field represents, check out our [API docs](https://api.g
         with col4:
             del_button(del_key)
 
-        try:
-            url_to_runs(url)
-        except Exception as e:
-            gui.error(repr(e))
+        if url and url not in d.get("--added_workflows", {}):
+            try:
+                page_cls, sr, pr = url_to_runs(url)
+                d.setdefault("--added_workflows", {})[url] = (
+                    get_title_breadcrumbs(page_cls, sr, pr).title_with_prefix() or url
+                )
+            except Exception as e:
+                gui.error(repr(e))
         d["url"] = url
 
     def render_eval_url_inputs(self, key: str, del_key: str | None, d: dict):
@@ -545,6 +501,65 @@ def slice_request_df(df, request):
             arr_len += 1
         yield df_ix, arr_len
         df_ix += arr_len
+
+
+@gui.cache_in_session_state
+def collect_bulk_runner_field_maps(
+    run_urls: tuple[str, ...],
+) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    preferred_input_fields = {}
+    other_input_fields = {}
+    output_fields = {}
+
+    for url in run_urls:
+        try:
+            page_cls, sr, _ = url_to_runs(url)
+        except Exception:
+            continue
+
+        schema = page_cls.RequestModel.model_json_schema(ref_template="{model}")
+        for field_name, field_info in page_cls.RequestModel.model_fields.items():
+            if (
+                field_info.is_required()
+                or field_name in page_cls.get_example_preferred_fields(sr.state)
+            ):
+                input_fields = preferred_input_fields
+            else:
+                input_fields = other_input_fields
+            field_props = schema["properties"][field_name]
+            title = field_props.get(
+                "title", field_name.replace("_", " ").capitalize()
+            )
+            keys = None
+            if is_arr(field_props):
+                try:
+                    ref = field_props["items"]["$ref"]
+                    props = schema["definitions"][ref]["properties"]
+                    keys = {k: prop["title"] for k, prop in props.items()}
+                except KeyError:
+                    try:
+                        keys = {k: k for k in sr.state[field_name][0].keys()}
+                    except (KeyError, IndexError, AttributeError, TypeError):
+                        pass
+            elif is_obj(field_props):
+                try:
+                    keys = {k: k for k in sr.state[field_name].keys()}
+                except (KeyError, AttributeError, TypeError):
+                    pass
+
+            if keys:
+                for k, ktitle in keys.items():
+                    input_fields[f"{field_name}.{k}"] = f"{title}.{ktitle}"
+            else:
+                input_fields[field_name] = title
+
+        schema = page_cls.ResponseModel.model_json_schema()
+        output_fields |= {
+            field: schema["properties"][field]["title"]
+            for field in page_cls.ResponseModel.model_fields
+        }
+
+    return preferred_input_fields, other_input_fields, output_fields
 
 
 def is_arr(field_props: dict | None) -> bool:
