@@ -235,6 +235,7 @@ def iterqueue(api_queue: queue.Queue, thread: threading.Thread):
 
 class ApiInterface(BotInterface):
     platform = Platform.WEB
+    preserve_think_tags = True
 
     run_id: str = None
     uid: str = None
@@ -359,7 +360,10 @@ class ApiInterface(BotInterface):
                 state = sr.to_dict()
                 output = VideoBotsPage.ResponseModel.model_validate(state)
                 output.output_text = [
-                    parse_bot_html(text)[1] for text in output.output_text or []
+                    parse_bot_html(text, preserve_think_tags=self.preserve_think_tags)[
+                        1
+                    ]
+                    for text in output.output_text or []
                 ]
                 self.queue.put(
                     FinalResponse(

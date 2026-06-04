@@ -1,5 +1,6 @@
 import mimetypes
 import random
+import re
 import traceback
 import typing
 from datetime import datetime
@@ -109,6 +110,7 @@ class BotInterface:
     ]
     user_msg_id: str | None = None
     can_update_message: bool = False
+    preserve_think_tags: bool = False
 
     page_cls: typing.Type[BasePage] | None = None
     query_params: dict
@@ -257,7 +259,9 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons, text, thinking, disable_feedback = parse_bot_html(text)
+        buttons, text, disable_feedback = parse_bot_html(
+            text, preserve_think_tags=self.preserve_think_tags
+        )
         if disable_feedback:
             send_feedback_buttons = False
 
@@ -344,17 +348,21 @@ class BotInterface:
             return text or ""
 
 
-def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]:
+def parse_bot_html(
+    text: str | None,
+    *,
+    preserve_think_tags: bool = False,
+) -> tuple[list[ReplyButton], str, bool]:
     from pyquery import PyQuery as pq
 
     if not text:
-        return [], text, "", False
+        return [], text, False
 
     doc = pq(f"<root>{text}</root>")
 
     buttons = []
     disable_feedback = False
-    for idx, btn in enumerate(doc("button") or []):
+    for idx, btn in enumerate(doc.children("button") or []):
         if "disable_feedback" in (btn.attrib.get("gui-action") or ""):
             disable_feedback = True
         buttons.append(
@@ -371,13 +379,17 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]
             )
         )
 
-    text = "".join(
-        s for elem in doc.contents() if isinstance(elem, str) and (s := elem)
-    )
+    if preserve_think_tags:
+        # avoid lxml — it auto-closes unclosed <think> mid-stream
+        text = BUTTON_RE.sub("", text)
+    else:
+        doc.children("button, think").remove()
+        text = doc.html() or ""
 
-    thinking = "\n\n".join(elem.text for elem in (doc("think") or []) if elem.text)
+    return buttons, text, disable_feedback
 
-    return buttons, text, thinking, disable_feedback
+
+BUTTON_RE = re.compile(r"<button\b[^>]*>.*?</button>", re.DOTALL | re.IGNORECASE)
 
 
 def _echo(bot, input_text):

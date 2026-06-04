@@ -1220,7 +1220,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
                         className="border rounded-3 p-2",
                         style=dict(borderColor="#f0f0f0"),
                     ),
-                    gui.styled("""
+                    gui.styled(
+                        """
                         & {
                             max-height: 4.5em; /* ~3 lines with 1.5 line-height */
                             overflow: hidden;
@@ -1229,7 +1230,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
                             -webkit-box-orient: vertical;
                             line-height: 1.5;
                         }
-                    """),
+                    """
+                    ),
                 ):
                     text = parse_bot_html(output_text[0])[1]
                     gui.write(text, className="container-margin-reset")
@@ -1361,18 +1363,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             text = output_text and output_text[0] or ""
 
             if text:
-                buttons, text, thinking, disable_feedback = parse_bot_html(text)
-                if thinking:
-                    thinking_duration = gui.session_state.get("metrics", {}).get(
-                        "thinking_duration_sec"
-                    )
-                    template = settings.templates.get_template("thinking_summary.html")
-                    context = dict(
-                        text=text,
-                        thinking=thinking,
-                        thinking_duration=thinking_duration,
-                    )
-                    text = template.render(context)
+                buttons, text, _ = parse_bot_html(text, preserve_think_tags=True)
             else:
                 buttons = []
 
