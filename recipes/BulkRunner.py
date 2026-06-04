@@ -29,8 +29,8 @@ from daras_ai_v2.workflow_url_input import (
     edit_button,
     del_button,
     workflow_url_input,
-    get_published_run_options,
     edit_done_button,
+    render_published_run_selectbox,
 )
 from recipes.DocSearch import render_documents
 
@@ -115,7 +115,7 @@ List of URLs to the evaluation runs that you requested.
         )
 
         preferred_input_fields, other_input_fields, output_fields = (
-            collect_bulk_runner_field_maps(tuple(run_urls))
+            get_bulk_runner_field_maps(tuple(run_urls))
         )
 
         gui.write(
@@ -197,6 +197,26 @@ To understand what each field represents, check out our [API docs](https://api.g
         eval_runs = gui.session_state.get("eval_runs")
 
         if eval_runs:
+            for url in eval_runs:
+                try:
+                    page_cls, sr, pr = url_to_runs(url)
+                except SavedRun.DoesNotExist:
+                    continue
+                title = breadcrumbs.get_title_breadcrumbs(
+                    page_cls=page_cls, sr=sr, pr=pr
+                ).title_with_prefix()
+                gui.html(
+                    f'{icons.external_link} <a href="{url}" target="_blank">{title}</a>'
+                )
+            if not gui.session_state.get("--expand_eval_outputs"):
+                if gui.button(
+                    "Show full evaluation outputs",
+                    key="--expand-eval-outputs-btn",
+                    type="secondary",
+                ):
+                    gui.session_state["--expand_eval_outputs"] = True
+                    gui.rerun()
+                return
             _backup = gui.session_state
             for url in eval_runs:
                 try:
@@ -387,18 +407,14 @@ To understand what each field represents, check out our [API docs](https://api.g
                     gui.session_state[last_workflow_key] = workflow
             with scol2:
                 page_cls = Workflow(workflow).page_cls
-                options = get_published_run_options(
-                    page_cls, current_user=self.request.user
+                url = render_published_run_selectbox(
+                    page_cls=page_cls,
+                    key=key,
+                    value=d.get("url"),
+                    current_user=self.request.user,
+                    selected_options=d.get("--added_workflows", {}),
+                    lazy_options=True,
                 )
-                options.update(d.get("--added_workflows", {}))
-                with gui.div(className="pt-1"):
-                    url = gui.selectbox(
-                        "",
-                        key=key,
-                        options=options,
-                        value=d.get("url"),
-                        format_func=lambda x: options[x],
-                    )
             with col2:
                 edit_button(key)
         with col3:
@@ -503,6 +519,46 @@ def slice_request_df(df, request):
         df_ix += arr_len
 
 
+def get_bulk_runner_field_maps(
+    run_urls: tuple[str, ...],
+) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    if can_skip_schema_discovery_for_field_maps(run_urls):
+        return field_maps_from_saved_mappings()
+    maps = collect_bulk_runner_field_maps(run_urls)
+    gui.session_state["--bulk_field_maps_run_urls"] = list(run_urls)
+    return maps
+
+
+def can_skip_schema_discovery_for_field_maps(run_urls: tuple[str, ...]) -> bool:
+    if not run_urls:
+        return False
+    if not gui.session_state.get("input_columns"):
+        return False
+    if not gui.session_state.get("output_columns"):
+        return False
+    cached_urls = gui.session_state.get("--bulk_field_maps_run_urls")
+    if cached_urls is not None and list(run_urls) != cached_urls:
+        return False
+    return True
+
+
+def field_maps_from_saved_mappings() -> tuple[
+    dict[str, str], dict[str, str], dict[str, str]
+]:
+    input_columns = gui.session_state.get("input_columns") or {}
+    output_columns = gui.session_state.get("output_columns") or {}
+    preferred_input_fields = {field: field for field in input_columns}
+    output_fields = {
+        "run_url": "Run URL",
+        "run_time": "Run Time",
+        "error_msg": "Error Msg",
+        "price": "Price",
+    }
+    for field, col in output_columns.items():
+        output_fields[field] = col
+    return preferred_input_fields, {}, output_fields
+
+
 @gui.cache_in_session_state
 def collect_bulk_runner_field_maps(
     run_urls: tuple[str, ...],
@@ -527,9 +583,7 @@ def collect_bulk_runner_field_maps(
             else:
                 input_fields = other_input_fields
             field_props = schema["properties"][field_name]
-            title = field_props.get(
-                "title", field_name.replace("_", " ").capitalize()
-            )
+            title = field_props.get("title", field_name.replace("_", " ").capitalize())
             keys = None
             if is_arr(field_props):
                 try:

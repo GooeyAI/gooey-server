@@ -112,11 +112,15 @@ def normalize_slug(page_slug):
     return re.sub(r"[-_]", "", page_slug.lower())
 
 
-page_slug_map: dict[str, typing.Type[BasePage]] = {
-    normalize_slug(slug): page
-    for page in (all_api_pages + all_hidden_pages)
-    for slug in page.slug_versions
+api_page_slug_map: dict[str, typing.Type[BasePage]] = {
+    normalize_slug(slug): page for page in all_api_pages for slug in page.slug_versions
 } | {str(page.workflow.value): page for page in all_api_pages}
+
+page_slug_map: dict[str, typing.Type[BasePage]] = api_page_slug_map | {
+    normalize_slug(slug): page
+    for page in all_hidden_pages
+    for slug in page.slug_versions
+}
 
 workflow_map: dict[Workflow, typing.Type[BasePage]] = {
     page.workflow: page for page in all_api_pages

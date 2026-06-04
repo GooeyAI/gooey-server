@@ -34,6 +34,7 @@ from routers import (
     account,
     facebook_api,
     api,
+    published_run_options,
     root,
     slack_api,
     paypal,
@@ -82,6 +83,7 @@ app.include_router(telegram_api.router, include_in_schema=False)
 app.include_router(static_pages.app, include_in_schema=False)
 app.include_router(twilio_ws_api.app, include_in_schema=False)
 app.include_router(gooey_builder.router, include_in_schema=False)
+app.include_router(published_run_options.app, include_in_schema=False)
 app.include_router(root.app, include_in_schema=False)  # this has a catch-all route
 
 app.add_middleware(
