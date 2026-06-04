@@ -4,6 +4,12 @@ import typing
 
 threadlocal = threading.local()
 
+URL_TO_RUNS_CACHE_ATTR = "url_to_runs_cache"
+
+
+def clear_render_caches():
+    threadlocal.__dict__.pop(URL_TO_RUNS_CACHE_ATTR, None)
+
 
 def get_session_state() -> dict[str, typing.Any]:
     try:

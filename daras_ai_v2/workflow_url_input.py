@@ -11,6 +11,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.enum_selector_widget import BLANK_OPTION
 from daras_ai_v2.fastapi_tricks import resolve_url
 from daras_ai_v2.query_params_util import extract_query_params
+from gooey_gui.core.state import URL_TO_RUNS_CACHE_ATTR, threadlocal
 
 
 def workflow_url_input(
@@ -124,6 +125,21 @@ def init_workflow_selector(
 
 
 def url_to_runs(
+    url: str,
+) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun]:
+    cache = getattr(threadlocal, URL_TO_RUNS_CACHE_ATTR, None)
+    if cache is None:
+        cache = {}
+        setattr(threadlocal, URL_TO_RUNS_CACHE_ATTR, cache)
+    cached = cache.get(url)
+    if cached is not None:
+        return cached
+    resolved = resolve_url_to_runs(url)
+    cache[url] = resolved
+    return resolved
+
+
+def resolve_url_to_runs(
     url: str,
 ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun]:
     page_cls, query_params = resolve_workflow_url(url)
