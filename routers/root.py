@@ -666,7 +666,7 @@ def render_recipe_page(
         raise RecipePageNotFound
 
     # ensure the latest slug is used
-    latest_slug = page_cls.slug_versions[-1]
+    latest_slug = page_cls.canonical_slug()
     if latest_slug != page_slug:
         new_url = furl(request.url)
         for i, seg in enumerate(new_url.path.segments):

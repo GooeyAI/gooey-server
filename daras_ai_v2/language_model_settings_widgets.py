@@ -19,7 +19,7 @@ class LanguageModelSettings(BaseModel):
     num_outputs: int | None = Field(
         None,
         title="Answer Outputs",
-        description="How many answers should the copilot generate? Additional answer outputs increase the cost of each run.",
+        description="How many answers should the agent/copilot generate? Additional answer outputs increase the cost of each run.",
     )
     quality: float | None = Field(
         None,

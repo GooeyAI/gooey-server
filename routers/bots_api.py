@@ -41,7 +41,7 @@ MSG_ID_PREFIX = "web-"
 
 class CreateStreamRequestBase(BaseModel):
     integration_id: str = Field(
-        description="Your Integration ID as shown in the Copilot Deploy tab"
+        description="Your Integration ID as shown in the Agent Deploy tab"
     )
 
     conversation_id: str | None = Field(
@@ -100,8 +100,8 @@ class CreateStreamResponse(BaseModel):
     response_model=CreateStreamResponse,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream_create",
-    tags=["Copilot Integrations"],
-    name="Copilot Integrations Create Stream",
+    tags=["Agent Integrations"],
+    name="Agent Integrations Create Stream",
 )
 def stream_create(request: CreateStreamRequest, response: Response):
     request_id = str(uuid.uuid4())
@@ -194,8 +194,8 @@ StreamEvent = ConversationStart | RunStart | MessagePart | FinalResponse | Strea
     response_model=StreamEvent,
     responses={402: {}},
     operation_id=VideoBotsPage.slug_versions[0] + "__stream",
-    tags=["Copilot Integrations"],
-    name="Copilot integrations Stream Response",
+    tags=["Agent Integrations"],
+    name="Agent Integrations Stream Response",
 )
 def stream_response(request_id: str):
     r = get_redis_cache().getdel(f"gooey/stream-init/v1/{request_id}")

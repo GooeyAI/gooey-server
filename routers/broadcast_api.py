@@ -44,7 +44,7 @@ class BotBroadcastRequestModel(BaseModel):
         None, description="Document URLs to send to all users"
     )
     integration_id: str | None = Field(
-        description="The Bot's Integration ID as shown in the Copilot Deploy tab or as variables in a function call."
+        description="The Bot's Integration ID as shown in the Agent Deploy tab or as variables in a function call."
     )
     buttons: list[ReplyButton] | None = Field(
         None, description="Buttons to send to all users"
@@ -144,6 +144,15 @@ def broadcast_api_json(
         )
 
     return {"status": "success", "count": total}
+
+
+for legacy_slug in VideoBotsPage.legacy_api_slugs():
+    app.add_api_route(
+        f"/v2/{legacy_slug}/broadcast/send/",
+        broadcast_api_json,
+        methods=["POST"],
+        include_in_schema=False,
+    )
 
 
 def ensure_slack_personal_channels(

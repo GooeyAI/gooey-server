@@ -197,6 +197,8 @@ def script_to_api(page_cls: typing.Type[BasePage]):
         # call regular json api
         return run_api_json(request, page_request=page_request, api_key=api_key)
 
+    endpoint_v2 = endpoint
+    sync_response_model = response_model
     endpoint = endpoint.replace("v2", "v3")
     response_model = AsyncApiResponseModelV3
 
@@ -301,6 +303,63 @@ def script_to_api(page_cls: typing.Type[BasePage]):
                     sr.state = {}
                     sr.save(update_fields=["state", "updated_at"])
             return ret
+
+    for legacy_slug in page_cls.legacy_api_slugs():
+        slug = page_cls.slug_versions[0]
+        app.add_api_route(
+            endpoint_v2.replace(f"/{slug}", f"/{legacy_slug}", 1),
+            run_api_json,
+            methods=["POST"],
+            response_model=sync_response_model,
+            responses={
+                HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
+                **common_errs,
+            },
+            include_in_schema=False,
+        )
+        app.add_api_route(
+            os.path.join(endpoint_v2.replace(f"/{slug}", f"/{legacy_slug}", 1), "form"),
+            run_api_form,
+            methods=["POST"],
+            response_model=sync_response_model,
+            responses={
+                HTTP_500_INTERNAL_SERVER_ERROR: {"model": FailedReponseModelV2},
+                HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
+                **common_errs,
+            },
+            include_in_schema=False,
+        )
+        app.add_api_route(
+            os.path.join(endpoint.replace(f"/{slug}", f"/{legacy_slug}", 1), "async"),
+            run_api_json_async,
+            methods=["POST"],
+            response_model=AsyncApiResponseModelV3,
+            responses=common_errs,
+            status_code=202,
+            include_in_schema=False,
+        )
+        app.add_api_route(
+            os.path.join(
+                endpoint.replace(f"/{slug}", f"/{legacy_slug}", 1), "async/form"
+            ),
+            run_api_form_async,
+            methods=["POST"],
+            response_model=AsyncApiResponseModelV3,
+            responses={
+                HTTP_400_BAD_REQUEST: {"model": GenericErrorResponse},
+                **common_errs,
+            },
+            status_code=202,
+            include_in_schema=False,
+        )
+        app.add_api_route(
+            os.path.join(endpoint.replace(f"/{slug}", f"/{legacy_slug}", 1), "status"),
+            get_run_status,
+            methods=["GET"],
+            response_model=response_model,
+            responses=common_errs,
+            include_in_schema=False,
+        )
 
 
 def _parse_form_data(

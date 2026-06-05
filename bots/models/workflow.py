@@ -191,7 +191,7 @@ class Workflow(models.IntegerChoices):
     DOC_SEARCH = (1, "Doc Search")
     DOC_SUMMARY = (2, "Doc Summary")
     GOOGLE_GPT = (3, "Google GPT")
-    VIDEO_BOTS = (4, "Copilot")
+    VIDEO_BOTS = (4, "Agent")
     LIPSYNC_TTS = (5, "Lipysnc + TTS")
     TEXT_TO_SPEECH = (6, "Text to Speech")
     ASR = (7, "Speech Recognition")

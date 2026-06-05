@@ -203,7 +203,7 @@ The maximum number of document search citations.
 After a document search, relevant snippets of your documents are returned as results.
 This setting adjusts the maximum number of words in each snippet (tokens = words * 2).
 A high snippet size allows the LLM to access more information from your document results, \
-at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the copilot to respond).
+at the cost of being verbose and potentially exhausting input tokens (which can cause a failure of the agent to respond).
 """,
         key="max_context_words",
         min_value=10,

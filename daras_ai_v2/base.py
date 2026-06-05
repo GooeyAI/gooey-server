@@ -219,6 +219,14 @@ class BasePage:
     def api_endpoint(cls) -> str:
         return f"/v2/{cls.slug_versions[0]}"
 
+    @classmethod
+    def canonical_slug(cls) -> str:
+        return cls.slug_versions[-1]
+
+    @classmethod
+    def legacy_api_slugs(cls) -> list[str]:
+        return []
+
     def current_app_url(
         self,
         tab: RecipeTabs = RecipeTabs.run,
@@ -272,7 +280,7 @@ class BasePage:
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
             / tab.url_path(
-                page_slug=cls.slug_versions[-1],
+                page_slug=cls.canonical_slug(),
                 run_slug=run_slug,
                 example_id=example_id,
                 **(path_params or {}),

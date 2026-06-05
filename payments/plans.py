@@ -86,7 +86,7 @@ class PricingPlan(PricingPlanData, Enum):
         db_value=2,
         key="premium",
         title="Premium Plan",
-        description="10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable [videobots](/video-bots/)",
+        description="10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable [agents](/agent/)",
         credits=10_000,
         monthly_charge=50,
         deprecated=True,
@@ -103,7 +103,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
             **Includes (est.)**
             <ul class="text-muted">
-              <li>400 Copilot Conversations  </li>
+              <li>400 Agent Conversations  </li>
               <li>40 Lipsync minutes  </li>
               <li>133 Animation seconds  </li>
               <li>75 AI QR Codes  </li>
@@ -116,7 +116,7 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Auto recharge with custom budgets  </li>
               <li>Premium LLMs (GPT 4s, Gemini, Claude)  </li>
               <li>100 MB of Knowledge  </li>
-              <li>Copilot Analytics  </li>
+              <li>Agent Analytics  </li>
               <li>11Labs voices for Lipsync  </li>
             </ul>
             """
@@ -134,7 +134,7 @@ class PricingPlan(PricingPlanData, Enum):
             """
             **Includes (est.)**
             <ul class="text-muted">
-              <li>4,000 Copilot Conversations</li>
+              <li>4,000 Agent Conversations</li>
               <li>400 Lipsync minutes</li>
               <li>1333 Animation seconds</li>
               <li>750 AI QR Codes</li>
@@ -170,7 +170,7 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
               <li>API Secrets to securely access any system</li>
               <li>Bring your own WhatsApp number</li>
-              <li>Embed copilots in your own App</li>
+              <li>Embed agents in your own App</li>
               <li>Impact and usage <a href="https://docs.gooey.ai/ai-agent/conversation-analysis">dashboards</a></li>
               <li>Role Based Management</li>
               <li>Centralized billing</li>
@@ -205,9 +205,9 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Public Workflows</li>
               <li>Run all frontier <a href="/compare-llm">LLMs</a></li>
               <li><a href="/explore">Explore</a>, fork & run any public AI Workflow</li>
-              <li>Test and deploy via <a href="/copilot/">Agent Web Widget</a></li>
+              <li>Test and deploy via <a href="/agent/">Agent Web Widget</a></li>
               <li><a href="/speech/">Speech recognition</a> and translation for 1000+ languages</li>
-              <li>Broad selection of <a href="/text-to-speech/">Text to Speech voices</a> for <a href="/lipsync/">Lipsync</a> and <a href="/copilot/">Copilot</a></li>
+              <li>Broad selection of <a href="/text-to-speech/">Text to Speech voices</a> for <a href="/lipsync/">Lipsync</a> and <a href="/agent/">Agent</a></li>
               <li>Access top image generation models</li>
               <li>Deploy Workflows via the Web, WhatsApp, SMS/Voice, Slack or FB</li>
             </ul>
@@ -272,7 +272,7 @@ class PricingPlan(PricingPlanData, Enum):
               <li>Integrate with Google, M365, Salesforce, Notion + 100s of others</li>
               <li>API Secrets to securely access any system (Researcher & above)</li>
               <li>Bring your own WhatsApp number</li>
-              <li>Embed copilots in your own App</li>
+              <li>Embed agents in your own App</li>
               <li>Impact and usage <a href="https://docs.gooey.ai/ai-agent/conversation-analysis">dashboards</a></li>
               <li>Role Based Management</li>
               <li>Centralized billing</li>

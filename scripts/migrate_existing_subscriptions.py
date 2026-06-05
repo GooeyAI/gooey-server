@@ -58,7 +58,7 @@ available_subscriptions = {
         "display": {
             "name": "Premium Plan",
             "title": "$50/month + Bots",
-            "description": '10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable <a href="/video-bots/">videobots</a>.',
+            "description": '10000 Credits (~2000 runs) for $50/month. Includes special access to build bespoke, embeddable <a href="/agent/">agents</a>.',
         },
         "stripe": {
             "price_data": {
