@@ -1126,8 +1126,8 @@ def tabular_bytes_to_any_df(
             df = pd.read_csv(f, dtype=dtype)
         case "text/tab-separated-values":
             df = pd.read_csv(f, sep="\t", dtype=dtype)
-        case "application/json":
-            df = pd.read_json(f, dtype=dtype)
+        # case "application/json":
+        #     df = pd.read_json(f, dtype=dtype)
         case "application/xml":
             df = pd.read_xml(f, dtype=dtype)
         case _ if "excel" in mime_type or "sheet" in mime_type:
