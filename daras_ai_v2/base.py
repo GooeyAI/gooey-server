@@ -2353,7 +2353,7 @@ class BasePage:
             workflow=self.workflow, workspace=self.current_workspace
         )
 
-        if settings.GOOEY_BUILDER_INTEGRATION_ID and self.is_current_user_admin():
+        if settings.GOOEY_BUILDER_INTEGRATION_ID and not self.is_current_user_admin():
             qs = qs.exclude(parent_version__published_run=get_default_builder_pr())
 
         # Apply user filter if specified
