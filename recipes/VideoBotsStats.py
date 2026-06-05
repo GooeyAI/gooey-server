@@ -50,7 +50,7 @@ from widgets.author import render_author_from_user
 
 
 class VideoBotsStatsPage(BasePage):
-    title = "Copilot Analytics"  # "Create Interactive Video Bots"
+    title = "Agent Analytics"  # "Create Interactive Video Bots"
     slug_versions = ["analytics", "stats"]
     workflow = (
         Workflow.VIDEO_BOTS

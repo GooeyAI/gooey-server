@@ -90,7 +90,7 @@ def general_integration_settings(
                 "**👍🏾 👎🏽 Show Feedback Buttons**",
                 value=bi.show_feedback_buttons,
                 key=f"_bi_show_feedback_buttons_{bi.id}",
-                help="Users can rate and provide feedback on every copilot response if enabled.",
+                help="Users can rate and provide feedback on every agent/copilot response if enabled.",
             )
 
         with gui.div(className="d-flex align-items-center gap-3"):
@@ -100,7 +100,7 @@ def general_integration_settings(
                 key=f"_bi_ask_detailed_feedback_{bi.id}",
                 help=(
                     "When users give a thumbs down, ask them to explain what was wrong and how it could be improved. "
-                    "Make sure to use our suggested prompt in your copilot to make this work well."
+                    "Make sure to use our suggested prompt in your agent/copilot to make this work well."
                 ),
             )
             copy_to_clipboard_button(
@@ -136,7 +136,7 @@ def analysis_runs_list_view(
             "##### <i class='fa-solid fa-brain'></i> Analysis Workflows",
             unsafe_allow_html=True,
             help=(
-                "Analyze each incoming message and the copilot's response using a Gooey.AI /LLM workflow. "
+                "Analyze each incoming message and the agent's response using a Gooey.AI /LLM workflow. "
                 "Must return a JSON object with a consistent schema. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/conversation-analysis)."
             ),
         )
@@ -256,7 +256,7 @@ def slack_specific_settings(bi: BotIntegration):
     bi.slack_read_receipt_msg = gui.text_input(
         """
             ##### ✅ Read Receipt
-            This message is sent immediately after recieving a user message and replaced with the copilot's response once it's ready.
+            This message is sent immediately after recieving a user message and replaced with the agent's response once it's ready.
             (leave blank to disable)
             """,
         placeholder=bi.slack_read_receipt_msg,

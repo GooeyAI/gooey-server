@@ -136,12 +136,16 @@ class ReplyButton(typing_extensions.TypedDict):
 class VideoBotsPage(BasePage):
     PROFIT_CREDITS = 3
 
-    title = "Copilot for your Enterprise"  # "Create Interactive Video Bots"
+    title = "Agent"  # "Create Interactive Video Bots"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
-    slug_versions = ["video-bots", "bots", "copilot"]
+    slug_versions = ["agent", "video-bots", "bots", "copilot", "agent"]
 
     functions_in_settings = False
+
+    @classmethod
+    def legacy_api_slugs(cls) -> list[str]:
+        return ["video-bots"]
 
     sane_defaults = {
         "messages": [],
@@ -184,22 +188,22 @@ class VideoBotsPage(BasePage):
         input_prompt: str | None = Field(
             None,
             title="Input Prompt",
-            description="The text message / prompt sent to the copilot by the user",
+            description="The text message / prompt sent to the agent by the user",
         )
         input_audio: str | None = Field(
             None,
             title="Input Audio",
-            description="The audio message sent to the copilot by the user",
+            description="The audio message sent to the agent by the user",
         )
         input_images: list[HttpUrlStr] | None = Field(
             None,
             title="Input Images",
-            description="The images sent to the copilot by the user",
+            description="The images sent to the agent by the user",
         )
         input_documents: list[HttpUrlStr] | None = Field(
             None,
             title="Input Documents",
-            description="The documents sent to the copilot by the user. Note: this is not the same as the knowledge base documents.",
+            description="The documents sent to the agent by the user. Note: this is not the same as the knowledge base documents.",
         )
 
         doc_extract_url: str | None = Field(
@@ -215,7 +219,7 @@ class VideoBotsPage(BasePage):
             None,
             title="Instructions",
             description="The system prompt for the LLM. "
-            "Use this to set the personality of your copilot and provide instructions for bot's behavior. "
+            "Use this to set the personality of your agent and provide instructions for the bot's behavior. "
             "Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating.",
         )
 
@@ -238,7 +242,7 @@ class VideoBotsPage(BasePage):
         documents: list[HttpUrlStr] | None = Field(
             None,
             title="Knowledge Base",
-            description="Add documents or links to give your copilot a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
+            description="Add documents or links to give your agent a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
         )
         max_references: int | None = None
         max_context_words: int | None = None
@@ -1133,7 +1137,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     gui.session_state.get("input_glossary_document")
                     or gui.session_state.get("output_glossary_document")
                 ),
-                help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your copilots domain specific language understanding!",
+                help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your agent's domain specific language understanding!",
             )
             if enable_glossary:
                 gui.caption(
@@ -1509,7 +1513,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             user = self.request.user
             # not signed in case
             if not user or user.is_anonymous:
-                integrations_welcome_screen(title="Connect your Copilot")
+                integrations_welcome_screen(title="Connect your Agent")
                 gui.newline()
                 with gui.center():
                     gui.anchor("Get Started", href=self.get_auth_url(), type="primary")

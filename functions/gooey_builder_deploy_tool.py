@@ -33,7 +33,7 @@ class DeployWorkflowLLMTool(GooeyBuilderLLMTool):
         self.pr = pr
         self.builder_sr = builder_sr
 
-        description = "Deploy the current saved copilot workflow to an end-user channel so real users can talk to it. "
+        description = "Deploy the current saved agent workflow to an end-user channel so real users can talk to it. "
 
         if self.sr.state != self.pr.saved_run.state:
             description += (

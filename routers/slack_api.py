@@ -265,7 +265,7 @@ def slack_oauth_shortcuts():
 
 @router.get("/__/slack/redirect/shortcuts/")
 def slack_connect_redirect_shortcuts(
-    request: Request, shortcut_name: str = "Start Copilot"
+    request: Request, shortcut_name: str = "Start Agent"
 ):
     retry_button = f'<a href="{slack_shortcuts_connect_url}">Retry</a>'
 

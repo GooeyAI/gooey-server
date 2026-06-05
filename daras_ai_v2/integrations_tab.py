@@ -57,7 +57,7 @@ def render_integrations_tab(
     # no connected integrations on this run
     if not (integrations_qs and integrations_qs.exists()):
         render_integrations_add(
-            label="#### Connect your Copilot",
+            label="#### Connect your Agent",
             current_sr=saved_run,
             pr=published_run,
             user=user,
@@ -111,7 +111,7 @@ def render_integrations_settings(
         col1, col2 = gui.columns(2)
 
     with col1:
-        gui.markdown("#### Configure your Copilot")
+        gui.markdown("#### Configure your Agent")
         gui.newline()
 
         if len(integrations) > 1:

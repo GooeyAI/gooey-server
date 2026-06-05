@@ -1,3 +1,4 @@
+import json
 import typing
 
 from starlette.testclient import TestClient
@@ -5,6 +6,7 @@ from starlette.testclient import TestClient
 from bots.models import Workflow, PublishedRun
 from daras_ai_v2.all_pages import all_test_pages
 from daras_ai_v2.base import BasePage
+from recipes.VideoBots import VideoBotsPage
 from server import app
 
 MAX_WORKERS = 20
@@ -25,6 +27,25 @@ def _test_api_sync(page_cls: typing.Type[BasePage], endpoint: str):
     r = client.post(
         endpoint,
         json=page_cls.get_example_request(state)[1],
+        headers={"Authorization": "Token None"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_agent_legacy_api_sync_alias(
+    mock_celery_tasks, db_fixtures, force_authentication
+):
+    _test_api_sync(VideoBotsPage, "/v2/video-bots/")
+
+
+def test_agent_legacy_api_form_alias(
+    mock_celery_tasks, db_fixtures, force_authentication
+):
+    state = VideoBotsPage.get_root_pr().saved_run.state
+    r = client.post(
+        "/v2/video-bots/form/",
+        data={"json": json.dumps(VideoBotsPage.get_example_request(state)[1])},
         headers={"Authorization": "Token None"},
         follow_redirects=False,
     )
@@ -64,6 +85,33 @@ def _test_api_async(page_cls: typing.Type[BasePage], endpoint: str):
     assert status, data
     if status == "completed":
         assert "output" in data, data
+
+
+def test_agent_legacy_api_async_alias(
+    mock_celery_tasks, db_fixtures, force_authentication
+):
+    _test_api_async(VideoBotsPage, "/v3/video-bots/async/")
+
+
+def test_agent_legacy_api_async_form_and_status_aliases(
+    mock_celery_tasks, db_fixtures, force_authentication
+):
+    state = VideoBotsPage.get_root_pr().saved_run.state
+    r = client.post(
+        "/v3/video-bots/async/form/",
+        data={"json": json.dumps(VideoBotsPage.get_example_request(state)[1])},
+        headers={"Authorization": "Token None"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 202, r.text
+
+    r = client.get(
+        "/v3/video-bots/status/",
+        params={"run_id": r.json()["run_id"]},
+        headers={"Authorization": "Token None"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200, r.text
 
 
 def test_apis_examples(
