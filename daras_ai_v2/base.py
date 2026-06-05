@@ -372,11 +372,14 @@ class BasePage:
             gui.realtime_clear_subs()
             return
 
+        sr = self.current_sr
+        workflow_channel = self.realtime_channel_name(sr.run_id, sr.uid)
+
         if is_builder_running:
             builder_channel = VideoBotsPage.realtime_channel_name(
                 builder_sr.run_id, builder_sr.uid
             )
-            gui.realtime_pull([builder_channel])
+            gui.realtime_pull([workflow_channel, builder_channel])
 
             new_state = self.current_sr_to_session_state()
             for k in ["--prev-request-hash"]:
@@ -387,9 +390,7 @@ class BasePage:
             gui.session_state.clear()
             gui.session_state.update(new_state)
         else:
-            sr = self.current_sr
-            channel = self.realtime_channel_name(sr.run_id, sr.uid)
-            output = gui.realtime_pull([channel])[0]
+            output = gui.realtime_pull([workflow_channel])[0]
             if output:
                 gui.session_state.update(output)
 
