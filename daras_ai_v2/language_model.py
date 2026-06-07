@@ -111,7 +111,7 @@ class FunctionToolCallParam(typing_extensions.TypedDict):
     icon: typing_extensions.NotRequired[str | None]
 
 
-class ConversationEntry(typing_extensions.TypedDict):
+class ConversationEntry(typing_extensions.TypedDict, total=False):
     role: typing.Literal["user", "system", "assistant", "tool"]
     content: str | list[ChatCompletionContentPartParam]
 

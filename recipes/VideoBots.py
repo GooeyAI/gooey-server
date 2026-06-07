@@ -323,7 +323,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         pass
 
     class ResponseModel(BaseModel):
-        final_prompt: str | list[ConversationEntry] = []
+        final_prompt: list[ConversationEntry | dict] | str = []
 
         output_text: list[str] = []
         output_audio: list[HttpUrlStr] = []
@@ -791,9 +791,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
                 output = tool.call_json(arguments)
             except Exception as e:
                 output = json.dumps(dict(error=str(e)))
-                if hasattr(e, "error_type") and exceptions.get_error_renderer(
-                    e.error_type
-                ):
+                error_type = getattr(e, "error_type", type(e).__name__)
+                if error_type and exceptions.get_error_renderer(error_type):
                     # bubble up error so the parent run's standard error pipeline renders it
                     raise
                 else:

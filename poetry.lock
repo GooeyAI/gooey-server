@@ -1074,18 +1074,18 @@ cron = ["capturer (>=2.4)"]
 
 [[package]]
 name = "composio"
-version = "0.11.4"
+version = "0.13.1"
 description = "SDK for integrating Composio with your applications."
 optional = false
 python-versions = "<4,>=3.9"
 groups = ["main"]
 files = [
-    {file = "composio-0.11.4-py3-none-any.whl", hash = "sha256:7362f3a3ef4c71a37bc5e3983daa12531bbbe36d961ee00c3428a572a15b7d00"},
-    {file = "composio-0.11.4.tar.gz", hash = "sha256:cb0622fa31926d9ce4f09e4aa7605a7873b4e3e61c7d7d094682025f34a19ebb"},
+    {file = "composio-0.13.1-py3-none-any.whl", hash = "sha256:9a9620499d792d8f3336533a68d71f704a55659eb9f7a575cfe8b930409793a5"},
+    {file = "composio-0.13.1.tar.gz", hash = "sha256:957327c6557704135d34e10f3a0c8a885082b3d650e08acfb0f562c69290d289"},
 ]
 
 [package.dependencies]
-composio-client = "1.29.0"
+composio-client = "1.39.0"
 json-schema-to-pydantic = ">=0.4.8"
 openai = "*"
 pydantic = ">=2.6.4"
@@ -1094,14 +1094,14 @@ typing-extensions = ">=4.0.0"
 
 [[package]]
 name = "composio-client"
-version = "1.29.0"
+version = "1.39.0"
 description = "The official Python library for the composio API"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "composio_client-1.29.0-py3-none-any.whl", hash = "sha256:9910268e77eead235e2b08fc504f2cfd11ad4987d756e260a8ba95f45cbf1b0a"},
-    {file = "composio_client-1.29.0.tar.gz", hash = "sha256:5bbc23a47538e9314bb88cdb9144fd270d5a128ce264936a51ab7db51d75801b"},
+    {file = "composio_client-1.39.0-py3-none-any.whl", hash = "sha256:bf6050dc0d523bd1e9d52e39e162f5b23bd029aa441b5c4a18e1751aae58571d"},
+    {file = "composio_client-1.39.0.tar.gz", hash = "sha256:2086493925117b956a3166da18414925cb50829172c8211591137fcdc3d60c7d"},
 ]
 
 [package.dependencies]
@@ -8060,4 +8060,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "e524bbed4496371474109a799f2ff652253bc611d95f2063b83e29415399ad91"
+content-hash = "86114facb1d925ae59a8cf39e60a0a55de60a588c5380718e3605961819235a6"

@@ -95,7 +95,7 @@ modal = "^1.0.3"
 livekit-agents = {extras = ["anthropic", "google", "groq", "mistralai", "openai", "silero", "turn-detector", "utils"], version = "^1.5.0"}
 google-genai = "^1.73.1"
 livekit-plugins-noise-cancellation = "^0.2.5"
-composio = "^0.11.1"
+composio = "^0.13.1"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"
