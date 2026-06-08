@@ -1207,6 +1207,7 @@ def add_page_number_to_pdf(url: str | furl, page_num: int) -> furl:
 
 # dont use more than 1GB of memory for pandoc in total
 MAX_PANDOC_MEM_MB = 512
+MAX_PANDOC_TIMEOUT_S = 120
 _pandoc_lock = multiprocessing.Semaphore(4)  # semaphore ensures max pandoc processes
 
 
@@ -1238,8 +1239,37 @@ def pandoc_to_text(f_name: str, f_bytes: bytes, to="plain") -> str:
             "--to", to,
             "--output",
             outfile.name,
+            err_msg=pandoc_err_msg,
+            timeout=MAX_PANDOC_TIMEOUT_S,
         )  # fmt: skip
         return outfile.read()
+
+
+def pandoc_err_msg(output: str) -> str:
+    if re.search(r"Unknown input format", output, re.IGNORECASE):
+        return output.strip()
+
+    if match := re.search(
+        r"Could not deduce format from file extension (\.\S+)",
+        output,
+        re.IGNORECASE,
+    ):
+        ext = match.group(1).rstrip(".")
+        return (
+            f"Unsupported file type ({ext})\n\n"
+            "This file type cannot be converted to text for search. "
+            "Please upload a [supported document format](https://pandoc.org/MANUAL.html#general-options) "
+            "such as PDF, DOCX, TXT, MD, HTML, or RTF."
+        )
+
+    if re.search(r"Heap exhausted", output, re.IGNORECASE):
+        return (
+            "Document too large\n\n"
+            "This file is too large to extract text from. "
+            "Try uploading a smaller file or splitting it into smaller documents."
+        )
+
+    return f"Could not read document\n\n{output.strip()}"
 
 
 def render_sources_widget(refs: list[SearchReference]):
