@@ -177,16 +177,32 @@ def ffprobe(filename: str) -> dict:
 
 
 def call_cmd(
-    *args, err_msg: str = "", ok_returncodes: typing.Iterable[int] = ()
+    *args,
+    err_msg: str | typing.Callable[[str], str] = "",
+    ok_returncodes: typing.Iterable[int] = (),
+    timeout: float | None = None,
 ) -> str:
     logger.info("$ " + " ".join(map(str, args)))
     try:
-        return subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
+        return subprocess.check_output(
+            args, stderr=subprocess.STDOUT, text=True, timeout=timeout
+        )
+    except subprocess.TimeoutExpired as e:
+        user_msg = (
+            f"{str(args[0]).capitalize()} timed out. "
+            f"It may be an unsupported file type or too large."
+        )
+        raise UserError(user_msg) from e
     except subprocess.CalledProcessError as e:
         if e.returncode in ok_returncodes:
             return e.output
-        err_msg = err_msg or f"{str(args[0]).capitalize()} Error"
+        if callable(err_msg):
+            user_msg = err_msg(e.output)
+        elif err_msg:
+            user_msg = err_msg
+        else:
+            user_msg = f"{str(args[0]).capitalize()} Error"
         try:
             raise subprocess.SubprocessError(e.output) from e
         except subprocess.SubprocessError as e:
-            raise UserError(err_msg) from e
+            raise UserError(user_msg) from e
