@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import typing
 from textwrap import dedent
+from requests import Response
 
 import gooey_gui as gui
 
@@ -9,11 +10,18 @@ from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import ComposioAuthRequired
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from functions.base_llm_tool import BaseLLMTool
+import requests
+import json
+from daras_ai_v2.exceptions import raise_for_status
 
 if typing.TYPE_CHECKING:
     from composio.types import Tool
     from composio import Composio
     from composio.client.types import AuthConfig
+    from composio_client.types.connected_account_list_response import (
+        Item as ComposioConnectedAccount,
+    )
+    from composio_client.types.tool_proxy_response import ToolProxyResponse
 
 
 class ComposioLLMTool(BaseLLMTool):
@@ -28,7 +36,7 @@ class ComposioLLMTool(BaseLLMTool):
             required=tool.input_parameters.get("required"),
         )
 
-    def bind(self, user_id: str, redirect_url: str):
+    def bind(self, user_id: str, redirect_url: str) -> ComposioLLMTool:
         self.user_id = user_id
         self.redirect_url = redirect_url
         return self
@@ -73,7 +81,7 @@ class ComposioLLMTool(BaseLLMTool):
         )
 
 
-def render_inbuilt_tools_selector(key="inbuilt_tools_selector"):
+def render_inbuilt_tools_selector(key: str = "inbuilt_tools_selector") -> None:
     dialog_ref = gui.use_alert_dialog(key)
 
     if gui.button(
@@ -107,7 +115,7 @@ def render_inbuilt_tools_selector(key="inbuilt_tools_selector"):
             gui.write(f"{len(function_urls)} integrations selected")
 
 
-def render_tool_search_dialog(function_urls: set[str]):
+def render_tool_search_dialog(function_urls: set[str]) -> None:
     if not settings.COMPOSIO_API_KEY:
         gui.error(
             "Please set the COMPOSIO_API_KEY environment variable to use this feature."
@@ -145,7 +153,7 @@ def render_tool_search_dialog(function_urls: set[str]):
             render_toolkit_tools(toolkit, function_urls)
 
 
-def render_toolkit_tools(toolkit: dict, function_urls: set[str]):
+def render_toolkit_tools(toolkit: dict[str, str], function_urls: set[str]) -> None:
     from daras_ai_v2.fastapi_tricks import get_app_route_url
     from routers.root import tool_page
 
@@ -217,7 +225,7 @@ def render_toolkit_tools(toolkit: dict, function_urls: set[str]):
 
 
 @redis_cache_decorator(ex=60 * 60 * 24)  # 1 day
-def list_toolkits():
+def list_toolkits() -> list[dict[str, str]]:
     from composio import Composio
 
     return [
@@ -239,7 +247,7 @@ def list_toolkits():
 
 
 @gui.cache_in_session_state(key="__tools_cache__")
-def get_tools_for_toolkit(toolkit_slug: str) -> dict[str, dict]:
+def get_tools_for_toolkit(toolkit_slug: str) -> dict[str, dict[str, str]]:
     from composio import Composio
 
     return {
@@ -260,7 +268,7 @@ def ensure_composio_connected_account(
     toolkit: str,
     redirect_url: str,
     user_id: str,
-):
+) -> None:
     get_composio_connected_accounts(
         composio,
         auth_config=get_or_create_composio_auth_config(composio, toolkit),
@@ -275,7 +283,7 @@ def get_composio_connected_accounts(
     auth_config: AuthConfig,
     redirect_url: str,
     user_id: str,
-):
+) -> list[ComposioConnectedAccount]:
     connected_accounts = composio.connected_accounts.list(
         user_ids=[user_id],
         auth_config_ids=[auth_config.id],
@@ -306,3 +314,43 @@ def get_or_create_composio_auth_config(composio: Composio, toolkit: str) -> Auth
             },
         )
     return auth_config
+
+
+def composio_proxy(
+    *,
+    endpoint: str,
+    method: str,
+    connected_account_id: str,
+    params: dict | None = None,
+) -> ToolProxyResponse:
+    from composio import Composio
+
+    if params:
+        parameters = [
+            dict(type="query", name=name, value=value) for name, value in params.items()
+        ]
+    else:
+        parameters = None
+    resp = Composio().tools.proxy(
+        endpoint=endpoint,
+        method=method,
+        connected_account_id=connected_account_id,
+        parameters=parameters,
+    )
+    if resp.status != 200:
+        http_resp = _proxy_resp_to_mock_http_resp(endpoint, resp)
+        raise_for_status(http_resp)
+    return resp
+
+
+def _proxy_resp_to_mock_http_resp(endpoint: str, resp: ToolProxyResponse) -> Response:
+    http_resp = requests.Response()
+    http_resp.url = endpoint
+    http_resp.status_code = int(resp.status)
+    if resp.headers:
+        http_resp.headers.update(resp.headers)
+    http_resp.reason = requests.status_codes._codes.get(
+        http_resp.status_code, ["Unknown"]
+    )[0]
+    http_resp._content = json.dumps(resp.data).encode()
+    return http_resp
