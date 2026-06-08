@@ -1,5 +1,5 @@
-import html
 from typing import Any
+
 
 import gooey_gui as gui
 
@@ -161,7 +161,7 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                 event_type = "final_response"
                 status = RecipeRunState.completed.value
                 error_msg = state.get(StateKeys.error_msg) or ""
-                text += f'\n<p className="text-gooeyDanger font_14_400">{html.escape(error_msg)}</p>'
+                text += f'\n<code className="text-gooeyDanger font_14_400">{error_msg}</code>'
             case _:
                 event_type = "final_response"
                 status = "completed"

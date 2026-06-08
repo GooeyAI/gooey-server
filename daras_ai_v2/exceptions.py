@@ -109,7 +109,10 @@ OneDrive access is currently unavailable.
 
 class ComposioAuthRequired(UserError):
     def __init__(self, redirect_url: str):
-        message = f"Access required. Connect your account to continue: {redirect_url}"
+        message = (
+            "Gooey.AI could not access this resource. It may be private, require "
+            f"a connected account, or no longer exist. Connect your account to continue: {redirect_url}"
+        )
         super().__init__(
             message,
             status_code=HTTP_401_UNAUTHORIZED,

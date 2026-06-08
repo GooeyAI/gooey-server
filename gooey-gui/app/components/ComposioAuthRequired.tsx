@@ -38,7 +38,7 @@ export function ComposioAuthRequired({
         >
           <i className="fa-regular fa-lock-keyhole" />
         </span>
-        <span>Access Required</span>
+        <span>Access Required or Not Found</span>
       </div>
 
       <div
@@ -48,8 +48,8 @@ export function ComposioAuthRequired({
           marginTop: "8px",
         }}
       >
-        Gooey.AI can't access this resource - it's private. Connect your account
-        to continue.
+        Gooey.AI can't access this resource. It may be private, require a
+        connected account, or no longer exist. Connect your account to continue.
       </div>
 
       <div style={{ marginTop: "14px" }}>
@@ -58,7 +58,7 @@ export function ComposioAuthRequired({
           className="btn btn-theme btn-primary p-2 m-0"
           style={{ textDecoration: "none" }}
         >
-          <i className="fa-solid fa-shield-check" /> Connect & Grant Access
+          <i className="fa-solid fa-shield-check" /> Connect Account
         </a>
       </div>
 
