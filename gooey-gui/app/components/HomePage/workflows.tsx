@@ -92,7 +92,7 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
               className="recent-card-icon-img"
             />
           ) : preview.emoji ? (
-            <span className="recent-card-icon-emoji">{preview.emoji}</span>
+            <span className="saved-card-thumb-letter">{preview.emoji}</span>
           ) : null}
         </div>
       );
