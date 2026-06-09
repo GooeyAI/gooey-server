@@ -24,6 +24,7 @@
 
 .saved-card-thumb {
   width: 72px;
+  min-height: 72px;
   align-self: stretch;
   object-fit: cover;
 }
@@ -74,11 +75,6 @@
   margin: 0;
   object-fit: cover;
   display: block;
-}
-
-.recent-card-icon-emoji {
-  font-size: 4rem;
-  line-height: 1;
 }
 
 .recent-card-icon-img {
