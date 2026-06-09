@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("bots", "0118_savedrun_celery_task_id"),
+        ("bots", "0120_remove_savedrun_bots_savedr_workflo_47a100_idx_and_more"),
     ]
 
     operations = [

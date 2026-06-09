@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("bots", "0119_tag_description"),
+        ("bots", "0121_tag_description"),
     ]
 
     operations = [
