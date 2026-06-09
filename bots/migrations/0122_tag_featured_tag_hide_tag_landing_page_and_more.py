@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("bots", "0119_tag_description"),
+        ("bots", "0121_tag_description"),
     ]
 
     operations = [
