@@ -1,4 +1,5 @@
 __import__("gooeysite.wsgi")  # Note: this must always be at the top
+
 import logging
 import traceback
 from contextlib import asynccontextmanager
@@ -48,6 +49,7 @@ from routers import (
 )
 from routers import twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
+from routers import base_auth
 
 
 @asynccontextmanager
@@ -66,23 +68,46 @@ app.mount(
     name="gooey-gui-styles",
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.include_router(bots_api.app)
-app.include_router(api.app)
-app.include_router(broadcast_api.app)
-app.include_router(account.app, include_in_schema=False)
-app.include_router(facebook_api.app, include_in_schema=False)
-app.include_router(onedrive_api.app, include_in_schema=False)
-app.include_router(slack_api.router, include_in_schema=False)
-app.include_router(workspace.app, include_in_schema=False)
-app.include_router(url_shortener.app, include_in_schema=False)
-app.include_router(paypal.router, include_in_schema=False)
-app.include_router(stripe.router, include_in_schema=False)
-app.include_router(twilio_api.router, include_in_schema=False)
-app.include_router(telegram_api.router, include_in_schema=False)
-app.include_router(static_pages.app, include_in_schema=False)
-app.include_router(twilio_ws_api.app, include_in_schema=False)
-app.include_router(gooey_builder.router, include_in_schema=False)
-app.include_router(root.app, include_in_schema=False)  # this has a catch-all route
+
+api_routers = [
+    bots_api.app,
+    api.app,
+    broadcast_api.app,
+]
+for router in api_routers:
+    app.include_router(router)
+
+app_routers = [
+    account.app,
+    facebook_api.app,
+    onedrive_api.app,
+    slack_api.router,
+    workspace.app,
+    url_shortener.app,
+    paypal.router,
+    stripe.router,
+    twilio_api.router,
+    telegram_api.router,
+    static_pages.app,
+    twilio_ws_api.app,
+    gooey_builder.router,
+    base_auth.app,
+]
+
+if settings.ENABLE_FIREBASE_AUTH:
+    from routers import firebase_auth
+
+    app_routers.append(firebase_auth.app)
+else:
+    from routers import local_auth
+
+    app_routers.append(local_auth.app)
+
+for router in app_routers:
+    app.include_router(router, include_in_schema=False)
+
+# this has a catch-all route, so it must be last
+app.include_router(root.app, include_in_schema=False)
 
 app.add_middleware(
     CORSMiddleware,

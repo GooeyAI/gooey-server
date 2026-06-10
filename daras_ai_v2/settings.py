@@ -230,9 +230,10 @@ if not DEBUG:
 # Gooey settings
 #
 
-if not DEBUG:
+SENTRY_DSN = config("SENTRY_DSN", default="")
+if not DEBUG and SENTRY_DSN:
     sentry_sdk.init(
-        dsn=config("SENTRY_DSN"),
+        dsn=SENTRY_DSN,
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
@@ -243,8 +244,9 @@ if not DEBUG:
         ],
     )
 
-service_account_key_path = str(BASE_DIR / "serviceAccountKey.json")
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+ENABLE_FIREBASE_AUTH = config("ENABLE_FIREBASE_AUTH", default=False, cast=bool)
+
+service_account_key_path = BASE_DIR / "serviceAccountKey.json"
 # save json file from env var if available
 try:
     _json = config("GOOGLE_APPLICATION_CREDENTIALS_JSON")
@@ -254,10 +256,18 @@ else:
     with open(service_account_key_path, "w") as f:
         f.write(_json)
 
-import firebase_admin
+if service_account_key_path.exists():
+    import firebase_admin
 
-if not firebase_admin._apps:
-    firebase_admin.initialize_app()
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(service_account_key_path)
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app()
+
+else:
+    assert not ENABLE_FIREBASE_AUTH, (
+        "serviceAccountKey.json or env.GOOGLE_APPLICATION_CREDENTIALS_JSON must be present to use firebase auth"
+    )
+
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"
@@ -287,15 +297,15 @@ GROQ_API_KEY = config("GROQ_API_KEY", default="")
 REPLICATE_API_KEY = config("REPLICATE_API_KEY", default="")
 FAL_API_KEY = config("FAL_API_KEY", default="")
 
-APP_BASE_URL: str = config("APP_BASE_URL", "/")  # type: ignore
-API_BASE_URL = config("API_BASE_URL", "/")
+APP_BASE_URL: str = config("APP_BASE_URL", "http://localhost:3000")
+API_BASE_URL = config("API_BASE_URL", "http://localhost:8080")
 WS_STREAM_API_BASE_URL = config(
     "WS_STREAM_API_BASE_URL", API_BASE_URL.replace("http", "ws", 1)
 )
 WS_PROXY_API_BASE_URL = config(
     "WS_PROXY_API_BASE_URL", API_BASE_URL.replace("http", "ws", 1)
 )
-ADMIN_BASE_URL = config("ADMIN_BASE_URL", "https://admin.gooey.ai/")
+ADMIN_BASE_URL = config("ADMIN_BASE_URL", "http://localhost:8000")
 EXPLORE_URL = furl(APP_BASE_URL).add(path="explore").url
 PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
 DOCS_URL = config("DOCS_URL", "https://docs.gooey.ai")
@@ -311,8 +321,6 @@ HEADER_LINKS = [
     (CONTACT_URL, "Contact"),
 ]
 HEADER_ICONS = {}
-
-GPU_SERVER_1 = furl(config("GPU_SERVER_1", "http://gpu-1.gooey.ai"))
 
 SERPER_API_KEY = config("SERPER_API_KEY", None)
 GOOGLE_GEOCODING_API_KEY = config("GOOGLE_GEOCODING_API_KEY", default="")
@@ -424,9 +432,6 @@ SLACK_CLIENT_SECRET = config("SLACK_CLIENT_SECRET", "")
 ONEDRIVE_CLIENT_ID = config("ONEDRIVE_CLIENT_ID", "")
 ONEDRIVE_CLIENT_SECRET = config("ONEDRIVE_CLIENT_SECRET", "")
 
-
-TALK_JS_APP_ID = config("TALK_JS_APP_ID", "")
-TALK_JS_SECRET_KEY = config("TALK_JS_SECRET_KEY", "")
 
 REDIS_URL = config("REDIS_URL", "redis://localhost:6379")
 # redis configured as cache backend

@@ -8,7 +8,9 @@ import stripe
 from django.contrib.humanize.templatetags.humanize import ordinal
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.urls import reverse
 from django.utils.translation import ngettext
+from furl import furl
 from loguru import logger
 
 from app_users.models import (
@@ -242,6 +244,17 @@ def billing_page(
     with gui.div(className="mb-5"):
         render_credit_balance(workspace)
 
+    if not settings.STRIPE_SECRET_KEY:
+        with gui.div(className="mb-5"):
+            admin_url = get_workspace_admin_url(workspace)
+            gui.write(
+                f"### Stripe is not configured. "
+                f'<a href="{admin_url}" target="_blank">Add balance in Django admin</a> '
+                f"to top up credits locally.",
+                unsafe_allow_html=True,
+            )
+        return
+
     with gui.div(className="mb-5"):
         selected_payment_provider = render_all_plans(
             workspace, user=user, session=session, plans_tab=plans_tab
@@ -263,6 +276,16 @@ def billing_page(
 
     with gui.div(className="mb-5"):
         render_billing_history(workspace, current_user=user)
+
+
+def get_workspace_admin_url(workspace: Workspace) -> str:
+    return str(
+        furl(settings.ADMIN_BASE_URL)
+        / reverse(
+            f"admin:{workspace._meta.app_label}_{workspace._meta.model_name}_change",
+            args=[str(workspace.id)],
+        )
+    )
 
 
 def render_payments_setup():

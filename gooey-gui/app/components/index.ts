@@ -9,8 +9,10 @@ export type CustomComponentProps = {
 
 export * from "./ComposioAuthRequired";
 export * from "./ExploreBuilderPrompt";
+export * from "./ForgotPasswordForm";
 export * from "./GooeyBuilderInlineEmbed";
 export * from "./GooeyPopover";
 export * from "./InsufficientCredits";
+export * from "./LoginForm";
 export * from "./PaymentRequired";
 export * from "./Sidebar";

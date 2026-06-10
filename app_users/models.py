@@ -1,10 +1,13 @@
 import hashlib
 import typing
+import uuid
 from functools import cached_property
 
 import requests
-from django.db import models, IntegrityError, transaction
+from django.contrib.auth import hashers
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from firebase_admin import auth
 from furl import furl
 from phonenumber_field.modelfields import PhoneNumberField
@@ -12,7 +15,6 @@ from phonenumber_field.modelfields import PhoneNumberField
 from bots.custom_fields import CustomURLField, StrippedTextField
 from daras_ai.image_input import upload_file_from_bytes, guess_ext_from_response
 from daras_ai_v2 import settings
-from daras_ai_v2.db import ANONYMOUS_USER_COOKIE
 from handles.models import Handle
 from payments.plans import PricingPlan
 
@@ -32,11 +34,13 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            firebase_user = auth.get_user(uid)
-            # Try to create an object using passed params.
             try:
-                user = self.model(**kwargs)
-                user.copy_from_firebase_user(firebase_user)
+                if settings.ENABLE_FIREBASE_AUTH:
+                    user = self.model(**kwargs)
+                    user.copy_from_firebase_user(auth.get_user(uid))
+                else:
+                    user = self.model(is_anonymous=False, balance=0, **kwargs)
+                    user.save()
                 return user, True
             except IntegrityError:
                 try:
@@ -55,11 +59,17 @@ class AppUserQuerySet(models.QuerySet):
         try:
             return super().get(**kwargs), False
         except self.model.DoesNotExist:
-            firebase_user = get_or_create_firebase_user_by_email(email)[0]
-            # Try to create an object using passed params.
             try:
-                user = self.model(**kwargs)
-                user.copy_from_firebase_user(firebase_user)
+                if settings.ENABLE_FIREBASE_AUTH:
+                    user = self.model(**kwargs)
+                    user.copy_from_firebase_user(
+                        get_or_create_firebase_user_by_email(email)[0]
+                    )
+                else:
+                    user = self.model(
+                        uid=str(uuid.uuid4()), is_anonymous=False, balance=0, **kwargs
+                    )
+                    user.save()
                 return user, True
             except IntegrityError:
                 try:
@@ -69,7 +79,9 @@ class AppUserQuerySet(models.QuerySet):
                 raise
 
 
-def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, bool]:
+def get_or_create_firebase_user_by_email(
+    email: str,
+) -> tuple[auth.UserRecord, bool]:
     try:
         return auth.get_user_by_email(email), False
     except auth.UserNotFoundError:
@@ -83,29 +95,6 @@ def get_or_create_firebase_user_by_email(email: str) -> tuple[auth.UserRecord, b
             raise
 
 
-def create_anonymous_app_user() -> "AppUser":
-    uid = auth.create_user().uid
-    return AppUser.objects.create(
-        uid=uid,
-        is_anonymous=True,
-        balance=settings.ANON_USER_FREE_CREDITS,
-    )
-
-
-def ensure_request_app_user(request) -> "AppUser":
-    if request.user:
-        return request.user
-
-    user = create_anonymous_app_user()
-    try:
-        request.user = user
-    except AttributeError:
-        # for fastapi Request object, which doesn't allow setting arbitrary attributes
-        pass
-    request.session[ANONYMOUS_USER_COOKIE] = dict(uid=user.uid)
-    return user
-
-
 class PaymentProvider(models.IntegerChoices):
     STRIPE = 1, "Stripe"
     PAYPAL = 2, "PayPal"
@@ -114,8 +103,10 @@ class PaymentProvider(models.IntegerChoices):
 class AppUser(models.Model):
     uid = models.CharField(max_length=255, unique=True)
 
+    password = models.CharField(max_length=255, blank=True, default="")
+
     display_name = models.TextField("name", blank=True)
-    email = models.EmailField(null=True, blank=True)
+    email = models.EmailField(null=True, blank=True, unique=True)
     phone_number = PhoneNumberField(null=True, blank=True)
     is_anonymous = models.BooleanField()
     is_disabled = models.BooleanField(default=False)
@@ -159,17 +150,41 @@ class AppUser(models.Model):
 
     objects = AppUserQuerySet.as_manager()
 
-    class Meta:
-        indexes = [
-            models.Index(fields=["email"]),
-            # GinIndex(
-            #     SearchVector("display_name", config="english"),
-            #     name="appuser_search_vector_idx",
-            # ),
-        ]
-
     def __str__(self):
         return f"{self.display_name} ({self.email or self.phone_number or self.uid})"
+
+    ##
+    # mirrors django.contrib.auth.models.AbstractBaseUser, used for local auth
+    ##
+
+    def get_username(self) -> str:
+        return str(self)
+
+    def set_password(self, raw_password: str):
+        self.password = hashers.make_password(raw_password)
+
+    def check_password(self, raw_password: str) -> bool:
+        def setter(raw_password):
+            # re-hash with the latest hashing params on successful login
+            self.set_password(raw_password)
+            self.save(update_fields=["password"])
+
+        return hashers.check_password(raw_password, self.password, setter)
+
+    def set_unusable_password(self):
+        # set a value that will never be a valid hash
+        self.password = hashers.make_password(None)
+
+    def has_usable_password(self) -> bool:
+        return bool(self.password and hashers.is_password_usable(self.password))
+
+    def get_session_auth_hash(self) -> str:
+        """HMAC of the password field, used to invalidate sessions on password change."""
+        return salted_hmac(
+            "app_users.models.AppUser.get_session_auth_hash",
+            self.password,
+            algorithm="sha256",
+        ).hexdigest()
 
     def first_name_possesive(self, fallback: str = "My") -> str:
         first_name = self.first_name(fallback=fallback)

@@ -28,7 +28,7 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
 
 from ai_models.llm_openapi import patch_ai_model_schema_enums
-from app_users.models import AppUser, AppUserTransaction, ensure_request_app_user
+from app_users.models import AppUser, AppUserTransaction
 from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
 from bots.models import (
     PublishedRun,
@@ -46,7 +46,6 @@ from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
-from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -88,6 +87,7 @@ from payments.auto_recharge import (
     should_attempt_auto_recharge,
 )
 from payments.plans import PricingPlan
+from routers.base_auth import get_login_url
 from routers.root import PREVIEW_ROUTE_WORKFLOWS, RecipeTabs
 from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.base_header import (
@@ -2146,6 +2146,8 @@ class BasePage:
         run_status: str | None = STARTING_STATE,
         **defaults,
     ) -> SavedRun:
+        from routers.firebase_auth import init_firebase_anonymous_user
+
         gui.session_state[StateKeys.run_status] = run_status
         gui.session_state.pop(StateKeys.error_msg, None)
         gui.session_state.pop(StateKeys.run_time, None)
@@ -2153,7 +2155,8 @@ class BasePage:
         self.clear_outputs()
 
         assert self.request, "request is not set for current session"
-        uid = ensure_request_app_user(self.request).uid
+        if not self.request.user:
+            init_firebase_anonymous_user(self.request)
 
         if enable_rate_limits:
             ensure_rate_limits(self.workflow, self.request.user, self.current_workspace)
@@ -2175,7 +2178,9 @@ class BasePage:
             )
             | defaults
         )
-        sr = self.get_sr_from_ids(run_id, uid, create=True, defaults=defaults)
+        sr = self.get_sr_from_ids(
+            run_id, self.request.user.uid, create=True, defaults=defaults
+        )
 
         self.dump_state_to_sr(self._get_validated_state(), sr)
 
@@ -2385,10 +2390,7 @@ class BasePage:
         return bool(self.request.user and not self.request.user.is_anonymous)
 
     def get_auth_url(self, next_url: str | None = None) -> str:
-        from routers.root import login
-
-        next_url = str(furl(next_url or self.request.url).set(origin=None))
-        return str(furl(get_route_path(login), query_params=dict(next=next_url)))
+        return get_login_url(self.request, next_url)
 
     def _render_run_preview(self, saved_run: SavedRun):
         from daras_ai_v2.billing import left_and_right

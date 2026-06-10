@@ -25,7 +25,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         profile_route,
         explore_in_current_workspace,
     )
-    from routers.root import logout
+    from routers.base_auth import logout
 
     try:
         del user.cached_workspaces  # invalidate cache on every re-render

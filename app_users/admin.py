@@ -1,9 +1,17 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.admin.models import LogEntry
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import (
+    AdminPasswordChangeForm,
+    ReadOnlyPasswordHashField,
+)
 from django.db.models import Sum
+from django.urls import path
 
 from api_keys.models import ApiKey
 from app_users import models
+from daras_ai_v2 import settings
 from bots.admin_links import open_in_new_tab, list_related_html_url, change_obj_url
 from bots.models import SavedRun, PublishedRun
 from embeddings.models import EmbeddedFile
@@ -13,8 +21,32 @@ from usage_costs.models import UsageCost
 from workspaces.admin import WorkspaceAdmin, WorkspaceMembershipInline
 
 
+class AppUserAdminForm(forms.ModelForm):
+    # renders the hash summary + a "Reset password" button that links to the
+    # dedicated password change form (see AppUserAdmin.user_change_password)
+    password = ReadOnlyPasswordHashField(
+        required=False,
+        help_text="Raw passwords are not stored, so there is no way to see this user's password.",
+    )
+
+    class Meta:
+        model = models.AppUser
+        fields = "__all__"
+
+
 @admin.register(models.AppUser)
 class AppUserAdmin(GooeyModelAdmin):
+    form = AppUserAdminForm
+    change_password_form = AdminPasswordChangeForm
+
+    if settings.ENABLE_FIREBASE_AUTH:
+        # passwords are managed by firebase, not by us
+        auth_fields = ()
+        open_in_links = ("open_in_firebase", "open_in_stripe")
+    else:
+        auth_fields = ("password",)
+        open_in_links = ("open_in_stripe",)
+
     deprecated_fields = (
         "balance",
         "is_paying",
@@ -29,6 +61,7 @@ class AppUserAdmin(GooeyModelAdmin):
                 "fields": [
                     "uid",
                     ("email", "phone_number"),
+                    *auth_fields,
                     "personal_workspace",
                     ("total_payments", "total_charged", "total_usage_cost"),
                     (
@@ -48,7 +81,7 @@ class AppUserAdmin(GooeyModelAdmin):
                         "view_transactions",
                     ),
                     ("created_at", "updated_at", "upgraded_from_anonymous_at"),
-                    ("open_in_firebase", "open_in_stripe"),
+                    open_in_links,
                 ],
             },
         ),
@@ -111,6 +144,26 @@ class AppUserAdmin(GooeyModelAdmin):
     ]
     autocomplete_fields = ["subscription"]
     inlines = [WorkspaceMembershipInline]
+
+    def lookup_allowed(self, lookup, value, request=None):
+        # don't allow lookups involving passwords
+        return not lookup.startswith("password") and super().lookup_allowed(
+            lookup, value, request
+        )
+
+    def get_urls(self):
+        return [
+            path(
+                "<id>/password/",
+                self.admin_site.admin_view(self.user_change_password),
+                name="app_users_appuser_password_change",
+            ),
+        ] + super().get_urls()
+
+    # borrowed as-is: only relies on generic ModelAdmin APIs + the
+    # AbstractBaseUser-style methods that AppUser mirrors
+    user_change_password = UserAdmin.user_change_password
+    change_user_password_template = None
 
     @admin.display(description="User Runs")
     def view_saved_runs(self, user: models.AppUser):
