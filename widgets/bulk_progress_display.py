@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import datetime
-from enum import Enum
 
 import gooey_gui as gui
-from typing_extensions import NotRequired, TypedDict
 
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+from widgets.bulk_progress_props import (
+    BulkProgressCardProps,
+    BulkProgressSnapshot,
+    BulkRunnerRunState,
+)
 from widgets.bulk_progress_state import (
     BulkEvalProgress,
     BulkProgress,
@@ -14,41 +17,6 @@ from widgets.bulk_progress_state import (
 )
 
 BULK_RERUN_ALL_KEY = "-submit-workflow"
-
-
-class BulkRunnerRunState(str, Enum):
-    running = "running"
-    stopping = "stopping"
-    evaluating = "evaluating"
-    complete = "complete"
-    error = "error"
-    stopped = "stopped"
-
-
-# Keep in sync with gooey-gui/app/components/bulkProgress/bulkProgress.types.ts (BulkProgressSnapshot).
-class BulkProgressSnapshot(TypedDict, total=False):
-    runState: BulkRunnerRunState
-    elapsedSeconds: float | None
-    completedUnitRuns: int
-    totalUnitRuns: int
-    totalRows: int
-    currentRowNumber: int
-    currentWorkflowNumber: int
-    totalWorkflows: int
-    currentWorkflowTitle: str
-    currentWorkflowUrl: str
-    currentWorkflowRunTimeSeconds: NotRequired[float | None]
-    creditsUsed: NotRequired[int]
-    totalEvalRuns: NotRequired[int]
-    evalCurrent: NotRequired[int]
-    evalTotal: NotRequired[int]
-    evalWorkflowTitle: NotRequired[str]
-    inputPrompt: NotRequired[str]
-    inputAudioUrl: NotRequired[str]
-    lastCompletedWorkflowTitle: NotRequired[str]
-    lastCompletedWorkflowUrl: NotRequired[str]
-    lastCompletedRunTimeSeconds: NotRequired[float | None]
-    lastCompletedCredits: NotRequired[int | None]
 
 
 def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
@@ -75,10 +43,13 @@ def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
     if not snapshot:
         return
 
-    gui.component(
-        "BulkProgressCard",
+    props = BulkProgressCardProps(
         snapshot=snapshot,
         rerunAllKey=BULK_RERUN_ALL_KEY,
+    )
+    gui.component(
+        "BulkProgressCard",
+        **props.model_dump(mode="json", exclude_none=True),
     )
 
 
@@ -98,48 +69,52 @@ def build_bulk_progress_snapshot(
     if not run_state:
         return None
 
-    snapshot: BulkProgressSnapshot = {
-        "runState": run_state,
-        "elapsedSeconds": elapsed_seconds,
-        "completedUnitRuns": progress["completed_unit_runs"],
-        "totalUnitRuns": progress["total_unit_runs"],
-        "totalRows": progress["total_rows"],
-        "currentRowNumber": progress["current_row_number"],
-        "currentWorkflowNumber": progress["current_workflow_number"],
-        "totalWorkflows": progress["total_workflows"],
-        "currentWorkflowTitle": progress["workflow_title"],
-        "currentWorkflowUrl": progress["workflow_url"],
-    }
-    if "workflow_run_time_seconds" in progress:
-        snapshot["currentWorkflowRunTimeSeconds"] = progress[
-            "workflow_run_time_seconds"
-        ]
-    if "credits_used" in progress:
-        snapshot["creditsUsed"] = progress["credits_used"]
-    if "total_eval_runs" in progress:
-        snapshot["totalEvalRuns"] = progress["total_eval_runs"]
+    eval_current = None
+    eval_total = None
+    eval_workflow_title = None
     if run_state == BulkRunnerRunState.evaluating and eval_progress:
-        snapshot["evalCurrent"] = eval_progress["current"]
-        snapshot["evalTotal"] = eval_progress["total"]
-        snapshot["evalWorkflowTitle"] = eval_progress["workflow_title"]
-    if input_prompt := progress.get("input_prompt"):
-        snapshot["inputPrompt"] = input_prompt
-    if input_audio := progress.get("input_audio"):
-        snapshot["inputAudioUrl"] = input_audio
+        eval_current = eval_progress["current"]
+        eval_total = eval_progress["total"]
+        eval_workflow_title = eval_progress["workflow_title"]
+
+    last_completed_workflow_title = None
+    last_completed_workflow_url = None
+    last_completed_run_time_seconds = None
+    last_completed_credits = None
     if progress.get("last_completed_workflow_title") and progress.get(
         "last_completed_workflow_url"
     ):
-        snapshot["lastCompletedWorkflowTitle"] = progress[
-            "last_completed_workflow_title"
-        ]
-        snapshot["lastCompletedWorkflowUrl"] = progress["last_completed_workflow_url"]
-        if "last_completed_run_time_seconds" in progress:
-            snapshot["lastCompletedRunTimeSeconds"] = progress[
-                "last_completed_run_time_seconds"
-            ]
-        if "last_completed_credits" in progress:
-            snapshot["lastCompletedCredits"] = progress["last_completed_credits"]
-    return snapshot
+        last_completed_workflow_title = progress["last_completed_workflow_title"]
+        last_completed_workflow_url = progress["last_completed_workflow_url"]
+        last_completed_run_time_seconds = progress.get(
+            "last_completed_run_time_seconds"
+        )
+        last_completed_credits = progress.get("last_completed_credits")
+
+    return BulkProgressSnapshot(
+        runState=run_state,
+        elapsedSeconds=elapsed_seconds,
+        completedUnitRuns=progress["completed_unit_runs"],
+        totalUnitRuns=progress["total_unit_runs"],
+        totalRows=progress["total_rows"],
+        currentRowNumber=progress["current_row_number"],
+        currentWorkflowNumber=progress["current_workflow_number"],
+        totalWorkflows=progress["total_workflows"],
+        currentWorkflowTitle=progress["workflow_title"],
+        currentWorkflowUrl=progress["workflow_url"],
+        currentWorkflowRunTimeSeconds=progress.get("workflow_run_time_seconds"),
+        creditsUsed=progress.get("credits_used"),
+        totalEvalRuns=progress.get("total_eval_runs"),
+        evalCurrent=eval_current,
+        evalTotal=eval_total,
+        evalWorkflowTitle=eval_workflow_title,
+        inputPrompt=progress.get("input_prompt") or None,
+        inputAudioUrl=progress.get("input_audio") or None,
+        lastCompletedWorkflowTitle=last_completed_workflow_title,
+        lastCompletedWorkflowUrl=last_completed_workflow_url,
+        lastCompletedRunTimeSeconds=last_completed_run_time_seconds,
+        lastCompletedCredits=last_completed_credits,
+    )
 
 
 def bulk_snapshot_run_state(

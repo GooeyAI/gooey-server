@@ -1,0 +1,32 @@
+/* Generated from widgets/bulk_progress_props.py. Do not edit manually. */
+
+export type BulkRunnerRunState = "running" | "stopping" | "evaluating" | "complete" | "error" | "stopped";
+
+export interface BulkProgressCardProps {
+  snapshot: BulkProgressSnapshot;
+  rerunAllKey?: string | null;
+}
+export interface BulkProgressSnapshot {
+  runState: BulkRunnerRunState;
+  elapsedSeconds?: number | null;
+  completedUnitRuns: number;
+  totalUnitRuns: number;
+  totalRows: number;
+  currentRowNumber: number;
+  currentWorkflowNumber: number;
+  totalWorkflows: number;
+  currentWorkflowTitle: string;
+  currentWorkflowUrl: string;
+  currentWorkflowRunTimeSeconds?: number | null;
+  creditsUsed?: number | null;
+  totalEvalRuns?: number | null;
+  evalCurrent?: number | null;
+  evalTotal?: number | null;
+  evalWorkflowTitle?: string | null;
+  inputPrompt?: string | null;
+  inputAudioUrl?: string | null;
+  lastCompletedWorkflowTitle?: string | null;
+  lastCompletedWorkflowUrl?: string | null;
+  lastCompletedRunTimeSeconds?: number | null;
+  lastCompletedCredits?: number | null;
+}
