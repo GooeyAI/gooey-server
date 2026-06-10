@@ -14,7 +14,7 @@ export type MediaPreview = {
 export type IconPreview = {
   type: "icon";
   imageUrl: string | null;
-  emoji: string | null;
+  icon: string | null;
 };
 
 export type CardPreview = ChatPreview | MediaPreview | IconPreview;
@@ -27,7 +27,7 @@ export type AccessBadge = {
 export type CardData = {
   title: string;
   href: string;
-  workflowEmoji?: string;
+  workflowIcon?: string;
   description?: string;
   authorName?: string;
   authorPhotoUrl?: string | null;

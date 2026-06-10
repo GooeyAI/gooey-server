@@ -67,7 +67,7 @@ class MediaPreview(CamelModel):
 class IconPreview(CamelModel):
     type: Literal["icon"] = "icon"
     image_url: str | None = None
-    emoji: str | None = None
+    icon: str | None = None
 
 
 CardPreview = Annotated[
@@ -83,7 +83,7 @@ class AccessBadgeData(CamelModel):
 class WorkflowCardData(CamelModel):
     title: str
     href: str
-    workflow_emoji: str | None = None
+    workflow_icon: str | None = None
     description: str | None = None
     author_name: str | None = None
     author_photo_url: str | None = None
@@ -378,7 +378,7 @@ def sr_to_json(
     return WorkflowCardData(
         title=(parent_pr and parent_pr.title) or workflow.label,
         href=sr.get_app_url(),
-        workflow_emoji=(metadata.emoji if metadata else "") or "",
+        workflow_icon=(metadata and (metadata.fa_icon or metadata.emoji)) or "",
         description=(parent_pr and parent_pr.notes) or None,
         preview=_sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata),
         **_author_fields(author),
@@ -457,11 +457,13 @@ def _pr_preview(
 
 
 def _icon_preview(metadata: WorkflowMetadata | None) -> IconPreview | None:
-    if not metadata or not (metadata.default_image or metadata.emoji):
+    if not metadata or not (
+        metadata.default_image or metadata.fa_icon or metadata.emoji
+    ):
         return None
     return IconPreview(
         image_url=metadata.default_image or None,
-        emoji=metadata.emoji or None,
+        icon=metadata.fa_icon or metadata.emoji or None,
     )
 
 
