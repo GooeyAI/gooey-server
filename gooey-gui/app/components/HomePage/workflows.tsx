@@ -99,6 +99,10 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
           ) : null}
         </div>
       );
+    default: {
+      const _exhaustive: never = preview;
+      return _exhaustive;
+    }
   }
 }
 

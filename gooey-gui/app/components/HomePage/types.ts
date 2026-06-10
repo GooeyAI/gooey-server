@@ -54,7 +54,6 @@ export type WorkspaceHeader = {
 
 export type IndustryTile = {
   id: number;
-  tagId: number;
   name: string;
   icon: string;
   color?: string | null;
