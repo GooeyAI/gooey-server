@@ -57,6 +57,7 @@ export type IndustryTile = {
   tagId: number;
   name: string;
   icon: string;
+  color?: string | null;
   description: string;
   workflowCount: number;
   href: string;

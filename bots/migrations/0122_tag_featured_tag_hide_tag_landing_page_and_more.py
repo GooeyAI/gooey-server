@@ -13,6 +13,25 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name="tag",
+            name="fa_icon",
+            field=models.TextField(
+                blank=True,
+                default="",
+                help_text='Font Awesome icon HTML, e.g. &lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;',
+            ),
+        ),
+        migrations.AddField(
+            model_name="tag",
+            name="color",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="Hex color associated with this tag, e.g. #4d8af0",
+                max_length=32,
+            ),
+        ),
+        migrations.AddField(
+            model_name="tag",
             name="featured",
             field=models.BooleanField(
                 default=False,
