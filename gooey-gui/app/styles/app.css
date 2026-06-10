@@ -37,7 +37,8 @@ img {
   white-space: pre-wrap;
 }
 
-input[type="text"], 
+input[type="text"],
+input[type="email"],
 input[type="password"],
 textarea {
   resize: vertical;

@@ -1,43 +1,46 @@
-<style>
-/* the google icon sometimes disappears from the button, this css hack fixes that */
-#g_id_signin_mobile div:has(> svg) {
-    min-width: 40px;
-    min-height: 40px;
-}
-</style>
+{% if settings.ENABLE_FIREBASE_AUTH %}
+    <style>
+        /* the google icon sometimes disappears from the button, this css hack fixes that */
+        #g_id_signin_mobile div:has(> svg) {
+            min-width: 40px;
+            min-height: 40px;
+        }
+    </style>
 
-<span class="pe-2" style="min-width: 40px; max-width: 200px;" data-replace-login-spinner>
-    <span id="g_id_signin_desktop" class="d-none d-md-inline"></span>
-    <span id="g_id_signin_mobile" class="d-md-none"></span>
-</span>
+    <span class="pe-2" style="min-width: 40px; max-width: 200px;" data-replace-login-spinner>
+        <span id="g_id_signin_desktop" class="d-none d-md-inline"></span>
+        <span id="g_id_signin_mobile" class="d-md-none"></span>
+    </span>
 
-<script>
-    window.addEventListener("DOMContentLoaded", async function () {
-        if (typeof google === "undefined") return;
-        google.accounts.id.initialize({
-            client_id: window.GOOGLE_CLIENT_ID,
-            callback: handleCredentialResponse,
+    <script>
+        window.addEventListener("DOMContentLoaded", async function () {
+            if (typeof google === "undefined") return;
+            google.accounts.id.initialize({
+                client_id: window.GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+            });
+            oneTapSignin();
+            window.addEventListener("hydrated", oneTapSignin);
         });
-        oneTapSignin();
-        window.addEventListener("hydrated", oneTapSignin);
-    });
-    async function oneTapSignin() {
-        google.accounts.id.prompt();
-        google.accounts.id.renderButton(document.getElementById("g_id_signin_desktop"), {
-            shape: "rectangular",
-            width: 200,
-            text: "continue_with",
-            size: "large",
-        });
-        google.accounts.id.renderButton(document.getElementById("g_id_signin_mobile"), {
-            shape: "rectangular",
-            width: 40,
-            type: "icon",
-            size: "large",
-        });
-    }
-</script>
-<script defer src="https://accounts.google.com/gsi/client"></script>
+
+        async function oneTapSignin() {
+            google.accounts.id.prompt();
+            google.accounts.id.renderButton(document.getElementById("g_id_signin_desktop"), {
+                shape: "rectangular",
+                width: 200,
+                text: "continue_with",
+                size: "large",
+            });
+            google.accounts.id.renderButton(document.getElementById("g_id_signin_mobile"), {
+                shape: "rectangular",
+                width: 40,
+                type: "icon",
+                size: "large",
+            });
+        }
+    </script>
+    <script defer src="https://accounts.google.com/gsi/client"></script>
+{% endif %}
 
 {% if block_incognito %}
     <script>

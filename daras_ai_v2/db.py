@@ -4,9 +4,6 @@ if typing.TYPE_CHECKING:
     from google.cloud import firestore
 
 
-FIREBASE_SESSION_COOKIE = "firebase_session"
-ANONYMOUS_USER_COOKIE = "anonymous_user"
-
 DEFAULT_COLLECTION = "daras-ai-v2"
 USERS_COLLECTION = "users"
 API_KEYS_COLLECTION = "api_keys"

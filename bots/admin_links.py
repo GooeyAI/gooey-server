@@ -31,7 +31,7 @@ def change_obj_url(obj: models.Model, *, label: str = None) -> str:
         str(
             furl(settings.ADMIN_BASE_URL)
             / reverse(
-                f"admin:{obj._meta.app_label}_{obj.__class__.__name__.lower()}_change",
+                f"admin:{obj._meta.app_label}_{obj._meta.model_name}_change",
                 args=[str(obj.id)],
             )
         ),
