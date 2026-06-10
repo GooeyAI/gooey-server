@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import typing
-from typing import TypedDict
 
 import gooey_gui as gui
 from furl import furl
@@ -20,12 +19,6 @@ from workspaces.models import Workspace
 
 if typing.TYPE_CHECKING:
     from recipes.VideoBots import PublishedRun
-
-
-class PlatformPillData(TypedDict):
-    iconHtml: str
-    title: str
-    bgColor: str | None
 
 
 def render_demo_buttons_header(pr: PublishedRun):
@@ -55,19 +48,6 @@ def get_demo_bots(pr: PublishedRun):
         .distinct("platform")
         .values_list("id", "platform")
     )
-
-
-def platform_pill_data(platform_id: int) -> PlatformPillData:
-    platform = Platform(platform_id)
-    return {
-        "iconHtml": platform.get_icon(),
-        "title": platform.get_title(),
-        "bgColor": platform.get_demo_button_color(),
-    }
-
-
-def platform_pills_for_ids(platform_ids: list[int]) -> list[PlatformPillData]:
-    return [platform_pill_data(platform_id) for platform_id in platform_ids]
 
 
 def render_demo_button(bi_id: int, platform_id: int, className: str = ""):
@@ -155,15 +135,13 @@ def render_demo_button_settings(
     *, workspace: Workspace, user: AppUser, bi: BotIntegration
 ) -> None:
     with (
-        gui.styled(
-            """
+        gui.styled("""
         @media (min-width: 768px) {
             & {
                 max-width: 55%;
             }
         }
-        """
-        ),
+        """),
         gui.div(),
     ):
         enabled = bi.public_visibility > WorkflowAccessLevel.VIEW_ONLY
@@ -174,10 +152,8 @@ def render_demo_button_settings(
 
         workspace_url = bi.workspace.handle_id and bi.workspace.handle.get_app_url()
 
-        gui.caption(
-            f"""Add a {Platform(bi.platform).get_title()} button to your [{bi.published_run.title}]({bi.published_run.get_app_url()}) workflow for easy demos.
-                      Please note all credit charges will be paid by the [{bi.workspace}]({workspace_url}) workspace."""
-        )
+        gui.caption(f"""Add a {Platform(bi.platform).get_title()} button to your [{bi.published_run.title}]({bi.published_run.get_app_url()}) workflow for easy demos.
+                      Please note all credit charges will be paid by the [{bi.workspace}]({workspace_url}) workspace.""")
 
         if new_value != enabled:
             enabled = new_value
