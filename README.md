@@ -52,36 +52,7 @@ Specifically, this repo may be for you if:
 
 ## 📋 Setup
 
-### ☁️ Create a google cloud / firebase account
-
-1. Create a [google cloud](https://console.cloud.google.com/) project
-2. Create a [firebase project](https://console.firebase.google.com/) (using the same google cloud project)
-3. Enable the following services:
-   - [Firestore](https://console.firebase.google.com/project/_/firestore)
-   - [Authentication](https://console.firebase.google.com/project/_/authentication)
-   - [Storage](https://console.firebase.google.com/project/_/storage)
-   - [Speech-to-Text](https://console.cloud.google.com/marketplace/product/google/speech.googleapis.com)
-   - [Text-to-Speech](https://console.cloud.google.com/marketplace/product/google/texttospeech.googleapis.com)
-   - [Translation API](https://console.cloud.google.com/marketplace/product/google/translate.googleapis.com)
-   - [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
-4. Go to IAM, Create a service account with following roles:
-   - Cloud Datastore User
-   - Cloud Speech Administrator
-   - Cloud Translation API Admin
-   - Firebase Authentication Admin
-   - Storage Admin
-5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
-6. Add your project & bucket name to `.env` (see [configuration.md](configuration.md) for all available settings)
-
 ### ⚙️ Configuration reference
-
-Almost every setting has a sensible default and is optional for local development. The only exceptions:
-
-| Variable | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `SECRET_KEY` | Production only | `"xxxx"` (dev) | Must be set to a strong random value when `DEBUG=False` |
-| `SENTRY_DSN` | Production only | — | Required when `DEBUG=False` |
-| `PGHOST` / `PGPORT` / `PGUSER` / `PGDATABASE` / `PGPASSWORD` | For PostgreSQL | — | If omitted, falls back to SQLite |
 
 For a full list of all available settings with defaults and descriptions, see [configuration.md](configuration.md).
 
@@ -89,7 +60,7 @@ For a full list of all available settings with defaults and descriptions, see [c
 
 - Install [pyenv](https://github.com/pyenv/pyenv) & install the same python version as in our [Dockerfile](Dockerfile)
 - Install [poetry](https://python-poetry.org/docs/)
-- Clone the github repo to `gooey-server` (and make sure that's the folder name)
+- Clone this github repo
 - Create & activate a virtualenv (e.g. `poetry shell`)
 - Run `poetry install --with dev`
 - Install [redis](https://redis.io/docs/getting-started/installation/install-redis-on-mac-os/), [rabbitmq](https://www.rabbitmq.com/install-homebrew.html), and [postgresql](https://formulae.brew.sh/formula/postgresql@15) (e.g. `brew install redis rabbitmq postgresql@15`)
@@ -133,26 +104,6 @@ export MAGICK_HOME=/opt/homebrew
 - Create a .env file from `.env.example`
 - Install the zbar library using your distro's package manager.
 
-### 🌍 Frontend
-
-The `gooey-gui` frontend lives inside this repository at `./gooey-gui`.
-
-After cloning `gooey-server`, install the frontend dependencies from the repo root:
-
-```bash
-cd gooey-gui
-npm install
-```
-
-The Python package imported by `gooey-server` is available as `gooey_gui`.
-
-### 🧪 Run Tests
-
-```
-ulimit -n unlimited  # Increase the number of open files allowed
-./scripts/run-tests.sh
-```
-
 ### 🗄 Initialize databse
 
 ```bash
@@ -168,27 +119,12 @@ ulimit -n unlimited  # Increase the number of open files allowed
 ./manage.py createsuperuser
 ```
 
-## 🏠 Sovereign Deployment
+### 🧪 Run Tests
 
-Gooey's production deployment depends on Firebase for auth, GCS for storage, and other providers for non-essential features.
-For your own deployment though, you can opt out of these dependencies and self-host local alternatives instead:
-
-### 🔓 Local auth + filesystem storage
-
-Set `SOVEREIGN_DEPLOY=True` in your `.env`:
-
-```env
-SOVEREIGN_DEPLOY=True
 ```
-
-This replaces Firebase auth with a built-in username/password sign-in form, and stores uploaded files on the local filesystem instead of GCS. You can optionally configure where files are stored (the defaults work out of the box):
-
-```env
-MEDIA_ROOT=./media   # directory where uploaded files are stored
-MEDIA_URL=/media/    # URL path under which files are served
+ulimit -n unlimited  # Increase the number of open files allowed
+./scripts/run-tests.sh
 ```
-
-> **Note:** The Google service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_CREDENTIALS_JSON`) is still required for Google Cloud services — Google TTS, Speech-to-Text, Translate, and Gemini models — even when `SOVEREIGN_DEPLOY=True`. Setting this flag only disables Firebase auth and GCS storage.
 
 ### ⚙️ Functions runtime (Deno)
 
@@ -225,8 +161,6 @@ See [configuration.md](configuration.md) for the full list of keys and their def
 Use [ruff](https://docs.astral.sh/ruff/)
 
 ## 🏃 Run
-
-_Note: The `gooey-server` project is not currently set up to be run without support from Gooey. This software requires access to a Google Cloud instance as well as business data loaded in the database. If you are interested in running this software totally independently, reach out to support@gooey.ai to communicate with our enterprise team._
 
 ### Services
 
