@@ -283,35 +283,43 @@ def _load_workflow_tabs(
 ) -> list[WorkflowTabData]:
     qs = (
         WorkflowTab.objects.filter(priority__gte=1)
+        .select_related("workflow_metadata")
         .prefetch_related(
             Prefetch(
                 "cards",
                 queryset=WorkflowCard.objects.filter(priority__gte=1)
                 .select_related(
-                    "recipe__workspace__created_by",
-                    "recipe__saved_run",
+                    "workflow__workspace__created_by",
+                    "workflow__saved_run",
                 )
                 .order_by("-priority"),
             )
         )
         .order_by("-priority")
     )
-    return [
-        WorkflowTabData(
-            id=tab.id,
-            title=tab.title,
-            icon=tab.icon,
-            cards=[
-                pr_to_json(
-                    card.recipe,
-                    author=author_from_workspace(card.recipe.workspace),
-                    metadata_by_workflow=metadata_by_workflow,
-                )
-                for card in tab.cards.all()
-            ],
+    tabs = []
+    for tab in qs:
+        metadata = _get_workflow_metadata(
+            Workflow(tab.workflow_metadata.workflow),
+            metadata_by_workflow,
+            prefetched=tab.workflow_metadata,
         )
-        for tab in qs
-    ]
+        tabs.append(
+            WorkflowTabData(
+                id=tab.id,
+                title=metadata.short_title if metadata else "",
+                icon=metadata.tab_icon_html() if metadata else "",
+                cards=[
+                    pr_to_json(
+                        card.workflow,
+                        author=author_from_workspace(card.workflow.workspace),
+                        metadata_by_workflow=metadata_by_workflow,
+                    )
+                    for card in tab.cards.all()
+                ],
+            )
+        )
+    return tabs
 
 
 class AuthorData(BaseModel):
@@ -409,10 +417,13 @@ def _author_fields(author: AuthorData | None) -> dict:
 
 
 def _get_workflow_metadata(
-    workflow: Workflow, cache: MetadataByWorkflow
+    workflow: Workflow,
+    cache: MetadataByWorkflow,
+    *,
+    prefetched: WorkflowMetadata | None = None,
 ) -> WorkflowMetadata | None:
     if workflow not in cache:
-        cache[workflow] = workflow.get_metadata()
+        cache[workflow] = prefetched or workflow.get_metadata()
     return cache[workflow]
 
 

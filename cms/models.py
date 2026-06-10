@@ -5,8 +5,12 @@ from bots.custom_fields import CustomURLField
 
 
 class WorkflowTab(models.Model):
-    title = models.CharField(max_length=64)
-    icon = models.TextField(blank=True, default="")
+    workflow_metadata = models.ForeignKey(
+        "bots.WorkflowMetadata",
+        on_delete=models.PROTECT,
+        related_name="workflow_tabs",
+        verbose_name="Workflow type",
+    )
     priority = models.IntegerField(
         default=1,
         help_text="Higher priority tabs are shown first. If 0, then the tab is not shown at all.",
@@ -20,7 +24,7 @@ class WorkflowTab(models.Model):
         verbose_name_plural = "Workflow Tabs"
 
     def __str__(self):
-        return self.title
+        return self.workflow_metadata.short_title
 
 
 class WorkflowCard(models.Model):
@@ -29,10 +33,11 @@ class WorkflowCard(models.Model):
         on_delete=models.CASCADE,
         related_name="cards",
     )
-    recipe = models.ForeignKey(
+    workflow = models.ForeignKey(
         "bots.PublishedRun",
         on_delete=models.PROTECT,
         related_name="+",
+        verbose_name="Workflow",
     )
     priority = models.IntegerField(
         default=1,
@@ -45,7 +50,7 @@ class WorkflowCard(models.Model):
         ordering = ["-priority", "id"]
 
     def __str__(self):
-        return f"{self.workflow_tab.title} — {self.recipe}"
+        return f"{self.workflow_tab} — {self.workflow}"
 
 
 class NewsItem(models.Model):

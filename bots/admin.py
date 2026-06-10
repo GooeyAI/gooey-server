@@ -1058,7 +1058,7 @@ class WorkflowMetadataAdmin(GooeyModelAdmin):
         "fa_icon",
         "color",
     ]
-    search_fields = ["workflow", "meta_title", "meta_description"]
+    search_fields = ["short_title", "meta_title", "workflow"]
     list_filter = ["workflow"]
     readonly_fields = ["created_at", "updated_at"]
 
