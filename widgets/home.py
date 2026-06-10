@@ -110,7 +110,6 @@ class WorkspaceHeaderData(CamelModel):
 
 class IndustryTileData(CamelModel):
     id: int
-    tag_id: int
     name: str
     icon: str
     color: str | None = None
@@ -129,6 +128,9 @@ class NewsItemData(CamelModel):
 
 
 def render(request: Request):
+    from routers.account import saved_route
+    from daras_ai_v2.fastapi_tricks import get_route_path
+
     is_anonymous = request.user is None or request.user.is_anonymous
     workspace = (
         get_current_workspace(request.user, request.session)
@@ -152,6 +154,7 @@ def render(request: Request):
         savedWorkflows=_load_saved_workflows(
             request.user, workspace, metadata_by_workflow
         ),
+        savedWorkflowsHref=get_route_path(saved_route),
         workflowTabs=_load_workflow_tabs(metadata_by_workflow),
         industryTiles=_load_industry_tiles(),
         newsItems=_load_news_items(),
@@ -538,7 +541,6 @@ def _load_industry_tiles() -> list[IndustryTileData]:
     return [
         IndustryTileData(
             id=tag.id,
-            tag_id=tag.id,
             name=tag.name,
             icon=tag.fa_icon or tag.icon,
             color=tag.color or None,

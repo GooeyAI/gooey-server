@@ -22,6 +22,7 @@ type HomePageProps = {
   workflowTabs: WorkflowTab[];
   recentWorkflows: CardData[];
   savedWorkflows: CardData[];
+  savedWorkflowsHref: string;
   industryTiles: IndustryTile[];
   newsItems: NewsItem[];
 };
@@ -32,6 +33,7 @@ export function HomePage({
   workflowTabs,
   recentWorkflows,
   savedWorkflows,
+  savedWorkflowsHref,
   industryTiles,
   newsItems,
 }: HomePageProps) {
@@ -57,7 +59,7 @@ export function HomePage({
         <section className="mb-5">
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h4>Saved workflows</h4>
-            <a href="/account/saved/">
+            <a href={savedWorkflowsHref}>
               <span className="fw-semibold small">
                 View all <i className="fa-solid fa-arrow-right"></i>
               </span>
