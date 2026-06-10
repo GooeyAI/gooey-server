@@ -1,42 +1,8 @@
-// Keep in sync with widgets/bulk_progress_display.py (BulkProgressSnapshot).
-
-export type BulkRunnerRunState =
-  | "running"
-  | "stopping"
-  | "evaluating"
-  | "complete"
-  | "error"
-  | "stopped";
-
-export type BulkProgressSnapshot = {
-  runState: BulkRunnerRunState;
-  elapsedSeconds?: number | null;
-  completedUnitRuns: number;
-  totalUnitRuns: number;
-  totalRows: number;
-  currentRowNumber: number;
-  currentWorkflowNumber: number;
-  totalWorkflows: number;
-  currentWorkflowTitle: string;
-  currentWorkflowUrl: string;
-  currentWorkflowRunTimeSeconds?: number | null;
-  creditsUsed?: number | null;
-  totalEvalRuns?: number;
-  evalCurrent?: number;
-  evalTotal?: number;
-  evalWorkflowTitle?: string;
-  inputPrompt?: string;
-  inputAudioUrl?: string;
-  lastCompletedWorkflowTitle?: string;
-  lastCompletedWorkflowUrl?: string;
-  lastCompletedRunTimeSeconds?: number | null;
-  lastCompletedCredits?: number | null;
-};
-
-export type BulkProgressCardProps = {
-  snapshot: BulkProgressSnapshot;
-  rerunAllKey?: string | null;
-};
+export type {
+  BulkProgressCardProps,
+  BulkProgressSnapshot,
+  BulkRunnerRunState,
+} from "./generated/componentProps";
 
 export type WorkflowDisplay = {
   prefix: string;
@@ -50,8 +16,8 @@ export type DetailDisplay = {
   rowLabel: string;
   showStoppingMessage: boolean;
   workflow: WorkflowDisplay | null;
-  inputPrompt?: string;
-  inputAudioUrl?: string;
+  inputPrompt?: string | null;
+  inputAudioUrl?: string | null;
   lastCompleted?: {
     title: string;
     url: string;
