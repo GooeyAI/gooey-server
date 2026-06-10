@@ -287,8 +287,7 @@ class WorkflowMetadata(models.Model):
         blank=True,
         default="",
         help_text=(
-            "Font Awesome icon HTML, e.g. "
-            '&lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
+            'Font Awesome icon HTML, e.g. &lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
         ),
     )
     color = models.CharField(
@@ -299,4 +298,16 @@ class WorkflowMetadata(models.Model):
     )
 
     def __str__(self):
-        return self.meta_title
+        return self.short_title or self.meta_title
+
+    def tab_icon_html(self) -> str:
+        if self.fa_icon:
+            return self.fa_icon
+        if self.emoji:
+            return self.emoji
+        if self.default_image:
+            return (
+                f'<img src="{self.default_image}" alt="" '
+                'class="workflow-tab-icon-img" />'
+            )
+        return ""

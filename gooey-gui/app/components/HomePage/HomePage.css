@@ -59,6 +59,11 @@
   background-color: rgba(0, 0, 0, 0.06) !important;
 }
 
+.workflow-tab-icon-img {
+  height: 1em;
+  width: auto;
+}
+
 .recent-card-preview {
   aspect-ratio: 16 / 10;
   overflow: hidden;

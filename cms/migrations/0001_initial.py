@@ -7,11 +7,10 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ("bots", "0121_tag_description"),
+        ("bots", "0121_tag_home_page_fields_and_workflowmetadata_icons"),
     ]
 
     operations = [
@@ -67,8 +66,6 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("title", models.CharField(max_length=64)),
-                ("icon", models.TextField(blank=True, default="")),
                 (
                     "priority",
                     models.IntegerField(
@@ -78,6 +75,14 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "workflow_metadata",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="workflow_tabs",
+                        to="bots.workflowmetadata",
+                    ),
+                ),
             ],
             options={
                 "verbose_name": "Workflow Tab",
@@ -107,11 +112,12 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
-                    "recipe",
+                    "workflow",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT,
                         related_name="+",
                         to="bots.publishedrun",
+                        verbose_name="Workflow",
                     ),
                 ),
                 (
