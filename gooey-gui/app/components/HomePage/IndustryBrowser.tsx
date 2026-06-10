@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import type { IndustryTile } from "./types";
 
 export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
@@ -12,10 +14,15 @@ export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
             <a
               href={tile.href}
               className="d-flex flex-column h-100 p-3 border rounded-4 text-decoration-none text-body border-hover"
+              style={
+                tile.color
+                  ? ({ "--tile-hover-color": tile.color } as CSSProperties)
+                  : undefined
+              }
             >
               {tile.icon && (
                 <div
-                  className="fs-3 mb-2"
+                  className="fs-3 mb-2 tile-icon"
                   dangerouslySetInnerHTML={{ __html: tile.icon }}
                 />
               )}

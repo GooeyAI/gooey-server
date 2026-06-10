@@ -402,6 +402,20 @@ class TagCategory(models.IntegerChoices):
 class Tag(models.Model):
     name = models.CharField(max_length=64)
     icon = models.TextField(blank=True, default="")
+    fa_icon = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "Font Awesome icon HTML, e.g. "
+            '&lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
+        ),
+    )
+    color = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Hex color associated with this tag, e.g. #4d8af0",
+    )
     category = models.IntegerField(
         choices=TagCategory.choices, default=TagCategory.other
     )

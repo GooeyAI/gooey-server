@@ -113,6 +113,7 @@ class IndustryTileData(CamelModel):
     tag_id: int
     name: str
     icon: str
+    color: str | None = None
     description: str
     workflow_count: int
     href: str
@@ -526,7 +527,8 @@ def _load_industry_tiles() -> list[IndustryTileData]:
             id=tag.id,
             tag_id=tag.id,
             name=tag.name,
-            icon=tag.icon,
+            icon=tag.fa_icon or tag.icon,
+            color=tag.color or None,
             description=tag.description,
             workflow_count=tag.workflow_count,
             href=_industry_tile_href(tag),
