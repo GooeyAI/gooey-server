@@ -408,8 +408,7 @@ class Tag(models.Model):
         blank=True,
         default="",
         help_text=(
-            "Font Awesome icon HTML, e.g. "
-            '&lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
+            'Font Awesome icon HTML, e.g. &lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
         ),
     )
     color = models.CharField(
