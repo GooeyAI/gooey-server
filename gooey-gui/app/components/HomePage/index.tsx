@@ -3,7 +3,6 @@ import "./HomePage.css";
 import { IndustryBrowser } from "./IndustryBrowser";
 import { NewsFeed } from "./NewsFeed";
 import {
-  HistoryWorkflowCard,
   SavedWorkflowCard,
   WorkflowPicker,
 } from "./workflows";
@@ -31,7 +30,6 @@ export function HomePage({
   greeting,
   workspaceHeader,
   workflowTabs,
-  recentWorkflows,
   savedWorkflows,
   savedWorkflowsHref,
   industryTiles,
@@ -42,6 +40,7 @@ export function HomePage({
       {workspaceHeader && <WorkspaceHeader header={workspaceHeader} />}
       {greeting && <h1 className="mb-5">Welcome, {greeting}.</h1>}
 
+      {/* Disabled until recent-workflows query perf is fixed on a separate branch.
       {recentWorkflows.length > 0 && (
         <section className="mb-5">
           <h4 className="mb-4">Recent workflows</h4>
@@ -54,6 +53,7 @@ export function HomePage({
           </div>
         </section>
       )}
+      */}
 
       {savedWorkflows.length > 0 && (
         <section className="mb-5">
