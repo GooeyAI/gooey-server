@@ -45,7 +45,7 @@ export function HomePage({
       {recentWorkflows.length > 0 && (
         <section className="mb-5">
           <h4 className="mb-4">Recent workflows</h4>
-          <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
+          <div className="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
             {recentWorkflows.map((card) => (
               <div key={card.href} className="col">
                 <HistoryWorkflowCard card={card} />
