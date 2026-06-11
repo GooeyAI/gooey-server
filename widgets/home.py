@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import mimetypes
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Iterable, Literal
 
 import gooey_gui as gui
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
@@ -13,7 +13,13 @@ from pydantic.alias_generators import to_camel
 from starlette.requests import Request
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, PublishedRunVersion, SavedRun, Workflow
+from bots.models import (
+    PublishedRun,
+    PublishedRunVersion,
+    SavedRun,
+    Workflow,
+    WorkspaceRecentWorkflow,
+)
 from bots.models.published_run import Tag
 from bots.models.workflow import WorkflowAccessLevel, WorkflowMetadata
 from cms.models import NewsItem, WorkflowCard, WorkflowTab
@@ -146,11 +152,9 @@ def render(request: Request):
         "HomePage",
         greeting=greeting,
         workspaceHeader=workspace_header,
-        # Disabled until recent-workflows query perf is fixed on a separate branch.
-        # recentWorkflows=_load_recent_workflows(
-        #     request.user, workspace, metadata_by_workflow
-        # ),
-        recentWorkflows=[],
+        recentWorkflows=_load_recent_workflows(
+            request.user, workspace, metadata_by_workflow
+        ),
         savedWorkflows=_load_saved_workflows(
             request.user, workspace, metadata_by_workflow
         ),
@@ -201,42 +205,58 @@ def _load_recent_workflows(
     workspace: Workspace | None,
     metadata_by_workflow: MetadataByWorkflow,
 ) -> list[WorkflowCardData]:
-    # Disabled until recent-workflows query perf is fixed on a separate branch.
-    return []
-    # if workspace is None:
-    #     return []
-    # runs = SavedRun.objects.filter(
-    #     workspace=workspace,
-    #     parent_version__published_run__isnull=False,
-    # )
-    # if user and not workspace.is_personal:
-    #     # in a team workspace, show only the current user's history
-    #     runs = runs.filter(uid=user.uid)
-    # latest_ids = (
-    #     runs.order_by("parent_version__published_run_id", "-updated_at")
-    #     .distinct("parent_version__published_run_id")
-    #     .values("id")
-    # )
-    # saved_runs = list(
-    #     SavedRun.objects.filter(id__in=latest_ids)
-    #     .select_related("parent_version__published_run")
-    #     .order_by("-updated_at")[:RECENT_WORKFLOW_LIST_LIMIT]
-    # )
-    # other_uids = {
-    #     sr.uid for sr in saved_runs if sr.uid and (not user or sr.uid != user.uid)
-    # }
-    # authors_by_uid = {u.uid: u for u in AppUser.objects.filter(uid__in=other_uids)}
-    # return [
-    #     _history_card(
-    #         sr,
-    #         author=author_from_user(
-    #             _history_author(sr, user=user, authors_by_uid=authors_by_uid),
-    #             current_user=user,
-    #         ),
-    #         metadata_by_workflow=metadata_by_workflow,
-    #     )
-    #     for sr in saved_runs
-    # ]
+    if workspace is None:
+        return []
+
+    qs = WorkspaceRecentWorkflow.objects.filter(workspace=workspace)
+    if user and not workspace.is_personal:
+        # in a team workspace, show only the current user's history
+        qs = qs.filter(uid=user.uid)
+
+    rows = _dedup_recent_by_published_run(
+        qs.select_related(
+            "last_saved_run__parent_version__published_run",
+            "published_run",
+        ).order_by("-last_used_at")[: RECENT_WORKFLOW_LIST_LIMIT * 10],
+        limit=RECENT_WORKFLOW_LIST_LIMIT,
+    )
+    other_uids = {
+        row.last_saved_run.uid
+        for row in rows
+        if row.last_saved_run.uid and (not user or row.last_saved_run.uid != user.uid)
+    }
+    authors_by_uid = {u.uid: u for u in AppUser.objects.filter(uid__in=other_uids)}
+    cards = []
+    for row in rows:
+        sr = row.last_saved_run
+        data = _history_card(
+            sr,
+            author=author_from_user(
+                _history_author(sr, user=user, authors_by_uid=authors_by_uid),
+                current_user=user,
+            ),
+            metadata_by_workflow=metadata_by_workflow,
+        )
+        data.updated_at = get_relative_time(row.last_used_at)
+        cards.append(data)
+    return cards
+
+
+def _dedup_recent_by_published_run(
+    rows: Iterable[WorkspaceRecentWorkflow],
+    *,
+    limit: int,
+) -> list[WorkspaceRecentWorkflow]:
+    seen: set[int] = set()
+    deduped: list[WorkspaceRecentWorkflow] = []
+    for row in rows:
+        if row.published_run_id in seen:
+            continue
+        seen.add(row.published_run_id)
+        deduped.append(row)
+        if len(deduped) >= limit:
+            break
+    return deduped
 
 
 def _history_author(
