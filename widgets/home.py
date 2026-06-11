@@ -21,6 +21,7 @@ from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.utils import get_relative_time
+from widgets.workflow_search import get_filter_value_from_workspace
 from workspaces.models import Workspace
 from workspaces.widgets import get_current_workspace
 
@@ -128,9 +129,6 @@ class NewsItemData(CamelModel):
 
 
 def render(request: Request):
-    from routers.account import saved_route
-    from daras_ai_v2.fastapi_tricks import get_route_path
-
     is_anonymous = request.user is None or request.user.is_anonymous
     workspace = (
         get_current_workspace(request.user, request.session)
@@ -154,7 +152,7 @@ def render(request: Request):
         savedWorkflows=_load_saved_workflows(
             request.user, workspace, metadata_by_workflow
         ),
-        savedWorkflowsHref=get_route_path(saved_route),
+        savedWorkflowsHref=_saved_workflows_href(workspace),
         workflowTabs=_load_workflow_tabs(metadata_by_workflow),
         industryTiles=_load_industry_tiles(),
         newsItems=_load_news_items(),
@@ -550,6 +548,17 @@ def _load_industry_tiles() -> list[IndustryTileData]:
         )
         for tag in qs
     ]
+
+
+def _saved_workflows_href(workspace: Workspace | None) -> str:
+    if workspace is None:
+        return "/explore/"
+    return str(
+        furl(
+            "/explore/",
+            query_params={"workspace": get_filter_value_from_workspace(workspace)},
+        )
+    )
 
 
 def _industry_tile_href(tag: Tag) -> str:
