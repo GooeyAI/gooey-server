@@ -10,6 +10,7 @@ from twilio.base.exceptions import TwilioRestException
 from twilio.twiml.voice_response import VoiceResponse
 
 from bots.models.bot_integration import validate_phonenumber
+from daras_ai_v2 import settings
 from functions.composio_tools import ComposioLLMTool
 from functions.memory_tools import (
     GooeyMemoryLLMToolRead,
@@ -65,10 +66,11 @@ def get_inbuilt_tools(state: dict) -> typing.Iterable[BaseLLMTool]:
             yield tool_cls(scope)
         except KeyError:
             composio_tools[tool_slug] = scope
-    for tool_spec in Composio().tools.get_raw_composio_tools(
-        tools=composio_tools, limit=50
-    ):
-        yield ComposioLLMTool(tool_spec, composio_tools[tool_spec.slug])
+    if settings.COMPOSIO_API_KEY:
+        for tool_spec in Composio().tools.get_raw_composio_tools(
+            tools=composio_tools, limit=50
+        ):
+            yield ComposioLLMTool(tool_spec, composio_tools[tool_spec.slug])
 
 
 class VectorSearchLLMTool(BaseLLMTool):
