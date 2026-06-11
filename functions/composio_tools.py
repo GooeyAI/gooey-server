@@ -116,12 +116,6 @@ def render_inbuilt_tools_selector(key: str = "inbuilt_tools_selector") -> None:
 
 
 def render_tool_search_dialog(function_urls: set[str]) -> None:
-    if not settings.COMPOSIO_API_KEY:
-        gui.error(
-            "Please set the COMPOSIO_API_KEY environment variable to use this feature."
-        )
-        return
-
     query = gui.text_input(label="", placeholder="Search integrations...")
 
     with (
@@ -139,7 +133,9 @@ def render_tool_search_dialog(function_urls: set[str]) -> None:
                 description="Securely store key user data such as their consent, location or other other info you want your AI agent to remember across sessions and conversations.",
                 search_terms="gooey.ai gooeyai storage data user consent location remember conversation session",
             )
-        ] + list_toolkits()
+        ]
+        if settings.COMPOSIO_API_KEY:
+            toolkits += list_toolkits()
 
         query_words = query.lower().split()
         if query_words:
