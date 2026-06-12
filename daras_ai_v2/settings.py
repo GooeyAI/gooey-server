@@ -245,6 +245,7 @@ if not DEBUG and SENTRY_DSN:
     )
 
 ENABLE_FIREBASE_AUTH = config("ENABLE_FIREBASE_AUTH", default=False, cast=bool)
+GS_BUCKET_NAME = config("GS_BUCKET_NAME", default="")
 
 service_account_key_path = BASE_DIR / "serviceAccountKey.json"
 # save json file from env var if available
@@ -267,7 +268,12 @@ else:
     assert not ENABLE_FIREBASE_AUTH, (
         "serviceAccountKey.json or env.GOOGLE_APPLICATION_CREDENTIALS_JSON must be present to use firebase auth"
     )
+    assert not GS_BUCKET_NAME, (
+        "serviceAccountKey.json or env.GOOGLE_APPLICATION_CREDENTIALS_JSON must be present to use google cloud storage"
+    )
 
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
 
 GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"
@@ -275,10 +281,9 @@ GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_a
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
-GCP_PROJECT = config("GCP_PROJECT", default="dara-c1b52")
-GCP_REGION = config("GCP_REGION", default="us-central1")
+GCP_PROJECT = config("GCP_PROJECT", default="")
+GCP_REGION = config("GCP_REGION", default="")
 
-GS_BUCKET_NAME = config("GS_BUCKET_NAME", default=f"{GCP_PROJECT}.appspot.com")
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
 MAX_UPLOAD_SIZE = config("MAX_UPLOAD_SIZE", default=1024 * 1024 * 250, cast=int)

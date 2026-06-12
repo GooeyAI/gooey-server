@@ -1,4 +1,3 @@
-import datetime
 import json
 import time
 
@@ -8,9 +7,8 @@ from pydantic import BaseModel, Field
 
 from bots.models import Workflow
 from daras_ai.image_input import (
-    gcs_blob_for,
-    register_blob,
     upload_file_from_bytes,
+    generate_signed_url,
 )
 from daras_ai.text_format import unmarkdown
 from daras_ai_v2 import settings
@@ -399,26 +397,18 @@ class TextToSpeechPage(BasePage):
                 if language not in MMS_TTS_SUPPORTED_LANGUAGES:
                     raise UserError(f"Unsupported language: {language}")
 
-                blob = gcs_blob_for("mms_tts_gen.wav")
-                upload_url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=datetime.timedelta(hours=12),
-                    method="PUT",
-                    content_type="audio/wav",
-                )
-
                 run_mms_tts = modal.Function.from_name(modal_app.name, "run_mms_tts")
                 with (
                     modal.enable_output(),
-                    register_blob(
-                        blob, filename="mms_tts_gen.wav", content_type="audio/wav"
+                    generate_signed_url("mms_tts_gen.wav", "audio/wav") as (
+                        upload_url,
+                        public_url,
                     ),
                 ):
                     run_mms_tts.remote(
                         language=language, text=text, upload_url=upload_url
                     )
-
-                state["audio_url"] = blob.public_url
+                state["audio_url"] = public_url
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):
         default_voice_model = next(iter(ELEVEN_LABS_MODELS))
