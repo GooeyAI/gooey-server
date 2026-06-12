@@ -26,6 +26,9 @@ app = CustomAPIRouter()
 
 
 def serve_static_file(request: Request) -> Response | None:
+    if not settings.GS_BUCKET_NAME:
+        raise HTTPException(status_code=404)
+
     bucket = gcs_bucket()
 
     relpath = request.url.path.strip("/") or "index"

@@ -69,6 +69,14 @@ app.mount(
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+if not settings.GS_BUCKET_NAME:
+    # local storage: ensure the media dir exists so freshly-uploaded files are
+    # served without a restart (uploads create subdirs lazily)
+    settings.MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        settings.MEDIA_URL, StaticFiles(directory=settings.MEDIA_ROOT), name="media"
+    )
+
 api_routers = [
     bots_api.app,
     api.app,
