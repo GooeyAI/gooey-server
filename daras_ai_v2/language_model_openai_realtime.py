@@ -70,7 +70,7 @@ class RealtimeSession:
 
         dispatch = {
             "input_audio_buffer.speech_started": self.on_speech_started,
-            "response.audio.delta": self.on_audio_delta,
+            "response.output_audio.delta": self.on_audio_delta,
             "conversation.item.input_audio_transcription.completed": self.on_transcription_completed,
             "response.output_item.done": self.on_output_item_done,
             "response.done": self.on_response_done,
