@@ -70,19 +70,11 @@ docker compose -f docker-compose.local.yml up --build
 
 The first build takes a few minutes. After startup:
 
-| Service | URL (localhost)                      | URL (OrbStack on macOS)                   |
-|---------|--------------------------------------|-------------------------------------------|
-| UI      | http://localhost:3000/explore        | https://ui.gooey-server.orb.local/explore |
-| API     | http://localhost:8080/docs           | https://api.gooey-server.orb.local/docs   |
-| Admin   | http://localhost:8000                | https://admin.gooey-server.orb.local      |
-
-On macOS with OrbStack, use the `*.orb.local` URLs — they route through OrbStack's HTTPS proxy and are more reliable than `localhost` port forwards for the UI. The project name in the domain (`gooey-server`) comes from this repo's directory name; if you cloned into a different folder, swap that segment accordingly (e.g. `https://ui.my-folder.orb.local`).
-
-The `admin` service runs migrations and deploys the Vespa schema automatically on first boot. If the API starts before migrations finish, restart it:
-
-```bash
-docker compose -f docker-compose.local.yml restart api
-```
+| Service | URL (localhost)                      |
+|---------|--------------------------------------|
+| UI      | http://localhost:3000/explore        |
+| API     | http://localhost:8080/docs           |
+| Admin   | http://localhost:8000                |
 
 To stop everything:
 
