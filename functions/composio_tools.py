@@ -45,9 +45,23 @@ class ComposioLLMTool(BaseLLMTool):
         import composio_client
         from composio import Composio
 
-        requires_auth = not self.tool.no_auth
-
         composio = Composio()
+        if is_composio_meta_tool(self.tool.slug):
+            session = composio.use(
+                get_or_create_composio_tool_router_session_id(
+                    composio,
+                    user_id=self.user_id,
+                    redirect_url=self.redirect_url,
+                )
+            )
+            response = session.execute(tool_slug=self.tool.slug, arguments=kwargs)
+            return {
+                "data": response.data or {},
+                "error": response.error,
+                "successful": not response.error,
+            }
+
+        requires_auth = not self.tool.no_auth
         try:
             return composio.tools.execute(
                 slug=self.tool.slug,
@@ -79,6 +93,51 @@ class ComposioLLMTool(BaseLLMTool):
             arguments=kwargs,
             dangerously_skip_version_check=True,
         )
+
+
+def is_composio_meta_tool(slug: str) -> bool:
+    return slug.startswith("COMPOSIO_")
+
+
+def render_composio_meta_tool_scope_warning(functions: list[dict]) -> None:
+    # Meta tools share one Composio tool-router session per run, keyed to the first
+    # caller's scope.
+    from functions.base_llm_tool import get_external_tool_slug_from_url
+    from functions.models import FunctionScopes
+
+    composio_meta_tool_scopes = set()
+    for function in functions:
+        composio_tool_slug = get_external_tool_slug_from_url(
+            function.get("url") or ""
+        ) or function.get("slug")
+        if not composio_tool_slug or not is_composio_meta_tool(composio_tool_slug):
+            continue
+        composio_meta_tool_scopes.add(
+            function.get("scope") or FunctionScopes.workspace.name
+        )
+    if len(composio_meta_tool_scopes) <= 1:
+        return
+    gui.error(
+        "Set the same scope on all Composio tools.",
+        icon="⚠️",
+        color="#ffe8b2",
+    )
+
+
+def get_or_create_composio_tool_router_session_id(
+    composio: Composio,
+    *,
+    user_id: str,
+    redirect_url: str,
+) -> str:
+    manage_connections = {"enable": True, "callback_url": redirect_url}
+
+    cache_key = f"composio_session_id:{user_id}"
+    if session_id := gui.session_state.get(cache_key):
+        return session_id
+    session = composio.create(user_id=user_id, manage_connections=manage_connections)
+    gui.session_state[cache_key] = session.session_id
+    return session.session_id
 
 
 def render_inbuilt_tools_selector(key: str = "inbuilt_tools_selector") -> None:
