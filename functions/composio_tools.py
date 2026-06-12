@@ -24,6 +24,9 @@ if typing.TYPE_CHECKING:
     from composio_client.types.tool_proxy_response import ToolProxyResponse
 
 
+COMPOSIO_TOOL_ROUTER_SESSION_ID_KEY = "__composio_tool_router_session_id__"
+
+
 class ComposioLLMTool(BaseLLMTool):
     def __init__(self, tool: Tool, scope: str | None):
         self.tool = tool
@@ -132,11 +135,10 @@ def get_or_create_composio_tool_router_session_id(
 ) -> str:
     manage_connections = {"enable": True, "callback_url": redirect_url}
 
-    cache_key = f"composio_session_id:{user_id}"
-    if session_id := gui.session_state.get(cache_key):
+    if session_id := gui.session_state.get(COMPOSIO_TOOL_ROUTER_SESSION_ID_KEY):
         return session_id
     session = composio.create(user_id=user_id, manage_connections=manage_connections)
-    gui.session_state[cache_key] = session.session_id
+    gui.session_state[COMPOSIO_TOOL_ROUTER_SESSION_ID_KEY] = session.session_id
     return session.session_id
 
 
