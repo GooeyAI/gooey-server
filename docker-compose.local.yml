@@ -43,8 +43,6 @@ x-gooey-app: &gooey-app
       condition: service_healthy
     rabbitmq:
       condition: service_healthy
-    vespa:
-      condition: service_healthy
 
 services:
   api:

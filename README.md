@@ -50,6 +50,54 @@ Specifically, this repo may be for you if:
 - You are an enterprise with specific requirements regarding data practices, such as using specific cloud providers.
 - You want to add some other functionality that we don’t support.
 
+## 🏗️ Architecture
+
+```
+                 +-----------+          +-----------------+
+                 |  Browser  |          |   API Clients   |
+                 +-----+-----+          |  (SDKs / curl)  |
+                       |                +--------+--------+
+                 :3000 |                         |
+                       v                         |
+          +-------------------------+            |
+          |        gooey-gui        |            |
+          | (Node / Remix frontend) |            | :8080
+          +------------+------------+            |
+                       |                         |
+                       | render requests         |
+                       v                         v
++--------------+  +-------------------------------------+
+| Django Admin |  |      Python API + GUI Server        |
+|    :8000     |  |        (FastAPI, server.py)         |
++------+-------+  +------------------+------------------+
+       |                              |
+       |                              |  enqueue recipe runs (amqp)
+       |                              v
+       |          +-------------------------------------+     +-----------------+
+       |          |           Celery Workers            |---->| GenAI providers |
+       |          |            (celeryapp)              |     | OpenAI, Gemini, |
+       |          +------------------+------------------+     | Replicate, ...  |
+       |                              |                       +-----------------+
+       v                              v
++---------------------------------------------------------------------+
+|                           Backing Services                          |
+|                                                                     |
+|  +-----------+   +-----------+   +------------+   +--------------+  |
+|  | Postgres  |   |   Redis   |   |  RabbitMQ  |   |    Vespa     |  |
+|  |   :5432   |   |   :6379   |   |   :5672    |   |    :8085     |  |
+|  |  app DB   |   |  cache +  |   |   celery   |   |   vector +   |  |
+|  |           |   |  pub/sub  |   |   broker   |   | text search  |  |
+|  +-----------+   +-----------+   +------------+   +--------------+  |
++---------------------------------------------------------------------+
+```
+
+- **gooey-gui** (`gooey-gui/`) — Remix/React frontend. It asks the Python server to render each page as a JSON component tree, renders that in React, and subscribes to Redis pub/sub so pages update live while a recipe runs.
+- **Python API + GUI Server** (`server.py`) — FastAPI app that serves the public API and the page-render endpoints used by gooey-gui.
+- **Celery Workers** (`celeryapp/`) — run the actual recipes: consume jobs from RabbitMQ, call the GenAI providers, save results to Postgres, and publish progress updates to Redis.
+- **Django Admin** (`gooeysite/`) — admin UI over the same Postgres database.
+- Both the API server and the workers talk directly to Postgres (app data), Redis (cache + realtime pub/sub), and Vespa (vector + full-text search for the doc search / RAG features).
+- File uploads are stored in cloud storage (GCS), and the Functions recipe executes user-supplied JavaScript on a sandboxed Deno runtime (see the Functions runtime section below).
+
 ## 📋 Setup
 
 ### ⚡ Quickstart
@@ -70,11 +118,11 @@ docker compose -f docker-compose.local.yml up --build
 
 The first build takes a few minutes. After startup:
 
-| Service | URL (localhost)                      |
-|---------|--------------------------------------|
-| UI      | http://localhost:3000/explore        |
-| API     | http://localhost:8080/docs           |
-| Admin   | http://localhost:8000                |
+| Service | URL (localhost)               |
+| ------- | ----------------------------- |
+| UI      | http://localhost:3000/explore |
+| API     | http://localhost:8080/docs    |
+| Admin   | http://localhost:8000         |
 
 To stop everything:
 
@@ -128,6 +176,7 @@ export MAGICK_HOME=/opt/homebrew
   local    all        gooey                    md5
   host     all        gooey                    md5
   ```
+
   - restart postgresql using `sudo systemctl restart postgresql`
 - Use the manage.py script to set up the Postgres database:
   - To create the user and database for gooey: `./manage.py sqlcreate | sudo -u postgres psql postgres `
