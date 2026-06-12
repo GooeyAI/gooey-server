@@ -95,8 +95,7 @@ Specifically, this repo may be for you if:
 - **Python API + GUI Server** (`server.py`) — FastAPI app that serves the public API and the page-render endpoints used by gooey-gui.
 - **Celery Workers** (`celeryapp/`) — run the actual recipes: consume jobs from RabbitMQ, call the GenAI providers, save results to Postgres, and publish progress updates to Redis.
 - **Django Admin** (`gooeysite/`) — admin UI over the same Postgres database.
-- Both the API server and the workers talk directly to Postgres (app data), Redis (cache + realtime pub/sub), and Vespa (vector + full-text search for the doc search / RAG features).
-- File uploads are stored in cloud storage (GCS), and the Functions recipe executes user-supplied JavaScript on a sandboxed Deno runtime (see the Functions runtime section below).
+- Services talk directly to Postgres (app data), Redis (cache + realtime pub/sub), and Vespa (vector + full-text search for the doc search / RAG features).
 
 ## 📋 Setup
 
