@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import mimetypes
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Iterable, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import gooey_gui as gui
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
@@ -209,67 +209,32 @@ def _load_recent_workflows(
         return []
 
     qs = WorkspaceRecentWorkflow.objects.filter(workspace=workspace)
-    if user and not workspace.is_personal:
-        # in a team workspace, show only the current user's history
+    if user:
+        # show only the current user's history, even in a shared team workspace
         qs = qs.filter(uid=user.uid)
 
-    rows = _dedup_recent_by_published_run(
+    # The model upserts one row per (workspace, uid, published_run) and keeps the
+    # latest saved run on it, so filtering by uid already gives a single row per
+    # published run (its most recent saved run). Just take the most recent few.
+    rows = list(
         qs.select_related(
             "last_saved_run__parent_version__published_run",
             "published_run",
-        ).order_by("-last_used_at")[: RECENT_WORKFLOW_LIST_LIMIT * 10],
-        limit=RECENT_WORKFLOW_LIST_LIMIT,
+        ).order_by("-last_used_at")[:RECENT_WORKFLOW_LIST_LIMIT]
     )
-    other_uids = {
-        row.last_saved_run.uid
-        for row in rows
-        if row.last_saved_run.uid and (not user or row.last_saved_run.uid != user.uid)
-    }
-    authors_by_uid = {u.uid: u for u in AppUser.objects.filter(uid__in=other_uids)}
     cards = []
     for row in rows:
         sr = row.last_saved_run
         data = _history_card(
             sr,
-            author=author_from_user(
-                _history_author(sr, user=user, authors_by_uid=authors_by_uid),
-                current_user=user,
-            ),
+            # rows are scoped to the current user's uid above, so every recent
+            # run is authored by the current user
+            author=author_from_user(user, current_user=user),
             metadata_by_workflow=metadata_by_workflow,
         )
         data.updated_at = get_relative_time(row.last_used_at)
         cards.append(data)
     return cards
-
-
-def _dedup_recent_by_published_run(
-    rows: Iterable[WorkspaceRecentWorkflow],
-    *,
-    limit: int,
-) -> list[WorkspaceRecentWorkflow]:
-    seen: set[int] = set()
-    deduped: list[WorkspaceRecentWorkflow] = []
-    for row in rows:
-        if row.published_run_id in seen:
-            continue
-        seen.add(row.published_run_id)
-        deduped.append(row)
-        if len(deduped) >= limit:
-            break
-    return deduped
-
-
-def _history_author(
-    sr: SavedRun,
-    *,
-    user: AppUser | None,
-    authors_by_uid: dict[str, AppUser],
-) -> AppUser | None:
-    if user and sr.uid == user.uid:
-        return user
-    if sr.uid:
-        return authors_by_uid.get(sr.uid)
-    return None
 
 
 def _load_saved_workflows(
