@@ -44,8 +44,8 @@ def run_openai_audio(
         # if the audio_url is a websocket url, connect to it
         twilio_ws = connect(audio_url)
         audio_session_extra = (audio_session_extra or {}) | {
-            "input_audio_format": "g711_ulaw",
-            "output_audio_format": "g711_ulaw",
+            "input_audio_format": {"type": "audio/pcmu"},
+            "output_audio_format": {"type": "audio/pcmu"},
             "turn_detection": {"type": "server_vad"},
         }
     elif audio_url and created:
@@ -117,7 +117,6 @@ def get_or_create_ws(model) -> tuple[ClientConnection, bool]:
             ).url,
             additional_headers={
                 "Authorization": "Bearer " + settings.OPENAI_API_KEY,
-                "OpenAI-Beta": "realtime=v1",
             },
         )
         created = True
@@ -170,14 +169,28 @@ def init_ws_session(
 
     # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
     session_data = {
+        "type": "realtime",
         "instructions": system_message,
-        "input_audio_transcription": {"model": "whisper-1"},
-        "turn_detection": None,
-        "temperature": temperature,
-        # "max_response_output_tokens": "inf",
+        "audio": {
+            "input": {
+                "transcription": {"model": "whisper-1"},
+                "turn_detection": None,
+            },
+        },
     }
     if audio_session_extra:
-        session_data |= audio_session_extra
+        audio_output = {}
+
+        if turn_detection := audio_session_extra.get("turn_detection"):
+            session_data["audio"]["input"]["turn_detection"] = turn_detection
+        if input_audio_format := audio_session_extra.get("input_audio_format"):
+            session_data["audio"]["input"]["format"] = input_audio_format
+        if output_audio_format := audio_session_extra.get("output_audio_format"):
+            audio_output["format"] = output_audio_format
+        if voice := audio_session_extra.get("voice"):
+            audio_output["voice"] = voice
+        if audio_output:
+            session_data["audio"]["output"] = audio_output
     if tools:
         session_data["tools"] = [tool.spec_openai_audio for tool in tools]
     send_recv_json(ws, {"type": "session.update", "session": session_data})
@@ -208,7 +221,9 @@ def stream_ws_response(
     while output is None or (wait_for_transcript and input_audio_transcript is None):
         event = recv_json(ws)
         match event.get("type"):
-            case "response.audio_transcript.delta" | "response.text.delta":
+            case (
+                "response.output_audio_transcript.delta" | "response.output_text.delta"
+            ):
                 entry["chunk"] += event["delta"]
                 if is_llm_chunk_large_enough(entry, chunk_size):
                     # increase the chunk size, but don't go over the max
@@ -216,7 +231,7 @@ def stream_ws_response(
                     # stream the chunk
                     yield entry
 
-            case "response.audio.delta":
+            case "response.output_audio.delta":
                 output_pcm += base64.b64decode(event["delta"])
 
             case "conversation.item.input_audio_transcription.completed":
