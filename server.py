@@ -69,6 +69,11 @@ app.mount(
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+if not settings.GS_BUCKET_NAME and settings.MEDIA_ROOT.exists():
+    app.mount(
+        settings.MEDIA_URL, StaticFiles(directory=settings.MEDIA_ROOT), name="media"
+    )
+
 api_routers = [
     bots_api.app,
     api.app,

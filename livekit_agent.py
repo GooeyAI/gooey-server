@@ -47,11 +47,10 @@ from bots.models.bot_integration import BotIntegration, Platform
 from bots.models.convo_msg import Conversation, db_msgs_to_entries
 from bots.models.saved_run import SavedRun
 from daras_ai.image_input import (
-    gcs_blob_for,
-    gcs_bucket,
     get_mimetype_from_response,
-    upload_gcs_blob_from_bytes,
     upload_file_from_bytes,
+    temp_upload_file_from_bytes,
+    delete_uploaded_url,
 )
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import (
@@ -60,13 +59,11 @@ from daras_ai_v2.asr import (
     should_translate_lang,
 )
 from daras_ai_v2.bots import BotIntegrationLookupFailed, BotInterface, build_system_vars
-from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.language_model import ConversationEntry
 from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.text_to_speech_settings_widgets import TextToSpeechProviders
 from daras_ai_v2.utils import clamp
-from files.models import UploadedFile
 from functions.workflow_tools import WorkflowLLMTool
 from number_cycling.utils import EXTENSION_NUMBER_LENGTH
 from recipes.TextToSpeech import TextToSpeechPage
@@ -683,13 +680,11 @@ def asr_step(request: VideoBotsPage.RequestModel, buffer: AudioBuffer) -> str:
             request.user_language or ""
         )
 
-    blob = gcs_blob_for(filename="audio.wav")
-    upload_gcs_blob_from_bytes(
-        blob, buffer.to_wav_bytes(), "audio/wav", is_user_uploaded=True
-    )
-    try:
+    with temp_upload_file_from_bytes(
+        "audio.wav", buffer.to_wav_bytes(), "audio/wav", is_user_uploaded=True
+    ) as audio_url:
         user_input = run_asr(
-            audio_url=blob.public_url,
+            audio_url=audio_url,
             selected_model=request.asr_model,
             language=request.asr_language,
             speech_translation_target=(
@@ -697,8 +692,6 @@ def asr_step(request: VideoBotsPage.RequestModel, buffer: AudioBuffer) -> str:
             ),
             input_prompt=request.asr_prompt,
         )
-    finally:
-        UploadedFile.objects.from_gcs_blob(blob).delete()
 
     request.translation_model = request.translation_model or DEFAULT_TRANSLATION_MODEL
     if (
@@ -824,11 +817,7 @@ def tts_step(
         audio_wav_bytes = r.content
         mime_type = get_mimetype_from_response(r)
     finally:
-        if is_user_uploaded_url(audio_url):
-            blob = gcs_bucket().blob(
-                audio_url.split(settings.GS_BUCKET_NAME)[-1].strip("/")
-            )
-            UploadedFile.objects.from_gcs_blob(blob).delete()
+        delete_uploaded_url(audio_url)
     return audio_wav_bytes, mime_type
 
 
