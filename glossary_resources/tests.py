@@ -1,6 +1,6 @@
 import pytest
 
-from daras_ai.image_input import gcs_blob_for
+from daras_ai.image_input import temp_upload_file_from_bytes
 from daras_ai_v2.crypto import get_random_doc_id
 from glossary_resources.models import GlossaryResource
 
@@ -39,11 +39,11 @@ def glossary_url():
     import pandas as pd
 
     df = pd.DataFrame.from_records(GLOSSARY)
-    blob = gcs_blob_for("test glossary.csv")
-    blob.upload_from_string(df.to_csv(index=False).encode(), content_type="text/csv")
 
     try:
-        yield blob.public_url
+        with temp_upload_file_from_bytes(
+            "test glossary.csv", df.to_csv(index=False).encode(), "text/csv"
+        ) as url:
+            yield url
     finally:
-        blob.delete()
         GlossaryResource.objects.all().delete()

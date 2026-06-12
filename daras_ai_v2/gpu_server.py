@@ -1,11 +1,9 @@
 import base64
-import datetime
 import os
-import typing
 from contextlib import ExitStack
 from time import time
 
-from daras_ai.image_input import gcs_blob_for, register_blob
+from daras_ai.image_input import generate_signed_url
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import GPUError, UserError
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -21,7 +19,7 @@ def call_sd_multi(
     endpoint: str,
     pipeline: dict,
     inputs: dict,
-) -> typing.List[str]:
+) -> list[str]:
     prompt = inputs["prompt"]
     num_images_per_prompt = inputs["num_images_per_prompt"]
     num_outputs = len(prompt) * num_images_per_prompt
@@ -43,16 +41,15 @@ def call_celery_task_outfile(
     content_type: str | None,
     filename: str,
     num_outputs: int = 1,
-):
-    links, _ = call_celery_task_outfile_with_ret(
+) -> list[str]:
+    return call_celery_task_outfile_with_ret(
         task_name,
         pipeline=pipeline,
         inputs=inputs,
         content_type=content_type,
         filename=filename,
         num_outputs=num_outputs,
-    )
-    return links
+    )[0]
 
 
 def call_celery_task_outfile_with_ret(
@@ -63,26 +60,17 @@ def call_celery_task_outfile_with_ret(
     content_type: str | None,
     filename: str,
     num_outputs: int = 1,
-):
-    blobs = [gcs_blob_for(filename) for i in range(num_outputs)]
-    pipeline["upload_urls"] = [
-        blob.generate_signed_url(
-            version="v4",
-            # This URL is valid for 15 minutes
-            expiration=datetime.timedelta(hours=12),
-            # Allow PUT requests using this URL.
-            method="PUT",
-            content_type=content_type,
-        )
-        for blob in blobs
-    ]
+) -> tuple[list[str], dict]:
+    if not num_outputs:
+        return [], {}
     with ExitStack() as stack:
-        for blob in blobs:
-            stack.enter_context(
-                register_blob(blob, filename=filename, content_type=content_type)
-            )
+        generated_urls = [
+            stack.enter_context(generate_signed_url(filename, content_type))
+            for _ in range(num_outputs)
+        ]
+        pipeline["upload_urls"], public_urls = zip(*generated_urls)
         ret = call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
-    return [blob.public_url for blob in blobs], ret
+        return list(public_urls), ret
 
 
 _app = None
