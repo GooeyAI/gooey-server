@@ -323,7 +323,13 @@ def bark_selector():
 
 
 def google_tts_selector():
-    voices = google_tts_voices()
+    import google.auth.exceptions
+
+    try:
+        voices = google_tts_voices()
+    except google.auth.exceptions.DefaultCredentialsError:
+        gui.error("Error fetching Google TTS voices. Please check your credentials.")
+        return
     gui.selectbox(
         label="""
         ###### Voice name (Google TTS)

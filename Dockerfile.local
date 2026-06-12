@@ -1,0 +1,31 @@
+# Lightweight ARM-friendly local image. Skips the prod Dockerfile's slow steps:
+# compiling poppler from source, amd64-only debs, playwright, and mediapipe.
+FROM python:3.10.12-slim-bookworm
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    poppler-utils \
+    libpoppler-dev \
+    libpoppler-cpp-dev \
+    pandoc \
+    libmagickwand-dev \
+    libgl1-mesa-glx \
+    python3-opencv \
+    postgresql-client \
+    ffmpeg \
+    libzbar0 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ./pyproject.toml ./poetry.lock ./
+RUN pip install --no-cache-dir -U poetry pip \
+    && poetry install --no-cache --only main --no-interaction
+
+COPY . .
+
+ENV FORWARDED_ALLOW_IPS='*'
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["poetry", "run"]

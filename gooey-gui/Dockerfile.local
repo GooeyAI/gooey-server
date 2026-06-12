@@ -1,0 +1,16 @@
+# Lightweight prod-mode image for local docker compose.
+# Skips the prod Dockerfile's sentry sourcemap upload and amd64-only Chrome.
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+CMD ["npm", "run", "start"]

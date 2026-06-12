@@ -52,6 +52,46 @@ Specifically, this repo may be for you if:
 
 ## 📋 Setup
 
+### ⚡ Quickstart
+
+The fastest way to run everything locally is Docker Compose. It starts postgres, redis, rabbitmq, vespa, and the app services (API, Django admin, celery, gooey-gui) in one command.
+
+**1. Install Docker**
+
+- **macOS** — install [OrbStack](https://orbstack.dev/download) (recommended on Apple Silicon; native arm64, fast builds)
+- **Linux** — install [Docker Engine](https://docs.docker.com/engine/install/) and the [Compose plugin](https://docs.docker.com/compose/install/linux/)
+- **Windows** — install [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+
+**3. Start the stack**
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
+
+The first build takes a few minutes. After startup:
+
+| Service | URL (localhost)                      | URL (OrbStack on macOS)                   |
+|---------|--------------------------------------|-------------------------------------------|
+| UI      | http://localhost:3000/explore        | https://ui.gooey-server.orb.local/explore |
+| API     | http://localhost:8080/docs           | https://api.gooey-server.orb.local/docs   |
+| Admin   | http://localhost:8000                | https://admin.gooey-server.orb.local      |
+
+On macOS with OrbStack, use the `*.orb.local` URLs — they route through OrbStack's HTTPS proxy and are more reliable than `localhost` port forwards for the UI. The project name in the domain (`gooey-server`) comes from this repo's directory name; if you cloned into a different folder, swap that segment accordingly (e.g. `https://ui.my-folder.orb.local`).
+
+The `admin` service runs migrations and deploys the Vespa schema automatically on first boot. If the API starts before migrations finish, restart it:
+
+```bash
+docker compose -f docker-compose.local.yml restart api
+```
+
+To stop everything:
+
+```bash
+docker compose -f docker-compose.local.yml down
+```
+
+> **Note:** `Dockerfile.local` is a lightweight image for local development. It skips playwright and mediapipe, so a few recipes that depend on those won't work in-container. For full parity, use the manual setup steps below instead.
+
 ### ⚙️ Configuration reference
 
 For a full list of all available settings with defaults and descriptions, see [configuration.md](configuration.md).
@@ -68,7 +108,6 @@ For a full list of all available settings with defaults and descriptions, see [c
 - Use `sqlcreate` helper to create a user and database for gooey:
   - `./manage.py sqlcreate | psql postgres`
   - make sure you are able to access the database with `psql -W -U gooey gooey` (and when prompted for password, entering `gooey`)
-- Create an `.env` file from `.env.example` (see [configuration.md](configuration.md) for all available settings and [12factor.net/config](https://12factor.net/config))
 - Run `./manage.py migrate`
 - Install the zbar library (`brew install zbar`)
 - (optional) Install imagemagick - Needed for HEIC image support - https://docs.wand-py.org/en/0.5.7/guide/install.html
@@ -101,7 +140,6 @@ export MAGICK_HOME=/opt/homebrew
 - Use the manage.py script to set up the Postgres database:
   - To create the user and database for gooey: `./manage.py sqlcreate | sudo -u postgres psql postgres `
   - Test your setup to ensure that `gooey-server` can access the database by running `psql -W -U gooey gooey` and supplying "gooey" as the password
-- Create a .env file from `.env.example`
 - Install the zbar library using your distro's package manager.
 
 ### 🗄 Initialize databse

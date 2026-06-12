@@ -1,0 +1,150 @@
+# Local development stack for gooey-server.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml up -d
+#
+# On OrbStack (macOS), services are also reachable at https://<service>.<dirname>.orb.local
+# e.g. https://ui.gooey-server.orb.local — often more reliable than localhost:3000.
+#
+# Backing services (postgres/redis/rabbitmq/vespa) use the same credentials &
+# host ports as .env.example / daras_ai_v2/settings.py defaults, so you can also
+# run the app processes on the host against them. Python app services mount the
+# repo and read secrets from your .env;
+# service hostnames are overridden below via environment (os.environ takes
+# precedence over .env for python-decouple).
+#
+# App services use Dockerfile.local (native arm64 on Apple Silicon). The prod
+# Dockerfile compiles poppler and pulls amd64-only packages, so avoid it here.
+
+x-gooey-app: &gooey-app
+  build:
+    context: .
+    dockerfile: Dockerfile.local
+  image: gooey-server:local
+  volumes:
+    - .:/app
+  environment:
+    PGHOST: postgres
+    PGPORT: "5432"
+    PGUSER: gooey
+    PGPASSWORD: gooey
+    PGDATABASE: gooey
+    REDIS_URL: redis://redis:6379
+    REDIS_CACHE_URL: redis://redis:6379
+    LOCAL_CELERY_BROKER_URL: amqp://rabbitmq
+    LOCAL_CELERY_RESULT_BACKEND: redis://redis:6379
+    VESPA_URL: http://vespa:8080
+    VESPA_CONFIG_SERVER_URL: http://vespa:19071
+    C_FORCE_ROOT: "1"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+    vespa:
+      condition: service_healthy
+
+services:
+  api:
+    <<: *gooey-app
+    command: uvicorn server:app --host 0.0.0.0 --port 8080
+    ports:
+      - "8080:8080"
+
+  admin:
+    <<: *gooey-app
+    command: >
+      bash -c "
+        ./manage.py runscript setup_vespa_db &&
+        ./manage.py migrate &&
+        exec ./manage.py runserver 0.0.0.0:8000
+      "
+    ports:
+      - "8000:8000"
+
+  celery:
+    <<: *gooey-app
+    command: celery -A celeryapp worker -P threads -c 16 -l DEBUG
+
+  ui:
+    build:
+      context: ./gooey-gui
+      dockerfile: Dockerfile.local
+    image: gooey-gui:local
+    environment:
+      PORT: "3000"
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      SERVER_HOST: http://api:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: gooey
+      POSTGRES_PASSWORD: gooey
+      POSTGRES_DB: gooey
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    command: postgres -c 'max_connections=10000'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gooey -d gooey"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  vespa:
+    image: vespaengine/vespa
+    hostname: vespa-container
+    ports:
+      - "8085:8080"
+      - "19071:19071"
+    volumes:
+      - vespa-data:/opt/vespa/var
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19071/state/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  vespa-data:
