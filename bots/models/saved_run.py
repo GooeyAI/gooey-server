@@ -136,7 +136,7 @@ class SavedRun(models.Model):
         api = 1, "API"
         deployment = 2, "Deployment"
         builder_prompt = 3, "Builder Prompt"
-        builder_child = 4, "Builder Child"
+        builder_child = 4, "Builder"
         tool_call = 5, "Tool Call"
         internal = 6, "Internal"
         analysis = 7, "Analysis"
