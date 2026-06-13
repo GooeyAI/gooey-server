@@ -586,6 +586,7 @@ def create_run(bot: LivekitVoice):
         current_user=bot.bi.created_by,
         workspace=bot.bi.workspace,
         request_body=body,
+        surface=SavedRun.Surface.deployment,
     )
 
     sr.transaction, sr.price = page.deduct_credits(sr.state)

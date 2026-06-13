@@ -2350,8 +2350,6 @@ class BasePage:
         paginate_button(url=self.request.url, cursor=cursor)
 
     def _history_tab(self):
-        from daras_ai_v2.gooey_builder import get_default_builder_pr
-
         self.ensure_authentication(anon_ok=True)
 
         # Filter by workspace
@@ -2359,8 +2357,8 @@ class BasePage:
             workflow=self.workflow, workspace=self.current_workspace
         )
 
-        if settings.GOOEY_BUILDER_INTEGRATION_ID and not self.is_current_user_admin():
-            qs = qs.exclude(parent_version__published_run=get_default_builder_pr())
+        if not self.is_current_user_admin():
+            qs = qs.exclude(surface=SavedRun.Surface.builder_prompt)
 
         # Apply user filter if specified
         for_param = self.request.query_params.get("for", "me")
@@ -2369,7 +2367,9 @@ class BasePage:
             and self.request.user
             and not self.current_workspace.is_personal
         ):
-            qs = qs.filter(uid=self.request.user.uid, is_api_call=False)
+            qs = qs.filter(uid=self.request.user.uid).exclude(
+                surface=SavedRun.Surface.deployment
+            )
 
         run_history, cursor = paginate_queryset(
             qs=qs, ordering=["-updated_at"], cursor=self.request.query_params

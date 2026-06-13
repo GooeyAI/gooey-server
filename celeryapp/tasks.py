@@ -180,7 +180,7 @@ def is_task_cancelled(e: BaseException | None) -> bool:
 def post_runner_tasks(saved_run_id: int):
     sr = SavedRun.objects.get(id=saved_run_id)
 
-    if not sr.is_api_call:
+    if sr.surface == SavedRun.Surface.run:
         send_email_on_completion(sr)
 
     if should_attempt_auto_recharge(sr.workspace):

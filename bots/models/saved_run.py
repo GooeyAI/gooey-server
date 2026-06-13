@@ -131,7 +131,37 @@ class SavedRun(models.Model):
         choices=RetentionPolicy.choices, default=RetentionPolicy.keep
     )
 
-    is_api_call = models.BooleanField(default=False)
+    class Surface(IntegerChoices):
+        run = 0, "Run"
+        api = 1, "API"
+        deployment = 2, "Deployment"
+        builder_prompt = 3, "Builder Prompt"
+        builder_child = 4, "Builder Child"
+        tool_call = 5, "Tool Call"
+        internal = 6, "Internal"
+        analysis = 7, "Analysis"
+        export = 8, "Export"
+        bulk = 9, "Bulk"
+
+    surface = models.IntegerField(
+        choices=Surface.choices,
+        default=Surface.run,
+        help_text="Where this run was created.<br><br>"
+        f"{Surface.run.label}: A run created from the UI playground directly by the user.<br>"
+        f"{Surface.api.label}: Called by an API.<br>"
+        f"{Surface.deployment.label}: Called by a bot integration.<br>"
+        f"{Surface.builder_prompt.label}: A prompt submitted to the Gooey builder.<br>"
+        f"{Surface.builder_child.label}: A child run created by the Gooey builder.<br>"
+        f"{Surface.tool_call.label}: Any tool calls made by a workflow.<br>"
+        f"{Surface.internal.label}: Any internal calls made by the app, e.g. QR code or icon generator.<br>"
+        f"{Surface.analysis.label}: A run created from the bot integration analysis feature.<br>"
+        f"{Surface.export.label}: A run created from the scheduled bot integration export feature.<br>"
+        f"{Surface.bulk.label}: A run created from the bulk runner.",
+    )
+    is_api_call = models.BooleanField(
+        default=False,
+        help_text="(Deprecated) Use surface instead.",
+    )
 
     # see signals.py:revoke_saved_run_task_on_cancel
     is_cancelled = models.BooleanField(default=False)

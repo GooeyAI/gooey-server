@@ -282,6 +282,7 @@ def call_text2img_for_model(
             selected_models=[Text2ImgModels.flux_1_dev.name],
             quality=50,
         ).model_dump(exclude_unset=True),
+        surface=SavedRun.Surface.internal,
     )[1]
     return sr
 

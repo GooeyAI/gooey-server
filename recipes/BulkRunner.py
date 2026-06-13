@@ -318,6 +318,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                         current_user=self.request.user,
                         request_body=request_body,
                         parent_pr=pr,
+                        surface=SavedRun.Surface.bulk,
                     )
                     sr.wait_for_celery_result(result)
 
@@ -390,6 +391,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 current_user=self.request.user,
                 request_body=request_body,
                 parent_pr=pr,
+                surface=SavedRun.Surface.bulk,
             )
             sr.wait_for_celery_result(result)
             response.eval_runs.append(sr.get_app_url())

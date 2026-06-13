@@ -520,6 +520,7 @@ def _process_and_send_msg(
         workspace=workspace,
         current_user=current_user,
         request_body=body,
+        surface=SavedRun.Surface.deployment,
     )
     bot.on_run_created(sr)
 

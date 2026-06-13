@@ -159,6 +159,7 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
                 parent_pr=pr,
                 uid=self.builder_sr.uid,
                 workspace_id=self.builder_sr.workspace_id,
+                surface=SavedRun.Surface.builder_child,
             )
 
         # update the state
@@ -221,6 +222,7 @@ class RunWorkflowLLMTool(GooeyBuilderLLMTool):
                 enable_rate_limits=True,
                 parent_builder_saved_run=self.builder_sr,
                 parent_pr=pr,
+                surface=SavedRun.Surface.builder_child,
             )
         else:
             page = page_cls(user=user)

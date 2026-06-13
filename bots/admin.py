@@ -449,7 +449,7 @@ class SavedRunAdmin(GooeyModelAdmin):
         "view_parent_published_run",
         "run_time",
         "price",
-        "is_api_call",
+        "surface",
         "is_cancelled",
         "created_at",
         "updated_at",
@@ -459,7 +459,7 @@ class SavedRunAdmin(GooeyModelAdmin):
     ]
     list_filter = [
         "workflow",
-        "is_api_call",
+        "surface",
         "is_cancelled",
         "is_flagged",
         ("run_status", admin.EmptyFieldListFilter),
@@ -482,7 +482,7 @@ class SavedRunAdmin(GooeyModelAdmin):
         "created_at",
         "updated_at",
         "run_time",
-        "is_api_call",
+        "surface",
         "parent_builder_saved_run",
         "view_bot_message",
     ]

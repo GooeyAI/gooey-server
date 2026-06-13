@@ -3,7 +3,7 @@ import json
 import gooey_gui as gui
 
 from app_users.models import AppUser
-from bots.models import PublishedRun
+from bots.models import PublishedRun, SavedRun
 from daras_ai_v2 import icons, settings
 from widgets.workflow_metadata_gen import (
     render_ai_generated_image_widget,
@@ -80,6 +80,7 @@ def run_icon_bot(
             response_format_type="json_object",
         ),
         deduct_credits=False,
+        surface=SavedRun.Surface.internal,
     )
     return VideoBotsPage.realtime_channel_name(sr.run_id, sr.uid)
 

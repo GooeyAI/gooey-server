@@ -28,7 +28,7 @@ from starlette.status import (
 from api_keys.models import ApiKey
 from app_users.models import AppUser
 from auth.token_authentication import api_auth_header
-from bots.models import RetentionPolicy, Workflow
+from bots.models import RetentionPolicy, SavedRun, Workflow
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import settings
 from daras_ai_v2.all_pages import all_api_pages
@@ -45,7 +45,6 @@ from workspaces.widgets import set_current_workspace
 
 if typing.TYPE_CHECKING:
     from functions.models import CalledFunction
-    from bots.models import SavedRun
     import celery.result
 
 app = CustomAPIRouter()
@@ -367,8 +366,9 @@ def submit_api_call(
     enable_rate_limits: bool = False,
     deduct_credits: bool = True,
     called_fn: typing.Optional["CalledFunction"] = None,
+    surface: SavedRun.Surface = SavedRun.Surface.api,
     **defaults,
-) -> tuple["celery.result.AsyncResult", "SavedRun"]:
+) -> tuple["celery.result.AsyncResult", SavedRun]:
     page, sr = create_new_run(
         page_cls=page_cls,
         query_params=query_params,
@@ -377,6 +377,7 @@ def submit_api_call(
         workspace=workspace,
         request_body=request_body,
         enable_rate_limits=enable_rate_limits,
+        surface=surface,
         **defaults,
     )
     if called_fn:
@@ -396,8 +397,9 @@ def create_new_run(
     workspace: Workspace,
     request_body: dict,
     enable_rate_limits: bool = False,
+    surface: SavedRun.Surface = SavedRun.Surface.api,
     **defaults,
-) -> tuple["BasePage", "SavedRun"]:
+) -> tuple["BasePage", SavedRun]:
     # init a new page for every request
     query_params.setdefault("uid", current_user.uid)
     page = page_cls(user=current_user, query_params=query_params)
@@ -422,8 +424,8 @@ def create_new_run(
     try:
         sr = page.create_new_run(
             enable_rate_limits=enable_rate_limits,
-            is_api_call=True,
             retention_policy=retention_policy or RetentionPolicy.keep,
+            surface=surface,
             **defaults,
         )
     except ValidationError as e:

@@ -151,6 +151,7 @@ def on_submit(
             workspace=workspace,
             request_body=dict(run_urls=[v1_url, v2_url]),
             current_user=user,
+            surface=SavedRun.Surface.bulk,
         )
 
         url = new_sr.get_app_url()
