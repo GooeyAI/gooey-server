@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, Workflow
-from daras_ai.image_input import gcs_blob_for, upload_gcs_blob_from_bytes
+from daras_ai.image_input import temp_upload_file_from_bytes
 from daras_ai_v2 import icons
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
@@ -21,7 +21,6 @@ from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fal_ai import generate_on_fal
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.stable_diffusion import LoraWeight, Text2ImgModels
-from files.models import UploadedFile
 from recipes.CompareText2Img import CompareText2ImgPage
 from workspaces.models import Workspace
 
@@ -288,7 +287,9 @@ def call_text2img_for_model(
 
 
 @contextmanager
-def zip_images(input_images: list[str], captions: dict[str, str] | None) -> str:
+def zip_images(
+    input_images: list[str], captions: dict[str, str] | None
+) -> typing.Iterator[str]:
     f = io.BytesIO()
     with zipfile.ZipFile(f, "w") as zipf:
         for i, image in enumerate(input_images):
@@ -302,12 +303,10 @@ def zip_images(input_images: list[str], captions: dict[str, str] | None) -> str:
                 pass
             else:
                 zipf.writestr(f"image_{i}.txt", caption)
-    blob = gcs_blob_for("images.zip")
-    try:
-        upload_gcs_blob_from_bytes(blob, f.getvalue(), "application/zip")
-        yield blob.public_url
-    finally:
-        UploadedFile.objects.from_gcs_blob(blob).delete()
+    with temp_upload_file_from_bytes(
+        "images.zip", f.getvalue(), "application/zip"
+    ) as zip_url:
+        yield zip_url
 
 
 def render_flux_lora_fast_form(selected_model: str):

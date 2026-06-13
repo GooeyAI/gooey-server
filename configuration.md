@@ -61,12 +61,23 @@ A Google Cloud service account (`serviceAccountKey.json` or `GOOGLE_APPLICATION_
 parts of the system: Firebase auth, GCS file storage, Google TTS, Google Speech-to-Text, Google Translate, and Gemini
 models. By default we use the local filesystem for file storage and django db for authentication.
 
+| Variable                                                         | Required | Default | Description                                                                                                                                        |
+| ---------------------------------------------------------------- | -------- | ------- |----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` / `serviceAccountKey.json` | No       | —       | Service account key as a JSON string (alternative to `serviceAccountKey.json`). Required if you want to use any Google Cloud services.             |
+| `ENABLE_FIREBASE_AUTH`                                           | No       | `False` | Enable Firebase Authentication instead of local password hash |
+| `GOOGLE_CLIENT_ID`                                               | No       | -       | Google OAuth client ID (for Firebase Google sign-in)                                                                                               |
+| `FIREBASE_CONFIG`                                                | No       | -       | Firebase web app config JSON string                                                                                                                |
+| `GCP_PROJECT`                                                    | No       | -       | Google Cloud project ID                                                                                                                            |
+| `GCP_REGION`                                                     | No       | -       | Google Cloud region                                                                                                                                |
+| `GS_BUCKET_NAME`                                                 | No       | -       | Use this GCS bucket for file storage instead of local filesystem                                                                                   |
+| `GS_MEDIA_PATH`                                                  | No       | -       | Path prefix inside the GCS bucket for media files                                                                                                  |
+| `GS_STATIC_PATH`                                                  | No       | -       | Path prefix inside the GCS bucket for static pages                                                                                                 |
+
 ### ☁️ Create a google cloud / firebase account
 
 1. Create a [google cloud](https://console.cloud.google.com/) project
 2. Create a [firebase project](https://console.firebase.google.com/) (using the same google cloud project)
 3. Enable the following services:
-   - [Firestore](https://console.firebase.google.com/project/_/firestore)
    - [Authentication](https://console.firebase.google.com/project/_/authentication)
    - [Storage](https://console.firebase.google.com/project/_/storage)
    - [Speech-to-Text](https://console.cloud.google.com/marketplace/product/google/speech.googleapis.com)
@@ -82,20 +93,9 @@ models. By default we use the local filesystem for file storage and django db fo
 5. Create and Download a JSON Key for this service account and save it to the project root as `serviceAccountKey.json`.
 6. Add your project & bucket name to `.env` (see [configuration.md](configuration.md) for all available settings)
 
-| Variable                                                         | Required | Default | Description                                                                                                                            |
-| ---------------------------------------------------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `ENABLE_FIREBASE_AUTH`                                           | No       | `False` | Enable Firebase based authentication instead of local password hash                                                                    |
-| `GOOGLE_APPLICATION_CREDENTIALS_JSON` / `serviceAccountKey.json` | No       | —       | Service account key as a JSON string (alternative to `serviceAccountKey.json`). Required if you want to use any Google Cloud services. |
-| `GCP_PROJECT`                                                    | No       | -       | Google Cloud project ID                                                                                                                |
-| `GCP_REGION`                                                     | No       | -       | Google Cloud region                                                                                                                    |
-| `GOOGLE_CLIENT_ID`                                               | No       | -       | Google OAuth client ID (for Firebase Google sign-in)                                                                                   |
-| `FIREBASE_CONFIG`                                                | No       | -       | Firebase web app config JSON string                                                                                                    |
-| `GS_BUCKET_NAME`                                                 | No       | -       | GCS bucket for file storage                                                                                                            |
-| `GS_MEDIA_PATH`                                                  | No       | -       | Path prefix inside the GCS bucket                                                                                                      |
-
 ---
 
-## Local auth + filesystem storage
+## Local filesystem storage
 
 | Variable     | Required | Default   | Description                                     |
 | ------------ | -------- | --------- | ----------------------------------------------- |

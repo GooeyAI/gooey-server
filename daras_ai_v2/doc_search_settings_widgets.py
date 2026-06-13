@@ -17,9 +17,12 @@ if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
 
-_user_media_url_prefix = os.path.join(
-    "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
-)
+if settings.GS_BUCKET_NAME:
+    _user_media_url_prefix = os.path.join(
+        "storage.googleapis.com", settings.GS_BUCKET_NAME, settings.GS_MEDIA_PATH
+    )
+else:
+    _user_media_url_prefix = os.path.join(settings.APP_BASE_URL, settings.MEDIA_URL)
 
 SUPPORTED_SPREADSHEET_TYPES = (
     ".csv",

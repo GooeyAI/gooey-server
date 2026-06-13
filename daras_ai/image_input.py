@@ -1,3 +1,4 @@
+import datetime
 import math
 import mimetypes
 import os
@@ -10,8 +11,8 @@ from pathlib import Path
 import numpy as np
 import requests
 from django.db import transaction
-from PIL import Image, ImageOps
 from furl import furl
+from PIL import Image, ImageOps
 
 from daras_ai_v2 import gcs_v2, settings
 from daras_ai_v2.exceptions import UserError
@@ -19,6 +20,7 @@ from files.models import FileMetadata, UploadedFile
 
 if typing.TYPE_CHECKING:
     from google.cloud.storage import Blob, Bucket
+
     from app_users.models import AppUser
     from workspaces.models import Workspace
 
@@ -61,6 +63,56 @@ def resize_img_fit(img_bytes: bytes, size: tuple[int, int]) -> bytes:
     return cv2_img_to_bytes(img_cv2)
 
 
+def delete_uploaded_url(url: str):
+    from daras_ai_v2.doc_search_settings_widgets import is_user_uploaded_url
+
+    if not is_user_uploaded_url(url):
+        return
+    if settings.GS_BUCKET_NAME:
+        blob = gcs_bucket().blob(url.split(settings.GS_BUCKET_NAME)[-1].strip("/"))
+        UploadedFile.objects.from_gcs_blob(blob).delete()
+    else:
+        try:
+            relpath = Path(furl(url).pathstr).relative_to(settings.MEDIA_URL)
+        except ValueError:
+            return
+        abspath = settings.MEDIA_ROOT / relpath
+        abspath.unlink(missing_ok=True)
+
+
+@contextmanager
+def temp_upload_file_from_bytes(
+    filename: str,
+    data: bytes,
+    content_type: str = None,
+    *,
+    workspace: typing.Optional["Workspace"] = None,
+    user: typing.Optional["AppUser"] = None,
+    is_user_uploaded: bool = False,
+) -> typing.Iterator[str]:
+    if settings.GS_BUCKET_NAME:
+        blob = gcs_blob_for(filename)
+        uploaded_file, public_url = upload_gcs_blob_from_bytes(
+            blob,
+            data,
+            content_type,
+            filename=filename,
+            workspace=workspace,
+            user=user,
+            is_user_uploaded=is_user_uploaded,
+        )
+        try:
+            yield public_url
+        finally:
+            uploaded_file.delete()
+    else:
+        path, public_url = save_local_file_from_bytes(filename, data)
+        try:
+            yield public_url
+        finally:
+            path.unlink(missing_ok=True)
+
+
 def upload_file_from_bytes(
     filename: str,
     data: bytes,
@@ -70,17 +122,35 @@ def upload_file_from_bytes(
     user: typing.Optional["AppUser"] = None,
     is_user_uploaded: bool = False,
 ) -> str:
+    if settings.GS_BUCKET_NAME:
+        blob = gcs_blob_for(filename)
+        return upload_gcs_blob_from_bytes(
+            blob,
+            data,
+            content_type,
+            filename=filename,
+            workspace=workspace,
+            user=user,
+            is_user_uploaded=is_user_uploaded,
+        )[1]
+    else:
+        return save_local_file_from_bytes(filename, data)[1]
+
+
+@contextmanager
+def generate_signed_url(filename: str, content_type: str | None = None):
     blob = gcs_blob_for(filename)
-    upload_gcs_blob_from_bytes(
-        blob,
-        data,
-        content_type,
-        filename=filename,
-        workspace=workspace,
-        user=user,
-        is_user_uploaded=is_user_uploaded,
+    content_type: str = (
+        content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
     )
-    return blob.public_url
+    upload_url = blob.generate_signed_url(
+        version="v4",
+        expiration=datetime.timedelta(hours=12),
+        method="PUT",
+        content_type=content_type,
+    )
+    with register_blob(blob, filename=filename, content_type=content_type):
+        yield upload_url, blob.public_url
 
 
 def gcs_blob_for(filename: str) -> "Blob":
@@ -101,7 +171,7 @@ def upload_gcs_blob_from_bytes(
     workspace: typing.Optional["Workspace"] = None,
     user: typing.Optional["AppUser"] = None,
     is_user_uploaded: bool = False,
-) -> str:
+) -> typing.Tuple[UploadedFile, str]:
     if not content_type:
         content_type = mimetypes.guess_type(blob.path)[0]
     content_type = content_type or "application/octet-stream"
@@ -113,9 +183,21 @@ def upload_gcs_blob_from_bytes(
         workspace=workspace,
         user=user,
         is_user_uploaded=is_user_uploaded,
-    ):
+    ) as uploaded_file:
         blob.upload_from_string(data, content_type=content_type)
-    return blob.public_url
+    return uploaded_file, blob.public_url
+
+
+def save_local_file_from_bytes(filename: str, data: bytes) -> tuple[Path, str]:
+    path = settings.MEDIA_ROOT / str(uuid.uuid1()) / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    url = str(
+        furl(settings.APP_BASE_URL)
+        / settings.MEDIA_URL
+        / str(path.relative_to(settings.MEDIA_ROOT))
+    )
+    return path, url
 
 
 @contextmanager
@@ -129,9 +211,10 @@ def register_blob(
     user: typing.Optional["AppUser"] = None,
     is_user_uploaded: bool = False,
 ) -> typing.Iterator[UploadedFile]:
+    from google.api_core import exceptions as gcs_exceptions
+
     from app_users.models import AppUser
     from celeryapp.tasks import get_running_saved_run
-    from google.api_core import exceptions as gcs_exceptions
 
     saved_run = get_running_saved_run()
     if saved_run:
@@ -197,6 +280,9 @@ def register_blob(
 
 
 def gcs_bucket() -> "Bucket":
+    if not settings.GS_BUCKET_NAME:
+        raise UserError("This feature is only available with GCS")
+
     from firebase_admin import storage
 
     return storage.bucket(settings.GS_BUCKET_NAME)

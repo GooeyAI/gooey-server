@@ -1,11 +1,10 @@
 import base64
-import datetime
 import os
 import typing
 from contextlib import ExitStack
 from time import time
 
-from daras_ai.image_input import gcs_blob_for, register_blob
+from daras_ai.image_input import generate_signed_url
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import GPUError, UserError
 from gooeysite.bg_db_conn import get_celery_result_db_safe
@@ -64,25 +63,15 @@ def call_celery_task_outfile_with_ret(
     filename: str,
     num_outputs: int = 1,
 ):
-    blobs = [gcs_blob_for(filename) for i in range(num_outputs)]
-    pipeline["upload_urls"] = [
-        blob.generate_signed_url(
-            version="v4",
-            # This URL is valid for 15 minutes
-            expiration=datetime.timedelta(hours=12),
-            # Allow PUT requests using this URL.
-            method="PUT",
-            content_type=content_type,
-        )
-        for blob in blobs
-    ]
     with ExitStack() as stack:
-        for blob in blobs:
-            stack.enter_context(
-                register_blob(blob, filename=filename, content_type=content_type)
-            )
+        generatd_urls = [
+            stack.enter_context(generate_signed_url(filename, content_type))
+            for _ in range(num_outputs)
+        ]
+        upload_urls, public_urls = zip(*generatd_urls)
+        pipeline["upload_urls"] = upload_urls
         ret = call_celery_task(task_name, pipeline=pipeline, inputs=inputs)
-    return [blob.public_url for blob in blobs], ret
+        return public_urls, ret
 
 
 _app = None
