@@ -125,11 +125,17 @@ html {
 @font-face {
   font-family: basiercircle;
   src: url("basiercircle-regular.otf");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: basiercircle-medium;
+  font-family: basiercircle;
   src: url("basiercircle-medium.otf");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 body {
@@ -703,6 +709,30 @@ a.text-primary:hover {
   text-overflow: ellipsis;
 }
 
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+.border-hover {
+  transition: border-color 0.10s ease;
+}
+.border-hover:hover {
+  border-color: var(--tile-hover-color, var(--bs-secondary, #dee2e6)) !important;
+}
+.tile-icon {
+  transition: color 0.1s ease;
+}
+.border-hover:hover .tile-icon {
+  color: var(--tile-hover-color, inherit);
+}
+
 .footer a,
 .footer p {
   font-size: 14px;
@@ -910,4 +940,20 @@ button {
 
 .ag-horizontal-left-spacer, .ag-body-viewport {
   background-color: #f7f7f7;
+}
+
+.object-fit-contain {
+  object-fit: contain;
+}
+.object-fit-cover {
+  object-fit: cover;
+}
+.object-fit-fill {
+  object-fit: fill;
+}
+.object-fit-scale {
+  object-fit: scale-down;
+}
+.object-fit-none {
+  object-fit: none;
 }

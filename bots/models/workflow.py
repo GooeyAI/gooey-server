@@ -244,6 +244,9 @@ class Workflow(models.IntegerChoices):
 
         return workflow_map[self]
 
+    def get_metadata(self) -> "WorkflowMetadata | None":
+        return WorkflowMetadata.objects.filter(workflow=self).first()
+
     def get_or_create_metadata(self) -> "WorkflowMetadata":
         return get_or_create_lazy(
             WorkflowMetadata,
@@ -280,6 +283,31 @@ class WorkflowMetadata(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     price_multiplier = models.FloatField(default=1)
     emoji = models.TextField(blank=True, default="")
+    fa_icon = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            'Font Awesome icon HTML, e.g. &lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
+        ),
+    )
+    color = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Hex color associated with this workflow, e.g. #4d8af0",
+    )
 
     def __str__(self):
-        return self.meta_title
+        return self.short_title or self.meta_title
+
+    def tab_icon_html(self) -> str:
+        if self.fa_icon:
+            return self.fa_icon
+        if self.emoji:
+            return self.emoji
+        if self.default_image:
+            return (
+                f'<img src="{self.default_image}" alt="" '
+                'class="workflow-tab-icon-img" />'
+            )
+        return ""

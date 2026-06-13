@@ -1,13 +1,16 @@
 import datetime
 import json
+import re
 
 import django.db.models
 from django import forms
 from django.conf import settings
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.db.models import Count, F, Max, Sum
 from django.template import loader
 from django.utils import dateformat
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.timesince import timesince
 
@@ -982,8 +985,67 @@ class FeedbackAdmin(GooeyModelAdmin):
     conversation_link.short_description = "Conversation"
 
 
+class ColorPickerWidget(forms.TextInput):
+    """A hex text input paired with a native color picker, kept in sync."""
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = attrs or {}
+        text_id = attrs.get("id") or f"id_{name}"
+        picker_id = f"{text_id}_picker"
+        attrs.setdefault("placeholder", "#4d8af0")
+        attrs["oninput"] = (
+            f"document.getElementById('{picker_id}').value = "
+            f"/^#[0-9a-fA-F]{{6}}$/.test(this.value) ? this.value : '#000000';"
+        )
+        text_html = super().render(name, value, attrs, renderer)
+        picker_value = value if value and value.startswith("#") else "#000000"
+        picker_html = format_html(
+            '<input type="color" id="{}" value="{}" '
+            "oninput=\"document.getElementById('{}').value = this.value;\" "
+            'style="margin-right: 8px; vertical-align: middle;">',
+            picker_id,
+            picker_value,
+            text_id,
+        )
+        return mark_safe(picker_html + text_html)
+
+
+FA_ICON_RE = re.compile(r'<i class="[\w\s-]+"></i>')
+HEX_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
+
+
+class IconColorAdminForm(forms.ModelForm):
+    """Validates the admin-only `fa_icon` / `color` fields to keep the raw HTML
+    rendered downstream constrained to a safe Font Awesome `<i>` tag and a hex color."""
+
+    class Meta:
+        widgets = {"color": ColorPickerWidget()}
+
+    def clean_fa_icon(self):
+        value = (self.cleaned_data.get("fa_icon") or "").strip()
+        if value and not FA_ICON_RE.fullmatch(value):
+            raise ValidationError(
+                "Must be a single Font Awesome icon tag, "
+                'e.g. <i class="fa-regular fa-tag"></i>'
+            )
+        return value
+
+    def clean_color(self):
+        value = (self.cleaned_data.get("color") or "").strip()
+        if value and not HEX_COLOR_RE.fullmatch(value):
+            raise ValidationError("Must be a hex color, e.g. #4d8af0")
+        return value
+
+
+class WorkflowMetadataAdminForm(IconColorAdminForm):
+    class Meta(IconColorAdminForm.Meta):
+        model = WorkflowMetadata
+        fields = "__all__"
+
+
 @admin.register(WorkflowMetadata)
 class WorkflowMetadataAdmin(GooeyModelAdmin):
+    form = WorkflowMetadataAdminForm
     list_display = [
         "workflow",
         "short_title",
@@ -993,22 +1055,35 @@ class WorkflowMetadataAdmin(GooeyModelAdmin):
         "updated_at",
         "price_multiplier",
         "emoji",
+        "fa_icon",
+        "color",
     ]
-    search_fields = ["workflow", "meta_title", "meta_description"]
+    search_fields = ["short_title", "meta_title", "workflow"]
     list_filter = ["workflow"]
     readonly_fields = ["created_at", "updated_at"]
 
 
+class TagAdminForm(IconColorAdminForm):
+    class Meta(IconColorAdminForm.Meta):
+        model = Tag
+        fields = "__all__"
+
+
 @admin.register(Tag)
 class TagAdmin(GooeyModelAdmin):
+    form = TagAdminForm
     list_display = [
         "name",
         "category",
         "icon",
+        "fa_icon",
+        "color",
+        "featured",
         "featured_priority",
+        "hide",
         "created_at",
         "updated_at",
     ]
     search_fields = ["name", "category"]
-    list_filter = ["category"]
+    list_filter = ["category", "featured", "hide"]
     readonly_fields = ["created_at", "updated_at"]

@@ -290,21 +290,27 @@ class PublishedRun(models.Model):
         else:
             return WorkflowAccessLevel(self.workspace_access).get_team_sharing_icon()
 
+    def get_share_badge_data(self) -> dict[str, str]:
+        icon_html, label = self._share_badge_icon_and_label()
+        return {"iconHtml": icon_html, "label": label}
+
     def get_share_badge_html(self):
         """
         Shown externally AND on listings. For example: saved list, profile page.
         """
+        icon_html, label = self._share_badge_icon_and_label()
+        return f"{icon_html} {label}"
+
+    def _share_badge_icon_and_label(self) -> tuple[str, str]:
         if self.workspace.is_personal or (
             self.public_access == WorkflowAccessLevel.FIND_AND_VIEW
         ):
             perm = WorkflowAccessLevel(self.public_access)
-            return f"{perm.get_public_sharing_icon()} {perm.get_public_sharing_label()}"
-
-        perm = WorkflowAccessLevel(self.workspace_access)
+            return perm.get_public_sharing_icon(), perm.get_public_sharing_label()
+        team_perm = WorkflowAccessLevel(self.workspace_access)
         if self.workspace_access == WorkflowAccessLevel.VIEW_ONLY:
-            return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
-        else:
-            return f"{self.workspace.html_icon(size='20px')} {perm.get_team_sharing_label()}"
+            return team_perm.get_team_sharing_icon(), team_perm.get_team_sharing_label()
+        return self.workspace.html_icon(size="20px"), team_perm.get_team_sharing_label()
 
     def submit_api_call(
         self,
@@ -398,12 +404,39 @@ class TagCategory(models.IntegerChoices):
 class Tag(models.Model):
     name = models.CharField(max_length=64)
     icon = models.TextField(blank=True, default="")
+    fa_icon = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            'Font Awesome icon HTML, e.g. &lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
+        ),
+    )
+    color = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Hex color associated with this tag, e.g. #4d8af0",
+    )
     category = models.IntegerField(
         choices=TagCategory.choices, default=TagCategory.other
     )
     featured_priority = models.IntegerField(
         default=1,
-        help_text="Higher priority tags are shown first. If 0, then the tag is not shown at all.",
+        help_text="Higher priority tags are shown first.",
+    )
+    description = models.TextField(blank=True, default="")
+    hide = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is hidden and not shown anywhere.",
+    )
+    featured = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is featured, ordered by priority.",
+    )
+    landing_page = CustomURLField(
+        blank=True,
+        default="",
+        help_text="Optional landing page URL for this tag.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -417,7 +450,7 @@ class Tag(models.Model):
 
     @classmethod
     def get_options(cls) -> list["Tag"]:
-        return list(cls.objects.filter(featured_priority__gte=1))
+        return list(cls.objects.filter(hide=False))
 
     class Meta:
         constraints = [
