@@ -268,7 +268,10 @@ def functions_input(
             col2.node.children[0].props["className"] += " col-12"
 
     def render_section():
-        from functions.composio_tools import render_inbuilt_tools_selector
+        from functions.composio_tools import (
+            render_inbuilt_tools_selector,
+            render_composio_meta_tool_scope_warning,
+        )
 
         gui.session_state.setdefault(key, [{}])
         with gui.div(className="d-flex align-items-center gap-3 mb-2"):
@@ -283,6 +286,7 @@ def functions_input(
             render_inbuilt_tools_selector()
 
         list_view_editor(key=key, render_inputs=render_inputs)
+        render_composio_meta_tool_scope_warning(gui.session_state[key])
 
     functions_enabled = switch_with_section(
         f"##### {field_title_desc(BasePage.RequestModel, key)}",
