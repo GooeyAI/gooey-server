@@ -45,7 +45,7 @@ class CodeLanguages(PydanticEnumMixin, Enum):
 class FunctionsPage(BasePage):
     title = "Functions"
     workflow = Workflow.FUNCTIONS
-    slug_versions = ["functions", "tools", "function", "fn", "functions"]
+    slug_versions = ["tools", "function", "fn", "functions"]
     show_settings = False
     price = 1
 

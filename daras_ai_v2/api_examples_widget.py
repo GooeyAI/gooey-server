@@ -403,7 +403,7 @@ Note that you do not need the API key for this endpoint and can use it directly 
     api_docs_url = (
         furl(
             settings.API_BASE_URL,
-            fragment_path=f"operation/{VideoBotsPage.slug_versions[0]}__stream_create",
+            fragment_path=f"operation/{VideoBotsPage.canonical_slug()}__stream_create",
         )
         / "docs"
     )

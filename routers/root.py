@@ -100,7 +100,7 @@ async def favicon():
     return FileResponse("static/favicon.ico")
 
 
-@app.get("/docs", include_in_schema=False)
+@app.get("/docs")
 async def redoc_html():
     return get_redoc_html(
         openapi_url="/openapi.json",

@@ -2,17 +2,16 @@ import threading
 
 from time import perf_counter
 
+from loguru import logger
+
 threadlocal = threading.local()
 
 
-def start_perf_timer():
-    threadlocal._perf_timer_start = perf_counter()
+def perf_timeit(f):
+    def wrapper(*args, **kwargs):
+        s = perf_counter()
+        result = f(*args, **kwargs)
+        logger.debug(f"{f.__name__} took {(perf_counter() - s) * 1000:.2f}ms")
+        return result
 
-
-def perf_timer():
-    try:
-        start = threadlocal._perf_timer_start
-    except AttributeError:
-        start = 0
-    ms = (perf_counter() - start) * 1000
-    return f"{ms:.2f}ms"
+    return wrapper

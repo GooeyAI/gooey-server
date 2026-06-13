@@ -91,7 +91,7 @@ class FinetuneModels(FinetuneModel, Enum):
 class ModelTrainerPage(BasePage):
     title = "Model Trainer"
     workflow = Workflow.MODEL_TRAINER
-    slug_versions = ["model-trainer", "train", "lora", "model-trainer"]
+    slug_versions = ["train", "lora", "model-trainer"]
 
     class RequestModel(BasePage.RequestModel):
         selected_model: typing.Literal[tuple(e.name for e in FinetuneModels)] | None = (

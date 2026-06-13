@@ -361,7 +361,7 @@ class BotIntegrationAdmin(GooeyModelAdmin):
             url=get_app_route_url(
                 integrations_stats_route,
                 path_params=dict(
-                    page_slug=VideoBotsPage.slug_versions[0],
+                    page_slug=VideoBotsPage.canonical_slug(),
                     integration_id=integration_id,
                 ),
             ),
