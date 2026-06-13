@@ -421,7 +421,6 @@ def _run_chat_model(
                 audio_url=audio_url,
                 audio_session_extra=audio_session_extra,
                 messages=messages,
-                temperature=temperature,
                 tools=tools,
             )
         case ModelProvider.openai:
