@@ -75,6 +75,17 @@ class OpenAI_TTS_Voices(OpenAI_Voice, GooeyEnum):
 
     ballad = OpenAI_Voice(label="Ballad (GPT-4o only)", voice_id="ballad")
     verse = OpenAI_Voice(label="Verse (GPT-4o only)", voice_id="verse")
+    marin = OpenAI_Voice(label="Marin (GPT-4o only)", voice_id="marin")
+    cedar = OpenAI_Voice(label="Cedar (GPT-4o only)", voice_id="cedar")
+
+    @classmethod
+    def supported_voices(cls, model_name: str | None = None):
+        model = OpenAI_TTS_Models.get(model_name)
+        match model:
+            case OpenAI_TTS_Models.gpt_4_o_mini | None:
+                return list(cls)
+            case _:
+                return list(set(cls) - {cls.ballad, cls.verse, cls.marin, cls.cedar})
 
 
 class GHANA_NLP_TTS_LANGUAGES(GooeyEnum):
@@ -229,11 +240,14 @@ def mms_tts_language_options():
 
 
 def openai_tts_selector():
-    enum_selector(
-        OpenAI_TTS_Voices,
+    model_name = gui.session_state.get("openai_tts_model")
+    voices = OpenAI_TTS_Voices.supported_voices(model_name)
+    options = {voice.name: voice.label for voice in voices}
+    gui.selectbox(
         label="###### OpenAI Voice Name",
         key="openai_voice_name",
-        use_selectbox=True,
+        options=list(options),
+        format_func=options.__getitem__,
     )
 
 
