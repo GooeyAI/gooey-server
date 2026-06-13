@@ -16,6 +16,7 @@ from bots.models import (
     Conversation,
     Message,
     Platform,
+    SavedRun,
 )
 from daras_ai_v2.bots import save_msg_pair_to_db
 from daras_ai_v2.facebook_bots import WhatsappBot
@@ -95,6 +96,7 @@ def msg_analysis(self, msg_id: int, anal_id: int, countdown: int | None):
         current_user=msg.conversation.bot_integration.created_by,
         request_body=dict(variables=variables),
         parent_pr=anal.published_run,
+        surface=SavedRun.Surface.analysis,
     )
 
     # save the run before the result is ready

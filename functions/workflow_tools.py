@@ -7,6 +7,7 @@ import typing
 from django.utils.text import slugify
 
 from app_users.models import AppUser
+from bots.models import SavedRun
 from daras_ai_v2.exceptions import UserError
 from functions.models import CalledFunction, FunctionTrigger
 from functions.base_llm_tool import (
@@ -17,7 +18,6 @@ from functions.base_llm_tool import (
 
 
 if typing.TYPE_CHECKING:
-    from bots.models import SavedRun
     from daras_ai_v2.base import BasePage
     from workspaces.models import Workspace
 
@@ -120,6 +120,7 @@ class WorkflowLLMTool(BaseLLMTool):
             request_body=request_body,
             deduct_credits=False,
             called_fn=called_fn,
+            surface=SavedRun.Surface.tool_call,
         )
         self.fn_sr = fn_sr
 

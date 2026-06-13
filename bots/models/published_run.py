@@ -315,6 +315,7 @@ class PublishedRun(models.Model):
         enable_rate_limits: bool = False,
         deduct_credits: bool = True,
         called_fn: CalledFunction | None = None,
+        **defaults,
     ) -> tuple[celery.result.AsyncResult, SavedRun]:
         return self.saved_run.submit_api_call(
             workspace=workspace,
@@ -324,6 +325,7 @@ class PublishedRun(models.Model):
             deduct_credits=deduct_credits,
             parent_pr=self,
             called_fn=called_fn,
+            **defaults,
         )
 
     @classmethod

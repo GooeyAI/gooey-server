@@ -13,6 +13,7 @@ from bots.models import (
     BotIntegration,
     BotIntegrationAnalysisRun,
     Platform,
+    SavedRun,
 )
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.api_examples_widget import bot_api_example_generator
@@ -576,6 +577,7 @@ def integration_details_generator(bi: BotIntegration, user: AppUser | None):
             workspace=bi.workspace,
             current_user=user,
             request_body=dict(variables=variables),
+            surface=SavedRun.Surface.internal,
         )
         sr.wait_for_celery_result(result)
         # if failed, show error and abort

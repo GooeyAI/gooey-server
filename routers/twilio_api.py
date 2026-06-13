@@ -11,7 +11,7 @@ from twilio.twiml import TwiML
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
-from bots.models import Conversation, BotIntegration
+from bots.models import Conversation, BotIntegration, SavedRun
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import normalised_lang_in_collection
 from daras_ai_v2.bots import BotIntegrationLookupFailed, msg_handler
@@ -281,6 +281,7 @@ def resp_say_or_tts_play(
                 current_user=bot.current_user,
                 workspace=bot.workspace,
                 request_body=tts_state,
+                surface=SavedRun.Surface.deployment,
             )
             # wait for the TTS to finish
             sr.wait_for_celery_result(result)

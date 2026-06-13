@@ -718,6 +718,7 @@ def exec_export_fn(bi: BotIntegration, fn_sr: SavedRun, fn_pr: PublishedRun | No
         request_body=dict(variables=variables, variables_schema=variables_schema),
         parent_pr=fn_pr,
         current_user=bi.workspace.created_by,
+        surface=SavedRun.Surface.export,
     )
 
 

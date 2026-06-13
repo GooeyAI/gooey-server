@@ -13,7 +13,6 @@ import fastapi
 from bots.models import (
     BotIntegration,
     SavedRun,
-    db_msgs_to_api_json,
     PublishedRun,
 )
 from daras_ai_v2 import settings
@@ -162,42 +161,6 @@ def can_launch_gooey_builder(
     # return current_workspace and current_workspace.enable_bot_builder
 
 
-def get_conversation_data_for_saved_run(
-    bot_builder_integration: BotIntegration, sr: SavedRun
-) -> dict | None:
-    """
-    Returns conversation_data for the builder conversation associated with the given
-    SavedRun (messages up to gooey_builder_last_message_id), or None if not found.
-    """
-    if not sr.parent_builder_saved_run:
-        return None
-
-    from bots.models.convo_msg import Message
-    from routers.bots_api import api_hashids
-
-    try:
-        last_message = Message.objects.get(saved_run=sr.parent_builder_saved_run)
-    except Message.DoesNotExist:
-        return None
-
-    conversation = last_message.conversation
-    msgs_qs = conversation.messages.filter(created_at__lte=last_message.created_at)
-    messages = list(
-        db_msgs_to_api_json(msgs_qs.last_n_msgs(reset_at=conversation.reset_at))
-    )
-    data = dict(
-        bot_id=api_hashids.encode(bot_builder_integration.id),
-        user_id=conversation.web_user_id,
-        timestamp=conversation.created_at.isoformat(),
-        messages=messages,
-    )
-    # only send the conversation id for a full conversation,
-    # for partial messages start a new conversation
-    if last_message == conversation.messages.latest():
-        data["id"] = api_hashids.encode(conversation.id)
-    return data
-
-
 router = CustomAPIRouter()
 
 
@@ -223,6 +186,7 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         parent_pr=workflow_pr,
         uid=request.user.uid,
         workspace_id=workspace.id,
+        surface=SavedRun.Surface.builder_child,
     )
     workflow_sr.state.update(body.workflow_state)
     workflow_sr.save()
@@ -239,6 +203,7 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         current_user=request.user,
         workspace=workspace,
         request_body=request_body,
+        surface=SavedRun.Surface.builder_prompt,
     )[1]
     workflow_sr.save(update_fields=["parent_builder_saved_run"])
 
@@ -272,7 +237,7 @@ def fetch_builder_conversations(
             workflow=Workflow.VIDEO_BOTS,
             workspace=get_current_workspace(request.user, request.session),
             uid=request.user.uid,
-            parent_builder_saved_run__isnull=False,
+            surface=SavedRun.Surface.builder_child,
         )
         .annotate(title=F("parent_builder_saved_run__state__input_prompt"))
         .order_by("-updated_at")[: body.limit]

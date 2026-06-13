@@ -259,6 +259,7 @@ def run_qr_bot(
             response_format_type="json_object",
         ),
         deduct_credits=False,
+        surface=SavedRun.Surface.internal,
     )
     gui.session_state[key + ":bot_run_id"] = sr.id
     return VideoBotsPage.realtime_channel_name(sr.run_id, sr.uid)

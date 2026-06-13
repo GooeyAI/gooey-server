@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 from app_users.models import AppUser
+from bots.models import SavedRun
 from daras_ai_v2 import settings
 from daras_ai_v2.azure_image_moderation import is_image_nsfw
 from daras_ai_v2.exceptions import UserError
@@ -35,6 +36,7 @@ def safety_checker_text(text_input: str):
             current_user=billing_account,
             request_body=dict(variables=dict(input=text_input)),
             deduct_credits=False,
+            surface=SavedRun.Surface.internal,
         )
     )
 
