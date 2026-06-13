@@ -2,16 +2,6 @@
 
 from django.db import migrations, models
 
-from bots.models import SavedRun
-
-
-def backfill_surface_from_is_api_call(apps, schema_editor):
-    SavedRunModel = apps.get_model("bots", "SavedRun")
-    db_alias = schema_editor.connection.alias
-    SavedRunModel.objects.using(db_alias).filter(is_api_call=True).update(
-        surface=SavedRun.Surface.api
-    )
-
 
 class Migration(migrations.Migration):
 
@@ -39,10 +29,6 @@ class Migration(migrations.Migration):
                 default=0,
                 help_text="Where this run was created.<br><br>Run: A run created from the UI playground directly by the user.<br>API: Called by an API.<br>Deployment: Called by a bot integration.<br>Builder Prompt: A prompt submitted to the Gooey builder.<br>Builder Child: A child run created by the Gooey builder.<br>Tool Call: Any tool calls made by a workflow.<br>Internal: Any internal calls made by the app, e.g. QR code or icon generator.<br>Analysis: A run created from the bot integration analysis feature.<br>Export: A run created from the scheduled bot integration export feature.<br>Bulk: A run created from the bulk runner.",
             ),
-        ),
-        migrations.RunPython(
-            backfill_surface_from_is_api_call,
-            migrations.RunPython.noop,
         ),
         migrations.AlterField(
             model_name="savedrun",
