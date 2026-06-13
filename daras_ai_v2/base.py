@@ -216,16 +216,8 @@ class BasePage:
         self.request = request
 
     @classmethod
-    def api_endpoint(cls) -> str:
-        return f"/v2/{cls.slug_versions[0]}"
-
-    @classmethod
     def canonical_slug(cls) -> str:
         return cls.slug_versions[-1]
-
-    @classmethod
-    def legacy_api_slugs(cls) -> list[str]:
-        return []
 
     def current_app_url(
         self,
@@ -301,7 +293,9 @@ class BasePage:
         elif example_id:
             query_params = dict(example_id=example_id)
         return (
-            furl(settings.API_BASE_URL, query_params=query_params) / cls.api_endpoint()
+            furl(settings.API_BASE_URL, query_params=query_params)
+            / "v2"
+            / cls.canonical_slug()
         )
 
     @classmethod
@@ -319,7 +313,7 @@ class BasePage:
     def setup_sentry(self):
         with sentry_sdk.configure_scope() as scope:
             scope.set_transaction_name(
-                "/" + self.slug_versions[0], source=TRANSACTION_SOURCE_ROUTE
+                "/" + self.canonical_slug(), source=TRANSACTION_SOURCE_ROUTE
             )
             scope.add_event_processor(self.sentry_event_set_request)
             scope.add_event_processor(self.sentry_event_set_user)
@@ -2235,7 +2229,7 @@ class BasePage:
 
     @classmethod
     def realtime_channel_name(cls, run_id: str, uid: str) -> str:
-        return f"gooey-outputs/{cls.slug_versions[0]}/{uid}/{run_id}"
+        return f"gooey-outputs/{cls.canonical_slug()}/{uid}/{run_id}"
 
     def _setup_rng_seed(self):
         seed = gui.session_state.get("seed")
@@ -2476,7 +2470,7 @@ class BasePage:
         api_docs_url = str(
             furl(
                 settings.API_BASE_URL,
-                fragment_path=f"operation/{self.slug_versions[0]}",
+                fragment_path=f"operation/{self.canonical_slug()}",
             )
             / "docs"
         )

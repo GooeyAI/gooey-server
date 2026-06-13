@@ -139,13 +139,9 @@ class VideoBotsPage(BasePage):
     title = "Agent"  # "Create Interactive Video Bots"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
-    slug_versions = ["agent", "video-bots", "bots", "copilot", "agent"]
+    slug_versions = ["video-bots", "bots", "copilot", "agent"]
 
     functions_in_settings = False
-
-    @classmethod
-    def legacy_api_slugs(cls) -> list[str]:
-        return ["video-bots"]
 
     sane_defaults = {
         "messages": [],

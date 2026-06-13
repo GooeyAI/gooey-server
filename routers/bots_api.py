@@ -99,7 +99,7 @@ class CreateStreamResponse(BaseModel):
     "/v3/integrations/stream",
     response_model=CreateStreamResponse,
     responses={402: {}},
-    operation_id=VideoBotsPage.slug_versions[0] + "__stream_create",
+    operation_id=VideoBotsPage.canonical_slug() + "__stream_create",
     tags=["Agent Integrations"],
     name="Agent Integrations Create Stream",
 )
@@ -193,7 +193,7 @@ StreamEvent = ConversationStart | RunStart | MessagePart | FinalResponse | Strea
     "/v3/integrations/stream/{request_id}",
     response_model=StreamEvent,
     responses={402: {}},
-    operation_id=VideoBotsPage.slug_versions[0] + "__stream",
+    operation_id=VideoBotsPage.canonical_slug() + "__stream",
     tags=["Agent Integrations"],
     name="Agent Integrations Stream Response",
 )

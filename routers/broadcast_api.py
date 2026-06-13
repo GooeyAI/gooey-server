@@ -58,16 +58,6 @@ class BotBroadcastRequestModel(BaseModel):
 R = typing.TypeVar("R", bound=BotBroadcastRequestModel)
 
 
-@app.post(
-    f"/v2/{VideoBotsPage.slug_versions[0]}/broadcast/send/",
-    operation_id=VideoBotsPage.slug_versions[0] + "__broadcast",
-    tags=["Misc"],
-    name="Send Broadcast Message",
-)
-@app.post(
-    f"/v2/{VideoBotsPage.slug_versions[0]}/broadcast/send",
-    include_in_schema=False,
-)
 def broadcast_api_json(
     bot_request: BotBroadcastRequestModel,
     api_key: ApiKey = Depends(api_auth_header),
@@ -146,12 +136,16 @@ def broadcast_api_json(
     return {"status": "success", "count": total}
 
 
-for legacy_slug in VideoBotsPage.legacy_api_slugs():
+for slug in VideoBotsPage.slug_versions:
+    is_latest = slug == VideoBotsPage.canonical_slug()
     app.add_api_route(
-        f"/v2/{legacy_slug}/broadcast/send/",
-        broadcast_api_json,
         methods=["POST"],
-        include_in_schema=False,
+        path=f"/v2/{slug}/broadcast/send/",
+        endpoint=broadcast_api_json,
+        operation_id=slug + "__broadcast",
+        tags=["Misc"],
+        name="Send Broadcast Message",
+        include_in_schema=is_latest,
     )
 
 

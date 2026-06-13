@@ -283,7 +283,7 @@ def broadcast_input(bi: BotIntegration):
     api_docs_url = (
         furl(
             settings.API_BASE_URL,
-            fragment_path=f"operation/{VideoBotsPage.slug_versions[0]}__broadcast",
+            fragment_path=f"operation/{VideoBotsPage.canonical_slug()}__broadcast",
         )
         / "docs"
     )

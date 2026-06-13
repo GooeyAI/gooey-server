@@ -12,6 +12,7 @@ from bots.models import (
     PublishedRun,
     Workflow,
 )
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
 from routers import facebook_api
 from routers.root import RecipeTabs, integrations_stats_route
@@ -88,7 +89,7 @@ def test_integration_stats_route(db_fixtures, force_authentication, threadpool_s
 def test_all_post(db_fixtures, force_authentication, threadpool_subtest):
     for pr in PublishedRun.objects.all():
         for tab in RecipeTabs:
-            slug = random.choice(Workflow(pr.workflow).page_cls.slug_versions)
+            slug = random_slug(Workflow(pr.workflow).page_cls)
             url_path = tab.url_path(slug, "test-run-slug", pr.published_run_id)
             if RecipeTabs in [RecipeTabs.run, RecipeTabs.run_as_api]:
                 test_content = [pr.title]
@@ -109,3 +110,7 @@ def _test_post_path(url, *test_content):
         return
     else:
         assert False, f"Too many redirects: {url}"
+
+
+def random_slug(page_cls: type[BasePage]) -> str:
+    return random.choice(page_cls.slug_versions)
