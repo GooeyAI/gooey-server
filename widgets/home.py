@@ -13,7 +13,13 @@ from pydantic.alias_generators import to_camel
 from starlette.requests import Request
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, PublishedRunVersion, SavedRun, Workflow
+from bots.models import (
+    PublishedRun,
+    PublishedRunVersion,
+    SavedRun,
+    Workflow,
+    WorkspaceRecentWorkflow,
+)
 from bots.models.published_run import Tag
 from bots.models.workflow import WorkflowAccessLevel, WorkflowMetadata
 from cms.models import NewsItem, WorkflowCard, WorkflowTab
@@ -146,11 +152,9 @@ def render(request: Request):
         "HomePage",
         greeting=greeting,
         workspaceHeader=workspace_header,
-        # Disabled until recent-workflows query perf is fixed on a separate branch.
-        # recentWorkflows=_load_recent_workflows(
-        #     request.user, workspace, metadata_by_workflow
-        # ),
-        recentWorkflows=[],
+        recentWorkflows=_load_recent_workflows(
+            request.user, workspace, metadata_by_workflow
+        ),
         savedWorkflows=_load_saved_workflows(
             request.user, workspace, metadata_by_workflow
         ),
@@ -201,55 +205,36 @@ def _load_recent_workflows(
     workspace: Workspace | None,
     metadata_by_workflow: MetadataByWorkflow,
 ) -> list[WorkflowCardData]:
-    # Disabled until recent-workflows query perf is fixed on a separate branch.
-    return []
-    # if workspace is None:
-    #     return []
-    # runs = SavedRun.objects.filter(
-    #     workspace=workspace,
-    #     parent_version__published_run__isnull=False,
-    # )
-    # if user and not workspace.is_personal:
-    #     # in a team workspace, show only the current user's history
-    #     runs = runs.filter(uid=user.uid)
-    # latest_ids = (
-    #     runs.order_by("parent_version__published_run_id", "-updated_at")
-    #     .distinct("parent_version__published_run_id")
-    #     .values("id")
-    # )
-    # saved_runs = list(
-    #     SavedRun.objects.filter(id__in=latest_ids)
-    #     .select_related("parent_version__published_run")
-    #     .order_by("-updated_at")[:RECENT_WORKFLOW_LIST_LIMIT]
-    # )
-    # other_uids = {
-    #     sr.uid for sr in saved_runs if sr.uid and (not user or sr.uid != user.uid)
-    # }
-    # authors_by_uid = {u.uid: u for u in AppUser.objects.filter(uid__in=other_uids)}
-    # return [
-    #     _history_card(
-    #         sr,
-    #         author=author_from_user(
-    #             _history_author(sr, user=user, authors_by_uid=authors_by_uid),
-    #             current_user=user,
-    #         ),
-    #         metadata_by_workflow=metadata_by_workflow,
-    #     )
-    #     for sr in saved_runs
-    # ]
+    if workspace is None:
+        return []
 
+    qs = WorkspaceRecentWorkflow.objects.filter(workspace=workspace)
+    if user:
+        # show only the current user's history, even in a shared team workspace
+        qs = qs.filter(uid=user.uid)
 
-def _history_author(
-    sr: SavedRun,
-    *,
-    user: AppUser | None,
-    authors_by_uid: dict[str, AppUser],
-) -> AppUser | None:
-    if user and sr.uid == user.uid:
-        return user
-    if sr.uid:
-        return authors_by_uid.get(sr.uid)
-    return None
+    # The model upserts one row per (workspace, uid, published_run) and keeps the
+    # latest saved run on it, so filtering by uid already gives a single row per
+    # published run (its most recent saved run). Just take the most recent few.
+    rows = list(
+        qs.select_related(
+            "last_saved_run__parent_version__published_run",
+            "published_run",
+        ).order_by("-last_used_at")[:RECENT_WORKFLOW_LIST_LIMIT]
+    )
+    cards = []
+    for row in rows:
+        sr = row.last_saved_run
+        data = _history_card(
+            sr,
+            # rows are scoped to the current user's uid above, so every recent
+            # run is authored by the current user
+            author=author_from_user(user, current_user=user),
+            metadata_by_workflow=metadata_by_workflow,
+        )
+        data.updated_at = get_relative_time(row.last_used_at)
+        cards.append(data)
+    return cards
 
 
 def _load_saved_workflows(

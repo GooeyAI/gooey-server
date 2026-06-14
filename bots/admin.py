@@ -33,6 +33,7 @@ from bots.models import (
     Tag,
     Workflow,
     WorkflowMetadata,
+    WorkspaceRecentWorkflow,
 )
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
@@ -46,6 +47,7 @@ from gooeysite.custom_filters import (
 from gooeysite.custom_widgets import JSONEditorWidget
 from recipes.VideoBots import VideoBotsPage
 from routers.root import integrations_stats_route
+from workspaces.admin import WorkspaceAdmin
 
 fb_fields = [
     "fb_page_id",
@@ -1087,3 +1089,22 @@ class TagAdmin(GooeyModelAdmin):
     search_fields = ["name", "category"]
     list_filter = ["category", "featured", "hide"]
     readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(WorkspaceRecentWorkflow)
+class WorkspaceRecentWorkflowAdmin(GooeyModelAdmin):
+    list_display = [
+        "workspace",
+        "uid",
+        "published_run",
+        "last_saved_run",
+        "last_used_at",
+    ]
+    list_filter = [("uid", admin.EmptyFieldListFilter), "last_used_at"]
+    search_fields = [
+        "uid",
+        "published_run__published_run_id",
+        "published_run__title",
+    ] + [f"workspace__{field}" for field in WorkspaceAdmin.search_fields]
+    autocomplete_fields = ["workspace", "published_run", "last_saved_run"]
+    ordering = ["-last_used_at"]

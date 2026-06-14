@@ -20,6 +20,7 @@ from time import sleep
 import gooey_gui as gui
 import sentry_sdk
 from django.db.models import Q, Sum
+from django.utils import timezone
 from django.utils.text import slugify
 from fastapi import HTTPException
 from furl import furl
@@ -37,6 +38,7 @@ from bots.models import (
     SavedRun,
     Workflow,
     WorkflowAccessLevel,
+    WorkspaceRecentWorkflow,
 )
 from bots.models.published_run import Tag
 from daras_ai.image_input import truncate_text_words
@@ -2178,6 +2180,16 @@ class BasePage:
         sr = self.get_sr_from_ids(run_id, uid, create=True, defaults=defaults)
 
         self.dump_state_to_sr(self._get_validated_state(), sr)
+
+        if parent_version is not None:
+            # denormalized "last used" index powering the home page's recent
+            # workflows widget; see WorkspaceRecentWorkflow
+            WorkspaceRecentWorkflow.objects.update_or_create(
+                workspace=self.current_workspace,
+                uid=uid,
+                published_run_id=parent_version.published_run_id,
+                defaults=dict(last_saved_run=sr, last_used_at=timezone.now()),
+            )
 
         return sr
 
