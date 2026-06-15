@@ -111,6 +111,9 @@ git clone https://github.com/GooeyAI/gooey-server.git
 **2. Install Docker**
 
 - **macOS** — install [OrbStack](https://orbstack.dev/download) (recommended on Apple Silicon; native arm64, fast builds)
+> [!NOTE]
+> OrbStack requires you to start it the first time.
+
 - **Linux** — install [Docker Engine](https://docs.docker.com/engine/install/) and the [Compose plugin](https://docs.docker.com/compose/install/linux/)
 - **Windows** — install [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
 
