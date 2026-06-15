@@ -103,7 +103,12 @@ Specifically, this repo may be for you if:
 
 The fastest way to run everything locally is Docker Compose. It starts postgres, redis, rabbitmq, vespa, and the app services (API, Django admin, celery, gooey-gui) in one command.
 
-**1. Install Docker**
+**1. Clone the Gooey Server Repo**
+```bash
+git clone https://github.com/GooeyAI/gooey-server.git
+```
+
+**2. Install Docker**
 
 - **macOS** — install [OrbStack](https://orbstack.dev/download) (recommended on Apple Silicon; native arm64, fast builds)
 - **Linux** — install [Docker Engine](https://docs.docker.com/engine/install/) and the [Compose plugin](https://docs.docker.com/compose/install/linux/)
