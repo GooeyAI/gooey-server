@@ -158,9 +158,12 @@ def file_upload(request: Request, form_data: FormData = fastapi_request_form):
             status_code=400,
         )
 
-    if not request.user:
+    if not request.user and settings.ENABLE_FIREBASE_AUTH:
         init_firebase_anonymous_user(request)
-    workspace = get_current_workspace(request.user, request.session)
+    if request.user:
+        workspace = get_current_workspace(request.user, request.session)
+    else:
+        workspace = None
 
     return {
         "url": upload_file_from_bytes(
