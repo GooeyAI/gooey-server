@@ -7,6 +7,8 @@ scripts/import_users.ipynb
 .idea
 *.json
 
+media/
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,macOS
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,macOS
 

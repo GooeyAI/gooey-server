@@ -360,28 +360,19 @@ class BasePage:
         return event
 
     def load_state(self):
-        from recipes.VideoBots import VideoBotsPage
-
         if not gui.session_state:
             gui.session_state.update(self.current_sr_to_session_state())
 
-        is_running = gui.session_state.get(StateKeys.run_status)
+        channels = self._realtime_channel_names()
+        if not channels:
+            gui.realtime_clear_subs()
+            return
 
         builder_sr = self.current_sr.parent_builder_saved_run
         is_builder_running = builder_sr and builder_sr.run_status
 
-        if not (is_running or is_builder_running):
-            gui.realtime_clear_subs()
-            return
-
-        sr = self.current_sr
-        workflow_channel = self.realtime_channel_name(sr.run_id, sr.uid)
-
         if is_builder_running:
-            builder_channel = VideoBotsPage.realtime_channel_name(
-                builder_sr.run_id, builder_sr.uid
-            )
-            gui.realtime_pull([workflow_channel, builder_channel])
+            gui.realtime_pull(channels)
 
             new_state = self.current_sr_to_session_state()
             for k in ["--prev-request-hash"]:
@@ -392,9 +383,34 @@ class BasePage:
             gui.session_state.clear()
             gui.session_state.update(new_state)
         else:
-            output = gui.realtime_pull([workflow_channel])[0]
+            output = gui.realtime_pull(channels)[0]
             if output:
                 gui.session_state.update(output)
+
+    def register_realtime_subscriptions(self):
+        channels = self._realtime_channel_names()
+        if channels:
+            gui.realtime_register(channels)
+
+    def _realtime_channel_names(self) -> list[str] | None:
+        from recipes.VideoBots import VideoBotsPage
+
+        is_running = gui.session_state.get(StateKeys.run_status)
+        builder_sr = self.current_sr.parent_builder_saved_run
+        is_builder_running = builder_sr and builder_sr.run_status
+
+        if not (is_running or is_builder_running):
+            return None
+
+        sr = self.current_sr
+        workflow_channel = self.realtime_channel_name(sr.run_id, sr.uid)
+
+        if is_builder_running:
+            builder_channel = VideoBotsPage.realtime_channel_name(
+                builder_sr.run_id, builder_sr.uid
+            )
+            return [workflow_channel, builder_channel]
+        return [workflow_channel]
 
     def render_unauthorized(self):
         with gui.div(className="d-flex flex-column align-items-center"):
@@ -2158,6 +2174,8 @@ class BasePage:
 
         assert self.request, "request is not set for current session"
         if not self.request.user:
+            if not settings.ENABLE_FIREBASE_AUTH:
+                raise gui.RedirectException(self.get_auth_url())
             init_firebase_anonymous_user(self.request)
 
         if enable_rate_limits:

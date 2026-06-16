@@ -21,9 +21,8 @@ from daras_ai_v2.fastapi_tricks import (
 )
 from routers.custom_api_router import CustomAPIRouter
 import fastapi
-from routers.base_auth import DEFAULT_LOGIN_REDIRECT, safe_next_url, get_login_url
+from routers.base_auth import DEFAULT_LOGIN_REDIRECT, safe_next_url
 from daras_ai_v2.settings import templates
-import gooey_gui as gui
 
 FIREBASE_SESSION_COOKIE = "firebase_session"
 ANONYMOUS_USER_COOKIE = "anonymous_user"
@@ -164,9 +163,6 @@ def _verify_session_cookie(firebase_cookie: str) -> AppUser | None:
 def init_firebase_anonymous_user(
     request: fastapi.Request | BasePageRequest,
 ) -> "AppUser":
-    if not settings.ENABLE_FIREBASE_AUTH:
-        raise gui.RedirectException(get_login_url(request))
-
     uid = auth.create_user().uid
     user = AppUser.objects.create(
         uid=uid,

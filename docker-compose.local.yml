@@ -15,8 +15,17 @@
 #
 # App services use Dockerfile.local (native arm64 on Apple Silicon). The prod
 # Dockerfile compiles poppler and pulls amd64-only packages, so avoid it here.
+#
+# .env defaults (APP_BASE_URL, API_BASE_URL, ADMIN_BASE_URL, …) use localhost
+# ports published on the host. Map localhost to the host gateway so containers
+# can reach those URLs without per-service hostname overrides.
+
+x-localhost-host-gateway: &localhost-host-gateway
+  extra_hosts:
+    - "localhost:host-gateway"
 
 x-gooey-app: &gooey-app
+  <<: *localhost-host-gateway
   build:
     context: .
     dockerfile: Dockerfile.local
@@ -64,9 +73,10 @@ services:
 
   celery:
     <<: *gooey-app
-    command: celery -A celeryapp worker -P threads -c 16 -l DEBUG
+    command: celery -A celeryapp worker -P threads -c 16 -l INFO
 
   ui:
+    <<: *localhost-host-gateway
     build:
       context: ./gooey-gui
       dockerfile: Dockerfile.local

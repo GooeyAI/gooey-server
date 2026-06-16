@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from enum import Enum
 
 import gooey_gui as gui
+from gooey_gui.core.state import threadlocal
 from fastapi import HTTPException, Query
 from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -158,9 +159,12 @@ def file_upload(request: Request, form_data: FormData = fastapi_request_form):
             status_code=400,
         )
 
-    if not request.user:
-        init_firebase_anonymous_user(request)
-    workspace = get_current_workspace(request.user, request.session)
+    if not request.user and settings.ENABLE_FIREBASE_AUTH:
+        user = init_firebase_anonymous_user(request)
+        workspace = get_current_workspace(request.user, request.session)
+    else:
+        user = None
+        workspace = None
 
     return {
         "url": upload_file_from_bytes(
@@ -168,7 +172,7 @@ def file_upload(request: Request, form_data: FormData = fastapi_request_form):
             data,
             content_type,
             workspace=workspace,
-            user=request.user,
+            user=user,
             is_user_uploaded=True,
         )
     }
@@ -691,10 +695,16 @@ def render_recipe_page(
         query_params=dict(request.query_params) | dict(example_id=example_id or ""),
     )
 
+    from gooey_gui.core.state import threadlocal
+
     page.load_state()
 
-    with page_wrapper(request, page=page):
-        page.render()
+    try:
+        threadlocal.after_render = page.register_realtime_subscriptions
+        with page_wrapper(request, page=page):
+            page.render()
+    finally:
+        threadlocal.after_render = None
 
     return dict(
         meta=build_meta_tags(
