@@ -38,6 +38,7 @@ from daras_ai_v2.azure_doc_extract import (
 )
 from daras_ai_v2.base import BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
+from daras_ai_v2.fastapi_tricks import get_api_route_url
 from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.doc_search_settings_widgets import (
     SUPPORTED_SPREADSHEET_TYPES,
@@ -1321,6 +1322,25 @@ Translation Glossary for LLM Language (English) -> User Langauge
         if self.current_pr.photo_url:
             bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
+
+        config = dict(
+            integration_id="magic",
+            target="#gooey-embed",
+            mode="inline",
+            enableAudioMessage=True,
+            enablePhotoUpload=True,
+            enableConversations=True,
+            showToolCalls=True,
+            branding=bot_branding,
+            fillParent=True,
+            enableSourcePreview=False,
+            secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
+        )
+        if settings.DEBUG:
+            from routers.bots_api import stream_create
+
+            config["apiUrl"] = get_api_route_url(stream_create)
+
         gui.div(
             className="border rounded py-1 mb-3 bg-white",
             style=dict(height="calc(100vh - 1rem)"),
@@ -1362,19 +1382,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
     GooeyEmbed.copilotPreviewControl.updateConfig?.({ branding: config.branding });
 }
             """,
-            config=dict(
-                integration_id="magic",
-                target="#gooey-embed",
-                mode="inline",
-                enableAudioMessage=True,
-                enablePhotoUpload=True,
-                enableConversations=True,
-                showToolCalls=True,
-                branding=bot_branding,
-                fillParent=True,
-                enableSourcePreview=False,
-                secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
-            ),
+            config=config,
             messages=messages,
             run_url=str(self.request.url),
         )

@@ -131,6 +131,14 @@ The first build takes a few minutes. After startup:
 | API     | http://localhost:8080/docs    |
 | Admin   | http://localhost:8000         |
 
+**First-time setup** — run once after the stack is up (migrations, local LLM models, default Django admin user):
+
+```bash
+docker compose -f docker-compose.local.yml run --rm admin ./manage.py runscript setup_local
+```
+
+Then log in to Django admin at http://localhost:8000 with username **`admin`** and password **`admin`**. These credentials are for local development only.
+
 To stop everything:
 
 ```bash
