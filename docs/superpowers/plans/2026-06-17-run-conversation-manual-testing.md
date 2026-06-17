@@ -26,6 +26,16 @@ streaming and the new-conversation leak).
 - [ ] Click **New conversation** (resets `messages`) and send one message.
 - [ ] History now shows a **NEW** entry, and it does **NOT** contain the previous 3 messages.
 
+## A2. Copilot preview widget — conversation list grouped
+
+> The agent page's embedded chat widget lists past chats via
+> `/__/agent/fetch-conversations`, now grouped one row per conversation.
+
+- [ ] In the VideoBots playground, open the embedded copilot widget's conversation list.
+- [ ] Each past chat is **one row per conversation** (not one per turn), newest first.
+- [ ] Clicking a conversation opens its latest run (resume).
+- [ ] (Forward-only) Conversations whose runs predate this feature won't appear until backfilled.
+
 ## B. Builder — response streams (regression: Bug 1)
 
 - [ ] Open the builder sidebar on a VideoBots page. Send a message.

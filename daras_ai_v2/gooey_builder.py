@@ -3,7 +3,6 @@ from __future__ import annotations
 import typing
 from typing import Any
 
-from django.db.models import F
 import pydantic
 
 from bots.models.workflow import Workflow
@@ -288,6 +287,7 @@ def export_run_conversations(qs) -> list[dict[str, Any]]:
 def fetch_chat_conversations(
     request: fastapi.Request, body: FetchConversations
 ) -> list[dict]:
+    from bots.models import RunConversation
     from daras_ai_v2.workflow_url_input import url_to_runs
 
     try:
@@ -296,24 +296,15 @@ def fetch_chat_conversations(
         return []
     if not pr:
         return []
+    # One row per playground conversation of this published agent. A conversation
+    # belongs to `pr` when its latest turn does (all turns share the same pr).
     qs = (
-        SavedRun.objects.filter(
+        RunConversation.objects.for_listing(
             workflow=Workflow.VIDEO_BOTS,
             workspace=get_current_workspace(request.user, request.session),
-            parent_version__published_run=pr,
+            surface=SavedRun.Surface.run,
         )
-        .annotate(title=F("state__input_prompt"))
+        .filter(last_run__parent_version__published_run=pr)
         .order_by("-updated_at")[: body.limit]
     )
-    return export_chat_qs(qs)
-
-
-def export_chat_qs(qs) -> list[dict[str, Any]]:
-    return [
-        dict(
-            title=sr.title or "",
-            timestamp=sr.updated_at.isoformat(),
-            url=sr.get_app_url(),
-        )
-        for sr in qs
-    ]
+    return export_run_conversations(qs)
