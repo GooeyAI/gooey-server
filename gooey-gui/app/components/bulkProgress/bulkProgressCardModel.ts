@@ -166,7 +166,6 @@ function buildInProgressUnitRunModel(
     detail: buildDetail(snapshot, {
       rowLabel: `Processing row ${snapshot.currentRowNumber} of ${snapshot.totalRows}`,
       showStoppingMessage: variant.runState === "stopping",
-      capitalized: false,
       failedAt: null,
       workflowElapsedSeconds: 0,
     }),
@@ -199,7 +198,6 @@ function buildTerminalUnitRunModel(
     detail: buildDetail(snapshot, {
       rowLabel,
       showStoppingMessage: false,
-      capitalized: true,
       failedAt:
         runState === "error"
           ? snapshot.currentWorkflowRunTimeSeconds ?? null
@@ -251,13 +249,11 @@ function buildDetail(
   {
     rowLabel,
     showStoppingMessage,
-    capitalized,
     failedAt,
     workflowElapsedSeconds = null,
   }: {
     rowLabel: string;
     showStoppingMessage: boolean;
-    capitalized: boolean;
     failedAt: number | null;
     workflowElapsedSeconds?: number | null;
   }
@@ -269,14 +265,8 @@ function buildDetail(
 
   if (currentTitle && snapshot.currentWorkflowUrl) {
     const workflowNumber = Math.max(snapshot.currentWorkflowNumber, 1);
-    let prefix: string;
-    if (capitalized) {
-      prefix = `Workflow ${workflowNumber} of ${snapshot.totalWorkflows}:`;
-    } else {
-      prefix = `workflow ${workflowNumber} of ${snapshot.totalWorkflows}`;
-    }
     workflow = {
-      prefix,
+      prefix: `Workflow ${workflowNumber} of ${snapshot.totalWorkflows}:`,
       title: currentTitle,
       url: snapshot.currentWorkflowUrl,
       failedAt,
