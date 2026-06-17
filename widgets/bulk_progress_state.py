@@ -79,7 +79,7 @@ class BulkProgressTracker:
         sr: SavedRun,
         pr,
         request_body: dict,
-    ) -> tuple[str, dict[str, BulkProgress]]:
+    ) -> str:
         self.counts.update(
             current_row_number=current_row_number,
             current_workflow_number=workflow_number,
@@ -106,7 +106,7 @@ class BulkProgressTracker:
         workflow_run_time_seconds: float | None,
         workflow_credits: int | None,
         error_msg: str | None,
-    ) -> tuple[str, dict[str, BulkProgress]]:
+    ) -> str:
         self.counts["completed_unit_runs"] += 1
         if self.counts["current_workflow_number"] == self.counts["total_workflows"]:
             self.counts["completed_row_groups"] += 1
@@ -150,17 +150,14 @@ class BulkProgressTracker:
         response,
         *,
         eval_credits: int | None,
-    ) -> tuple[str, dict[str, BulkProgress]] | None:
+    ) -> str | None:
         self.credits_used += eval_credits or 0
         if not self.snapshot:
             return None
 
         self.snapshot["credits_used"] = self.credits_used
         response.bulk_progress = self.snapshot
-        return (
-            f"{bulk_progress_percent(self.snapshot)}% Completed",
-            {"bulk_progress": self.snapshot},
-        )
+        return f"{bulk_progress_percent(self.snapshot)}% Completed"
 
     def evals_completed(self, response) -> None:
         response.eval_progress = None
@@ -182,7 +179,7 @@ class BulkProgressTracker:
         workflow_run_time_seconds: float | None = None,
         workflow_credits: int | None = None,
         error_msg: str | None = None,
-    ) -> tuple[str, dict[str, BulkProgress]]:
+    ) -> str:
         self.snapshot = build_bulk_progress(
             progress=self.counts,
             page_cls=page_cls,
@@ -199,10 +196,7 @@ class BulkProgressTracker:
         )
         response.bulk_progress = self.snapshot
 
-        return (
-            f"{bulk_progress_percent(self.snapshot)}% Completed",
-            {"bulk_progress": self.snapshot},
-        )
+        return f"{bulk_progress_percent(self.snapshot)}% Completed"
 
 
 def is_bulk_progress_complete(progress: BulkProgressCounts) -> bool:
