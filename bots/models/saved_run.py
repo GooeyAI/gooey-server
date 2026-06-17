@@ -216,6 +216,7 @@ class SavedRun(models.Model):
             models.Index(fields=["workflow", "uid", "-updated_at"]),
             models.Index(fields=["workflow", "workspace", "-updated_at"]),
             models.Index(fields=["workflow", "uid", "workspace", "-updated_at"]),
+            # used by gooey_builder.py:fetch_builder_conversations
             models.Index(fields=["uid", "workspace", "surface", "-updated_at"]),
         ]
 
@@ -285,9 +286,6 @@ class SavedRun(models.Model):
                 "created_at",
                 "updated_at",
                 "error_msg",
-                "error_code",
-                "error_type",
-                "error_params",
                 "run_time",
                 "run_status",
                 "is_flagged",
