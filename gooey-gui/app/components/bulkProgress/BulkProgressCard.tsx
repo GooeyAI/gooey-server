@@ -60,7 +60,6 @@ export function BulkProgressCard({
             <ProgressRing
               ringPercent={model.ringPercent}
               ringLabel={model.ringLabel}
-              ringAccent={model.ringAccent}
             />
           </div>
           <div className="bulk-progress-main-right">
@@ -157,31 +156,33 @@ function SummaryStat({
   );
 }
 
+const RING_RADIUS = 40;
+
 function ProgressRing({
   ringPercent,
   ringLabel,
-  ringAccent,
 }: {
   ringPercent: number;
   ringLabel: string;
-  ringAccent: string;
 }) {
-  const circumference = 251.33;
+  const circumference = 2 * Math.PI * RING_RADIUS;
   const boundedRingPercent = Math.max(Math.min(ringPercent, 100), 0);
   const remaining = circumference - (circumference * boundedRingPercent) / 100;
 
   return (
-    <div
-      className="bulk-progress-ring"
-      style={{ "--bulk-progress-accent": ringAccent } as React.CSSProperties}
-    >
+    <div className="bulk-progress-ring">
       <svg viewBox="0 0 100 100" aria-hidden="true">
-        <circle className="bulk-progress-ring-track" cx="50" cy="50" r="40" />
+        <circle
+          className="bulk-progress-ring-track"
+          cx="50"
+          cy="50"
+          r={RING_RADIUS}
+        />
         <circle
           className="bulk-progress-ring-bar"
           cx="50"
           cy="50"
-          r="40"
+          r={RING_RADIUS}
           strokeDasharray={circumference.toFixed(2)}
           strokeDashoffset={remaining.toFixed(2)}
         />

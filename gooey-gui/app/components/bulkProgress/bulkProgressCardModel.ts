@@ -22,7 +22,6 @@ type ActiveRunStateProfile = {
   showRerun: boolean;
   marker: ActiveCardModel["marker"];
   cardClass: string;
-  ringAccent: string;
 };
 
 const ACTIVE_RUN_STATE_PROFILE: Record<ActiveRunState, ActiveRunStateProfile> = {
@@ -32,7 +31,6 @@ const ACTIVE_RUN_STATE_PROFILE: Record<ActiveRunState, ActiveRunStateProfile> = 
     showRerun: false,
     marker: "dot",
     cardClass: "running",
-    ringAccent: "#070b1a",
   },
   stopping: {
     title: "Stopping...",
@@ -40,7 +38,6 @@ const ACTIVE_RUN_STATE_PROFILE: Record<ActiveRunState, ActiveRunStateProfile> = 
     showRerun: false,
     marker: "dot",
     cardClass: "running",
-    ringAccent: "#070b1a",
   },
   evaluating: {
     title: "Running evals...",
@@ -48,7 +45,6 @@ const ACTIVE_RUN_STATE_PROFILE: Record<ActiveRunState, ActiveRunStateProfile> = 
     showRerun: false,
     marker: "dot",
     cardClass: "running",
-    ringAccent: "#070b1a",
   },
   error: {
     title: "Bulk run failed",
@@ -56,7 +52,6 @@ const ACTIVE_RUN_STATE_PROFILE: Record<ActiveRunState, ActiveRunStateProfile> = 
     showRerun: true,
     marker: "dot",
     cardClass: "error",
-    ringAccent: "#b42318",
   },
   stopped: {
     title: "Bulk run stopped",
@@ -64,7 +59,6 @@ const ACTIVE_RUN_STATE_PROFILE: Record<ActiveRunState, ActiveRunStateProfile> = 
     showRerun: true,
     marker: "stop",
     cardClass: "stopped",
-    ringAccent: "#9d7b1f",
   },
 };
 
@@ -225,7 +219,6 @@ function activeFromProfile(
     marker: profile.marker,
     ringPercent: fields.ringPercent,
     ringLabel: fields.ringLabel,
-    ringAccent: profile.ringAccent,
     detail: fields.detail,
     showRerun: profile.showRerun,
   };

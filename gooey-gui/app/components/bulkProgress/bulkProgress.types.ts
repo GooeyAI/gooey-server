@@ -48,7 +48,6 @@ export type ActiveCardModel = {
   marker: "dot" | "stop" | null;
   ringPercent: number;
   ringLabel: string;
-  ringAccent: string;
   detail: DetailDisplay | null;
   showRerun: boolean;
 };
