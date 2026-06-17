@@ -124,6 +124,7 @@ def bulk_snapshot_run_state(
     recipe_run_state: RecipeRunState,
 ) -> BulkRunnerRunState | None:
     is_active = recipe_run_state in {RecipeRunState.starting, RecipeRunState.running}
+
     if is_cancelled:
         if is_active:
             return BulkRunnerRunState.stopping
@@ -132,13 +133,12 @@ def bulk_snapshot_run_state(
     if recipe_run_state == RecipeRunState.failed:
         return BulkRunnerRunState.error
 
-    bulk_complete = is_bulk_progress_complete(progress)
-    if not bulk_complete:
-        if is_active:
-            return BulkRunnerRunState.running
-        return BulkRunnerRunState.stopped
+    if is_active:
+        if progress["phase"] == "evaluating":
+            return BulkRunnerRunState.evaluating
+        return BulkRunnerRunState.running
 
-    if progress["phase"] == "evaluating":
-        return BulkRunnerRunState.evaluating
+    if is_bulk_progress_complete(progress):
+        return BulkRunnerRunState.complete
 
-    return BulkRunnerRunState.complete
+    return BulkRunnerRunState.stopped
