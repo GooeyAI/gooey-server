@@ -1234,20 +1234,14 @@ Translation Glossary for LLM Language (English) -> User Langauge
         paginate_button(url=self.request.url, cursor=cursor)
 
     def _render_conversation_preview(self, conversation):
-        from daras_ai_v2 import icons
-        from daras_ai_v2.utils import get_relative_time
-
+        # Render the conversation's latest run with the standard run preview so the
+        # card shows the saved run's title (via get_title_breadcrumbs), not the
+        # conversation title. Listing stays one-row-per-conversation; the row links
+        # to last_run (resume).
         sr = conversation.last_run
         if sr is None:
             return
-        with gui.link(to=sr.get_app_url(), className="text-decoration-none text-reset"):
-            gui.write(f"#### {conversation.title or 'Conversation'}")
-            gui.caption(
-                f"{icons.time} {get_relative_time(conversation.updated_at)}",
-                unsafe_allow_html=True,
-            )
-            with gui.div(className="mt-2"):
-                self.render_run_preview_output(sr.to_dict())
+        self._render_run_preview(sr)
 
     def render_run_preview_output(self, state: dict):
         from daras_ai_v2.bots import parse_bot_html
