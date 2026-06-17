@@ -216,6 +216,7 @@ class SavedRun(models.Model):
             models.Index(fields=["workflow", "uid", "-updated_at"]),
             models.Index(fields=["workflow", "workspace", "-updated_at"]),
             models.Index(fields=["workflow", "uid", "workspace", "-updated_at"]),
+            models.Index(fields=["uid", "workspace", "surface", "-updated_at"]),
         ]
 
     def __str__(self):

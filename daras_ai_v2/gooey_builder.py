@@ -234,9 +234,8 @@ def fetch_builder_conversations(
 ) -> list[dict]:
     qs = (
         SavedRun.objects.filter(
-            workflow=Workflow.VIDEO_BOTS,
-            workspace=get_current_workspace(request.user, request.session),
             uid=request.user.uid,
+            workspace=get_current_workspace(request.user, request.session),
             surface=SavedRun.Surface.builder_child,
         )
         .annotate(title=F("parent_builder_saved_run__state__input_prompt"))
