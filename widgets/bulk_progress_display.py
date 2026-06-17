@@ -124,8 +124,10 @@ def bulk_snapshot_run_state(
     recipe_run_state: RecipeRunState,
 ) -> BulkRunnerRunState | None:
     is_active = recipe_run_state in {RecipeRunState.starting, RecipeRunState.running}
-    if is_active and is_cancelled:
-        return BulkRunnerRunState.stopping
+    if is_cancelled:
+        if is_active:
+            return BulkRunnerRunState.stopping
+        return BulkRunnerRunState.stopped
 
     if recipe_run_state == RecipeRunState.failed:
         return BulkRunnerRunState.error
