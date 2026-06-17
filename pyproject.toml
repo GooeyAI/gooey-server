@@ -127,4 +127,3 @@ ignore = ["E402", "E741"]  # position of imports, single letter variables
 
 [tool.ruff.lint.per-file-ignores]
 "*/{tests,views,admin}.py" = ["F401"]
-"widgets/bulk_progress_props.py" = ["N815"]

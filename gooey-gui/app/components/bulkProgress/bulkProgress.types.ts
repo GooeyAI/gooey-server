@@ -2,7 +2,7 @@ export type {
   BulkProgressCardProps,
   BulkProgressSnapshot,
   BulkRunnerRunState,
-} from "./generated/componentProps";
+} from "@gooey-types/bulk_progress_props";
 
 export type WorkflowDisplay = {
   prefix: string;

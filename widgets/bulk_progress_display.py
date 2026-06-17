@@ -5,7 +5,7 @@ import datetime
 import gooey_gui as gui
 
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
-from widgets.bulk_progress_props import (
+from gooey_gui.types.bulk_progress_props import (
     BulkProgressCardProps,
     BulkProgressSnapshot,
     BulkRunnerRunState,

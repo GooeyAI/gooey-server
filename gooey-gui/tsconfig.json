@@ -13,7 +13,8 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./app/*"]
+      "~/*": ["./app/*"],
+      "@gooey-types/*": ["../gooey_gui/types/*"]
     },
     "module": "CommonJS",
 
