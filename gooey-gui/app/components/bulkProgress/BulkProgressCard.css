@@ -1,5 +1,6 @@
 .bulk-progress-card {
   --bulk-progress-detail-label-width: 7.5rem;
+  --bulk-progress-accent: #070b1a;
   background: #fff;
   border: 1px solid #e4e4e7;
   border-radius: 8px;
@@ -20,11 +21,13 @@
 }
 
 .bulk-progress-card-stopped {
+  --bulk-progress-accent: #9d7b1f;
   background: #fff7d8;
   border-color: #f0dc92;
 }
 
 .bulk-progress-card-error {
+  --bulk-progress-accent: #b42318;
   background: #fff4f2;
   border-color: #f5b8b0;
 }
@@ -154,11 +157,11 @@
 }
 
 .bulk-progress-card-error .bulk-progress-dot {
-  background: #b42318;
+  background: var(--bulk-progress-accent);
 }
 
 .bulk-progress-stop-icon {
-  color: #9d7b1f;
+  color: var(--bulk-progress-accent);
   flex-shrink: 0;
   font-size: var(--bulk-progress-dot-size, 0.65rem);
   line-height: 1;

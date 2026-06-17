@@ -16,8 +16,6 @@ from widgets.bulk_progress_state import (
     is_bulk_progress_complete,
 )
 
-BULK_RERUN_ALL_KEY = "-submit-workflow"
-
 
 def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
     session = gui.session_state
@@ -45,7 +43,7 @@ def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
 
     props = BulkProgressCardProps(
         snapshot=snapshot,
-        rerunAllKey=BULK_RERUN_ALL_KEY,
+        rerunAllKey="-submit-workflow",
     )
     gui.component(
         "BulkProgressCard",
