@@ -3,6 +3,43 @@ name: Python tests
 on: [ push, workflow_dispatch ]
 
 jobs:
+  generated-types:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: [ "3.10.12" ]
+        poetry-version: [ "1.8.3" ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python, Poetry and Dependencies
+        uses: packetcoders/action-setup-cache-python-poetry@main
+        with:
+          python-version: ${{matrix.python-version}}
+          poetry-version: ${{matrix.poetry-version}}
+          install-args: --only main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: gooey-gui/package-lock.json
+
+      - name: Install GUI dependencies
+        working-directory: gooey-gui
+        run: npm ci
+
+      - name: Verify generated GUI types
+        run: |
+          poetry run python scripts/generate_gui_types.py
+          if [[ -n "$(git status --porcelain -- gooey_gui/types)" ]]; then
+            git status --short -- gooey_gui/types
+            git diff -- gooey_gui/types
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-22.04
     strategy:

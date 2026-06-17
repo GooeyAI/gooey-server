@@ -44,19 +44,3 @@ class BulkProgressCardProps(BaseModel):
 
     snapshot: BulkProgressSnapshot
     rerunAllKey: str | None = None
-
-
-def build_bulk_progress_schema() -> dict:
-    schema = BulkProgressCardProps.model_json_schema(ref_template="#/$defs/{model}")
-    schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-    strip_field_titles(schema)
-    return schema
-
-
-def strip_field_titles(schema: dict) -> None:
-    for prop in schema.get("properties", {}).values():
-        if isinstance(prop, dict):
-            prop.pop("title", None)
-    for definition in schema.get("$defs", {}).values():
-        if isinstance(definition, dict):
-            strip_field_titles(definition)
