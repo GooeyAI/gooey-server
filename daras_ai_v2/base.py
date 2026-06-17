@@ -158,6 +158,10 @@ class BasePage:
 
     explore_image: str = None
 
+    # Workflows that group their runs into RunConversations (History tab + sidebar
+    # show one entry per conversation). Off by default; opt in per workflow.
+    supports_conversations: bool = False
+
     template_keys: typing.Iterable[str] = (
         "task_instructions",
         "query_instructions",
@@ -2188,6 +2192,17 @@ class BasePage:
         )
 
         self.dump_state_to_sr(self._get_validated_state(), sr)
+
+        if self.supports_conversations:
+            from bots.models import RunConversation
+
+            RunConversation.attach_run(
+                sr=sr,
+                parent_sr=parent,
+                is_continuation=bool(gui.session_state.get("messages")),
+                surface=SavedRun.Surface.run,
+                title=gui.session_state.get("input_prompt") or "",
+            )
 
         return sr
 

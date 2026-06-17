@@ -140,6 +140,7 @@ class VideoBotsPage(BasePage):
     title = "Agent"  # "Create Interactive Video Bots"
     explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
     workflow = Workflow.VIDEO_BOTS
+    supports_conversations = True
     slug_versions = ["video-bots", "bots", "copilot", "agent"]
 
     functions_in_settings = False
@@ -1199,6 +1200,54 @@ Translation Glossary for LLM Language (English) -> User Langauge
     @classmethod
     def get_example_preferred_fields(cls, state: dict) -> list[str]:
         return ["input_prompt", "messages"]
+
+    def _history_tab(self):
+        from bots.models import RunConversation, SavedRun
+        from daras_ai_v2.grid_layout_widget import grid_layout
+        from daras_ai_v2.urls import paginate_button, paginate_queryset
+
+        self.ensure_authentication(anon_ok=True)
+
+        uid = None
+        for_param = self.request.query_params.get("for", "me")
+        if (
+            for_param != "all"
+            and self.request.user
+            and not self.current_workspace.is_personal
+        ):
+            uid = self.request.user.uid
+
+        qs = RunConversation.objects.for_listing(
+            workflow=self.workflow,
+            workspace=self.current_workspace,
+            surface=SavedRun.Surface.run,
+            uid=uid,
+        )
+        conversations, cursor = paginate_queryset(
+            qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
+        )
+        if not conversations:
+            gui.write("No history yet")
+            return
+
+        grid_layout(3, conversations, self._render_conversation_preview)
+        paginate_button(url=self.request.url, cursor=cursor)
+
+    def _render_conversation_preview(self, conversation):
+        from daras_ai_v2 import icons
+        from daras_ai_v2.utils import get_relative_time
+
+        sr = conversation.last_run
+        if sr is None:
+            return
+        with gui.link(to=sr.get_app_url(), className="text-decoration-none text-reset"):
+            gui.write(f"#### {conversation.title or 'Conversation'}")
+            gui.caption(
+                f"{icons.time} {get_relative_time(conversation.updated_at)}",
+                unsafe_allow_html=True,
+            )
+            with gui.div(className="mt-2"):
+                self.render_run_preview_output(sr.to_dict())
 
     def render_run_preview_output(self, state: dict):
         from daras_ai_v2.bots import parse_bot_html
