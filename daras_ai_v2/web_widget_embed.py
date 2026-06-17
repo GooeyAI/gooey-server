@@ -184,3 +184,44 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
             )
         )
     return messages
+
+
+def get_builder_conversation_messages(conversation) -> list[dict]:
+    """Replay a builder conversation from its turns, one message pair per turn,
+    each carrying the exact point-in-time URLs.
+
+    saved_run_url   -> the workflow snapshot (builder_child) at that turn
+    builder_run_url -> the builder agent run (builder_prompt) that produced it
+    """
+    from daras_ai_v2.bots import parse_bot_html
+
+    messages: list[dict] = []
+    turns = conversation.messages.select_related("parent_builder_saved_run").order_by(
+        "created_at"
+    )
+    for child in turns:
+        prompt_sr = child.parent_builder_saved_run
+        if prompt_sr is None:
+            continue
+        state = prompt_sr.state or {}
+        input_prompt = state.get("input_prompt") or ""
+        raw_output = state.get("raw_output_text") or state.get("output_text") or [""]
+        output_text = raw_output[0] if raw_output else ""
+        messages.append(
+            dict(
+                role=CHATML_ROLE_USER,
+                input_prompt=input_prompt,
+                input_images=state.get("input_images") or [],
+            )
+        )
+        messages.append(
+            dict(
+                role=CHATML_ROLE_ASSISTANT,
+                type="final_response",
+                status="completed",
+                output_text=[parse_bot_html(output_text)[1]],
+                saved_run_url=child.get_app_url(),
+                builder_run_url=prompt_sr.get_app_url(),
+            )
+        )
+    return messages
