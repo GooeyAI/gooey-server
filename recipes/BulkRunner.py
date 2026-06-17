@@ -9,7 +9,7 @@ from bots.models import Workflow, SavedRun
 from daras_ai.image_input import upload_file_from_bytes
 from daras_ai_v2 import icons
 from daras_ai_v2 import breadcrumbs
-from daras_ai_v2.base import BasePage
+from daras_ai_v2.base import BasePage, StateKeys
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.doc_search_settings_widgets import (
     bulk_documents_uploader,
@@ -290,7 +290,6 @@ To understand what each field represents, check out our [API docs](https://api.g
     def _render_running_output(self):
         if gui.session_state.get("bulk_progress"):
             return
-
         super()._render_running_output()
 
     def render_is_cancelled(self):
@@ -298,21 +297,15 @@ To understand what each field represents, check out our [API docs](https://api.g
             return
         super().render_is_cancelled()
 
-    def get_run_cost_display(self) -> str:
-        progress = gui.session_state.get("bulk_progress") or {}
-        run_cost = progress.get("credits_used") or 0
-        url = self.get_credits_click_url()
-        ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
+    def get_run_cost_credits(self) -> int | None:
+        progress = gui.session_state.get("bulk_progress")
+        if progress:
+            return progress.get("credits_used", 0)
 
-        cost_note = self.get_cost_note()
-        if cost_note:
-            ret += f" ({cost_note.strip()})"
+        if gui.session_state.get(StateKeys.run_status):
+            return 0
 
-        additional_notes = self.additional_notes()
-        if additional_notes:
-            ret += f" \n{additional_notes}"
-
-        return ret
+        return super().get_run_cost_credits()
 
     def run_v2(
         self,
