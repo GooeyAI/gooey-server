@@ -204,6 +204,15 @@ class SavedRun(models.Model):
         default=None,
         help_text="The Parent Gooey Builder SavedRun that created this run",
     )
+    conversation = models.ForeignKey(
+        "bots.RunConversation",
+        on_delete=models.SET_NULL,
+        related_name="messages",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The conversation this run is a turn of (VideoBots grouping).",
+    )
     redirect_url = models.TextField(
         blank=True,
         default="",
