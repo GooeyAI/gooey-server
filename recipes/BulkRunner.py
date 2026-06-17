@@ -299,10 +299,7 @@ To understand what each field represents, check out our [API docs](https://api.g
         super().render_is_cancelled()
 
     def get_run_cost_display(self) -> str:
-        progress = gui.session_state.get("bulk_progress")
-        if not progress:
-            return ""
-
+        progress = gui.session_state.get("bulk_progress") or {}
         run_cost = progress.get("credits_used") or 0
         url = self.get_credits_click_url()
         ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'

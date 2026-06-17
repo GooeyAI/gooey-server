@@ -194,27 +194,15 @@ function ProgressRing({
 }
 
 function MetaRow({ parts }: { parts: string[] }) {
-  const nodes: React.ReactNode[] = [];
-  parts.forEach((part, index) => {
-    if (index) {
-      nodes.push(
-        <span
-          aria-hidden="true"
-          className="bulk-progress-meta-separator"
-          key={`separator-${index}`}
-        >
-          &middot;
+  return (
+    <div className="bulk-progress-meta">
+      {parts.map((part, index) => (
+        <span className="bulk-progress-meta-item" key={index}>
+          {part}
         </span>
-      );
-    }
-    nodes.push(
-      <span className="bulk-progress-meta-item" key={`part-${index}`}>
-        {part}
-      </span>
-    );
-  });
-
-  return <div className="bulk-progress-meta">{nodes}</div>;
+      ))}
+    </div>
+  );
 }
 
 function ProgressDetail({ detail }: { detail: DetailDisplay }) {
@@ -294,14 +282,14 @@ function WorkflowRow({ workflow }: { workflow: WorkflowDisplay }) {
           </a>
           {showElapsed ? (
             <span className="bulk-progress-workflow-elapsed">
-              &middot; {formatElapsed(liveElapsedSeconds ?? 0)}
+              {formatElapsed(liveElapsedSeconds ?? 0)}
             </span>
           ) : null}
         </span>
       </span>
       {workflow.failedAt != null ? (
         <span className="bulk-progress-workflow-status">
-          &middot; failed at {formatElapsed(workflow.failedAt)}
+          failed at {formatElapsed(workflow.failedAt)}
         </span>
       ) : null}
     </div>
@@ -326,14 +314,14 @@ function LastCompleted({
         >
           {title}
         </a>
-        {runTimeSeconds != null || credits != null ? (
+        {credits != null ? (
           <span className="bulk-progress-workflow-elapsed">
-            {credits != null ? (
-              <span>&middot; {formatCredits(credits)}</span>
-            ) : null}
-            {runTimeSeconds != null ? (
-              <span>&middot; {formatElapsed(runTimeSeconds)}</span>
-            ) : null}
+            {formatCredits(credits)}
+          </span>
+        ) : null}
+        {runTimeSeconds != null ? (
+          <span className="bulk-progress-workflow-elapsed">
+            {formatElapsed(runTimeSeconds)}
           </span>
         ) : null}
       </span>

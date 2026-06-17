@@ -196,9 +196,10 @@
   white-space: nowrap;
 }
 
-.bulk-progress-meta-separator {
+.bulk-progress-meta-item:not(:first-child)::before {
   color: #59617d;
-  white-space: nowrap;
+  content: "\00B7";
+  margin-inline-end: 0.45rem;
 }
 
 .bulk-progress-detail {
@@ -267,6 +268,13 @@
 .bulk-progress-workflow-elapsed {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.bulk-progress-workflow-link-group > :not(:first-child)::before,
+.bulk-progress-workflow > .bulk-progress-workflow-status::before {
+  color: #59617d;
+  content: "\00B7";
+  margin-inline-end: 0.35rem;
 }
 
 .bulk-progress-detail-link {

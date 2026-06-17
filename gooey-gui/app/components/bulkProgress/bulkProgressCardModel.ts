@@ -166,7 +166,6 @@ function buildInProgressUnitRunModel(
     detail: buildDetail(snapshot, {
       rowLabel: `Processing row ${snapshot.currentRowNumber} of ${snapshot.totalRows}`,
       showStoppingMessage: variant.runState === "stopping",
-      capitalized: false,
       failedAt: null,
       workflowElapsedSeconds: 0,
     }),
@@ -184,7 +183,7 @@ function buildTerminalUnitRunModel(
     0
   );
   const metaParts = [
-    `${snapshot.completedUnitRuns} of ${snapshot.totalUnitRuns} Total runs (${remaining} remaining)`,
+    `${snapshot.completedUnitRuns} of ${snapshot.totalUnitRuns} total runs (${remaining} remaining)`,
   ];
   const elapsed = runState === "stopped" ? snapshot.elapsedSeconds : undefined;
   appendCreditsAndElapsed(metaParts, snapshot, elapsed);
@@ -199,7 +198,6 @@ function buildTerminalUnitRunModel(
     detail: buildDetail(snapshot, {
       rowLabel,
       showStoppingMessage: false,
-      capitalized: true,
       failedAt:
         runState === "error"
           ? snapshot.currentWorkflowRunTimeSeconds ?? null
@@ -251,13 +249,11 @@ function buildDetail(
   {
     rowLabel,
     showStoppingMessage,
-    capitalized,
     failedAt,
     workflowElapsedSeconds = null,
   }: {
     rowLabel: string;
     showStoppingMessage: boolean;
-    capitalized: boolean;
     failedAt: number | null;
     workflowElapsedSeconds?: number | null;
   }
@@ -269,12 +265,7 @@ function buildDetail(
 
   if (currentTitle && snapshot.currentWorkflowUrl) {
     const workflowNumber = Math.max(snapshot.currentWorkflowNumber, 1);
-    let prefix: string;
-    if (capitalized) {
-      prefix = `Workflow ${workflowNumber} of ${snapshot.totalWorkflows}:`;
-    } else {
-      prefix = `workflow ${workflowNumber} of ${snapshot.totalWorkflows}`;
-    }
+    const prefix = `workflow ${workflowNumber} of ${snapshot.totalWorkflows}`;
     workflow = {
       prefix,
       title: currentTitle,
@@ -339,6 +330,6 @@ function unitRunRingFields(snapshot: BulkProgressSnapshot) {
   return {
     ringPercent,
     ringLabel: `${ringPercent}%`,
-    headline: `${ringPercent}% Completed`,
+    headline: `${ringPercent}% completed`,
   };
 }
