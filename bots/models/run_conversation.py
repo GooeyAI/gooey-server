@@ -7,10 +7,21 @@ from bots.models.saved_run import SavedRun
 
 class RunConversationQuerySet(models.QuerySet):
     def for_listing(
-        self, *, workflow: int, workspace, surface: int, uid: str | None = None
+        self,
+        *,
+        workspace,
+        surface: int,
+        workflow: int | None = None,
+        uid: str | None = None,
     ):
-        """Conversations for a workspace, newest activity first. uid filters to one owner."""
-        qs = self.filter(workflow=workflow, workspace=workspace, surface=surface)
+        """Conversations for a workspace, newest activity first.
+
+        workflow=None lists across all workflows (e.g. the builder sidebar, which
+        spans every workflow it can build); uid filters to one owner.
+        """
+        qs = self.filter(workspace=workspace, surface=surface)
+        if workflow is not None:
+            qs = qs.filter(workflow=workflow)
         if uid is not None:
             qs = qs.filter(uid=uid)
         return qs

@@ -15,6 +15,7 @@ from bots.models import (
     PublishedRun,
 )
 from daras_ai_v2 import settings
+from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.fastapi_tricks import fastapi_login_required
 from daras_ai_v2.web_widget_embed import (
     load_chat_widget_lib,
@@ -251,6 +252,8 @@ def get_default_builder_pr() -> PublishedRun:
 class FetchConversations(pydantic.BaseModel):
     run_url: str
     limit: int = 50
+    # Optional workflow filter. None lists builder conversations across all workflows.
+    workflow: int | None = None
 
 
 @router.post(
@@ -262,23 +265,11 @@ def fetch_builder_conversations(
     from bots.models import RunConversation
 
     qs = RunConversation.objects.for_listing(
-        workflow=Workflow.VIDEO_BOTS,
         workspace=get_current_workspace(request.user, request.session),
         surface=SavedRun.Surface.builder_child,
         uid=request.user.uid,
     ).order_by("-updated_at")[: body.limit]
-    return export_run_conversations(qs)
-
-
-def export_run_conversations(qs) -> list[dict[str, Any]]:
-    return [
-        dict(
-            title=convo.title or "",
-            timestamp=convo.updated_at.isoformat(),
-            url=convo.last_run.get_app_url() if convo.last_run else "",
-        )
-        for convo in qs.select_related("last_run")
-    ]
+    return export_run_conversations(qs, include_workflow=True)
 
 
 @router.post("/__/agent/fetch-conversations", dependencies=[fastapi_login_required])
@@ -306,3 +297,42 @@ def fetch_chat_conversations(
         .order_by("-updated_at")[: body.limit]
     )
     return export_run_conversations(qs)
+
+
+def export_run_conversations(
+    qs, include_workflow: bool = False
+) -> list[dict[str, Any]]:
+    return [
+        _export_run_conversation(convo, include_workflow)
+        for convo in qs.select_related("last_run__parent_version__published_run")
+    ]
+
+
+def _export_run_conversation(convo, include_workflow: bool = False) -> dict[str, Any]:
+    sr = convo.last_run
+    pr = sr and sr.parent_published_run()
+    result = dict(
+        title=convo.title or "",
+        timestamp=convo.updated_at.isoformat(),
+        url=sr.get_app_url() if sr else "",
+    )
+    if include_workflow:
+        result["secondaryTitle"] = _last_run_title(sr, pr)
+        result["icon"] = _last_run_photo(sr, pr)
+    return result
+
+
+def _last_run_title(sr: SavedRun | None, pr: PublishedRun | None) -> str:
+    """Latest turn's title without its surface prefix (e.g. "My Bot", not "Web Chat: My Bot")."""
+    if not sr:
+        return ""
+    return get_title_breadcrumbs(Workflow(sr.workflow).page_cls, sr, pr).h1_title.title
+
+
+def _last_run_photo(sr: SavedRun | None, pr: PublishedRun | None) -> str:
+    """The workflow image shown in the page header -- the bot's photo, else the workflow default."""
+    if not sr:
+        return ""
+    if pr and pr.photo_url:
+        return pr.photo_url
+    return Workflow(sr.workflow).get_or_create_metadata().default_image or ""
