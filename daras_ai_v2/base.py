@@ -1730,13 +1730,8 @@ class BasePage:
 
     def get_run_cost_display(self) -> str:
         url = self.get_credits_click_url()
-        if self.current_sr.price and not self._has_request_changed():
-            run_cost = self.current_sr.price
-        elif self.price_deferred:
-            run_cost = None
-        else:
-            run_cost = self.get_price_roundoff(gui.session_state)
-        if run_cost:
+        run_cost = self.get_run_cost_credits()
+        if run_cost is not None:
             ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
         else:
             ret = ""
@@ -1750,6 +1745,14 @@ class BasePage:
             ret += f" \n{additional_notes}"
 
         return ret
+
+    def get_run_cost_credits(self) -> int | None:
+        if self.current_sr.price and not self._has_request_changed():
+            return self.current_sr.price
+        elif self.price_deferred:
+            return None
+        else:
+            return self.get_price_roundoff(gui.session_state)
 
     def _render_step_row(self, key="details-expander"):
         with gui.expander("**🐞 Debug**", key=key):
