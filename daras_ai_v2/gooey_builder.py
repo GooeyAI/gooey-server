@@ -21,6 +21,7 @@ from daras_ai_v2.web_widget_embed import (
     load_chat_widget_lib,
     chat_widget_input_to_request_body,
     get_chat_widget_messages,
+    get_builder_conversation_messages,
 )
 from routers.custom_api_router import CustomAPIRouter
 
@@ -126,11 +127,22 @@ def render_gooey_builder(
         builder_sr.save(update_fields=["redirect_url"])
         raise gui.RedirectException(redirect_url)
 
+    # `messages` drives the live (streaming) chat display and must come from the
+    # builder run's own state. `conversation_messages` rides alongside it, carrying
+    # each turn's point-in-time URLs (saved_run_url / builder_run_url) so the widget
+    # can render a "go back to this turn" link per message -- consumed by a follow-up
+    # change in the gooey-web-widget repo. It is metadata only; it never drives the
+    # display, so it cannot regress streaming.
+    conversation_messages = []
     if builder_sr and not gui.session_state.get("builderOnNewConversation"):
         builder_run_url = builder_sr.get_app_url()
         messages = get_chat_widget_messages(
             builder_sr.to_dict(), web_url=builder_sr.get_app_url()
         )
+        if page.current_sr.conversation_id:
+            conversation_messages = get_builder_conversation_messages(
+                page.current_sr.conversation
+            )
     else:
         builder_run_url = bi.published_run.get_app_url()
         messages = []
@@ -141,6 +153,7 @@ def render_gooey_builder(
         config=config,
         sidebar_key=sidebar_key,
         messages=messages,
+        conversation_messages=conversation_messages,
         builder_run_url=builder_run_url,
         workflow_state={
             field_name: gui.session_state[field_name]
@@ -183,8 +196,8 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
     # copy the workflow_url into a new run linked to
     # builder_sr so the chat widget can navigate the user to a workflow page
     # that knows which builder iteration produced it
-    workflow_page_cls, workflow_sr, workflow_pr = url_to_runs(body.workflow_url)
-    workflow_sr = workflow_sr.clone(
+    workflow_page_cls, prev_child, workflow_pr = url_to_runs(body.workflow_url)
+    workflow_sr = prev_child.clone(
         parent_pr=workflow_pr,
         uid=request.user.uid,
         workspace_id=workspace.id,
@@ -208,6 +221,21 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         surface=SavedRun.Surface.builder_prompt,
     )[1]
     workflow_sr.save(update_fields=["parent_builder_saved_run"])
+
+    from bots.models import RunConversation
+
+    # The widget always sends *some* builder_run_url, so bool() can't tell new from
+    # continue. It resolves to the published/default builder run for a fresh
+    # conversation, or to a specific prior builder turn when continuing -- so
+    # comparing the resolved run against the published template is the real signal.
+    is_continuation = builder_sr != builder_pr.saved_run
+    RunConversation.attach_run(
+        sr=workflow_sr,
+        parent_sr=prev_child,
+        is_continuation=is_continuation,
+        surface=SavedRun.Surface.builder_child,
+        title=request_body.get("input_prompt") or "",
+    )
 
     return workflow_url
 
@@ -234,16 +262,26 @@ class FetchConversations(pydantic.BaseModel):
 def fetch_builder_conversations(
     request: fastapi.Request, body: FetchConversations
 ) -> list[dict]:
-    qs = (
-        SavedRun.objects.filter(
-            uid=request.user.uid,
-            workspace=get_current_workspace(request.user, request.session),
-            surface=SavedRun.Surface.builder_child,
+    from bots.models import RunConversation
+
+    qs = RunConversation.objects.for_listing(
+        workflow=Workflow.VIDEO_BOTS,
+        workspace=get_current_workspace(request.user, request.session),
+        surface=SavedRun.Surface.builder_child,
+        uid=request.user.uid,
+    ).order_by("-updated_at")[: body.limit]
+    return export_run_conversations(qs)
+
+
+def export_run_conversations(qs) -> list[dict[str, Any]]:
+    return [
+        dict(
+            title=convo.title or "",
+            timestamp=convo.updated_at.isoformat(),
+            url=convo.last_run.get_app_url() if convo.last_run else "",
         )
-        .annotate(title=F("parent_builder_saved_run__state__input_prompt"))
-        .order_by("-updated_at")[: body.limit]
-    )
-    return export_chat_qs(qs)
+        for convo in qs.select_related("last_run")
+    ]
 
 
 @router.post("/__/agent/fetch-conversations", dependencies=[fastapi_login_required])
