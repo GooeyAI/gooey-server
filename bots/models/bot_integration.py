@@ -610,16 +610,17 @@ class BotIntegration(models.Model):
             branding=self.get_web_widget_branding(),
         )
 
-        google_maps_api_key = None
-        try:
-            google_maps_secret = self.workspace.managed_secrets.get(
-                name__iexact="GOOGLE_MAPS_API_KEY"
-            )
-            google_maps_secret.load_value()
-            google_maps_api_key = google_maps_secret.value
-        except (ManagedSecret.DoesNotExist, ManagedSecret.NotFoundError):
-            if hostname in settings.GOOGLE_MAPS_API_KEY_HOSTNAMES:
-                google_maps_api_key = settings.GOOGLE_MAPS_API_KEY
+        if hostname in settings.GOOGLE_MAPS_API_KEY_HOSTNAMES:
+            google_maps_api_key = settings.GOOGLE_MAPS_API_KEY
+        else:
+            try:
+                google_maps_secret = self.workspace.managed_secrets.get(
+                    name__iexact="GOOGLE_MAPS_API_KEY"
+                )
+                google_maps_secret.load_value()
+                google_maps_api_key = google_maps_secret.value
+            except (ManagedSecret.DoesNotExist, ManagedSecret.NotFoundError):
+                google_maps_api_key = None
         if google_maps_api_key:
             config["secrets"] = config.get("secrets") or {}
             config["secrets"]["GOOGLE_MAPS_API_KEY"] = google_maps_api_key
