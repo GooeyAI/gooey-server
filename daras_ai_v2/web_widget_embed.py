@@ -9,6 +9,8 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
     format_chat_entry,
+    get_entry_display_text,
+    get_entry_documents,
     get_entry_images,
     get_entry_text,
 )
@@ -93,11 +95,14 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
     for entry in entries:
         role = entry.get("role")
         if role == CHATML_ROLE_USER:
+            # strip the LLM-only attachment prefixes; attachments are shown
+            # separately via input_images / input_documents
             messages.append(
                 dict(
                     role=role,
-                    input_prompt=get_entry_text(entry),
+                    input_prompt=get_entry_display_text(entry),
                     input_images=get_entry_images(entry) or [],
+                    input_documents=get_entry_documents(entry),
                 )
             )
         elif role == CHATML_ROLE_ASSISTANT:
