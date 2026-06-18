@@ -234,7 +234,7 @@ function ProgressDetail({ detail }: { detail: DetailDisplay }) {
       </div>
       {detail.showStoppingMessage ? (
         <div className="bulk-progress-stop-pending">
-          We're trying our best to cancel this run, please be patient.
+          Canceling this run, this may take a moment.
         </div>
       ) : null}
       {detail.workflow ? (
