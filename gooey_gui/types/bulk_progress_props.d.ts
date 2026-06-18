@@ -4,29 +4,29 @@ export type BulkRunnerRunState = "running" | "stopping" | "evaluating" | "comple
 
 export interface BulkProgressCardProps {
   snapshot: BulkProgressSnapshot;
-  rerunAllKey?: string | null;
+  rerun_all_key: string | null;
 }
 export interface BulkProgressSnapshot {
-  runState: BulkRunnerRunState;
-  elapsedSeconds?: number | null;
-  completedUnitRuns: number;
-  totalUnitRuns: number;
-  totalRows: number;
-  currentRowNumber: number;
-  currentWorkflowNumber: number;
-  totalWorkflows: number;
-  currentWorkflowTitle: string;
-  currentWorkflowUrl: string;
-  currentWorkflowRunTimeSeconds?: number | null;
-  creditsUsed?: number | null;
-  totalEvalRuns?: number | null;
-  evalCurrent?: number | null;
-  evalTotal?: number | null;
-  evalWorkflowTitle?: string | null;
-  inputPrompt?: string | null;
-  inputAudioUrl?: string | null;
-  lastCompletedWorkflowTitle?: string | null;
-  lastCompletedWorkflowUrl?: string | null;
-  lastCompletedRunTimeSeconds?: number | null;
-  lastCompletedCredits?: number | null;
+  credits_used: number | null;
+  total_eval_runs: number | null;
+  last_completed_workflow_title: string | null;
+  last_completed_workflow_url: string | null;
+  last_completed_run_time_seconds: number | null;
+  last_completed_credits: number | null;
+  workflow_title: string;
+  workflow_url: string;
+  input_prompt: string;
+  input_audio: string | null;
+  workflow_run_time_seconds: number | null;
+  completed_unit_runs: number;
+  total_unit_runs: number;
+  total_rows: number;
+  current_row_number: number;
+  current_workflow_number: number;
+  total_workflows: number;
+  run_state: BulkRunnerRunState;
+  elapsed_seconds: number | null;
+  eval_current: number | null;
+  eval_total: number | null;
+  eval_workflow_title: string | null;
 }

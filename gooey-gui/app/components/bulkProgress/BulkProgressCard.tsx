@@ -12,10 +12,10 @@ import "./BulkProgressCard.css";
 
 export function BulkProgressCard({
   snapshot,
-  rerunAllKey,
+  rerun_all_key,
 }: BulkProgressCardProps) {
   const liveElapsedSeconds = useLiveElapsedSeconds(
-    snapshot.elapsedSeconds,
+    snapshot.elapsed_seconds,
     snapshotTicksElapsed(snapshot)
   );
   const model = buildCardModel(snapshot, liveElapsedSeconds);
@@ -47,7 +47,10 @@ export function BulkProgressCard({
             {model.averageRunTime}
           </SummaryStat>
         </div>
-        <RerunAllActions rerunAllKey={rerunAllKey} showRerun={model.showRerun} />
+        <RerunAllActions
+          rerunAllKey={rerun_all_key}
+          showRerun={model.showRerun}
+        />
       </div>
     );
   }
@@ -71,7 +74,9 @@ export function BulkProgressCard({
                     className="fa-solid fa-circle-stop bulk-progress-stop-icon"
                   />
                 )}
-                {model.marker === "dot" && <span className="bulk-progress-dot" />}
+                {model.marker === "dot" && (
+                  <span className="bulk-progress-dot" />
+                )}
                 <strong>{model.title}</strong>
               </div>
               <div className="bulk-progress-headline">{model.headline}</div>
@@ -81,7 +86,10 @@ export function BulkProgressCard({
         </div>
       </div>
       {model.detail ? <ProgressDetail detail={model.detail} /> : null}
-      <RerunAllActions rerunAllKey={rerunAllKey} showRerun={model.showRerun} />
+      <RerunAllActions
+        rerunAllKey={rerun_all_key}
+        showRerun={model.showRerun}
+      />
     </div>
   );
 }
@@ -246,7 +254,11 @@ function ProgressDetail({ detail }: { detail: DetailDisplay }) {
         <div className="bulk-progress-input">
           <span>input_audio:</span>{" "}
           {inputAudioSafeHref ? (
-            <a href={inputAudioSafeHref} target="_blank" rel="noopener noreferrer">
+            <a
+              href={inputAudioSafeHref}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               View audio &rarr;
             </a>
           ) : (

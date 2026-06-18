@@ -26,18 +26,18 @@ export function formatCredits(credits: number | null | undefined) {
 }
 
 export function formatAverageCredits(snapshot: BulkProgressSnapshot) {
-  const totalRuns = snapshot.totalUnitRuns + (snapshot.totalEvalRuns || 0);
-  if (snapshot.creditsUsed == null || totalRuns <= 0) {
+  const totalRuns = snapshot.total_unit_runs + (snapshot.total_eval_runs || 0);
+  if (snapshot.credits_used == null || totalRuns <= 0) {
     return "-";
   }
-  return `${(snapshot.creditsUsed / totalRuns).toFixed(1)} Cr / run`;
+  return `${(snapshot.credits_used / totalRuns).toFixed(1)} Cr / run`;
 }
 
 export function formatAverageRunTime(snapshot: BulkProgressSnapshot) {
-  if (snapshot.elapsedSeconds == null || snapshot.totalUnitRuns <= 0) {
+  if (snapshot.elapsed_seconds == null || snapshot.total_unit_runs <= 0) {
     return "-";
   }
-  return `${(snapshot.elapsedSeconds / snapshot.totalUnitRuns).toFixed(
+  return `${(snapshot.elapsed_seconds / snapshot.total_unit_runs).toFixed(
     1
   )}s avg / run`;
 }

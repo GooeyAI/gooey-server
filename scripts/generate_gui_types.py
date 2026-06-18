@@ -10,6 +10,7 @@ from pathlib import Path
 from types import ModuleType
 
 from pydantic import BaseModel
+from pydantic.json_schema import GenerateJsonSchema
 
 TYPES_PACKAGE = "gooey_gui.types"
 
@@ -36,7 +37,7 @@ def generate_types_for_module(module: ModuleType) -> None:
     source_path = get_module_source_path(module)
     output_path = source_path.with_suffix(".d.ts")
     for model in models:
-        schema = model.model_json_schema()
+        schema = model.model_json_schema(schema_generator=AllFieldsRequiredJsonSchema)
         strip_field_titles(schema)
         with tempfile.NamedTemporaryFile(mode="w", suffix=".schema.json") as f:
             schema_path = Path(f.name)
@@ -98,6 +99,11 @@ def run_type_generator(
         cwd=BASE_DIR / "gooey-gui",
         check=True,
     )
+
+
+class AllFieldsRequiredJsonSchema(GenerateJsonSchema):
+    def field_is_required(self, field, total: bool) -> bool:
+        return True
 
 
 if __name__ == "__main__":
