@@ -290,7 +290,6 @@ class SavedRun(models.Model):
                 "run_status",
                 "is_flagged",
                 "state",
-                "price",
             ]
         )
 
