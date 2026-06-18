@@ -340,7 +340,6 @@ To understand what each field represents, check out our [API docs](https://api.g
             for df_ix, arr_len in slice_request_df(df, request):
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
-                current_row_number = row_offset + min(df_ix + arr_len, len(df))
 
                 used_col_names = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
@@ -355,7 +354,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                     )
                     yield progress.workflow_started(
                         response,
-                        current_row_number=current_row_number,
+                        current_row_number=row_offset + df_ix + 1,
                         workflow_number=url_ix + 1,
                         page_cls=page_cls,
                         sr=sr,
