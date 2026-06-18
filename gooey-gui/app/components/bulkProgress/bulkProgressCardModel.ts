@@ -66,7 +66,7 @@ export function buildCardModel(
   snapshot: BulkProgressSnapshot,
   liveElapsedSeconds: number | null | undefined
 ): CardModel {
-  switch (snapshot.runState) {
+  switch (snapshot.run_state) {
     case "complete":
       return buildCompleteModel(snapshot);
     case "evaluating":
@@ -90,8 +90,8 @@ export function buildCardModel(
 
 export function snapshotTicksElapsed(snapshot: BulkProgressSnapshot): boolean {
   return (
-    snapshot.runState !== "complete" &&
-    ACTIVE_RUN_STATE_PROFILE[snapshot.runState].tickElapsed
+    snapshot.run_state !== "complete" &&
+    ACTIVE_RUN_STATE_PROFILE[snapshot.run_state].tickElapsed
   );
 }
 
@@ -99,16 +99,16 @@ function buildCompleteModel(snapshot: BulkProgressSnapshot): CompleteCardModel {
   return {
     kind: "complete",
     title: "Bulk run complete",
-    totalRuns: snapshot.totalUnitRuns,
-    totalRows: snapshot.totalRows,
-    rowsCaption: `× ${snapshot.totalWorkflows} workflows`,
+    totalRuns: snapshot.total_unit_runs,
+    totalRows: snapshot.total_rows,
+    rowsCaption: `× ${snapshot.total_workflows} workflows`,
     totalTime:
-      snapshot.elapsedSeconds != null
-        ? formatElapsed(snapshot.elapsedSeconds)
+      snapshot.elapsed_seconds != null
+        ? formatElapsed(snapshot.elapsed_seconds)
         : "-",
     averageRunTime: formatAverageRunTime(snapshot),
     credits:
-      snapshot.creditsUsed != null ? String(snapshot.creditsUsed) : "-",
+      snapshot.credits_used != null ? String(snapshot.credits_used) : "-",
     averageCredits: formatAverageCredits(snapshot),
     showRerun: true,
   };
@@ -120,8 +120,8 @@ function buildEvaluatingModel(
 ): ActiveCardModel {
   const profile = ACTIVE_RUN_STATE_PROFILE.evaluating;
   const evalCounts =
-    snapshot.evalCurrent != null && snapshot.evalTotal != null
-      ? { current: snapshot.evalCurrent, total: snapshot.evalTotal }
+    snapshot.eval_current != null && snapshot.eval_total != null
+      ? { current: snapshot.eval_current, total: snapshot.eval_total }
       : null;
   const ring = getEvalRingDisplay(evalCounts);
   const metaParts: string[] = [];
@@ -132,7 +132,7 @@ function buildEvaluatingModel(
   appendCreditsAndElapsed(metaParts, snapshot, liveElapsedSeconds);
 
   return activeFromProfile(profile, {
-    headline: snapshot.evalWorkflowTitle || "Eval workflow",
+    headline: snapshot.eval_workflow_title || "Eval workflow",
     metaParts,
     ringPercent: ring.ringPercent,
     ringLabel: ring.ringLabel,
@@ -150,7 +150,7 @@ function buildInProgressUnitRunModel(
   const profile = ACTIVE_RUN_STATE_PROFILE[variant.runState];
   const ring = unitRunRingFields(snapshot);
   const metaParts = [
-    `${snapshot.completedUnitRuns} of ${snapshot.totalUnitRuns} total runs`,
+    `${snapshot.completed_unit_runs} of ${snapshot.total_unit_runs} total runs`,
   ];
   appendCreditsAndElapsed(metaParts, snapshot, variant.liveElapsedSeconds);
 
@@ -158,7 +158,7 @@ function buildInProgressUnitRunModel(
     ...ring,
     metaParts,
     detail: buildDetail(snapshot, {
-      rowLabel: `Processing row ${snapshot.currentRowNumber} of ${snapshot.totalRows}`,
+      rowLabel: `Processing row ${snapshot.current_row_number} of ${snapshot.total_rows}`,
       showStoppingMessage: variant.runState === "stopping",
       failedAt: null,
       workflowElapsedSeconds: 0,
@@ -173,18 +173,18 @@ function buildTerminalUnitRunModel(
   const profile = ACTIVE_RUN_STATE_PROFILE[runState];
   const ring = unitRunRingFields(snapshot);
   const remaining = Math.max(
-    snapshot.totalUnitRuns - snapshot.completedUnitRuns,
+    snapshot.total_unit_runs - snapshot.completed_unit_runs,
     0
   );
   const metaParts = [
-    `${snapshot.completedUnitRuns} of ${snapshot.totalUnitRuns} total runs (${remaining} remaining)`,
+    `${snapshot.completed_unit_runs} of ${snapshot.total_unit_runs} total runs (${remaining} remaining)`,
   ];
-  const elapsed = runState === "stopped" ? snapshot.elapsedSeconds : undefined;
+  const elapsed = runState === "stopped" ? snapshot.elapsed_seconds : undefined;
   appendCreditsAndElapsed(metaParts, snapshot, elapsed);
   const rowLabel =
     runState === "error"
-      ? `Failed on row ${snapshot.currentRowNumber} of ${snapshot.totalRows}`
-      : `Started row ${snapshot.currentRowNumber} of ${snapshot.totalRows}`;
+      ? `Failed on row ${snapshot.current_row_number} of ${snapshot.total_rows}`
+      : `Started row ${snapshot.current_row_number} of ${snapshot.total_rows}`;
 
   return activeFromProfile(profile, {
     ...ring,
@@ -194,7 +194,7 @@ function buildTerminalUnitRunModel(
       showStoppingMessage: false,
       failedAt:
         runState === "error"
-          ? snapshot.currentWorkflowRunTimeSeconds ?? null
+          ? snapshot.workflow_run_time_seconds ?? null
           : null,
     }),
   });
@@ -229,8 +229,8 @@ function appendCreditsAndElapsed(
   snapshot: BulkProgressSnapshot,
   elapsedSeconds: number | null | undefined
 ) {
-  if (snapshot.creditsUsed != null) {
-    metaParts.push(formatCredits(snapshot.creditsUsed));
+  if (snapshot.credits_used != null) {
+    metaParts.push(formatCredits(snapshot.credits_used));
   }
   if (elapsedSeconds != null) {
     metaParts.push(formatElapsed(elapsedSeconds));
@@ -251,18 +251,18 @@ function buildDetail(
     workflowElapsedSeconds?: number | null;
   }
 ): DetailDisplay {
-  const currentTitle = snapshot.currentWorkflowTitle.trim();
-  const lastTitle = snapshot.lastCompletedWorkflowTitle?.trim();
-  const lastUrl = snapshot.lastCompletedWorkflowUrl;
+  const currentTitle = snapshot.workflow_title.trim();
+  const lastTitle = snapshot.last_completed_workflow_title?.trim();
+  const lastUrl = snapshot.last_completed_workflow_url;
   let workflow: WorkflowDisplay | null = null;
 
-  if (currentTitle && snapshot.currentWorkflowUrl) {
-    const workflowNumber = Math.max(snapshot.currentWorkflowNumber, 1);
-    const prefix = `workflow ${workflowNumber} of ${snapshot.totalWorkflows}`;
+  if (currentTitle && snapshot.workflow_url) {
+    const workflowNumber = Math.max(snapshot.current_workflow_number, 1);
+    const prefix = `workflow ${workflowNumber} of ${snapshot.total_workflows}`;
     workflow = {
       prefix,
       title: currentTitle,
-      url: snapshot.currentWorkflowUrl,
+      url: snapshot.workflow_url,
       failedAt,
       elapsedSeconds: workflowElapsedSeconds,
     };
@@ -272,15 +272,15 @@ function buildDetail(
     rowLabel,
     showStoppingMessage,
     workflow,
-    inputPrompt: snapshot.inputPrompt,
-    inputAudioUrl: snapshot.inputAudioUrl,
+    inputPrompt: snapshot.input_prompt,
+    inputAudioUrl: snapshot.input_audio,
     lastCompleted:
       lastTitle && lastUrl
         ? {
             title: lastTitle,
             url: lastUrl,
-            credits: snapshot.lastCompletedCredits,
-            runTimeSeconds: snapshot.lastCompletedRunTimeSeconds,
+            credits: snapshot.last_completed_credits,
+            runTimeSeconds: snapshot.last_completed_run_time_seconds,
           }
         : undefined,
   };
@@ -311,10 +311,10 @@ function getEvalRingDisplay(
 
 function unitRunRingFields(snapshot: BulkProgressSnapshot) {
   let ringPercent = 0;
-  if (snapshot.totalUnitRuns) {
+  if (snapshot.total_unit_runs) {
     ringPercent = Math.min(
       Math.max(
-        Math.round((snapshot.completedUnitRuns / snapshot.totalUnitRuns) * 100),
+        Math.round((snapshot.completed_unit_runs / snapshot.total_unit_runs) * 100),
         0
       ),
       100
