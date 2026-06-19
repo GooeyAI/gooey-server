@@ -52,6 +52,11 @@
   height: 20px;
 }
 
+.workflow-tab-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  -webkit-overflow-scrolling: touch;
+}
 .workflow-tab-pill {
   transition: background-color 80ms ease;
 }
