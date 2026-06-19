@@ -11,6 +11,7 @@ from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
+from gooey_gui.types.home_page_props import AccessBadgeData
 from .saved_run import SavedRun
 from .workflow import Workflow, WorkflowAccessLevel
 
@@ -120,9 +121,13 @@ class PublishedRun(models.Model):
         default=WorkflowAccessLevel.EDIT,
     )
     is_approved_example = models.BooleanField(default=False)
+    is_featured = models.BooleanField(
+        default=False,
+        help_text="If checked, this workflow is featured on homepage.",
+    )
     example_priority = models.IntegerField(
         default=1,
-        help_text="Priority of the example in the example list",
+        help_text="Priority of the example in the example list & homepage",
     )
     tags = models.ManyToManyField("Tag", related_name="published_runs", blank=True)
 
@@ -186,6 +191,11 @@ class PublishedRun(models.Model):
                 ]
             ),
             models.Index(fields=["published_run_id"]),
+            models.Index(
+                fields=["workflow", "-example_priority"],
+                condition=Q(is_featured=True),
+                name="bots_publis_feat_home_idx",
+            ),
             # GinIndex(
             #     SearchVector("title", "notes", config="english"),
             #     name="publishedrun_search_vector_idx",
@@ -294,17 +304,30 @@ class PublishedRun(models.Model):
         """
         Shown externally AND on listings. For example: saved list, profile page.
         """
+        data = self.get_access_badge_data()
+        return f"{data.icon_html} {data.label}"
+
+    def get_access_badge_data(self) -> AccessBadgeData:
         if self.workspace.is_personal or (
             self.public_access == WorkflowAccessLevel.FIND_AND_VIEW
         ):
             perm = WorkflowAccessLevel(self.public_access)
-            return f"{perm.get_public_sharing_icon()} {perm.get_public_sharing_label()}"
+            return AccessBadgeData(
+                icon_html=perm.get_public_sharing_icon(),
+                label=perm.get_public_sharing_label(),
+            )
 
-        perm = WorkflowAccessLevel(self.workspace_access)
+        team_perm = WorkflowAccessLevel(self.workspace_access)
         if self.workspace_access == WorkflowAccessLevel.VIEW_ONLY:
-            return f"{perm.get_team_sharing_icon()} {perm.get_team_sharing_label()}"
-        else:
-            return f"{self.workspace.html_icon(size='20px')} {perm.get_team_sharing_label()}"
+            return AccessBadgeData(
+                icon_html=team_perm.get_team_sharing_icon(),
+                label=team_perm.get_team_sharing_label(),
+            )
+
+        return AccessBadgeData(
+            icon_html=self.workspace.html_icon(size="20px"),
+            label=team_perm.get_team_sharing_label(),
+        )
 
     def submit_api_call(
         self,
@@ -398,12 +421,42 @@ class TagCategory(models.IntegerChoices):
 class Tag(models.Model):
     name = models.CharField(max_length=64)
     icon = models.TextField(blank=True, default="")
+    fa_icon = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            'Font Awesome icon HTML, e.g. &lt;i class="fa-regular fa-tag"&gt;&lt;/i&gt;'
+        ),
+    )
+    color = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Hex color associated with this tag, e.g. #4d8af0",
+    )
     category = models.IntegerField(
         choices=TagCategory.choices, default=TagCategory.other
     )
+    description = models.TextField(blank=True, default="")
+
+    hidden = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is hidden and not shown anywhere.",
+    )
+
+    is_featured = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is featured, ordered by priority.",
+    )
     featured_priority = models.IntegerField(
         default=1,
-        help_text="Higher priority tags are shown first. If 0, then the tag is not shown at all.",
+        help_text="Higher priority tags are shown first.",
+    )
+
+    landing_page = CustomURLField(
+        blank=True,
+        default="",
+        help_text="Optional landing page URL for this tag.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -417,7 +470,7 @@ class Tag(models.Model):
 
     @classmethod
     def get_options(cls) -> list["Tag"]:
-        return list(cls.objects.filter(featured_priority__gte=1))
+        return list(cls.objects.filter(hidden=False).order_by("-featured_priority"))
 
     class Meta:
         constraints = [
@@ -427,5 +480,4 @@ class Tag(models.Model):
                 violation_error_message="This tag already exists",
             )
         ]
-        ordering = ["-featured_priority", "name"]
         indexes = [models.Index(fields=["name"])]

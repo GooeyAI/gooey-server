@@ -230,6 +230,18 @@ def explore2_page(request: Request):
     }
 
 
+@gui.route(app, "/home/")
+def home_page(request: Request):
+    from widgets import home
+
+    with page_wrapper(request):
+        home.render(request)
+
+    return {
+        "meta": home.build_meta_tags(url=get_og_url_path(request)),
+    }
+
+
 @app.get("/tools/{toolkit_slug}/{tool_slug}")
 def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
     import composio_client
@@ -720,8 +732,6 @@ def page_wrapper(
     show_search_bar: bool = True,
     page: typing.Optional["BasePage"] = None,
 ):
-    from routers.account import explore_in_current_workspace
-
     context = {"request": request, "block_incognito": True}
 
     display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]
@@ -774,9 +784,9 @@ def page_wrapper(
 
                 if request.user and not request.user.is_anonymous:
                     render_header_link(
-                        url=get_route_path(explore_in_current_workspace),
-                        label="Saved",
-                        icon=icons.save,
+                        url=get_route_path(home_page),
+                        label="Home",
+                        icon=icons.home,
                     )
 
                     launcher_div = gui.div()

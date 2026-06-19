@@ -2,9 +2,67 @@
 
 export type BulkRunnerRunState = "running" | "stopping" | "evaluating" | "complete" | "error" | "stopped";
 
-export interface BulkProgressCardProps {
-  snapshot: BulkProgressSnapshot;
-  rerun_all_key: string | null;
+export interface BulkEvalProgress {
+  current: number;
+  total: number;
+  workflow_title: string;
+}
+export interface BulkProgressUnitCounts {
+  completed_unit_runs: number;
+  total_unit_runs: number;
+  total_rows: number;
+  current_row_number: number;
+  current_workflow_number: number;
+  total_workflows: number;
+}
+export interface BulkProgressCounts {
+  completed_unit_runs: number;
+  total_unit_runs: number;
+  total_rows: number;
+  current_row_number: number;
+  current_workflow_number: number;
+  total_workflows: number;
+  completed_row_groups: number;
+  total_row_groups: number;
+  completed_rows: number;
+}
+export interface BulkProgressCompletionInfo {
+  credits_used: number | null;
+  total_eval_runs: number | null;
+  last_completed_workflow_title: string | null;
+  last_completed_workflow_url: string | null;
+  last_completed_run_time_seconds: number | null;
+  last_completed_credits: number | null;
+  workflow_title: string;
+  workflow_url: string;
+  input_prompt: string;
+  input_audio: string | null;
+  workflow_run_time_seconds: number | null;
+}
+export interface BulkProgress {
+  credits_used: number | null;
+  total_eval_runs: number | null;
+  last_completed_workflow_title: string | null;
+  last_completed_workflow_url: string | null;
+  last_completed_run_time_seconds: number | null;
+  last_completed_credits: number | null;
+  workflow_title: string;
+  workflow_url: string;
+  input_prompt: string;
+  input_audio: string | null;
+  workflow_run_time_seconds: number | null;
+  completed_unit_runs: number;
+  total_unit_runs: number;
+  total_rows: number;
+  current_row_number: number;
+  current_workflow_number: number;
+  total_workflows: number;
+  completed_row_groups: number;
+  total_row_groups: number;
+  completed_rows: number;
+  phase: "running" | "evaluating" | "complete";
+  workflow_credits: number | null;
+  error_msg: string | null;
 }
 export interface BulkProgressSnapshot {
   credits_used: number | null;
@@ -29,4 +87,8 @@ export interface BulkProgressSnapshot {
   eval_current: number | null;
   eval_total: number | null;
   eval_workflow_title: string | null;
+}
+export interface BulkProgressCardProps {
+  snapshot: BulkProgressSnapshot;
+  rerun_all_key: string | null;
 }

@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 
 from furl import furl
 from gooey_gui import core
+import pydantic
+
+if typing.TYPE_CHECKING:
+    import pandas as pd
 
 T = typing.TypeVar("T")
 LabelVisibility = typing.Literal["visible", "collapsed"]
@@ -29,6 +33,17 @@ spinner = dummy
 set_page_config = dummy
 form = dummy
 dataframe = dummy
+
+
+def model_component(model_props: pydantic.BaseModel):
+    try:
+        nodename = model_props._component
+    except AttributeError:
+        raise ValueError(
+            f"Model {model_props.__class__.__name__} must define _component for rendering"
+        )
+    props = model_props.model_dump(mode="json")
+    return component(nodename, **props)
 
 
 def component(nodename: str, **props):

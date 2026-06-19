@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 BulkProgressPhase = Literal["running", "evaluating", "complete"]
 
@@ -59,8 +59,6 @@ class BulkProgress(BulkProgressCounts, BulkProgressCompletionInfo):
 
 
 class BulkProgressSnapshot(BulkProgressUnitCounts, BulkProgressCompletionInfo):
-    model_config = ConfigDict(extra="forbid")
-
     run_state: BulkRunnerRunState
     elapsed_seconds: float | None = None
 
@@ -94,7 +92,7 @@ class BulkProgressSnapshot(BulkProgressUnitCounts, BulkProgressCompletionInfo):
 
 
 class BulkProgressCardProps(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    _component: str = "BulkProgressCard"
 
     snapshot: BulkProgressSnapshot
     rerun_all_key: str | None = None
