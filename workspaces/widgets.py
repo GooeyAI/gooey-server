@@ -142,7 +142,14 @@ def global_workspace_selector(user: AppUser, session: dict):
             ),
         )
 
+        from routers.root import home_page
+
         with gui.div(className="d-xl-none d-inline-block"):
+            workspace_selector_link(
+                url=get_route_path(home_page),
+                icon=icons.home,
+                label="Home",
+            )
             for url, label in settings.HEADER_LINKS:
                 workspace_selector_link(
                     url=url,
