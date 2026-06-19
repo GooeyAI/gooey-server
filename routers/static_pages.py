@@ -19,7 +19,6 @@ from daras_ai.text_format import format_number_with_suffix
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from routers.custom_api_router import CustomAPIRouter
 
@@ -29,6 +28,7 @@ app = CustomAPIRouter()
 @gui.route(app, "/sovereign/")
 def sovereign_page(request: Request):
     from routers.root import get_og_url_path
+    from daras_ai_v2.meta_content import raw_build_meta_tags
 
     gui.component("SovereignPage")
     return dict(

@@ -27,18 +27,12 @@ body{margin:0;font-family:var(--gy-font-sans);font-size:16px;line-height:1.5;col
 img{max-width:100%;display:block}
 a{color:var(--gy-ink);text-underline-offset:2px}
 
-/* progress + header */
+/* progress */
 .progress{position:fixed;top:0;left:0;right:0;height:3px;background:transparent;z-index:60}
 .progress>i{display:block;height:100%;width:0;background:var(--gy-orange);transition:width 90ms linear}
-.site-header{position:fixed;top:0;left:0;right:0;z-index:55;height:60px;display:flex;align-items:center;gap:16px;padding:0 26px;background:rgba(255,254,253,.82);backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--gy-line-soft)}
-.site-header .logo{height:24px}
-.site-header .h-title{font-family:var(--gy-font-serif);font-size:14px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .2s ease}
-.site-header.scrolled .h-title{opacity:1}
-.site-header .h-cta{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:8px;background:var(--gy-ink);color:var(--gy-bg);font-weight:700;font-size:12.5px;text-decoration:none;transition:background .12s}
-.site-header .h-cta:hover{background:rgb(34,42,64)}
 
 /* HERO */
-.hero{min-height:100vh;display:flex;align-items:center;position:relative;border-bottom:1px solid var(--gy-line-soft);overflow:hidden;padding:80px 0 40px}
+.hero{min-height:100vh;display:flex;align-items:center;position:relative;border-bottom:1px solid var(--gy-line-soft);overflow:hidden;padding:40px 0}
 .hero-art{position:absolute;inset:0;z-index:1;pointer-events:none}
 .globe-float{position:fixed;z-index:40;pointer-events:none;left:0;top:0;width:0;height:0;transition:opacity .25s ease,visibility .25s ease}
 #globeDockAnchor{position:absolute;left:50%;top:50%;width:min(420px,88%,60vh);aspect-ratio:1;transform:translate(-50%,-50%);visibility:hidden;pointer-events:none}
@@ -122,7 +116,7 @@ text.axlbl{fill:var(--gy-ink-muted);font-size:11.5px;font-weight:600;font-family
 
 @media(max-width:900px){
   .scrolly{display:block;padding:0 20px}
-  .media{position:sticky;top:60px;height:44vh;grid-column:auto;margin:0 -20px 0;background:var(--gy-bg);border-bottom:1px solid var(--gy-line-soft);z-index:20}
+  .media{position:sticky;top:0;height:44vh;grid-column:auto;margin:0 -20px 0;background:var(--gy-bg);border-bottom:1px solid var(--gy-line-soft);z-index:20}
   .stage{height:40vh;max-width:520px}
   .figlayer img{max-height:34vh}
   .figlayer .artbox svg{max-height:36vh}
@@ -155,11 +149,6 @@ text.axlbl{fill:var(--gy-ink-muted);font-size:11.5px;font-weight:600;font-family
 </head>
 <body>
 <div class="progress"><i id="progbar"></i></div>
-<header class="site-header" id="siteHeader">
-  <img class="logo" src="/static/sovereign/assets/gooey-logo.png" alt="Gooey.AI"/>
-  <span class="h-title">How Middle Powers Cooperate for AI Sovereignty</span>
-  <a class="h-cta" href="https://gooey.ai" target="_blank" rel="noopener"><i class="fa-regular fa-arrow-up-right"></i>gooey.ai</a>
-</header>
 
 <!-- ===================== HERO ===================== -->
 <header class="hero" id="top">
@@ -683,7 +672,7 @@ function computeGlobeRects(){
  const from={left:innerWidth-heroGs+heroGs*0.13,top:hero.offsetHeight-heroGs+heroGs*0.13,width:heroGs,height:heroGs};
  let to;
  if(mobile){
-  to={left:(innerWidth-size)/2,top:60+(innerHeight*0.44-size)/2,width:size,height:size};
+  to={left:(innerWidth-size)/2,top:(innerHeight*0.44-size)/2,width:size,height:size};
  }else{
   const mediaLeft=scrollyLeft+scrollyPad+contentW*0.42+gap;
   to={left:mediaLeft+contentW*0.58/2-size/2,top:(innerHeight-size)/2,width:size,height:size};
@@ -764,10 +753,10 @@ function initScrolly(globeCtrl,updateGlobeFlight){
  activate(steps[0]);
 }
 
-/* ---------- header + progress ---------- */
-function initChrome(){
- const header=document.getElementById('siteHeader'),pb=document.getElementById('progbar');
- const on=()=>{const h=document.documentElement,sc=h.scrollTop,max=h.scrollHeight-h.clientHeight;pb.style.width=(max>0?sc/max*100:0)+'%';header.classList.toggle('scrolled',sc>360);};
+/* ---------- progress ---------- */
+function initProgress(){
+ const pb=document.getElementById('progbar');
+ const on=()=>{const h=document.documentElement,sc=h.scrollTop,max=h.scrollHeight-h.clientHeight;pb.style.width=(max>0?sc/max*100:0)+'%';};
  addEventListener('scroll',on,{passive:true});on();
 }
 
@@ -775,7 +764,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  const globeCtrl=typeof initGlobe==='function'?initGlobe(document.getElementById('globe')):null;
  const updateGlobeFlight=globeCtrl?initGlobeFlight(globeCtrl):null;
  renderDC();renderPub();renderDonut();renderClaude();renderGemControls();
- injectArt();initScrolly(globeCtrl,updateGlobeFlight);initChrome();
+ injectArt();initScrolly(globeCtrl,updateGlobeFlight);initProgress();
 });
 </script>
 </body>
