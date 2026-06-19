@@ -231,7 +231,6 @@ export function SavedWorkflowCard({ card }: { card: WorkflowCardData }) {
 }
 
 export function WorkflowPickerCard({ card }: { card: WorkflowCardData }) {
-  const hasAuthor = !!(card.author?.photo_url || card.author?.name);
   const fallbackLetter = (card.title.trim().charAt(0) || "?").toUpperCase();
 
   return (
@@ -241,20 +240,22 @@ export function WorkflowPickerCard({ card }: { card: WorkflowCardData }) {
     >
       <div className="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
         <div>
-          <LineClamp lines={1} expandable={false}>
+          <LineClamp lines={2} expandable={false}>
             <span className="fw-bold text-break m-0 bold">{card.title}</span>
           </LineClamp>
           {card.description && (
-            <div className="text-muted small line-clamp-2 text-break">
-              {card.description}
+            <div className="text-muted small text-break">
+              <LineClamp lines={3} expandable={false}>
+                {card.description}
+              </LineClamp>
             </div>
           )}
         </div>
-        {hasAuthor && (
+        {/* {hasAuthor && (
           <div className="small text-muted">
             <CardAuthor author={card.author} />
           </div>
-        )}
+        )} */}
       </div>
 
       <div className="flex-shrink-0 align-self-center starter-thumb overflow-hidden rounded bg-light p-0">
