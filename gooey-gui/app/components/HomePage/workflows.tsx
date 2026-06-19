@@ -4,22 +4,32 @@ import { GooeyImg, GooeyVideo } from "~/components/MediaTags";
 import { LineClamp } from "~/renderedHTML";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 
-import type { CardData, CardPreview, WorkflowTab } from "./types";
+import type {
+  AuthorData,
+  ChatPreview,
+  IconPreview,
+  MediaPreview,
+  WorkflowCardData,
+  WorkflowTabData,
+} from "@gooey-types/home_page_props";
+
 import { GooeyTooltip } from "../GooeyTooltip";
 
-function CardAuthor({ card }: { card: CardData }) {
-  if (!card.authorPhotoUrl && !card.authorName) return null;
+export type CardPreview = ChatPreview | MediaPreview | IconPreview;
+
+function CardAuthor({ author }: { author: AuthorData | null }) {
+  if (!author?.photo_url && !author?.name) return null;
   return (
     <span className="d-inline-flex align-items-center gap-2 min-w-0">
-      {card.authorPhotoUrl && (
+      {author?.photo_url && (
         <img
-          src={card.authorPhotoUrl}
+          src={author?.photo_url}
           alt=""
           className="rounded-circle flex-shrink-0 starter-thumb-author object-fit-cover"
         />
       )}
-      {card.authorName && (
-        <span className="text-break text-truncate">{card.authorName}</span>
+      {author?.name && (
+        <span className="text-break text-truncate">{author?.name}</span>
       )}
     </span>
   );
@@ -30,20 +40,20 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
     case "chat":
       return (
         <div className="d-flex flex-column justify-content-center gap-3 p-3 h-100">
-          {preview.userMessage && (
+          {preview.user_message && (
             <div className="d-flex justify-content-end">
               <div className="recent-card-chat-bubble border rounded-3 px-2 py-1 text-break">
                 <LineClamp lines={2} expandable={false}>
-                  {preview.userMessage}
+                  {preview.user_message}
                 </LineClamp>
               </div>
             </div>
           )}
-          {preview.botMessage && (
+          {preview.bot_message && (
             <div className="d-flex justify-content-start">
               <div className="recent-card-chat-bubble bg-white rounded-3 px-2 py-1 text-break line-clamp-3 container-margin-reset">
                 <RenderedMarkdown
-                  body={preview.botMessage}
+                  body={preview.bot_message}
                   lineClamp={3}
                   lineClampExpand={false}
                 />
@@ -56,14 +66,14 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
       return (
         <GooeyImg
           src={preview.url}
-          previewImg={preview.previewImg ?? undefined}
+          previewImg={preview.preview_img ?? undefined}
         />
       );
     case "video":
       return (
         <GooeyVideo
           src={preview.url}
-          previewImg={preview.previewImg ?? undefined}
+          previewImg={preview.preview_img ?? undefined}
           muted
           playsInline
           preload="metadata"
@@ -85,9 +95,9 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
     case "icon":
       return (
         <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-          {preview.imageUrl ? (
+          {preview.image_url ? (
             <img
-              src={preview.imageUrl}
+              src={preview.image_url}
               alt=""
               className="recent-card-icon-img"
             />
@@ -106,19 +116,19 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
   }
 }
 
-export function HistoryWorkflowCard({ card }: { card: CardData }) {
-  const hasAuthor = !!(card.authorPhotoUrl || card.authorName);
+export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
+  const hasAuthor = !!(card.author?.photo_url || card.author?.name);
   return (
     <a
       href={card.href}
       className="d-flex flex-column h-100 border rounded-4 overflow-hidden text-decoration-none text-body border-hover"
     >
       <div className="position-relative recent-card-preview bg-light p-0">
-        {card.workflowIcon && (
+        {card.workflow_icon && (
           <span className="badge bg-white text-body rounded-pill px-2 py-1 small d-inline-flex align-items-center gap-1 fw-normal position-absolute top-0 start-0 m-2 shadow-lg z-1">
             <span
               aria-hidden="true"
-              dangerouslySetInnerHTML={{ __html: card.workflowIcon }}
+              dangerouslySetInnerHTML={{ __html: card.workflow_icon }}
             />
           </span>
         )}
@@ -128,10 +138,10 @@ export function HistoryWorkflowCard({ card }: { card: CardData }) {
       <div className="d-flex flex-column p-3 gap-2 border-top">
         <span className="text-break line-clamp-1 m-0">{card.title}</span>
         <div className="d-flex align-items-center gap-1 small">
-          <CardAuthor card={card} />
-          {hasAuthor && card.updatedAt && <span>·</span>}
-          {card.updatedAt && (
-            <span className="text-nowrap text-muted">{card.updatedAt}</span>
+          <CardAuthor author={card.author} />
+          {hasAuthor && card.updated_at && <span>·</span>}
+          {card.updated_at && (
+            <span className="text-nowrap text-muted">{card.updated_at}</span>
           )}
         </div>
       </div>
@@ -139,11 +149,11 @@ export function HistoryWorkflowCard({ card }: { card: CardData }) {
   );
 }
 
-export function SavedWorkflowCard({ card }: { card: CardData }) {
-  const hasAuthor = !!(card.authorPhotoUrl || card.authorName);
+export function SavedWorkflowCard({ card }: { card: WorkflowCardData }) {
+  const hasAuthor = !!(card.author?.photo_url || card.author?.name);
   const fallbackLetter = (card.title.trim().charAt(0) || "?").toUpperCase();
 
-  const hasFooter = hasAuthor || card.updatedAt || card.runCount;
+  const hasFooter = !!(hasAuthor || card.updated_at || card.run_count);
 
   return (
     <a
@@ -163,12 +173,12 @@ export function SavedWorkflowCard({ card }: { card: CardData }) {
 
         <div className="flex-grow-1 min-w-0">
           <div className="d-flex align-items-center gap-1 min-w-0">
-            {card.accessBadge && (
-              <GooeyTooltip content={card.accessBadge.label}>
+            {card.access_badge && (
+              <GooeyTooltip content={card.access_badge.label}>
                 <span
                   className="flex-shrink-0 small text-muted d-inline-flex align-items-center"
                   dangerouslySetInnerHTML={{
-                    __html: card.accessBadge.iconHtml,
+                    __html: card.access_badge.icon_html,
                   }}
                 />
               </GooeyTooltip>
@@ -187,39 +197,39 @@ export function SavedWorkflowCard({ card }: { card: CardData }) {
 
       {hasFooter && (
         <div className="d-flex align-items-center gap-2 mt-1 small flex-nowrap">
-          <CardAuthor card={card} />
-          {hasAuthor && card.updatedAt && <span>·</span>}
-          {card.updatedAt && (
+          <CardAuthor author={card.author} />
+          {hasAuthor && card.updated_at && <span>·</span>}
+          {card.updated_at && (
             <span className="d-inline-flex small align-items-center gap-1 text-nowrap text-muted">
               <i className="far fa-clock" aria-hidden="true" />
-              {card.updatedAt}
+              {card.updated_at}
             </span>
           )}
-          {hasAuthor && card.runCount && card.updatedAt && <span>·</span>}
-          {card.runCount ? (
+          {hasAuthor && card.run_count && card.updated_at && <span>·</span>}
+          {card.run_count ? (
             <span className="d-inline-flex small align-items-center gap-1 text-nowrap text-muted">
               <i className="fas fa-person-running" aria-hidden="true" />
-              {card.runCount.toLocaleString()} runs
+              {card.run_count.toLocaleString()} runs
             </span>
           ) : null}
         </div>
       )}
 
-      {card.changeNotes && (
+      {card.change_notes && (
         <div className="d-flex align-items-center gap-1 pt-2 border-top small text-muted text-truncate">
           <i
             className="fa-regular fa-money-check-pen flex-shrink-0"
             aria-hidden="true"
           />
-          <span className="text-truncate small">{card.changeNotes}</span>
+          <span className="text-truncate small">{card.change_notes}</span>
         </div>
       )}
     </a>
   );
 }
 
-export function WorkflowPickerCard({ card }: { card: CardData }) {
-  const hasAuthor = !!(card.authorPhotoUrl || card.authorName);
+export function WorkflowPickerCard({ card }: { card: WorkflowCardData }) {
+  const hasAuthor = !!(card.author?.photo_url || card.author?.name);
   const fallbackLetter = (card.title.trim().charAt(0) || "?").toUpperCase();
 
   return (
@@ -240,7 +250,7 @@ export function WorkflowPickerCard({ card }: { card: CardData }) {
         </div>
         {hasAuthor && (
           <div className="small text-muted">
-            <CardAuthor card={card} />
+            <CardAuthor author={card.author} />
           </div>
         )}
       </div>
@@ -258,7 +268,7 @@ export function WorkflowPickerCard({ card }: { card: CardData }) {
   );
 }
 
-export function WorkflowPicker({ tabs }: { tabs: WorkflowTab[] }) {
+export function WorkflowPicker({ tabs }: { tabs: WorkflowTabData[] }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const activeTab = tabs[activeIdx];
 
@@ -286,17 +296,21 @@ export function WorkflowPicker({ tabs }: { tabs: WorkflowTab[] }) {
         ))}
       </div>
 
-      {activeTab.cards.length === 0 ? (
-        <p className="text-muted small">No workflows yet — check back soon.</p>
-      ) : (
-        <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 d-flex align-items-stretch">
-          {activeTab.cards.map((card) => (
-            <div key={card.href} className="col">
-              <WorkflowPickerCard card={card} />
-            </div>
-          ))}
-        </div>
-      )}
+      <div key={activeTab.id}>
+        {activeTab.cards.length === 0 ? (
+          <p className="text-muted small">
+            No workflows yet — check back soon.
+          </p>
+        ) : (
+          <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 d-flex align-items-stretch">
+            {activeTab.cards.map((card) => (
+              <div key={card.href} className="col">
+                <WorkflowPickerCard card={card} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

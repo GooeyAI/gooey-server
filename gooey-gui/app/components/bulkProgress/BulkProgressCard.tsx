@@ -9,11 +9,12 @@ import type {
 } from "./bulkProgress.types";
 
 import "./BulkProgressCard.css";
+import type { CustomComponentProps } from "~/components";
 
 export function BulkProgressCard({
   snapshot,
   rerun_all_key,
-}: BulkProgressCardProps) {
+}: CustomComponentProps & BulkProgressCardProps) {
   const liveElapsedSeconds = useLiveElapsedSeconds(
     snapshot.elapsed_seconds,
     snapshotTicksElapsed(snapshot)

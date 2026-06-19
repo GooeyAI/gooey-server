@@ -39,13 +39,11 @@ def render_bulk_runner_progress(*, is_cancelled: bool) -> None:
     if not snapshot:
         return
 
-    props = BulkProgressCardProps(
-        snapshot=snapshot,
-        rerun_all_key="-submit-workflow",
-    )
-    gui.component(
-        "BulkProgressCard",
-        **props.model_dump(mode="json", exclude_none=True),
+    gui.model_component(
+        BulkProgressCardProps(
+            snapshot=snapshot,
+            rerun_all_key="-submit-workflow",
+        )
     )
 
 

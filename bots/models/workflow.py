@@ -244,9 +244,6 @@ class Workflow(models.IntegerChoices):
 
         return workflow_map[self]
 
-    def get_metadata(self) -> "WorkflowMetadata | None":
-        return WorkflowMetadata.objects.filter(workflow=self).first()
-
     def get_or_create_metadata(self) -> "WorkflowMetadata":
         return get_or_create_lazy(
             WorkflowMetadata,
@@ -295,6 +292,15 @@ class WorkflowMetadata(models.Model):
         blank=True,
         default="",
         help_text="Hex color associated with this workflow, e.g. #4d8af0",
+    )
+
+    is_featured = models.BooleanField(
+        default=False,
+        help_text="If checked, this workflow is featured on homepage, ordered by priority.",
+    )
+    priority = models.IntegerField(
+        default=1,
+        help_text="Higher priority workflows are shown first.",
     )
 
     def __str__(self):

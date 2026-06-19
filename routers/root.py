@@ -732,8 +732,6 @@ def page_wrapper(
     show_search_bar: bool = True,
     page: typing.Optional["BasePage"] = None,
 ):
-    from routers.account import explore_in_current_workspace
-
     context = {"request": request, "block_incognito": True}
 
     display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]

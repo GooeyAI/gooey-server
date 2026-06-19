@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 
-import type { IndustryTile } from "./types";
+import type { IndustryTileData } from "@gooey-types/home_page_props";
 
-export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
+export function IndustryBrowser({ tiles }: { tiles: IndustryTileData[] }) {
   return (
     <section className="mb-5">
       <h6 className="text-muted text-uppercase small mb-3">
@@ -34,7 +34,7 @@ export function IndustryBrowser({ tiles }: { tiles: IndustryTile[] }) {
               )}
               <div className="d-flex align-items-center justify-content-between mt-auto pt-2 small">
                 <span className="text-muted">
-                  {tile.workflowCount} workflows
+                  {tile.workflow_count} workflows
                 </span>
                 <span className="fw-semibold small">
                   <i className="fa-solid fa-arrow-right"></i>

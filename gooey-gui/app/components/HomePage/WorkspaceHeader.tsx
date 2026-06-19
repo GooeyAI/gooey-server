@@ -1,13 +1,13 @@
 import { RenderedMarkdown } from "~/renderedMarkdown";
-import type { WorkspaceHeader as WorkspaceHeaderData } from "./types";
+import type { WorkspaceHeaderData } from "@gooey-types/home_page_props";
 
 export function WorkspaceHeader({ header }: { header: WorkspaceHeaderData }) {
   return (
     <header className="mb-5">
       <div className="d-flex align-items-center gap-3 mb-2">
-        {header.photoUrl && (
+        {header.photo_url && (
           <img
-            src={header.photoUrl}
+            src={header.photo_url}
             alt=""
             className="rounded-3 flex-shrink-0 object-fit-cover"
             style={{ width: "64px", height: "64px" }}
@@ -15,9 +15,9 @@ export function WorkspaceHeader({ header }: { header: WorkspaceHeaderData }) {
         )}
         <h1 className="m-0 d-inline-flex align-items-center gap-2">
           <span className="text-break">{header.name}</span>
-          {header.settingsHref && (
+          {header.settings_href && (
             <a
-              href={header.settingsHref}
+              href={header.settings_href}
               className="text-muted fs-6"
               aria-label="Workspace settings"
             >

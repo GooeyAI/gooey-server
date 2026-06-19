@@ -1,26 +1,41 @@
 from __future__ import annotations
 
 import mimetypes
+import threading
+import typing
+from contextlib import contextmanager
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING
+
 
 import gooey_gui as gui
-from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, OuterRef, Q, Subquery, F
 from django.utils import timezone
 from furl import furl
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
 from starlette.requests import Request
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, PublishedRunVersion, SavedRun, Workflow
 from bots.models.published_run import Tag
 from bots.models.workflow import WorkflowAccessLevel, WorkflowMetadata
-from cms.models import NewsItem, WorkflowCard, WorkflowTab
+from cms.models import NewsItem
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.utils import get_relative_time
+from gooey_gui.types.home_page_props import (
+    CardPreview,
+    ChatPreview,
+    IconPreview,
+    IndustryTileData,
+    MediaPreview,
+    NewsItemData,
+    WorkflowCardData,
+    WorkflowTabData,
+    WorkspaceHeaderData,
+    HomePageProps,
+    AuthorData,
+)
 from widgets.workflow_search import get_filter_value_from_workspace
 from workspaces.models import Workspace
 from workspaces.widgets import get_current_workspace
@@ -28,137 +43,55 @@ from workspaces.widgets import get_current_workspace
 if TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
-# request-scoped cache of Workflow value -> its metadata row (or None when the
-# workflow has none), populated lazily so each workflow is queried at most once
-# per render instead of once per card.
-MetadataByWorkflow = dict[Workflow, WorkflowMetadata | None]
-
 META_TITLE = "Home | Gooey.AI"
 META_DESCRIPTION = "Build AI workflows on Gooey.AI"
 
 WORKFLOW_LIST_LIMIT = 3
 RECENT_WORKFLOW_LIST_LIMIT = 4
+RECENT_WORKFLOW_SCAN_LIMIT = 200
 NEWS_ITEM_LIST_LIMIT = 4
 
 CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
 
 
-class CamelModel(BaseModel):
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        extra="forbid",
-    )
-
-
-class ChatPreview(CamelModel):
-    type: Literal["chat"] = "chat"
-    user_message: str | None = None
-    bot_message: str | None = None
-
-
-class MediaPreview(CamelModel):
-    type: Literal["image", "video", "audio"]
-    url: str
-    preview_img: str | None = None
-    caption: str | None = None
-
-
-class IconPreview(CamelModel):
-    type: Literal["icon"] = "icon"
-    image_url: str | None = None
-    icon: str | None = None
-
-
-CardPreview = Annotated[
-    ChatPreview | MediaPreview | IconPreview, Field(discriminator="type")
-]
-
-
-class AccessBadgeData(CamelModel):
-    icon_html: str
-    label: str
-
-
-class WorkflowCardData(CamelModel):
-    title: str
-    href: str
-    workflow_icon: str | None = None
-    description: str | None = None
-    author_name: str | None = None
-    author_photo_url: str | None = None
-    preview: CardPreview | None = None
-    updated_at: str | None = None
-    run_count: int | None = None
-    access_badge: AccessBadgeData | None = None
-    change_notes: str | None = None
-
-
-class WorkflowTabData(CamelModel):
-    id: int
-    title: str
-    icon: str
-    cards: list[WorkflowCardData]
-
-
-class WorkspaceHeaderData(CamelModel):
-    name: str
-    photo_url: str
-    description: str | None = None
-    settings_href: str | None = None
-
-
-class IndustryTileData(CamelModel):
-    id: int
-    name: str
-    icon: str
-    color: str | None = None
-    description: str
-    workflow_count: int
-    href: str
-
-
-class NewsItemData(CamelModel):
-    id: int
-    headline: str
-    tag: str
-    photo_url: str | None = None
-    publish_date: str
-    href: str
-
-
 def render(request: Request):
     is_anonymous = request.user is None or request.user.is_anonymous
-    workspace = (
-        get_current_workspace(request.user, request.session)
-        if not is_anonymous
-        else None
-    )
+    if is_anonymous:
+        workspace = None
+    else:
+        workspace = get_current_workspace(request.user, request.session)
     workspace_header = _get_workspace_header(request.user, workspace)
-    metadata_by_workflow: MetadataByWorkflow = {}
     if not is_anonymous and workspace_header is None:
         greeting = _get_greeting(request.user)
     else:
         greeting = None
 
-    gui.component(
-        "HomePage",
-        greeting=greeting,
-        workspaceHeader=workspace_header,
-        # Disabled until recent-workflows query perf is fixed on a separate branch.
-        # recentWorkflows=_load_recent_workflows(
-        #     request.user, workspace, metadata_by_workflow
-        # ),
-        recentWorkflows=[],
-        savedWorkflows=_load_saved_workflows(
-            request.user, workspace, metadata_by_workflow
-        ),
-        savedWorkflowsHref=_saved_workflows_href(workspace),
-        workflowTabs=_load_workflow_tabs(metadata_by_workflow),
-        industryTiles=_load_industry_tiles(),
-        newsItems=_load_news_items(),
-    )
+    with get_featured_workflows() as featured_workflows:
+        gui.model_component(
+            HomePageProps(
+                greeting=greeting,
+                workspace_header=workspace_header,
+                workflow_tabs=list(_load_workflow_tabs(featured_workflows)),
+                recent_workflows=_load_recent_workflows(request.user, workspace),
+                saved_workflows=_load_saved_workflows(request.user, workspace),
+                saved_workflows_href=_saved_workflows_href(workspace),
+                industry_tiles=_load_industry_tiles(),
+                news_items=_load_news_items(),
+            ),
+        )
+
+
+@contextmanager
+def get_featured_workflows() -> typing.Iterator[list[Workflow | int]]:
+    qs = WorkflowMetadata.objects.filter(is_featured=True).order_by("-priority")
+    cache = workflow_metadata_cache()
+    try:
+        for metadata in qs:
+            cache[metadata.workflow] = metadata
+        yield [metadata.workflow for metadata in qs]
+    finally:
+        cache.clear()
 
 
 def _get_workspace_header(
@@ -199,69 +132,43 @@ def _get_greeting(user: AppUser) -> str | None:
 def _load_recent_workflows(
     user: AppUser | None,
     workspace: Workspace | None,
-    metadata_by_workflow: MetadataByWorkflow,
 ) -> list[WorkflowCardData]:
-    # Disabled until recent-workflows query perf is fixed on a separate branch.
-    return []
-    # if workspace is None:
-    #     return []
-    # runs = SavedRun.objects.filter(
-    #     workspace=workspace,
-    #     parent_version__published_run__isnull=False,
-    # )
-    # if user and not workspace.is_personal:
-    #     # in a team workspace, show only the current user's history
-    #     runs = runs.filter(uid=user.uid)
-    # latest_ids = (
-    #     runs.order_by("parent_version__published_run_id", "-updated_at")
-    #     .distinct("parent_version__published_run_id")
-    #     .values("id")
-    # )
-    # saved_runs = list(
-    #     SavedRun.objects.filter(id__in=latest_ids)
-    #     .select_related("parent_version__published_run")
-    #     .order_by("-updated_at")[:RECENT_WORKFLOW_LIST_LIMIT]
-    # )
-    # other_uids = {
-    #     sr.uid for sr in saved_runs if sr.uid and (not user or sr.uid != user.uid)
-    # }
-    # authors_by_uid = {u.uid: u for u in AppUser.objects.filter(uid__in=other_uids)}
-    # return [
-    #     _history_card(
-    #         sr,
-    #         author=author_from_user(
-    #             _history_author(sr, user=user, authors_by_uid=authors_by_uid),
-    #             current_user=user,
-    #         ),
-    #         metadata_by_workflow=metadata_by_workflow,
-    #     )
-    #     for sr in saved_runs
-    # ]
+    if user is None or workspace is None:
+        return []
 
+    qs = (
+        SavedRun.objects.filter(
+            uid=user.uid, workspace=workspace, surface=SavedRun.Surface.run
+        )
+        .annotate(published_run_id=F("parent_version__published_run_id"))
+        .order_by("-updated_at")
+        .values("id", "published_run_id")[:RECENT_WORKFLOW_SCAN_LIMIT]
+    )
+    ids = []
+    seen_published_runs = set()
+    for sr in qs:
+        if sr["published_run_id"] in seen_published_runs:
+            continue
+        seen_published_runs.add(sr["published_run_id"])
+        ids.append(sr["id"])
+        if len(ids) >= RECENT_WORKFLOW_LIST_LIMIT:
+            break
 
-def _history_author(
-    sr: SavedRun,
-    *,
-    user: AppUser | None,
-    authors_by_uid: dict[str, AppUser],
-) -> AppUser | None:
-    if user and sr.uid == user.uid:
-        return user
-    if sr.uid:
-        return authors_by_uid.get(sr.uid)
-    return None
+    return [
+        _history_card(sr, author=author_from_user(user, current_user=user))
+        for sr in SavedRun.objects.filter(id__in=ids).order_by("-updated_at")
+    ]
 
 
 def _load_saved_workflows(
     user: AppUser | None,
     workspace: Workspace | None,
-    metadata_by_workflow: MetadataByWorkflow,
 ) -> list[WorkflowCardData]:
     if user is None or workspace is None:
         return []
     pr_filter = Q(workspace=workspace)
     if workspace.is_personal:
-        pr_filter |= Q(created_by=user, workspace__isnull=True)
+        pr_filter |= Q(created_by=user)
     latest_change_notes = (
         PublishedRunVersion.objects.filter(published_run=OuterRef("pk"))
         .order_by("-created_at")
@@ -277,59 +184,38 @@ def _load_saved_workflows(
         _saved_card(
             pr,
             author=author_from_user(pr.last_edited_by, current_user=user),
-            metadata_by_workflow=metadata_by_workflow,
         )
         for pr in prs
     ]
 
 
 def _load_workflow_tabs(
-    metadata_by_workflow: MetadataByWorkflow,
-) -> list[WorkflowTabData]:
-    qs = (
-        WorkflowTab.objects.filter(priority__gte=1)
-        .select_related("workflow_metadata")
-        .prefetch_related(
-            Prefetch(
-                "cards",
-                queryset=WorkflowCard.objects.filter(priority__gte=1)
-                .select_related(
-                    "workflow__workspace__created_by",
-                    "workflow__saved_run",
-                )
-                .order_by("-priority"),
-            )
-        )
-        .order_by("-priority")
+    featured_workflows: list[Workflow | int],
+) -> typing.Iterable[WorkflowTabData]:
+    pr_qs = (
+        PublishedRun.objects.select_related("workspace__created_by", "saved_run")
+        .filter(is_featured=True, workflow__in=featured_workflows)
+        .order_by("-example_priority")
     )
-    tabs = []
-    for tab in qs:
-        metadata = _get_workflow_metadata(
-            Workflow(tab.workflow_metadata.workflow),
-            metadata_by_workflow,
-            prefetched=tab.workflow_metadata,
+    grouped = {workflow: [] for workflow in featured_workflows}
+    for pr in pr_qs:
+        try:
+            grouped[pr.workflow].append(pr)
+        except KeyError:
+            pass
+    for workflow, pr_group in grouped.items():
+        if not pr_group:
+            continue
+        metadata = get_workflow_metadata(workflow)
+        yield WorkflowTabData(
+            id=metadata.workflow,
+            title=metadata.short_title,
+            icon=metadata.tab_icon_html(),
+            cards=[
+                pr_to_card(pr, author=author_from_workspace(pr.workspace))
+                for pr in pr_group
+            ],
         )
-        tabs.append(
-            WorkflowTabData(
-                id=tab.id,
-                title=metadata.short_title if metadata else "",
-                icon=metadata.tab_icon_html() if metadata else "",
-                cards=[
-                    pr_to_json(
-                        card.workflow,
-                        author=author_from_workspace(card.workflow.workspace),
-                        metadata_by_workflow=metadata_by_workflow,
-                    )
-                    for card in tab.cards.all()
-                ],
-            )
-        )
-    return tabs
-
-
-class AuthorData(BaseModel):
-    name: str
-    photo_url: str | None = None
 
 
 def author_from_user(
@@ -353,9 +239,8 @@ def _history_card(
     sr: SavedRun,
     *,
     author: AuthorData | None,
-    metadata_by_workflow: MetadataByWorkflow,
 ) -> WorkflowCardData:
-    data = sr_to_json(sr, author=author, metadata_by_workflow=metadata_by_workflow)
+    data = sr_to_card(sr, author=author)
     if sr.updated_at:
         data.updated_at = get_relative_time(sr.updated_at)
     return data
@@ -365,71 +250,67 @@ def _saved_card(
     pr: PublishedRun,
     *,
     author: AuthorData | None,
-    metadata_by_workflow: MetadataByWorkflow,
 ) -> WorkflowCardData:
-    data = pr_to_json(pr, author=author, metadata_by_workflow=metadata_by_workflow)
+    data = pr_to_card(pr, author=author)
     if pr.updated_at:
         data.updated_at = get_relative_time(pr.updated_at)
     if pr.run_count:
         data.run_count = pr.run_count
-    data.access_badge = AccessBadgeData.model_validate(pr.get_share_badge_data())
+    data.access_badge = pr.get_access_badge_data()
     change_notes = getattr(pr, "latest_change_notes", None)
     if change_notes:
         data.change_notes = change_notes
     return data
 
 
-def sr_to_json(
+def sr_to_card(
     sr: SavedRun,
     *,
     author: AuthorData | None,
-    metadata_by_workflow: MetadataByWorkflow,
 ) -> WorkflowCardData:
     parent_pr = sr.parent_published_run()
     workflow = Workflow(sr.workflow)
-    metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
+    metadata = get_workflow_metadata(workflow)
     return WorkflowCardData(
         title=(parent_pr and parent_pr.title) or workflow.label,
         href=sr.get_app_url(),
         workflow_icon=(metadata and (metadata.fa_icon or metadata.emoji)) or "",
         description=(parent_pr and parent_pr.notes) or None,
         preview=_sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata),
-        **_author_fields(author),
+        author=author,
     )
 
 
-def pr_to_json(
+def pr_to_card(
     pr: PublishedRun,
     *,
     author: AuthorData | None,
-    metadata_by_workflow: MetadataByWorkflow,
 ) -> WorkflowCardData:
     workflow = Workflow(pr.workflow)
-    metadata = _get_workflow_metadata(workflow, metadata_by_workflow)
+    metadata = get_workflow_metadata(workflow)
     return WorkflowCardData(
         title=pr.title or workflow.label,
         href=pr.get_app_url(),
         description=pr.notes or None,
         preview=_pr_preview(pr, workflow=workflow, metadata=metadata),
-        **_author_fields(author),
+        author=author,
     )
 
 
-def _author_fields(author: AuthorData | None) -> dict:
-    if author is None:
-        return {}
-    return {"author_name": author.name, "author_photo_url": author.photo_url}
+def get_workflow_metadata(workflow: Workflow | int) -> WorkflowMetadata:
+    cache = workflow_metadata_cache()
+    try:
+        metadata = cache[workflow]
+    except KeyError:
+        metadata = cache[workflow] = Workflow(workflow).get_or_create_metadata()
+    return metadata
 
 
-def _get_workflow_metadata(
-    workflow: Workflow,
-    cache: MetadataByWorkflow,
-    *,
-    prefetched: WorkflowMetadata | None = None,
-) -> WorkflowMetadata | None:
-    if workflow not in cache:
-        cache[workflow] = prefetched or workflow.get_metadata()
-    return cache[workflow]
+def workflow_metadata_cache() -> dict[int, WorkflowMetadata]:
+    return threadlocal.__dict__.setdefault("workflow_metadata_cache", {})
+
+
+threadlocal = threading.local()
 
 
 def _sr_preview(
@@ -527,7 +408,7 @@ def _preview_text(text: str | None, maxlen: int) -> str | None:
 
 def _load_industry_tiles() -> list[IndustryTileData]:
     qs = (
-        Tag.objects.filter(featured=True, hide=False)
+        Tag.objects.filter(is_featured=True, hidden=False)
         .annotate(
             workflow_count=Count(
                 "published_runs",

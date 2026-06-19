@@ -11,6 +11,7 @@ from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
+from gooey_gui.types.home_page_props import AccessBadgeData
 from .saved_run import SavedRun
 from .workflow import Workflow, WorkflowAccessLevel
 
@@ -120,9 +121,13 @@ class PublishedRun(models.Model):
         default=WorkflowAccessLevel.EDIT,
     )
     is_approved_example = models.BooleanField(default=False)
+    is_featured = models.BooleanField(
+        default=False,
+        help_text="If checked, this workflow is featured on homepage.",
+    )
     example_priority = models.IntegerField(
         default=1,
-        help_text="Priority of the example in the example list",
+        help_text="Priority of the example in the example list & homepage",
     )
     tags = models.ManyToManyField("Tag", related_name="published_runs", blank=True)
 
@@ -186,6 +191,11 @@ class PublishedRun(models.Model):
                 ]
             ),
             models.Index(fields=["published_run_id"]),
+            models.Index(
+                fields=["workflow", "-example_priority"],
+                condition=Q(is_featured=True),
+                name="bots_publis_feat_home_idx",
+            ),
             # GinIndex(
             #     SearchVector("title", "notes", config="english"),
             #     name="publishedrun_search_vector_idx",
@@ -290,27 +300,34 @@ class PublishedRun(models.Model):
         else:
             return WorkflowAccessLevel(self.workspace_access).get_team_sharing_icon()
 
-    def get_share_badge_data(self) -> dict[str, str]:
-        icon_html, label = self._share_badge_icon_and_label()
-        return {"iconHtml": icon_html, "label": label}
-
     def get_share_badge_html(self):
         """
         Shown externally AND on listings. For example: saved list, profile page.
         """
-        icon_html, label = self._share_badge_icon_and_label()
-        return f"{icon_html} {label}"
+        data = self.get_access_badge_data()
+        return f"{data.icon_html} {data.label}"
 
-    def _share_badge_icon_and_label(self) -> tuple[str, str]:
+    def get_access_badge_data(self) -> AccessBadgeData:
         if self.workspace.is_personal or (
             self.public_access == WorkflowAccessLevel.FIND_AND_VIEW
         ):
             perm = WorkflowAccessLevel(self.public_access)
-            return perm.get_public_sharing_icon(), perm.get_public_sharing_label()
+            return AccessBadgeData(
+                icon_html=perm.get_public_sharing_icon(),
+                label=perm.get_public_sharing_label(),
+            )
+
         team_perm = WorkflowAccessLevel(self.workspace_access)
         if self.workspace_access == WorkflowAccessLevel.VIEW_ONLY:
-            return team_perm.get_team_sharing_icon(), team_perm.get_team_sharing_label()
-        return self.workspace.html_icon(size="20px"), team_perm.get_team_sharing_label()
+            return AccessBadgeData(
+                icon_html=team_perm.get_team_sharing_icon(),
+                label=team_perm.get_team_sharing_label(),
+            )
+
+        return AccessBadgeData(
+            icon_html=self.workspace.html_icon(size="20px"),
+            label=team_perm.get_team_sharing_label(),
+        )
 
     def submit_api_call(
         self,
@@ -420,19 +437,22 @@ class Tag(models.Model):
     category = models.IntegerField(
         choices=TagCategory.choices, default=TagCategory.other
     )
+    description = models.TextField(blank=True, default="")
+
+    hidden = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is hidden and not shown anywhere.",
+    )
+
+    is_featured = models.BooleanField(
+        default=False,
+        help_text="If checked, this tag is featured, ordered by priority.",
+    )
     featured_priority = models.IntegerField(
         default=1,
         help_text="Higher priority tags are shown first.",
     )
-    description = models.TextField(blank=True, default="")
-    hide = models.BooleanField(
-        default=False,
-        help_text="If checked, this tag is hidden and not shown anywhere.",
-    )
-    featured = models.BooleanField(
-        default=False,
-        help_text="If checked, this tag is featured, ordered by priority.",
-    )
+
     landing_page = CustomURLField(
         blank=True,
         default="",
@@ -450,7 +470,7 @@ class Tag(models.Model):
 
     @classmethod
     def get_options(cls) -> list["Tag"]:
-        return list(cls.objects.filter(hide=False))
+        return list(cls.objects.filter(hidden=False).order_by("-featured_priority"))
 
     class Meta:
         constraints = [
@@ -460,5 +480,4 @@ class Tag(models.Model):
                 violation_error_message="This tag already exists",
             )
         ]
-        ordering = ["-featured_priority", "name"]
         indexes = [models.Index(fields=["name"])]

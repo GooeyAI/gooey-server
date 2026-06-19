@@ -1,6 +1,6 @@
-import type { NewsItem } from "./types";
+import type { NewsItemData } from "@gooey-types/home_page_props";
 
-export function NewsFeed({ items }: { items: NewsItem[] }) {
+export function NewsFeed({ items }: { items: NewsItemData[] }) {
   return (
     <section className="mb-5">
       <h6 className="text-muted text-uppercase small mb-3">News from Gooey</h6>
@@ -12,9 +12,9 @@ export function NewsFeed({ items }: { items: NewsItem[] }) {
               className="d-flex flex-column h-100 border rounded-4 overflow-hidden text-decoration-none text-body border-hover"
             >
               <div className="ratio ratio-21x9 bg-light">
-                {item.photoUrl && (
+                {item.photo_url && (
                   <img
-                    src={item.photoUrl}
+                    src={item.photo_url}
                     alt=""
                     className="w-100 h-100 object-fit-cover"
                   />
@@ -22,7 +22,7 @@ export function NewsFeed({ items }: { items: NewsItem[] }) {
               </div>
               <div className="p-3 d-flex flex-column flex-grow-1">
                 <div className="text-uppercase text-muted small mb-2">
-                  {item.tag} · {item.publishDate}
+                  {item.tag} · {item.publish_date}
                 </div>
                 <div className="fw-semibold line-clamp-2">{item.headline}</div>
               </div>

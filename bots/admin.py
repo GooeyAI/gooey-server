@@ -377,13 +377,23 @@ class PublishedRunVersionAdmin(GooeyModelAdmin):
     search_fields = ["id", "version_id", "published_run__published_run_id"]
     autocomplete_fields = ["published_run", "saved_run", "changed_by"]
     readonly_fields = ["created_at"]
+    list_display = [
+        "version_id",
+        "view_saved_run",
+        "changed_by",
+        "change_notes",
+        "title",
+        "notes",
+        "public_access",
+        "workspace_access",
+        "photo_url",
+        "created_at",
+    ]
+    ordering = ["-created_at"]
 
-
-class PublishedRunVersionInline(admin.TabularInline):
-    model = PublishedRunVersion
-    extra = 0
-    autocomplete_fields = PublishedRunVersionAdmin.autocomplete_fields
-    readonly_fields = PublishedRunVersionAdmin.readonly_fields
+    @admin.display(description="View Saved Run")
+    def view_saved_run(self, published_run_version: PublishedRunVersion):
+        return change_obj_url(published_run_version.saved_run)
 
 
 @admin.register(PublishedRun)
@@ -399,18 +409,26 @@ class PublishedRunAdmin(GooeyModelAdmin):
         "created_at",
         "updated_at",
     ]
-    list_filter = ["workflow", "public_access", "created_by__is_paying"]
+    list_filter = ["workflow", "is_featured", "public_access", "created_by__is_paying"]
     search_fields = ["workflow", "published_run_id", "title", "notes"]
     autocomplete_fields = ["saved_run", "created_by", "last_edited_by", "workspace"]
     readonly_fields = [
         "open_in_gooey",
+        "view_versions",
         "view_runs",
         "run_count",
         "view_bot_integrations",
         "created_at",
         "updated_at",
     ]
-    inlines = [PublishedRunVersionInline]
+
+    @admin.display(description="Versions")
+    def view_versions(self, published_run: PublishedRun):
+        return list_related_html_url(
+            published_run.versions.all(),
+            query_param="published_run__id__exact",
+            instance_id=published_run.id,
+        )
 
     def view_user(self, published_run: PublishedRun):
         if published_run.created_by is None:
@@ -1053,6 +1071,7 @@ class WorkflowMetadataAdmin(GooeyModelAdmin):
         "meta_description",
         "created_at",
         "updated_at",
+        "priority",
         "price_multiplier",
         "emoji",
         "fa_icon",
@@ -1060,7 +1079,17 @@ class WorkflowMetadataAdmin(GooeyModelAdmin):
     ]
     search_fields = ["short_title", "meta_title", "workflow"]
     list_filter = ["workflow"]
-    readonly_fields = ["created_at", "updated_at"]
+    readonly_fields = ["featured_published_runs", "created_at", "updated_at"]
+
+    @admin.display(description="Featured Published Runs")
+    def featured_published_runs(self, workflow_metadata: WorkflowMetadata):
+        return list_related_html_url(
+            PublishedRun.objects.filter(
+                workflow=workflow_metadata.workflow, is_featured=True
+            ),
+            query_param="workflow__exact",
+            instance_id=workflow_metadata.workflow,
+        )
 
 
 class TagAdminForm(IconColorAdminForm):
@@ -1078,12 +1107,12 @@ class TagAdmin(GooeyModelAdmin):
         "icon",
         "fa_icon",
         "color",
-        "featured",
+        "is_featured",
+        "hidden",
         "featured_priority",
-        "hide",
         "created_at",
         "updated_at",
     ]
     search_fields = ["name", "category"]
-    list_filter = ["category", "featured", "hide"]
+    list_filter = ["category", "is_featured", "hidden"]
     readonly_fields = ["created_at", "updated_at"]
