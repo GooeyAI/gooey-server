@@ -136,7 +136,9 @@ export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
       </div>
 
       <div className="d-flex flex-column p-3 gap-2 border-top">
-        <span className="text-break line-clamp-1 m-0">{card.title}</span>
+        <span className="text-break text-truncate line-clamp-1 m-0">
+          {card.title}
+        </span>
         <div className="d-flex align-items-center gap-1 small">
           <CardAuthor author={card.author} />
           {hasAuthor && card.updated_at && <span>·</span>}
