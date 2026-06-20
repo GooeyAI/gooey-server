@@ -27,39 +27,58 @@ body{margin:0;font-family:var(--gy-font-sans);font-size:16px;line-height:1.5;col
 img{max-width:100%;display:block}
 a{color:var(--gy-ink);text-underline-offset:2px}
 
-/* progress */
+/* progress + header */
 .progress{position:fixed;top:0;left:0;right:0;height:3px;background:transparent;z-index:60}
 .progress>i{display:block;height:100%;width:0;background:var(--gy-orange);transition:width 90ms linear}
+.site-header{position:fixed;top:0;left:0;right:0;z-index:55;height:60px;display:flex;align-items:center;gap:16px;padding:0 26px;background:rgba(255,254,253,.82);backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--gy-line-soft)}
+.site-header .logo{height:24px}
+.site-header .h-title{font-family:var(--gy-font-serif);font-size:14px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .2s ease}
+.site-header.scrolled .h-title{opacity:1}
+.site-header .h-cta{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:8px;background:var(--gy-ink);color:var(--gy-bg);font-weight:700;font-size:12.5px;text-decoration:none;transition:background .12s}
+.site-header .h-cta:hover{background:rgb(34,42,64)}
 
 /* HERO */
-.hero{min-height:100vh;display:flex;align-items:center;position:relative;border-bottom:1px solid var(--gy-line-soft);overflow:hidden;padding:40px 0}
+.hero{min-height:100vh;display:flex;align-items:center;position:relative;border-bottom:1px solid var(--gy-line-soft);overflow:hidden;padding:80px 0 40px}
 .hero-art{position:absolute;inset:0;z-index:1;pointer-events:none}
 .globe-float{position:fixed;z-index:40;pointer-events:none;left:0;top:0;width:0;height:0;transition:opacity .25s ease,visibility .25s ease}
 #globeDockAnchor{position:absolute;left:50%;top:50%;width:min(420px,88%,60vh);aspect-ratio:1;transform:translate(-50%,-50%);visibility:hidden;pointer-events:none}
+#globeHeroAnchor{display:none}
 .figlayer[data-vis="art-abstract"]{opacity:0!important;pointer-events:none!important;transform:none!important}
 .hero-inner{max-width:1080px;margin:0 auto;padding:0 32px;position:relative;z-index:2;width:100%}
 .hero .tag{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gy-ink-muted);margin-bottom:24px}
 .hero h1{font-family:var(--gy-font-serif);font-weight:700;font-size:clamp(42px,7vw,84px);line-height:1.02;letter-spacing:-.018em;margin:0 0 22px;max-width:15ch}
 .hero .dek{font-family:var(--gy-font-serif);font-style:italic;font-size:clamp(20px,2.5vw,28px);color:var(--gy-ink-muted);line-height:1.34;margin:0 0 30px;max-width:30ch}
+.hero-authors{margin-bottom:16px}
+.hero-authors .faces{display:flex;align-items:center;gap:16px}
+.hero-authors img{width:56px;height:56px;border-radius:50%;object-fit:cover;border:1px solid var(--gy-line-soft)}
 .hero .byline{display:flex;align-items:center;gap:12px;font-size:14.5px;color:var(--gy-ink-muted);flex-wrap:wrap}
 .hero .byline b{color:var(--gy-ink);font-weight:600}
 .hero .byline .dot{width:3px;height:3px;border-radius:50%;background:var(--gy-line-strong)}
-.hero .disparity{display:flex;gap:28px;margin-top:46px;flex-wrap:wrap}
-.hero .stat{border-left:2px solid var(--gy-orange);padding-left:14px}
-.hero .stat .v{font-family:var(--gy-font-serif);font-weight:700;font-size:30px;line-height:1}
-.hero .stat .l{font-size:12.5px;color:var(--gy-ink-muted);margin-top:6px;max-width:20ch}
-.scroll-cue{display:flex;align-items:center;gap:9px;margin-top:42px;font-size:13px;color:var(--gy-ink-soft)}
-.scroll-cue i{animation:bob 1.8s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
 
 /* SCROLLYTELLING */
 .scrolly{max-width:1280px;margin:0 auto;padding:0 32px;display:grid;grid-template-columns:42% 58%;column-gap:64px;align-items:start}
+.scrolly+.scrolly{border-top:1px solid var(--gy-line-soft);padding-top:4vh}
 .col-text{grid-column:1;grid-row:1}
-.media{grid-column:2;grid-row:1;position:sticky;top:0;height:100vh;display:flex;align-items:center;justify-content:center}
+.media{grid-column:2;grid-row:1;position:relative;top:auto;height:100vh;display:flex;align-items:center;justify-content:center;transform:translateY(var(--media-y, 0))}
+.media.media-docked{position:sticky;top:0;transform:none}
 .stage{position:relative;width:100%;max-width:600px;height:84vh;display:flex;align-items:center;justify-content:center}
 .figlayer{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:0;transform:translateY(10px) scale(.99);transition:opacity .5s ease,transform .5s ease;pointer-events:none}
 .figlayer.active{opacity:1;transform:none;pointer-events:auto}
+.figlayer[data-vis="img-desire"].fly-in.active{transform:var(--fly-y, none)}
 .figlayer img{max-height:74vh;width:auto;max-width:100%;border-radius:12px;border:1px solid var(--gy-line-soft)}
+.dataset-trio{display:flex;flex-direction:column;gap:10px;width:100%;max-width:520px}
+.dataset-trio-item{margin:0;display:flex;flex-direction:column;gap:5px;min-width:0}
+.dataset-trio-item img{max-height:22vh;width:100%;object-fit:contain;border-radius:10px;border:1px solid var(--gy-line-soft)}
+.dataset-trio-item figcaption{font-size:11px;color:var(--gy-ink-meta);text-align:center;line-height:1.4}
+.culture-stack{display:flex;flex-direction:column;gap:14px;width:100%;max-width:640px}
+.culture-stack-item{margin:0;display:flex;flex-direction:column;gap:5px;min-width:0}
+.culture-stack-item figcaption{font-size:11px;color:var(--gy-ink-meta);text-align:center;line-height:1.4}
+.culture-stack-item figcaption a{color:var(--gy-ink-muted)}
+.culture-stack img{max-height:36vh;width:100%;object-fit:contain;border:none;border-radius:0}
+.figlayer[data-vis="img-hotswap"] .culture-stack img{max-height:32vh}
+.figlayer[data-vis="art-edge"] .culture-stack img{max-height:32vh}
+.figlayer[data-vis="img-kin"] img{max-height:84vh;max-width:min(100%,720px);width:100%;object-fit:contain}
+.figlayer[data-vis="art-actors"] img{border:none;border-radius:0}
 .figlayer .artbox{width:100%;display:flex;align-items:center;justify-content:center}
 .figlayer .artbox svg{width:100%;height:auto;max-height:76vh}
 .figlayer figcaption{font-size:12.5px;color:var(--gy-ink-meta);text-align:center;line-height:1.5;max-width:90%}
@@ -67,7 +86,6 @@ a{color:var(--gy-ink);text-underline-offset:2px}
 .figlayer .badge{position:absolute;top:-2px;left:0;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gy-ink-soft);border:1px solid var(--gy-line-soft);border-radius:99px;padding:4px 11px;background:var(--gy-bg)}
 .stage-meta{position:absolute;right:6px;bottom:18px;font-family:var(--gy-font-sans);font-size:12px;color:var(--gy-ink-soft);letter-spacing:.06em}
 .stage-meta b{color:var(--gy-ink);font-weight:700}
-.stage-section{position:absolute;left:6px;top:14px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gy-orange)}
 
 /* chart bits inside stage */
 .chartwrap{width:100%}
@@ -81,12 +99,13 @@ a{color:var(--gy-ink);text-underline-offset:2px}
 .chart-legend .sw.line{height:3px;width:15px;border-radius:2px}
 text.tick{fill:var(--gy-ink-soft);font-size:11px;font-family:var(--gy-font-sans)}
 text.axlbl{fill:var(--gy-ink-muted);font-size:11.5px;font-weight:600;font-family:var(--gy-font-sans)}
-.dot{cursor:pointer}.barseg{cursor:pointer}.linedot{cursor:pointer}.linepath{fill:none;stroke-width:2.4}
+.dot{cursor:pointer}.barseg{cursor:pointer}.linedot{cursor:pointer}.linepath{fill:none;stroke-width:2.4}.pub-hit{cursor:crosshair}.inv-dot{cursor:pointer}
 .gemsel{font-family:var(--gy-font-sans);font-size:13px;font-weight:600;color:var(--gy-ink);border:1px solid var(--gy-line);border-radius:8px;padding:7px 10px;background:var(--gy-white);max-width:100%;margin-bottom:4px}
 .gem-cat{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gy-orange);text-align:center}
 
 /* LEFT text steps */
 .col-text{max-width:560px}
+#section-abstract{max-width:560px;width:100%}
 .step{min-height:84vh;display:flex;flex-direction:column;justify-content:center;padding:8vh 0}
 .step:first-child{padding-top:14vh}
 .step-eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gy-orange);margin-bottom:16px}
@@ -99,6 +118,9 @@ text.axlbl{fill:var(--gy-ink-muted);font-size:11.5px;font-weight:600;font-family
 .step .lead{font-size:20px;line-height:1.55}
 .step .pull{margin:6px 0 0;padding:4px 0 4px 22px;border-left:3px solid var(--gy-orange)}
 .step .pull p{font-family:var(--gy-font-serif);font-size:23px;line-height:1.32;margin:0}
+.step .pull-wright p{font-size:30px;line-height:1.28}
+.step .pull-wright .wright-red{color:#E84A3A}
+.step .pull-wright .wright-teal{color:#008B7D}
 .step .pull .by{font-size:14px;color:var(--gy-ink-muted);margin-top:12px}
 .step .mini{display:grid;grid-template-columns:1fr;gap:10px;margin-top:8px}
 .step .mini .m{display:flex;gap:12px;background:var(--gy-surface-50);border:1px solid var(--gy-line-soft);border-radius:12px;padding:14px}
@@ -111,19 +133,91 @@ text.axlbl{fill:var(--gy-ink-muted);font-size:11.5px;font-weight:600;font-family
 .step .callout p{font-size:14.5px;line-height:1.55;color:var(--gy-ink-muted);margin:0}
 .step .callout b{color:var(--gy-ink)}
 
-/* mobile inline visual (clone target) */
+.lever-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:540px}
+.lever-grid .lg-card{background:var(--gy-surface-50);border:1px solid var(--gy-line-soft);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.lever-grid .lg-card i{color:var(--gy-orange);font-size:16px;line-height:1}
+.lever-grid .lg-card h5{font-family:var(--gy-font-sans);font-weight:700;font-size:13px;margin:0;line-height:1.25;color:var(--gy-ink)}
+.lever-grid .lg-card p{font-size:12px;color:var(--gy-ink-muted);margin:0;line-height:1.45}
+
+.scrolly-finale{display:block;max-width:none;padding:0 clamp(24px,6vw,96px)}
+.scrolly-finale .col-text{max-width:640px;margin:0 auto;text-align:center}
+.scrolly-finale .step{align-items:center;text-align:center}
+.scrolly-finale .step-eyebrow{justify-content:center}
+
+/* horizontal cards — full-width scroll-driven sections */
+.scrolly.scrolly-hscroll{display:block;max-width:none;width:100%;padding:0;grid-template-columns:none;border-top:1px solid var(--gy-line-soft)}
+.scrolly-hscroll .media{display:none}
+.scrolly-hscroll .col-text{display:none}
+.hscroll-header{max-width:640px;margin:0 auto;padding:12vh clamp(24px,6vw,96px) 4vh}
+.hscroll-header.step{min-height:auto;padding-top:12vh;padding-bottom:4vh}
+.scrolly-recs .hscroll-header{padding-top:5vh;padding-bottom:3vh}
+.scrolly-recs .hscroll-header.step{padding-top:5vh;padding-bottom:3vh}
+.scrolly-recs .hscroll-pin{padding-top:10vh}
+.scrolly-recs .hscroll-track .hcard{flex:0 0 min(506px,calc(100vw - clamp(24px,6vw,96px)*2))}
+@media(min-width:901px){
+  .scrolly-03 .hscroll-header{padding-top:5vh;padding-bottom:3vh}
+  .scrolly-03 .hscroll-header.step{padding-top:5vh;padding-bottom:3vh}
+  .scrolly-03 .hscroll-pin{padding-top:8vh}
+}
+.hscroll-pin{position:sticky;top:0;height:100vh;display:flex;align-items:flex-start;padding-top:14vh;overflow:hidden}
+.hscroll-track{display:flex;gap:24px;padding:0 clamp(24px,6vw,96px) 0;will-change:transform;overflow:visible}
+.hscroll-spacer{height:0;pointer-events:none}
+.hscroll-track .hcard{flex:0 0 min(440px,calc(100vw - clamp(24px,6vw,96px)*2));scroll-snap-align:none;min-height:min(68vh,600px)}
+/* legacy horizontal cards inside 2-panel (unused) */
+.step-hscroll{min-height:100vh}
+.hscroll-track-inline{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding:8px 0 24px;margin-top:12px}
+.hscroll-track-inline:focus{outline:2px solid var(--gy-orange);outline-offset:4px}
+.hcard{flex:0 0 min(420px,88vw);scroll-snap-align:start;display:flex;flex-direction:column;background:var(--gy-surface-50);border:1px solid var(--gy-line-soft);border-radius:16px;overflow:hidden;min-height:min(72vh,640px)}
+.hcard img{width:100%;aspect-ratio:16/10;object-fit:cover;border-bottom:1px solid var(--gy-line-soft);max-height:42vh}
+.hcard-media{position:relative;overflow:hidden;border-bottom:1px solid var(--gy-line-soft);flex:none}
+.hcard-media img{width:100%;aspect-ratio:16/10;object-fit:cover;max-height:42vh;display:block;border-bottom:none}
+.hcard-cite{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:11px;line-height:1.45;text-align:center;background:rgba(10,16,33,0.88);color:#fff;opacity:0;transition:opacity .2s ease;pointer-events:none}
+.hcard-media:hover .hcard-cite,.hcard-media:focus-within .hcard-cite{opacity:1;pointer-events:auto}
+.hcard-cite a{color:#fff;text-decoration:underline;text-underline-offset:2px}
+.hcard-cite a:hover{color:var(--gy-orange)}
+.hcard h3{font-family:var(--gy-font-serif);font-weight:400;font-size:22px;line-height:1.2;margin:18px 20px 10px}
+.hcard p{font-size:15.5px;line-height:1.58;color:var(--gy-ink-muted);margin:0 20px 22px;flex:1}
+.hcards-stage-hint{font-size:13px;color:var(--gy-ink-soft);text-align:center;padding:20px}
+.hcards-stage-hint i{margin:0 6px}
+
+/* chart brand row */
+.chart-brand{display:flex;align-items:center;gap:10px;font-family:var(--gy-font-serif);font-size:17px;margin:0 0 8px}
+.chart-brand img{border-radius:4px}
+.chart-brand a{color:var(--gy-ink-muted)}
+
+/* mobile inline visual (after each step) */
 .inline-vis{display:none}
 
 @media(max-width:900px){
-  .scrolly{display:block;padding:0 20px}
-  .media{position:sticky;top:0;height:44vh;grid-column:auto;margin:0 -20px 0;background:var(--gy-bg);border-bottom:1px solid var(--gy-line-soft);z-index:20}
-  .stage{height:40vh;max-width:520px}
-  .figlayer img{max-height:34vh}
-  .figlayer .artbox svg{max-height:36vh}
-  .csvg{max-height:30vh}
-  .figlayer figcaption{font-size:11px}
+  .hero{min-height:auto;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:68px 20px 0}
+  .hero-inner{padding:0;width:100%}
+  #globeHeroAnchor{width:100%;display:flex;align-items:center;justify-content:center;padding:28px 0 36px;min-height:min(92vw,480px)}
+  .globe-in-hero{position:relative!important;left:auto!important;top:auto!important;width:min(92vw,440px)!important;height:min(92vw,440px)!important;opacity:1!important;visibility:visible!important}
+  .scrolly:not(.scrolly-hscroll){display:block;padding:0 20px}
+  .scrolly.scrolly-hscroll{padding:0}
+  .hscroll-header{padding-left:20px;padding-right:20px}
+  .hscroll-track{padding:0 20px}
+  .hscroll-track .hcard{flex-basis:min(340px,calc(100vw - 40px))}
+  .scrolly-recs .hscroll-track .hcard{flex-basis:min(391px,calc(100vw - 40px))}
+  .scrolly:not(.scrolly-hscroll) .media{display:none!important}
+  .mobile-flow .inline-vis{display:block;padding:8px 0 32px}
+  .mobile-flow .inline-vis .figlayer{position:relative;inset:auto;opacity:1!important;transform:none!important;pointer-events:auto;gap:10px}
+  .mobile-flow .inline-vis .figlayer > img{max-width:100%;width:100%;object-fit:contain;max-height:70vh;border-radius:12px;border:1px solid var(--gy-line-soft)}
+  .mobile-flow .inline-vis .chart-brand{font-size:14px;line-height:1.35;gap:8px;justify-content:center;text-align:center;flex-wrap:wrap}
+  .mobile-flow .inline-vis .chart-brand img{width:22px;height:22px;max-width:22px;max-height:22px;flex:0 0 22px;border:none;border-radius:4px;object-fit:contain}
+  .mobile-flow .inline-vis .chart-brand span{flex:1 1 auto;min-width:0}
+  .mobile-flow .inline-vis .dataset-trio-item img{max-height:28vh}
+  .mobile-flow .inline-vis .culture-stack img{max-height:40vh;border:none;border-radius:0}
+  .mobile-flow .inline-vis .figlayer[data-vis="img-hotswap"] .culture-stack img{max-height:36vh}
+  .mobile-flow .inline-vis .figlayer[data-vis="art-edge"] .culture-stack img{max-height:36vh}
+  .mobile-flow .inline-vis .figlayer[data-vis="img-kin"] img{max-height:75vh}
+  .mobile-flow .inline-vis .figlayer[data-vis="art-actors"] > img{border:none;border-radius:0}
+  .mobile-flow .inline-vis .figlayer .artbox svg{max-height:50vh}
+  .mobile-flow .inline-vis .csvg{max-height:45vh}
+  .mobile-flow .inline-vis .lever-grid{max-width:none}
+  .mobile-flow .inline-vis .figlayer figcaption{font-size:11px}
   .col-text{max-width:none}
-  .step{min-height:auto;padding:34px 0;border-bottom:1px solid var(--gy-line-soft)}
+  .step{min-height:auto;padding:34px 0;border-bottom:none}
   .step:first-child{padding-top:30px}
   .step h2{font-size:26px}.step p{font-size:17px}
 }
@@ -143,346 +237,472 @@ text.axlbl{fill:var(--gy-ink-muted);font-size:11.5px;font-weight:600;font-family
 .ack ul b{color:var(--gy-ink);font-weight:600}
 .ref{font-size:12.5px;color:var(--gy-ink-meta);margin-top:22px;line-height:1.6}
 .ref a{color:var(--gy-ink-muted);word-break:break-word}
+.refs{margin-top:28px}
+.refs h4{font-family:var(--gy-font-serif);font-weight:400;font-size:18px;margin:0 0 12px}
+.ref-list{margin:0;padding:0 0 0 1.2em;font-size:12.5px;color:var(--gy-ink-meta);line-height:1.65}
+.ref-list li{margin:0 0 10px}
+.ref-list a{color:var(--gy-ink-muted);word-break:break-word}
 .foot-brand{display:flex;align-items:center;gap:12px;margin-top:32px;padding-top:22px;border-top:1px solid var(--gy-line-soft)}
 .foot-brand img{height:24px}.foot-brand span{font-size:13px;color:var(--gy-ink-soft)}
 </style>
 </head>
 <body>
 <div class="progress"><i id="progbar"></i></div>
+<header class="site-header" id="siteHeader">
+  <img class="logo" src="/static/sovereign/assets/gooey-logo.png" alt="Gooey.AI"/>
+  <span class="h-title">How Middle Powers Cooperate for AI Sovereignty</span>
+  <a class="h-cta" href="https://gooey.ai" target="_blank" rel="noopener"><i class="fa-regular fa-arrow-up-right"></i>gooey.ai</a>
+</header>
 
 <!-- ===================== HERO ===================== -->
 <header class="hero" id="top">
   <div class="hero-inner">
     <div class="tag">Gooey.AI · Position paper</div>
     <h1>How Middle Powers Cooperate for AI&nbsp;Sovereignty</h1>
-    <p class="dek">What AI sovereignty means — and how we can achieve it, together.</p>
-    <div class="byline"><span>By <b>Sean Blagsvedt</b> &amp; <b>Archana Prasad</b></span><span class="dot"></span><span>Founders, <a href="https://gooey.ai" target="_blank" rel="noopener">Gooey.AI</a></span></div>
-    <div class="disparity">
-      <div class="stat"><div class="v">$100B+</div><div class="l">US frontier data-center spend, vs. millions for most middle powers</div></div>
-      <div class="stat"><div class="v">&gt;50%</div><div class="l">of 2026 AI papers from just China &amp; the US</div></div>
-      <div class="stat"><div class="v">37% / 32%</div><div class="l">of the world's leading AI researchers: China / US</div></div>
+    <p class="dek">What AI sovereignty means and how we can achieve it.</p>
+    <div class="hero-authors">
+      <div class="faces">
+        <img src="/static/sovereign/assets/sean-blagsvedt.jpg" width="56" height="56" alt="Sean Blagsvedt"/>
+        <img src="/static/sovereign/assets/archana-prasad.jpg" width="56" height="56" alt="Archana Prasad"/>
+      </div>
     </div>
-    <div class="scroll-cue"><i class="fa-regular fa-arrow-down"></i> Scroll — the visual on the right follows the story</div>
+    <div class="byline"><span>By <b>Sean Blagsvedt</b> &amp; <b>Archana Prasad</b></span><span class="dot"></span><span>Founders, <a href="https://gooey.ai" target="_blank" rel="noopener">Gooey.AI</a></span></div>
   </div>
+  <div id="globeHeroAnchor" aria-hidden="true"></div>
 </header>
 
 <!-- ===================== SCROLLYTELLING ===================== -->
-<div class="scrolly">
 
-  <!-- RIGHT: sticky media stage (DOM-first so it sits right on desktop, top on mobile) -->
+<div class="scrolly scrolly-abstract">
+
   <div class="media" aria-hidden="false">
-    <div class="stage" id="stage">
-      <span class="stage-section" id="stageSection">Abstract</span>
-
+    <div class="stage">
       <figure class="figlayer" data-vis="art-abstract"><div id="globeDockAnchor" aria-hidden="true"></div></figure>
-      <figure class="figlayer" data-vis="art-infrastructure"><div class="artbox"></div></figure>
-
-      <figure class="figlayer" data-vis="chart-dc">
-        <div class="chartwrap"><p class="chart-title">US Frontier Data Centers</p><div class="chart-legend" id="dcLegend"></div>
-        <svg class="csvg" id="dcChart" viewBox="0 0 760 560" role="img" aria-label="Frontier data center cost scatter"></svg></div>
-        <figcaption><b>Source: <a href="https://epoch.ai/data/data-centers?view=graph&tab=cost&colorCategorization=primaryUser" target="_blank" rel="noopener">Epoch.AI</a>.</b> Build cost vs. operational date, bubble ≈ power. Hover any project. Cost figures are public estimates.</figcaption>
-      </figure>
-
-      <figure class="figlayer" data-vis="chart-pub">
-        <div class="chartwrap"><p class="chart-title">AI publications by country</p><div class="chart-legend" id="pubLegend"></div>
-        <svg class="csvg" id="pubChart" viewBox="0 0 760 520" role="img" aria-label="AI publications by country"></svg></div>
-        <figcaption><b>Source: <a href="https://oecd.ai/en/data?visualizationFiltersHash=eyJkYXRlIjpbIjIwMTYiLCIyMDI2Il0sImNvbnRyb2xzIjp7ImxvZ1NjYWxlIjpmYWxzZSwibm9ybWFsaXplTGFzdFllYXIiOnRydWUsInBlcmNlbnRhZ2UiOnRydWV9fQ%3D%3D" target="_blank" rel="noopener">OECD AI Policy Observatory</a>.</b> Share of the world's AI publications (%), 2016–2026. Click a country to toggle.</figcaption>
-      </figure>
-
-      <figure class="figlayer" data-vis="chart-donut">
-        <div class="chartwrap" style="text-align:center"><p class="chart-title">World's top AI researchers</p>
-        <svg id="resDonut" viewBox="0 0 230 230" width="240" height="240" style="margin:6px auto"></svg>
-        <div class="chart-legend" id="resLegend" style="flex-direction:column;align-items:flex-start;gap:8px;max-width:240px;margin:0 auto"></div></div>
-        <figcaption><b>Source: The Economist (2026).</b> Share of leading AI researchers by organisation's country.</figcaption>
-      </figure>
-
-      <figure class="figlayer" data-vis="img-wright"><img src="/static/sovereign/images/image2.png" alt="'Zero-sum threats create non-zero-sum incentives' beside Robert Wright's book Nonzero: The Logic of Human Destiny."/><figcaption>After Robert Wright, <i>Nonzero: The Logic of Human Destiny</i>.</figcaption></figure>
-
-      <figure class="figlayer" data-vis="art-cooperation"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-goals"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-levers"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-scoreboard"><div class="artbox"></div></figure>
-
-      <figure class="figlayer" data-vis="chart-claude">
-        <div class="chartwrap"><p class="chart-title">Claude 4.8 benchmark scores</p><div class="chart-legend" id="claudeLegend"></div>
-        <svg class="csvg" id="claudeChart" viewBox="0 0 600 660" role="img" aria-label="Claude 4.8 benchmarks"></svg></div>
-        <figcaption><b>Source: <a href="https://www.anthropic.com/news/claude-opus-4-8" target="_blank" rel="noopener">Anthropic</a>.</b> Opus 4.8 vs. Opus 4.7, GPT-5.5, Gemini 3.1 Pro. GDPval-AA is an Elo score.</figcaption>
-      </figure>
-
-      <figure class="figlayer" data-vis="chart-gemini">
-        <div class="chartwrap" style="text-align:center"><p class="chart-title">Gemini 3.5 Flash benchmarks</p>
-        <select class="gemsel" id="gemSel"></select>
-        <div class="gem-cat" id="gemCat"></div>
-        <svg class="csvg" id="gemChart" viewBox="0 0 600 320" role="img" aria-label="Gemini benchmark by model"></svg></div>
-        <figcaption><b>Source: <a href="https://deepmind.google/models/gemini/flash/" target="_blank" rel="noopener">Google</a>.</b> Pick a benchmark; bars compare six model families. "—" = not reported.</figcaption>
-      </figure>
-
-      <figure class="figlayer" data-vis="art-bench-opportunity"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-mirror"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-axes"><div class="artbox"></div></figure>
-
-      <figure class="figlayer" data-vis="img-culture7"><img src="/static/sovereign/images/image7.png" alt="Van Gogh and a convincing 'Kamala Harris in the style of Van Gogh', beside an authentic Madhubani painting and a flattened 'Madhubani-style' portrait."/><figcaption>AI renders the Western canon faithfully (Van Gogh) but flattens Global South traditions (Madhubani).</figcaption></figure>
-
-      <figure class="figlayer" data-vis="img-kin"><img src="/static/sovereign/images/image1.png" alt="Gooey.AI's Kinyarwanda evaluation of open-source audio AI models: accuracy vs latency scatter."/><figcaption>Our low-resource-language eval for Kinyarwanda — <a href="https://gooey.ai/language" target="_blank" rel="noopener">gooey.ai/language</a> · Gooey.AI, ClearGlobal &amp; the Gates Foundation.</figcaption></figure>
-
-      <figure class="figlayer" data-vis="img-culture8"><img src="/static/sovereign/images/image8.png" alt="Dataset of indigenous artworks → fine-tuned image model → custom video; partners Royal College of Art, Karnataka Libraries, Goethe-Institut, British Council, Mozilla."/><figcaption>Dataset → fine-tuned image model → custom video — <a href="https://gooey.ai/beyondbias" target="_blank" rel="noopener">gooey.ai/beyondbias</a></figcaption></figure>
-
-      <figure class="figlayer" data-vis="art-coverage"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-lockin"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-actors"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-recs"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-edge"><div class="artbox"></div></figure>
-
-      <figure class="figlayer" data-vis="img-standards"><img src="/static/sovereign/images/image6.png" alt="Today vs With AI Standards: an app wired directly to OpenAI versus an app talking via standard APIs to a swappable matrix of private and open-source providers."/><figcaption>Today an app is wired to one provider; with shared standards, every capability becomes swappable.</figcaption></figure>
-
-      <figure class="figlayer" data-vis="art-commodity"><div class="artbox"></div></figure>
-
-      <figure class="figlayer" data-vis="img-landscape"><img src="/static/sovereign/images/image3.png" alt="The Agriculture AI Landscape (Figure 8): end-user channels, an AI-workflow orchestration layer, models, training data, and sovereign compute."/><figcaption><b>Figure 8.</b> The Agriculture AI landscape — channels, the workflow layer, models, and sovereign compute.</figcaption></figure>
-
-      <figure class="figlayer" data-vis="img-dg"><img src="/static/sovereign/images/image10.png" alt="Digital Green impact: 17% income increase; cost per farmer down from $35 to $3.50; 4.1M farmers reached, 70% women."/><figcaption>Digital Green's impact: +17% farmer income, cost down from $35→$3.50, 4.1M farmers reached (70% women).</figcaption></figure>
-
-      <figure class="figlayer" data-vis="img-chat"><img src="/static/sovereign/images/image5.png" alt="A WhatsApp conversation with the Farmer.CHAT 'Ag bot' giving grounded advice about whiteflies on chili plants."/><figcaption>A real Farmer.CHAT exchange — grounded, cited advice by text or voice, in the user's language.</figcaption></figure>
-
-      <figure class="figlayer" data-vis="art-forks"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-conclusion"><div class="artbox"></div></figure>
-      <figure class="figlayer" data-vis="art-final"><div class="artbox"></div></figure>
-
-      <div class="stage-meta"><b id="stepCount">01</b> / <span id="stepTotal">30</span></div>
+      <div class="stage-meta"><b class="step-count">01</b> / <span class="step-total">30</span></div>
     </div>
   </div>
 
-  <!-- LEFT: scrolling text steps -->
   <div class="col-text">
 
-    <section class="step" data-vis="art-abstract" data-section="Abstract">
+    <section class="step" id="section-abstract" data-vis="art-abstract" data-section="Abstract">
       <span class="step-eyebrow">Abstract</span>
-      <p class="lead"><b>Middle power</b> nations trail the US &amp; China in AI compute and talent — but together they can thrive with sovereign AI that is beneficial to local citizens, communities, and businesses; reflective of our local languages, culture, and productivity needs; not extractive, surveilled nor suspendable by other nations; and positively impactful, with benefits and expertise spreading.</p>
-      <p>We argue middle powers — including India, the UK and the nations of Europe, SE Asia, Africa, and Latin America — should cooperate to influence AI benchmarks; publish datasets to improve both private and open-source models; invest in locally deployable, hot-swappable models that are verified and fine-tunable; and support distributed efforts to train models. By leveraging their collective market power to mandate standards that encourage <b>commoditization and abstraction</b>, they can spread AI workflows that advance the SDGs and empower every nation.</p>
+      <p class="lead">Middle power nations trail the US &amp; China in AI compute and talent but together they can thrive with sovereign AI that is beneficial to local communities and businesses; reflective of our local languages, culture, and productivity needs; not extractive, surveilled nor suspendable by other nations; and positively impactful with benefits and expertise that can easily spread.</p>
+      <p>We argue middle powers — including India, UK and the nations of Europe, SE Asia, Africa, Latin America — should cooperate to influence AI benchmarks; publish datasets to improve both private and open source models; invest in locally deployable, hot-swappable models that are verified and fine-tunable; and support distributed efforts to train models, and mandate standards that encourage commoditization and abstraction to spread AI workflows that advance SDGs and empower every nation.</p>
     </section>
 
-    <section class="step" data-vis="art-infrastructure" data-section="The sovereign desire">
+  </div>
+</div>
+
+<div class="scrolly scrolly-01">
+
+  <div class="media" aria-hidden="false">
+    <div class="stage">
+      <figure class="figlayer" data-vis="img-desire"><img src="/static/sovereign/images/image18.png" alt="The sovereign desire — structural vulnerability of foreign AI dependence"/></figure>
+      <div class="stage-meta"><b class="step-count">01</b> / <span class="step-total">30</span></div>
+    </div>
+  </div>
+
+  <div class="col-text">
+
+    <section class="step" id="section-sovereign-desire" data-vis="img-desire" data-section="The sovereign desire">
       <span class="step-eyebrow"><span class="n">01</span> The sovereign desire</span>
       <h2>The sovereign desire</h2>
-      <p>Amidst the global AI race, middle AI powers face immense pressure to forge their own digital destiny. The risk is concrete: the rising integration and ubiquity of AI in private and public infrastructure implies that the systems running local businesses, schools, hospitals, banks, and government services will be trained on non-local norms and languages — and remain susceptible to being repriced, surveilled, or suspended by foreign governments and corporations.</p>
-      <p>We argue that the path forward is <i>not</i> what some political rhetoric suggests: complete self-sufficiency across the entire AI value chain. That path is neither economically realistic, desirable, nor necessary.</p>
+      <p>Amidst the global AI race, Middle powers face immense pressure to forge their own digital destiny. The risk is concrete: rising integration and ubiquity of AI in private and public infrastructure implies that systems running local businesses, schools, hospitals, banks, and government services will be trained on non-local norms and languages; susceptible to be repriced, surveilled, or suspended by foreign governments and corporations. With the June 2026 US directive suspending access to Anthropic's latest Claude Fable 5 and Mythos models to all foreign nationals, this is no longer a distant reality. Frontier model capabilities are increasingly viewed as national security assets, framed not as software but strategic infrastructure. Increasingly, dependence on a foreign AI ecosystem means inviting structural vulnerability.</p>
+      <p>For middle powers, AI sovereignty thus has never been more urgent. We argue that the path forward is not what some political rhetoric suggests: complete self-sufficiency across the entire AI value chain — energy, chips, infrastructure, models and applications. That path is neither economically realistic, desirable nor necessary.</p>
     </section>
 
-    <section class="step" data-vis="chart-dc" data-section="We're outgunned">
-      <span class="step-eyebrow"><span class="n">02</span> We're outgunned</span>
+  </div>
+</div>
+
+<div class="scrolly scrolly-02">
+
+  <div class="media" aria-hidden="false">
+    <div class="stage">
+      <figure class="figlayer" data-vis="img-power"><img src="/static/sovereign/images/image12.png" alt="Power/Profit by Claire &amp; AI4Media — Better Images of AI"/><figcaption><a href="https://betterimagesofai.org" target="_blank" rel="noopener">Power/Profit by Claire &amp; AI4Media</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></figcaption></figure>
+      <figure class="figlayer" data-vis="chart-dc">
+        <div class="chartwrap"><div class="chart-brand"><img src="https://www.google.com/s2/favicons?domain=epoch.ai&amp;sz=32" width="22" height="22" alt=""/><span>US Frontier Data Centers · <a href="https://epoch.ai" target="_blank" rel="noopener">Epoch.AI</a></span></div><div class="chart-legend" id="dcLegend"></div>
+        <svg class="csvg" id="dcChart" viewBox="0 0 760 560" role="img" aria-label="Frontier data center cost scatter"></svg></div>
+        <figcaption>Build cost vs. operational date, bubble ≈ power. Hover any project. Cost figures are public estimates.</figcaption>
+      </figure>
+      <figure class="figlayer" data-vis="chart-pub">
+        <div class="chartwrap"><div class="chart-brand"><img src="https://www.google.com/s2/favicons?domain=oecd.ai&amp;sz=32" width="22" height="22" alt=""/><span>AI publications by country · <a href="https://oecd.ai" target="_blank" rel="noopener">OECD</a></span></div><div class="chart-legend" id="pubLegend"></div>
+        <svg class="csvg" id="pubChart" viewBox="0 0 760 520" role="img" aria-label="AI publications by country"></svg></div>
+        <figcaption>Share of the world's AI publications (%), 2016–2026. Click a country to toggle.</figcaption>
+      </figure>
+      <figure class="figlayer" data-vis="img-wright"><img src="/static/sovereign/images/image1.png" alt="Nonzero: The Logic of Human Destiny by Robert Wright"/><figcaption>Robert Wright, <i>Nonzero: The Logic of Human Destiny</i>.</figcaption></figure>
+      <figure class="figlayer" data-vis="img-cooperation"><img src="/static/sovereign/images/image21.png" alt="Middle powers cooperating on shared infrastructure and standards"/><figcaption>Data Mining 1 by Hanna Barakat &amp; Archival Images of AI + AIxDESIGN · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></figcaption></figure>
+      <div class="stage-meta"><b class="step-count">01</b> / <span class="step-total">30</span></div>
+    </div>
+  </div>
+
+  <div class="col-text">
+
+    <section class="step" id="section-outgunned" data-vis="img-power" data-section="Current AI Landscape">
+      <span class="step-eyebrow"><span class="n">02</span> Current AI Landscape</span>
       <h2>But let's face it. We're outgunned.</h2>
-      <p>Let's look at the numbers. When it comes to <a href="https://epoch.ai/data/data-centers?view=graph&tab=cost&colorCategorization=primaryUser" target="_blank" rel="noopener">compute spend</a> — the energy, real estate, chips, and data centers driving AI — the US and China are orders of magnitude ahead of any other country.</p>
+      <p>Let's look at the numbers. When it comes to <a href="https://epoch.ai/data/data-centers?view=graph&tab=cost&colorCategorization=primaryUser" target="_blank" rel="noopener">compute spend</a> — the energy, real estate, chips and data centers driving AI — the US and China are orders of magnitude ahead of any other country.</p>
+    </section>
+
+    <section class="step" data-vis="chart-dc" data-section="Current AI Landscape">
+      <span class="step-eyebrow"><span class="n">02</span> Current AI Landscape</span>
       <p>The single largest planned US site — Microsoft's Fairwater Wisconsin (3,328&nbsp;MW, primary user OpenAI) — alone rivals the entire national AI budget of most middle powers.</p>
     </section>
 
-    <section class="step" data-vis="chart-pub" data-section="We're outgunned">
-      <span class="step-eyebrow"><span class="n">02</span> We're outgunned</span>
-      <p>AI talent and research is similarly concentrated. China and the US are expected to publish more than half of all AI papers in 2026, with the 27 EU nations publishing 11.3% and India at 8.4%.</p>
+    <section class="step" data-vis="chart-pub" data-section="Current AI Landscape">
+      <span class="step-eyebrow"><span class="n">02</span> Current AI Landscape</span>
+      <p>AI talent &amp; research is similarly concentrated; China and the US are expected to publish more than half of all AI papers in 2026, with the 27 EU nations publishing 11.3% and India at 8.4%.</p>
+      <p>A 2026 Economist <a href="https://www.economist.com/interactive/science-and-technology/2026/03/25/china-is-winning-the-ai-talent-race" target="_blank" rel="noopener">report</a> reveals that Chinese organisations account for 37% of world's leading AI researchers, with U.S. organisations trailing with a close 32%.</p>
     </section>
 
-    <section class="step" data-vis="chart-donut" data-section="We're outgunned">
-      <span class="step-eyebrow"><span class="n">02</span> We're outgunned</span>
-      <p>A 2026 <i>Economist</i> <a href="https://www.economist.com/interactive/science-and-technology/2026/03/25/china-is-winning-the-ai-talent-race" target="_blank" rel="noopener">report</a> reveals that Chinese organisations account for 37% of the world's leading AI researchers, with U.S. organisations trailing close behind at 32%.</p>
-    </section>
-
-    <section class="step" data-vis="img-wright" data-section="We're outgunned">
-      <span class="step-eyebrow"><span class="n">02</span> We're outgunned</span>
+    <section class="step" data-vis="img-wright" data-section="Current AI Landscape">
+      <span class="step-eyebrow"><span class="n">02</span> Current AI Landscape</span>
       <p>And from this collective but under-resourced stance, we recall Robert Wright.</p>
-      <div class="pull"><p>"Zero-sum threats create non-zero-sum incentives."</p><div class="by">— after Robert Wright, <i>Nonzero</i></div></div>
+      <div class="pull pull-wright"><p>"<span class="wright-red">Zero-sum threats</span> create<br><span class="wright-teal">non-zero-sum incentives</span>."</p><div class="by">— Robert Wright, <i>Nonzero</i></div></div>
     </section>
 
-    <section class="step" data-vis="art-cooperation" data-section="We're outgunned">
-      <span class="step-eyebrow"><span class="n">02</span> We're outgunned</span>
-      <p>While independent nations may not be able to effectively compete and sway the AI market, like-minded, coordinated states can. Instead of building walled gardens, middle power nations can work together on shared infrastructure and standards — to help create digital foundations that build on everyone's progress.</p>
+    <section class="step" data-vis="img-cooperation" data-section="Current AI Landscape">
+      <span class="step-eyebrow"><span class="n">02</span> Current AI Landscape</span>
+      <p>While independent nations may not be able to effectively compete and sway the AI market, like-minded coordinated states can. Instead of building walled gardens, middle power nations can work together on shared infrastructure and standards, to help create digital foundations that build on everyone's progress.</p>
     </section>
 
-    <section class="step" data-vis="art-goals" data-section="Our goals">
-      <span class="step-eyebrow"><span class="n">03</span> Our goals</span>
-      <h2>Our goals for AI sovereignty</h2>
-      <p>Four properties define sovereign AI worth building. It must be:</p>
-      <div class="goal-n">GOAL 01 — BENEFICIAL</div>
-      <p>Beneficial to local citizens, communities, and businesses. Sovereign AI must benefit each nation's people, society, and economy — while mitigating harms and risks.</p>
-      <div class="goal-n">GOAL 02 — REFLECTIVE</div>
-      <p>Reflective of local languages, culture, and productivity needs. Sovereign AI must not only speak the languages of each nation, but also reflect its broader visual, audio, and cultural traditions, and enhance its productivity needs. A model that can solve English coding challenges but can't give reasonable farming advice in Indic languages — when 65% of <a href="https://www.pib.gov.in/PressReleseDetailm.aspx?PRID=1939473&reg=3&lang=2" target="_blank" rel="noopener">Indians work in agriculture</a> and related industries — by definition can't be very useful to most Indians.</p>
-      <div class="goal-n">GOAL 03 — NON-EXTRACTIVE</div>
-      <p>Not extractive, surveilled, nor suspendable by other nations. The greatest productivity leap of this century cannot come with a foreign tax on every digital interaction to the powers that dominated the last one. Sovereign AI implies freedom from citizen conversations being subject to <a href="https://www.bbc.co.uk/news/articles/ckge8zkr0d2o" target="_blank" rel="noopener">foreign surveillance</a>, and government communication tools that can't be suspended with geopolitical shifts (see EU prosecutor Karim Khan's <a href="https://www.euractiv.com/news/international-criminal-court-to-ditch-microsoft-office-for-european-open-source-alternative/" target="_blank" rel="noopener">suspended Microsoft Office account</a>). Sovereign telecommunications can be a guide: nations don't pay US or Chinese companies to connect every domestic phone call. We should demand the same of AI.</p>
-      <div class="goal-n">GOAL 04 — IMPACTFUL</div>
-      <p>Positively impactful, with benefits and expertise spreading. Finally, sovereign AI must push forward each country's and the UN's <a href="https://sdgs.un.org/goals" target="_blank" rel="noopener">Sustainable Development Goals</a>. When we find AI hardware, software, and solutions that work responsibly and sustainably, they should easily spread — with each country able to quickly learn from and sell new AI products to one another.</p>
-    </section>
+  </div>
+</div>
 
-    <section class="step" data-vis="art-levers" data-section="How they cooperate">
+<div class="scrolly scrolly-hscroll scrolly-03" id="hscroll-goals">
+
+  <div class="hscroll-header step" id="section-goals" data-vis="hcards-goals" data-section="Our goals">
+    <span class="step-eyebrow"><span class="n">03</span> Our goals</span>
+    <h2>Our goals for AI sovereignty</h2>
+    <p>Four properties define sovereign AI worth building. It must be:</p>
+  </div>
+
+  <div class="hscroll-pin">
+    <div class="hscroll-track" aria-label="Goals — scroll horizontally">
+      <article class="hcard">
+        <img src="/static/sovereign/images/image13.png" alt="Beneficial to local citizens, communities, and businesses"/>
+        <h3>Beneficial to local citizens, communities, and businesses</h3>
+        <p>Sovereign AI must benefit each nation's people, society and economy, while mitigating harms and risks.</p>
+      </article>
+      <article class="hcard">
+        <img src="/static/sovereign/images/image6.png" alt="Reflective of local languages, culture, and productivity needs"/>
+        <h3>Reflective of local languages, culture, and productivity needs</h3>
+        <p>Sovereign AI must not only speak the languages of each nation, but also reflect its broader visual, audio and cultural traditions. It must enhance the productivity needs of a nation. A model that can solve English coding challenges, but can't provide reasonable farming advice in Indic languages when 65% of <a href="https://www.pib.gov.in/PressReleseDetailm.aspx?PRID=1939473&amp;reg=3&amp;lang=2" target="_blank" rel="noopener">Indians work in agriculture</a> and related industries, by definition can't be very useful to most Indians.</p>
+      </article>
+      <article class="hcard">
+        <img src="/static/sovereign/images/image17.png" alt="Not extractive, surveilled nor suspendable by other nations"/>
+        <h3>Not extractive, surveilled nor suspendable by other nations</h3>
+        <p>The greatest productivity leap of this century cannot come with a foreign tax on every digital interaction to the powers that dominated the last one. Sovereign AI implies freedom from citizen conversations being subject to <a href="https://www.bbc.co.uk/news/articles/ckge8zkr0d2o" target="_blank" rel="noopener">foreign surveillance</a> and government communication tools that can't be suspended with geopolitical shifts (see EU prosecutor <a href="https://www.euractiv.com/news/international-criminal-court-to-ditch-microsoft-office-for-european-open-source-alternative/" target="_blank" rel="noopener">Karim Khan's suspended Microsoft Office account</a>). Sovereign telecommunications can be a guide here too; nations don't pay US or Chinese companies to connect every domestic phone call. We should demand the same of AI.</p>
+      </article>
+      <article class="hcard">
+        <img src="/static/sovereign/images/image8.png" alt="Positively impactful with benefits and expertise spreading"/>
+        <h3>Positively impactful with benefits and expertise spreading</h3>
+        <p>Finally, sovereign AI must push forward each country's and the <a href="https://sdgs.un.org/goals" target="_blank" rel="noopener">UN's Sustainable Development Goals</a>. And when we find AI hardware, software and solutions that work responsibly and sustainably, they should easily spread, with each country able to quickly learn from and sell new AI products to each other.</p>
+      </article>
+    </div>
+  </div>
+  <div class="hscroll-spacer" aria-hidden="true"></div>
+</div>
+
+<div class="scrolly scrolly-04">
+
+  <div class="media" aria-hidden="false">
+    <div class="stage">
+      <figure class="figlayer" data-vis="art-levers"><img src="/static/sovereign/images/image35.png" alt="Joining the Table by Yutong Liu — Better Images of AI"/><figcaption><a href="https://betterimagesofai.org" target="_blank" rel="noopener">Joining the Table by Yutong Liu — Better Images of AI</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></figcaption></figure>
+      <figure class="figlayer" data-vis="art-scoreboard"><div class="artbox"></div></figure>
+      <figure class="figlayer" data-vis="chart-gemini">
+        <div class="chartwrap" style="text-align:center"><div class="chart-brand" style="justify-content:center"><img src="https://www.google.com/s2/favicons?domain=deepmind.google&amp;sz=32" width="22" height="22" alt=""/><span>Gemini 3.5 Flash benchmarks · <a href="https://deepmind.google/models/gemini/flash/" target="_blank" rel="noopener">Google</a></span></div>
+        <select class="gemsel" id="gemSel"></select>
+        <div class="gem-cat" id="gemCat"></div>
+        <svg class="csvg" id="gemChart" viewBox="0 0 600 320" role="img" aria-label="Gemini benchmark by model"></svg></div>
+      </figure>
+      <figure class="figlayer" data-vis="chart-glm">
+        <div class="chartwrap" style="text-align:center"><div class="chart-brand" style="justify-content:center"><img src="https://www.google.com/s2/favicons?domain=z.ai&amp;sz=32" width="22" height="22" alt=""/><span>GLM 5.2 benchmarks · <a href="https://docs.z.ai/guides/llm/glm-5.2" target="_blank" rel="noopener">Z.ai</a></span></div>
+        <select class="gemsel" id="glmSel"></select>
+        <div class="gem-cat" id="glmCat"></div>
+        <svg class="csvg" id="glmChart" viewBox="0 0 600 320" role="img" aria-label="GLM benchmark by model"></svg></div>
+      </figure>
+      <figure class="figlayer" data-vis="img-bench"><img src="/static/sovereign/images/image22.png" alt="Benchmark opportunity for middle powers — agriculture and local productivity"/></figure>
+      <figure class="figlayer" data-vis="img-dataset-trio">
+        <div class="dataset-trio">
+          <figure class="dataset-trio-item"><img src="/static/sovereign/images/image2.png" alt="Biased Algorithms Learn From Biased Data"/><figcaption><a href="https://www.forbes.com/sites/cognitiveworld/2020/02/07/biased-algorithms/" target="_blank" rel="noopener">Biased Algorithms Learn From Biased Data</a> · Forbes</figcaption></figure>
+          <figure class="dataset-trio-item"><img src="/static/sovereign/images/image20.jpg" alt="Soaps in London = Soap in Nepal"/><figcaption><a href="https://arxiv.org/abs/1906.02659" target="_blank" rel="noopener">Does Object Recognition Work The Same Way for Everyone?</a></figcaption></figure>
+          <figure class="dataset-trio-item"><img src="/static/sovereign/images/image10.png" alt="Casteist depictions produced by OpenAI"/><figcaption><a href="https://www.technologyreview.com/2025/10/01/1124621/openai-india-caste-bias/" target="_blank" rel="noopener">Casteist depictions produced by OpenAI</a> · MIT Technology Review</figcaption></figure>
+        </div>
+      </figure>
+      <figure class="figlayer" data-vis="art-axes"><img src="/static/sovereign/images/image34.png" alt="Language axis — figure at a typewriter, red script flowing from the keys"/></figure>
+      <figure class="figlayer" data-vis="img-culture7">
+        <div class="culture-stack">
+          <img src="/static/sovereign/images/image26.png" alt="Van Gogh landscape vs Kamala Harris in the style of Van Gogh (DALL·E 3)"/>
+          <img src="/static/sovereign/images/image27.png" alt="Madhubani painting vs Kamala Harris in the style of a Madhubani painting"/>
+        </div>
+      </figure>
+      <figure class="figlayer" data-vis="img-axis-domain"><img src="/static/sovereign/images/image33.png" alt="What AI measures vs what the majority world needs — domain understanding gap"/></figure>
+      <figure class="figlayer" data-vis="img-kin"><img src="/static/sovereign/images/image15.png" alt="Gooey.AI low-resource language eval for Hausa"/><figcaption>Our low-resource-language eval for Hausa — <a href="https://gooey.ai/language" target="_blank" rel="noopener">gooey.ai/language</a> · Gooey.AI, ClearGlobal &amp; the Gates Foundation.</figcaption></figure>
+      <figure class="figlayer" data-vis="img-culture8"><img src="/static/sovereign/images/image36.gif" alt="Indian miniature-style painting — two women in traditional dress riding a motorcycle past a street scene"/><figcaption>Dataset → fine-tuned image model → custom video — <a href="https://gooey.ai/beyondbias" target="_blank" rel="noopener">gooey.ai/beyondbias</a></figcaption></figure>
+      <figure class="figlayer" data-vis="art-lockin"><img src="/static/sovereign/images/image29.png" alt="Jensen Huang presenting NVIDIA Blackwell GPU architecture"/><figcaption>Jensen Huang's calls for nations to build their own sovereign data centers</figcaption></figure>
+      <figure class="figlayer" data-vis="art-actors"><img src="/static/sovereign/images/image39.png" alt="How Nvidia and OpenAI fuel the AI money machine — network diagram of investments and hardware flows"/><figcaption>How Nvidia and OpenAI Fuel the AI Money Machine · Source: Bloomberg News reporting</figcaption></figure>
+      <div class="stage-meta"><b class="step-count">01</b> / <span class="step-total">30</span></div>
+    </div>
+  </div>
+
+  <div class="col-text">
+
+    <section class="step" id="section-cooperate" data-vis="art-levers" data-section="How they cooperate">
       <span class="step-eyebrow"><span class="n">04</span> How they cooperate</span>
       <h2>So how do middle powers cooperate for AI sovereignty?</h2>
       <p>Four levers, where cooperation creates real leverage. Each builds on the last: influence the benchmarks, direct the datasets, foster deployable models, and spread impactful workflows.</p>
     </section>
 
-    <section class="step" data-vis="art-scoreboard" data-section="1 · Benchmarks">
+    <section class="step" id="section-benchmarks" data-vis="chart-gemini" data-section="1 · Benchmarks">
       <span class="step-eyebrow"><span class="n">Lever 01</span> Benchmarks</span>
       <h2>Influence the AI benchmarks</h2>
-      <p>What gets measured, gets built. Every AI lab is pouring billions into topping an ever-evolving — and frankly, highly geeky — set of benchmarks attempting to evaluate which AI model beats the others.</p>
+      <p>What gets measured, gets built. Every AI lab is pouring billions into topping an ever-evolving and frankly highly geeky set of benchmarks attempting to evaluate which AI model beats the others.</p>
       <div class="pull"><p>"My engineers will work 25 hours per day to score a tenth of a point higher on a popular eval."</p><div class="by">— <a href="mailto:dorukc@google.com" target="_blank" rel="noopener">Doruk Caner</a>, Director at DeepMind</div></div>
+      <p>Popular AI benchmarks published by model makers as a proof of their AI supremacy tend to reflect the fields that produce AI engineers and over-index on arcane knowledge.</p>
     </section>
 
-    <section class="step" data-vis="chart-claude" data-section="1 · Benchmarks">
+    <section class="step" data-vis="chart-glm" data-section="1 · Benchmarks">
       <span class="step-eyebrow"><span class="n">Lever 01</span> Benchmarks</span>
-      <p>Popular AI benchmarks — published by model makers as proof of their AI supremacy — tend to reflect the fields that produce AI engineers and over-index on arcane knowledge. Anthropic's scorecard for Claude 4.8 is typical of the genre: agentic coding, terminal coding, multidisciplinary reasoning, computer use, knowledge work, and financial analysis.</p>
+      <p>Benchmarks such as <a href="https://agi.safe.ai/" target="_blank" rel="noopener">Humanity's Last Exam</a>, <a href="https://arcprize.org/arc-agi/2" target="_blank" rel="noopener">ARC-AGI2</a> and <a href="https://epoch.ai/benchmarks/gpqa-diamond" target="_blank" rel="noopener">GPQA Diamond</a> test deep knowledge and skills in math, programming and the most lucrative professional services of the West — medicine, finance and law.</p>
+      <p>The opportunity for middle powers is to create and proselytize benchmarks that represent their specific national productivity needs. E.g. Wouldn't it be great if Google and OpenAI loudly proclaimed the quality of their smallholder agriculture advice — a field that 42% of the world's households (<a href="https://documents1.worldbank.org/curated/en/587251468175472382/pdf/41455optmzd0PA18082136807701PUBLIC1.pdf" target="_blank" rel="noopener">World Bank</a>) rely on for their primary income and is changing dramatically with wars, increased fertilizer prices and climate change — vs just PhD level math?</p>
     </section>
 
-    <section class="step" data-vis="chart-gemini" data-section="1 · Benchmarks">
-      <span class="step-eyebrow"><span class="n">Lever 01</span> Benchmarks</span>
-      <p>Google's Gemini 3.5 Flash is benchmarked the same way — across coding, agentic tool use, multimodal understanding, long context, and academic exams. Benchmarks such as <a href="https://agi.safe.ai/" target="_blank" rel="noopener">Humanity's Last Exam</a>, <a href="https://arcprize.org/arc-agi/2" target="_blank" rel="noopener">ARC-AGI-2</a>, and <a href="https://epoch.ai/benchmarks/gpqa-diamond" target="_blank" rel="noopener">GPQA Diamond</a> test deep knowledge and skills in math, programming, and the most lucrative professional services of the West: medicine, finance, and law.</p>
-    </section>
-
-    <section class="step" data-vis="art-bench-opportunity" data-section="1 · Benchmarks">
-      <span class="step-eyebrow"><span class="n">Lever 01</span> Benchmarks</span>
-      <p>The opportunity for middle powers is to create and proselytize benchmarks that represent their specific national productivity needs. Wouldn't it be great if Google and OpenAI loudly proclaimed the quality of their smallholder-agriculture advice — a field that 42% of the world's households (<a href="https://documents1.worldbank.org/curated/en/587251468175472382/pdf/41455optmzd0PA18082136807701PUBLIC1.pdf" target="_blank" rel="noopener">World Bank</a>) rely on for their primary income, and that is changing dramatically with wars, increased fertilizer prices, and climate change — rather than just PhD-level math?</p>
-      <div class="callout"><i class="fa-regular fa-lightbulb"></i><p><b>The lever:</b> a shared, well-publicized benchmark for smallholder farming, multilingual health triage, or local-language tutoring would redirect billions of dollars of lab effort toward the productivity needs of most of humanity — simply by changing the scoreboard.</p></div>
-    </section>
-
-    <section class="step" data-vis="art-mirror" data-section="2 · Datasets">
+    <section class="step" id="section-datasets" data-vis="img-dataset-trio" data-section="2 · Datasets">
       <span class="step-eyebrow"><span class="n">Lever 02</span> Datasets</span>
       <h2>Directing datasets</h2>
-      <p>All AI models are reflections of their training datasets. AI model makers trained their models on <a href="https://commoncrawl.org/" target="_blank" rel="noopener">much of the Internet</a> — so the cultures, languages, and nations that dominated the imagery, text, and increasingly video of the early-2020s Internet are those that AI now generates for everyone.</p>
-      <p>The problem that arises is one of continued cultural and economic hegemony, manifested in AI model performance along three axes.</p>
+      <p>All AI models are reflections of their training datasets. AI model makers trained their models on <a href="https://commoncrawl.org/" target="_blank" rel="noopener">much of the Internet</a>. Hence, the cultures, languages and nations that dominated the imagery, text and increasingly video of the early 2020s Internet are those that AI now generates for everyone.</p>
+      <p>The problem that arises is one of continued cultural and economic hegemony manifested in AI model performance along three axes.</p>
     </section>
 
     <section class="step" data-vis="art-axes" data-section="2 · Datasets">
       <span class="step-eyebrow"><span class="n">Lever 02</span> Datasets</span>
       <h3>Axis 01 — Language</h3>
-      <p>English, EU, and Chinese languages dominate much of the world's Internet text, and their speakers command most of the world's richest economies — so these languages are reasonably well understood and generated in text and voice. Low-resource languages, spoken by fewer than 100 million people, traditionally lacked the datasets and market potential for AI makers to focus on. The digital divide then exacerbates: low-resource-language speakers engage with often-addictive social media, without the economic and knowledge access of productivity-enhancing AI.</p>
-      <h3>Axis 02 — Culture</h3>
-      <p>This inequity is detectable in language but often ridiculous in images. Ask image models for culturally specific visual styles and they may flatten, confuse, or Westernize them. Ask for local people, clothing, architecture, crops, festivals, or classroom settings and AI models often return the Western gaze on Global South culture — see "Kamala Harris in Bollywood dress" — rather than indigenous cultural styles.</p>
-      <h3>Axis 03 — Domain understanding &amp; reasoning</h3>
-      <p>The major AI labs have spent billions to train AI on the most valuable Western professions — programming, finance, medicine, and law. Thousands of person-years of coders, accountants, doctors, and lawyers rating and annotating AI-generated, mostly-English responses have achieved incredible gains in step-by-step "thinking" in the fields US tech firms believed easiest to monetize. Industries and markets far from Beijing and Silicon Valley have seen far less investment — so AI's potential in these non-lucrative fields isn't being met.</p>
+      <p>English, EU and Chinese languages dominate much of the world's Internet text and their speakers command most of the world's richest economies. Hence, these languages tend to be reasonably well understood and generated in text and voice. Low-resource languages spoken by less than 100 million people traditionally have not garnered the datasets nor requisite market potential for AI makers to focus on, and hence, the digital divide exacerbates, with low-resource language speakers engaging with often addictive social media, without the economic and knowledge access of productivity-enhancing AI.</p>
     </section>
 
     <section class="step" data-vis="img-culture7" data-section="2 · Datasets">
       <span class="step-eyebrow"><span class="n">Lever 02</span> Datasets</span>
-      <p>This problem is particularly urgent as many emerging countries seek to equip their students with AI skills, pushing tools such as Google Slides and M365 into classrooms — with students then using image-generation models that often don't represent local cultures well. These misrepresentations — images and the textual descriptions around them — then become training data for future iterations of AI models, baking in deeply flawed representations of Global South cultures.</p>
+      <h3>Axis 02 — Culture</h3>
+      <p>This inequity in AI generated is detectable in language but often ridiculous in images. Ask image models for culturally specific visual styles and they may flatten, confuse, or Westernize them. Ask for local people, clothing, architecture, crops, festivals, or classroom settings and AI models often return the Western gaze on Global South culture — see Kamala Harris in Bollywood dress — rather than indigenous cultural styles.</p>
+      <p>This problem is particularly urgent as many emerging countries seek to equip their students with AI skills, pushing tools such as Google Slides and M365 into classrooms, with students then using image generation models that often don't represent local cultures well. These misrepresentations — images and the textual descriptions around them — then become training data for future iterations of AI models, baking in deeply flawed representations of Global South cultures.</p>
       <p>To build more inclusive AI, middle powers should cooperate on datasets that cover four areas.</p>
+    </section>
+
+    <section class="step" data-vis="img-axis-domain" data-section="2 · Datasets">
+      <span class="step-eyebrow"><span class="n">Lever 02</span> Datasets</span>
+      <h3>Axis 03 — Domain understanding &amp; reasoning</h3>
+      <p>The major AI labs have spent billions of dollars to train AI on the most valuable Western professions including programming, finance, medicine and law. Thousands of person-years of coders, accountants, doctors and lawyers have been spent rating and annotating AI generated, mostly English responses and these efforts have achieved incredible gains in step-by-step "thinking" and AI performance in the fields mostly US tech firms believed would be the easiest to monetize. Those industries and markets far from Beijing and Silicon Valley have seen far less investment and hence, the potential impact of AI in these non-lucrative fields isn't being met.</p>
     </section>
 
     <section class="step" data-vis="img-kin" data-section="2 · Datasets">
       <span class="step-eyebrow"><span class="n">Lever 02</span> Datasets · Languages</span>
       <h3>Languages</h3>
-      <p>Speech, text, dialects, code-switching, and local scripts. The good news: low-resource-language investments made by the Gates Foundation, the World Bank, Google, Meta, and others appear to be working. As we at <a href="https://gooey.ai/language-evaluation" target="_blank" rel="noopener">Gooey.AI can attest</a>, text and speech-recognition AI performance on low-resource languages is improving dramatically — in both private and the latest open-source models.</p>
+      <p>Speech, text, dialects, code-switching, and local scripts. The good news here is that low-resource language investments made by the Gates Foundation, the World Bank, Google and Meta and others appear to be working. As we at <a href="https://gooey.ai/language-evaluation" target="_blank" rel="noopener">Gooey.AI can attest</a>, text and speech recognition AI performance on low-resource language is improving dramatically in both private and the latest open source models.</p>
     </section>
 
     <section class="step" data-vis="img-culture8" data-section="2 · Datasets">
       <span class="step-eyebrow"><span class="n">Lever 02</span> Datasets · Culture</span>
       <h3>Culture</h3>
-      <p>Custodians of local indigenous cultures — including libraries, museums, and universities — have a valuable role to play in digitizing, labeling, and publishing under-represented culture in its broadest forms: visual art, music, dance, film, handwriting, and scripts — so that all generative AI models can accurately create new forms of culture.</p>
-    </section>
-
-    <section class="step" data-vis="art-coverage" data-section="2 · Datasets">
-      <span class="step-eyebrow"><span class="n">Lever 02</span> Datasets</span>
+      <p>Custodians of local indigenous cultures (including libraries, museums and universities) have a valuable role to play in digitizing, labeling and publishing under-represented culture in its broadest forms — including visual art, music, dance, film, handwriting, scripts — so that all generative AI models can accurately create new forms of culture.</p>
       <h3>Productivity needs</h3>
       <p>The actual tasks people perform in agriculture, health, education, government, and business.</p>
       <h3>Domain-specific reasoning</h3>
-      <p>Not just "Does the model speak my language?" but "Does it give expert and locally informed advice to the problems my community faces?" This should include critical and under-resourced datasets in areas critical to each country — e.g. thousands of labeled images of ailing plants taken on cheap Android phones.</p>
+      <p>Not just "Does the model speak my language?" but "Does it give expert and locally informed advice to the problems my community faces?" This should include critical and under-resourced datasets in areas critical to each country. Eg 1000s of labeled images taken on cheap Android phones of ailing plants.</p>
     </section>
 
-    <section class="step" data-vis="art-lockin" data-section="3 · Deployable models">
+    <section class="step" id="section-deployable" data-vis="art-lockin" data-section="3 · Deployable models">
       <span class="step-eyebrow"><span class="n">Lever 03</span> Deployable models</span>
       <h2>Foster locally deployable frontier models</h2>
       <p style="font-family:var(--gy-font-serif);font-style:italic;color:var(--gy-ink-muted);font-size:20px">No country or vendor lock-in.</p>
-      <p>When cell phones spread to every country, nations did not have to pay a tax to the US or China with every phone call. They could also be reasonably confident that their citizens were not being surveilled <i>en masse</i> by a foreign power with every domestic conversation. Compare this to private usage today with ChatGPT, Gemini, or Claude: the data and dollars of every BigTech AI conversation flow to US companies, subject to the <a href="https://en.wikipedia.org/wiki/CLOUD_Act" target="_blank" rel="noopener">Cloud Act</a> and <a href="https://www.bbc.co.uk/news/articles/ckge8zkr0d2o" target="_blank" rel="noopener">FISA</a>, with rising token costs as models improve their intelligence. Similar data and dollar leakage occurs with usage of <a href="https://deepseek.com" target="_blank" rel="noopener">deepseek.com</a>.</p>
-      <p>Jensen Huang's <a href="https://blogs.nvidia.com/blog/world-governments-summit/" target="_blank" rel="noopener">call for nations</a> to build their own sovereign data centers has resonated (there's a reason Nvidia is the world's <a href="https://en.wikipedia.org/wiki/List_of_public_corporations_by_market_capitalization" target="_blank" rel="noopener">most valuable company</a>). And though middle powers can't spend $500 billion on data centers, they can spend millions — and once they do, they will want to monetize these investments.</p>
-      <p>Modern frontier AI models <a href="https://www.iea.org/reports/energy-and-ai/energy-demand-from-ai" target="_blank" rel="noopener">demand</a> energy equivalent to the needs of whole countries, and most middle powers simply haven't made the investments required to be even distant players in this space. BUT they can run inference — on mobiles, personal computers, and data-center GPUs — so long as there are good-enough pre-trained models with customer demand. Hence, middle powers must organize markets to ensure these sovereign, deployable AI models are viable intelligence contenders.</p>
+      <p>When cell phones spread to every country, nations did not have to pay a tax to the US or China with every phone call. They could also be reasonably confident that their citizens were not being surveilled en masse by a foreign power with every domestic conversation. Compare this to private usage today with ChatGPT, Gemini or Claude. The data and dollars of every BigTech AI conversation flows to US companies, subject to the <a href="https://en.wikipedia.org/wiki/CLOUD_Act" target="_blank" rel="noopener">Cloud Act</a> and <a href="https://www.bbc.co.uk/news/articles/ckge8zkr0d2o" target="_blank" rel="noopener">FISA</a>, with rising token costs as models improve their intelligence. Similar data and dollar leakage occurs with usage of <a href="https://deepseek.com" target="_blank" rel="noopener">deepseek.com</a>.</p>
+      <p>Jensen Huang's <a href="https://blogs.nvidia.com/blog/world-governments-summit/" target="_blank" rel="noopener">calls for nations</a> to build their own sovereign data centers has resonated (there's a reason Nvidia is the <a href="https://en.wikipedia.org/wiki/List_of_public_corporations_by_market_capitalization" target="_blank" rel="noopener">world's most valuable company</a>) and though middle powers can't spend $500 billion on data centers, they can spend millions and once they do, they will want to monetize these data center investments.</p>
+      <p>Training frontier AI models <a href="https://www.iea.org/reports/energy-and-ai/energy-demand-from-ai" target="_blank" rel="noopener">demand</a> energy equivalents to the needs of entire countries and most middle powers simply haven't made the investments required to be even distant players in this space. BUT they can run inference — on mobiles, personal computers and data center GPUs — so long as there are good enough pre-trained models with customer demand. Hence, middle powers must organize markets to ensure these sovereign deployable AI models are viable intelligence contenders.</p>
     </section>
 
     <section class="step" data-vis="art-actors" data-section="3 · Deployable models">
       <span class="step-eyebrow"><span class="n">Lever 03</span> Deployable models</span>
-      <p>This is where the differing assets and aspirations of other powers are relevant.</p>
+      <p>This is where the differing assets and aspirations of other powers are relevant:</p>
       <h4>The United States</h4>
-      <p>The US (and its BigTech giants, now more than <a href="https://www.cnbc.com/2025/10/22/your-portfolio-may-be-more-tech-heavy-than-you-think.html" target="_blank" rel="noopener">30% of the S&amp;P 500</a>) has a business model based on private inference — betting that the world's companies and governments will pay for the most intelligent AI from US firms and data centers. Meta was the only BigTech firm publishing frontier-capable, sovereign-deployable models, but with <a href="https://techcrunch.com/2025/11/11/metas-chief-ai-scientist-yann-lecun-reportedly-plans-to-leave-to-build-his-own-startup/" target="_blank" rel="noopener">Yann LeCun's departure</a> this appears to have slowed. Google publishes capable <a href="https://deepmind.google/models/gemma/" target="_blank" rel="noopener">Gemma models</a>, but their best-in-class performance is limited to low-parameter models (to drive Android demand) while the most intelligent <a href="https://deepmind.google/models/gemini/" target="_blank" rel="noopener">Gemini models</a> are not sovereign-deployable. Nvidia has a strong interest in selling sovereign AI, and may end up being the US company willing to invest billions in capable open-source models like Nemotron.</p>
+      <p>The US (and its BigTech giants that now make up more than <a href="https://www.cnbc.com/2025/10/22/your-portfolio-may-be-more-tech-heavy-than-you-think.html" target="_blank" rel="noopener">30% of the S&amp;P 500</a>) have business models based on private inference, betting that companies and governments of the world will spend for most intelligent AI models from US-based firms and data centers serving inference tokens via private models. Meta was the only BigTech firm publishing frontier capable, sovereign data center deployable models but with <a href="https://techcrunch.com/2025/11/11/metas-chief-ai-scientist-yann-lecun-reportedly-plans-to-leave-to-build-his-own-startup/" target="_blank" rel="noopener">Yann LeCun's departure</a>, this appears to have slowed. Google is publishing capable <a href="https://deepmind.google/models/gemma/" target="_blank" rel="noopener">Gemma models</a>, but their best-in-class performance is limited to low-parameter models (intended to increase demand for new Android devices) while the most intelligent large models — <a href="https://deepmind.google/models/gemini/" target="_blank" rel="noopener">Gemini</a> — are not sovereign deployable. Nvidia has a strong interest in selling sovereign AI and hence, may end up being the US company willing to invest billions in capable open source models like Nemotron Ultra.</p>
       <h4>China</h4>
-      <p>China leads the world in manufacturing, has the second-best compute resources, and strategically wants to disrupt US AI with open-source, open-weight models. Its strategy: leverage its hardware advantage and embed open-source AI into every piece of electronics it sells. China's tech giants — <a href="https://www.moonshot.ai/" target="_blank" rel="noopener">Moonshot AI</a>, <a href="https://www.tencent.com/" target="_blank" rel="noopener">Tencent</a>, <a href="https://z.ai" target="_blank" rel="noopener">Z.ai</a>, and <a href="https://www.alibaba.com/" target="_blank" rel="noopener">Alibaba</a> — are currently creating some of the world's most intelligent models that can be deployed in sovereign data centers.</p>
+      <p>China leads the world in manufacturing, has the 2nd best compute resources and strategically wants to disrupt US AI with open-source, open-weight AI models. China's strategy is to leverage its significant hardware advantage and embed open source AI into every piece of electronics it sells. China's tech giants such as <a href="https://www.moonshot.ai/" target="_blank" rel="noopener">Moonshot AI</a>, <a href="https://www.tencent.com/" target="_blank" rel="noopener">Tencent</a>, <a href="https://z.ai" target="_blank" rel="noopener">Z.ai</a> and <a href="https://www.alibaba.com/" target="_blank" rel="noopener">Alibaba</a> are currently creating the world's most intelligent AI models that can be deployed in sovereign data centers.</p>
       <h4>Middle powers</h4>
-      <p>Middle powers on the upper end of the AI spectrum — India, the UK, the EU, Korea — are attempting to create their own LLMs, but none have yet fine-tuned or created models that achieved significant traction.</p>
+      <p>Middle powers on the upper end of the AI spectrum — India, the UK, the EU, Korea — are attempting to create their own LLMs but none have fine-tuned nor created models with that later achieved significant traction.</p>
     </section>
 
-    <section class="step" data-vis="art-recs" data-section="3 · Deployable models">
-      <span class="step-eyebrow"><span class="n">Lever 03</span> Recommendations</span>
-      <h3>Recommendations</h3>
-      <div class="mini">
-        <div class="m"><i class="fa-regular fa-arrows-rotate"></i><div><h5>Foster instant swapability</h5><p>Leverage market power and standards bodies so a model can be swapped the instant a better, cheaper, or more sovereign option appears.</p></div></div>
-        <div class="m"><i class="fa-regular fa-book-open"></i><div><h5>Guides on unlearning embedded worldviews</h5><p>Cooperate with global labs to build efficient fine-tuning and inference pipelines. We must be able to re-insert history (as Perplexity did with DeepSeek R1 to create the "<a href="https://www.perplexity.ai/api-platform/resources/open-sourcing-r1-1776" target="_blank" rel="noopener">1776</a>" model, now sadly <a href="https://www.reddit.com/r/perplexity_ai/comments/1mbvnvs/model_update_r1_1776_is_being_deprecated/" target="_blank" rel="noopener">deprecated</a>), and need open, documented processes to prove models are free of hidden bias, <a href="https://www.abc.net.au/news/2025-06-04/beijing-ai-and-censors-erase-tiananmen-square-massacre/105370772" target="_blank" rel="noopener">Tiananmen</a>-Square-style refusals, and embedded "phone home" routines (as reported in <a href="https://www.youtube.com/watch?v=lA8WuXDXfcI" target="_blank" rel="noopener">Unitree robot dogs</a> and the <a href="https://uk.pcmag.com/software/10782/the-10-most-disturbing-snowden-revelations" target="_blank" rel="noopener">Snowden revelations</a>).</p></div></div>
-        <div class="m"><i class="fa-regular fa-network-wired"></i><div><h5>Invest in distributed training for commodity hardware</h5><p>Facilitate the creation and easy deployment of effective, locally deployable models that run on sovereign data centers and on cheap, ubiquitous hardware. Here, there are natural ecosystem allies.</p></div></div>
-      </div>
-    </section>
+  </div>
+</div>
+
+<div class="scrolly scrolly-hscroll scrolly-recs" id="hscroll-recs">
+
+  <div class="hscroll-header step" data-vis="hcards-recs" data-section="3 · Recommendations">
+    <span class="step-eyebrow"><span class="n">Lever 03</span> Recommendations</span>
+    <h3>Recommendations</h3>
+  </div>
+
+  <div class="hscroll-pin">
+    <div class="hscroll-track" aria-label="Recommendations — scroll horizontally">
+      <article class="hcard">
+        <img src="/static/sovereign/images/image16.png" alt="Foster instant swapability"/>
+        <h3>Foster instant swapability</h3>
+        <p>Rather than spending billions on indigenous AI tech stacks, we believe middle powers should enable open, modular AI architectures that preserve choice and substitutability by collaborating on technical standards. The goal is AI model and provider commoditization. Success should be gauged by how easily applications can be moved across providers and models. As David Eaves and Mike Brackon <a href="https://www.techpolicy.press/the-path-to-a-sovereign-tech-stack-is-via-a-commodified-tech-stack/" target="_blank" rel="noopener">argue</a>, "Domination by a local champion, free to extract rents, may be a path to greater autonomy, but it is unlikely to lead to increased competitiveness or greater global influence." By championing open-source middleware, abstraction and orchestration layers, middle powers can build an architecture of choice where swappability is real.</p>
+      </article>
+      <article class="hcard">
+        <div class="hcard-media">
+          <img src="/static/sovereign/images/image40.png" alt="Clarote &amp; AI4Media — Better Images of AI"/>
+          <div class="hcard-cite"><a href="https://betterimagesofai.org" target="_blank" rel="noopener">Clarote &amp; AI4Media</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></div>
+        </div>
+        <h3>Develop tools to detect and undo model bias and misinformation</h3>
+        <p>AI models do not come with a clean slate; they instill their own cultural worldviews and ideologies — and for Chinese trained models, this means importing histories inline with Chinese Communist Party's (CCP) guidelines. Middle powers must be able to reinsert history like <a href="https://www.perplexity.ai/api-platform/resources/open-sourcing-r1-1776" target="_blank" rel="noopener">Perplexity's 1776 model</a> did by taking DeepSeek R1 as a base and stripping documented CCP censorship and <a href="https://www.abc.net.au/news/2025-06-04/beijing-ai-and-censors-erase-tiananmen-square-massacre/105370772" target="_blank" rel="noopener">re-adding suppressed historical records</a>. Additionally, there is a credible risk that frontier models may deliberately misdirect strategically sensitive queries. Research on detection and reversal of these misdirections currently remain nascent; middle powers must collaborate to fill this lacuna.</p>
+      </article>
+      <article class="hcard">
+        <div class="hcard-media">
+          <img src="/static/sovereign/images/image12.png" alt="Clarote &amp; AI4Media — Better Images of AI"/>
+          <div class="hcard-cite"><a href="https://betterimagesofai.org" target="_blank" rel="noopener">Clarote &amp; AI4Media</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></div>
+        </div>
+        <h3>Invest in distributed model training and cheaper inference</h3>
+        <p>Rather than matching the compute of the US and China, middle powers can redirect their investments to distributed training. Recent advances in distributed machine learning (e.g. <a href="https://deepmind.google/blog/decoupled-diloco/" target="_blank" rel="noopener">Google DeepMind's DiLoCo framework</a>) demonstrate how frontier models can be trained across geographically dispersed computing datacenters. We've seen this play out in airlines, with Airbus mounting a credible alternative to Boeing through a cooperative multi-country effort. Additionally, middle powers should <a href="https://www.youtube.com/watch?v=xmkSf5IS-zw" target="_blank" rel="noopener">invest in cheaper inference</a>, so they can run top AI models on their own data centers more efficiently too.</p>
+      </article>
+      <article class="hcard">
+        <div class="hcard-media">
+          <img src="/static/sovereign/images/image41.png" alt="Clarote &amp; AI4Media — Better Images of AI"/>
+          <div class="hcard-cite"><a href="https://betterimagesofai.org" target="_blank" rel="noopener">Clarote &amp; AI4Media</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></div>
+        </div>
+        <h3>Encourage small, capable models designed for commodity hardware</h3>
+        <p>Middle powers should facilitate the creation of effective, locally deployable AI models that can run not only on sovereign data centers, but also on cheap, ubiquitous hardware. Here, we have natural ecosystem allies on mobiles and personal computers costing $1,000–$5,000 — Nvidia, Intel, Apple, Microsoft and the largely Taiwanese and Chinese computer hardware industry all have business model alignment to create increasingly capable AI models that run on commodity hardware.</p>
+      </article>
+    </div>
+  </div>
+  <div class="hscroll-spacer" aria-hidden="true"></div>
+</div>
+
+<div class="scrolly scrolly-04b">
+
+  <div class="media" aria-hidden="false">
+    <div class="stage">
+      <figure class="figlayer" data-vis="art-edge">
+        <div class="culture-stack">
+          <figure class="culture-stack-item">
+            <img src="/static/sovereign/images/image37.png" alt="Continued Opportunity by Suraj Rai — Better Images of AI"/>
+            <figcaption><a href="https://betterimagesofai.org" target="_blank" rel="noopener">Continued Opportunity by Suraj Rai &amp; Digit - Better Images of AI</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></figcaption>
+          </figure>
+          <figure class="culture-stack-item">
+            <img src="/static/sovereign/images/image38.png" alt="Continued Mining by Suraj Rai — Better Images of AI"/>
+            <figcaption><a href="https://betterimagesofai.org" target="_blank" rel="noopener">Continued Mining by Suraj Rai &amp; Digit by Better Images of AI</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></figcaption>
+          </figure>
+        </div>
+      </figure>
+      <figure class="figlayer" data-vis="img-hotswap">
+        <div class="culture-stack">
+          <img src="/static/sovereign/images/image31.png" alt="Today: App talks to OpenAI APIs"/>
+          <img src="/static/sovereign/images/image32.png" alt="With AI standards: App talks via AI Standard APIs to private and open source providers"/>
+        </div>
+      </figure>
+      <div class="stage-meta"><b class="step-count">01</b> / <span class="step-total">30</span></div>
+    </div>
+  </div>
+
+  <div class="col-text">
 
     <section class="step" data-vis="art-edge" data-section="3 · Deployable models">
       <span class="step-eyebrow"><span class="n">Lever 03</span> Commodity hardware</span>
       <h4>Mobiles</h4>
-      <p>AI on the phone can enable offline speech understanding as its most relevant near-term use case. Google, Apple, and the mostly Chinese-based handset ecosystem will continue to invest here (e.g. Google's <a href="https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/" target="_blank" rel="noopener">Gemma 4 Effective</a> series) because they hope it will drive demand for new mobile purchases. With sufficient localized datasets of low-resource languages, we can hope to see offline speech understanding available for most languages in the coming 12–18 months — enabling everyone to harness collective human reasoning, regardless of their literacy. Sovereign nations can nudge this with better language datasets, and with demands and incentives on handset makers to pass speech-recognition standards for their country's languages.</p>
-      <h4>High-end laptops, Mac Mini, and Surface Ultra</h4>
-      <p>Personal computers — costing $1,000–$5,000 — can be effective hardware to run AI sovereignly in the years ahead. Nvidia, Intel, Apple, Microsoft, and the largely Taiwanese and Chinese computer-hardware industry all have business-model alignment to create increasingly capable AI models that run on personal computers. Apple has bet its future on improving prosumer hardware for AI (e.g. the upcoming <a href="https://like2byte.com/mac-mini-m4-local-llm-server-agency/" target="_blank" rel="noopener">Mac Minis</a> and Microsoft's Surface Ultra). Getting good AI running on hardware any organization can buy is good for middle powers.</p>
+      <p>AI on the phone can enable offline speech understanding as its most relevant near-term use case. Google, Apple and the mostly Chinese-based handset ecosystem will continue to invest here (e.g. Google's <a href="https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/" target="_blank" rel="noopener">Gemma 4 Effective</a> series) because they hope it will drive demand for new mobile purchases. With sufficient localized datasets of low-resource languages, we hope to see offline speech understanding available to most languages in the coming 12–18 months, enabling everyone to harness humanity's collective knowledge and reasoning, regardless of their literacy or connectivity.</p>
+      <h4>High-end laptops, Mac Mini and Surface Ultra</h4>
+      <p>Personal computers — costing $1,000–$5,000 — can be effective hardware to run AI sovereignly in the years ahead. <a href="https://www.youtube.com/watch?v=wykPErJ8M-8" target="_blank" rel="noopener">Apple</a> has bet their future on improving prosumer hardware for AI (e.g. the upcoming <a href="https://like2byte.com/mac-mini-m4-local-llm-server-agency/" target="_blank" rel="noopener">Mac Minis</a>) and Microsoft hopes to re-energize PC purchases with AI workhorses like the Surface Ultra.</p>
     </section>
 
-    <section class="step" data-vis="img-standards" data-section="4 · Spread workflows">
+    <section class="step" id="section-workflows" data-vis="img-hotswap" data-section="4 · Spread workflows">
       <span class="step-eyebrow"><span class="n">Lever 04</span> Spread workflows</span>
-      <h2>Spread impactful AI via open source, markets &amp; workflows</h2>
+      <h2>Spread impactful AI via open source software, markets &amp; workflows</h2>
       <p>The model landscape is moving quickly. OpenAI, Google, Anthropic, Mistral, Qwen, DeepSeek, Kimi, and other model families keep changing the frontier of cost, quality, latency, multilingual support, and deployability.</p>
-      <p>This constant change creates anxiety — but it also creates opportunity. A sovereign AI strategy doesn't fight this churn; it builds for it. Many use-cases worldwide will benefit from the frontier intelligence of US-based AI companies, and many times the data-privacy risks and costs for this intelligence are accepted.</p>
-      <p>The key is designing for <b>substitutability</b>. When AI systems are built on open, interoperable standards, institutions retain the practical ability to switch providers as the landscape shifts — avoiding the slow capture that comes from deep integration with a single vendor's ecosystem.</p>
-      <p>Hence, we should facilitate <b>hot-swapping</b>: the ability to constantly evaluate and then switch to whichever model is best, fastest, cheapest, safest, or most sovereign for the task. The point is not to reject private frontier models, but to avoid dependency on any single provider and to encourage competition. We should be able to easily run, fork, and usability-test AI solutions in the cloud — where the global marketplace of hyperscalers keeps costs lower — and quickly deploy them to sovereign data centers if needed.</p>
+      <p>Many use-cases worldwide benefit from the frontier intelligence of US and China based AI companies and often the data privacy risks and costs are worth it.</p>
+      <p>The key is designing for substitutability. When AI systems are built on open, interoperable standards, institutions retain the practical ability to switch providers as the landscape shifts.</p>
+      <p>Hence, we should facilitate hot-swapping: the ability to easily constantly evaluate and then switch to whichever model is best, fastest, cheapest, safest, or most sovereign for the task. The point is not to reject private frontier models; but rather to avoid dependency on any single provider and encourage competition.</p>
+      <p>We should be able to easily run, fork and usability test AI solutions in the cloud — where the global marketplace of hyperscalers can keep costs lower — and quickly deploy them to sovereign data centers if needed.</p>
     </section>
 
-    <section class="step" data-vis="art-commodity" data-section="4 · Spread workflows">
-      <span class="step-eyebrow"><span class="n">Lever 04</span> Spread workflows</span>
-      <p>For middle powers, this means cooperating with global AI labs while also investing in locally deployable models, model benchmarks that reflect our needs, and sovereign hosting options.</p>
-      <div class="pull"><p>Commoditization is our friend. As models become more interchangeable, the lasting value moves upward — into workflows, datasets, evaluations, domain expertise, distribution channels, and trust.</p></div>
-    </section>
+  </div>
+</div>
 
-    <section class="step" data-vis="img-landscape" data-section="Shared workflows">
+<div class="scrolly scrolly-05">
+
+  <div class="media" aria-hidden="false">
+    <div class="stage">
+      <figure class="figlayer" data-vis="img-landscape"><img src="/static/sovereign/images/image3.png" alt="The Agriculture AI Landscape (Figure 8)"/><figcaption><b>Figure 8.</b> An Overview of the Agriculture AI landscape.</figcaption></figure>
+      <figure class="figlayer" data-vis="img-dg"><img src="/static/sovereign/images/image23.png" alt="Digital Green impact: 17% income increase; 4.1M farmers reached"/><figcaption>Digital Green's impact: +17% farmer income, cost down from $35→$3.50, 4.1M farmers reached (70% women).</figcaption></figure>
+      <figure class="figlayer" data-vis="img-chat"><img src="/static/sovereign/images/image7.png" alt="Farmer.CHAT WhatsApp exchange"/><figcaption>A real Farmer.CHAT exchange — grounded, cited advice by text or voice, in the user's language.</figcaption></figure>
+      <div class="stage-meta"><b class="step-count">01</b> / <span class="step-total">30</span></div>
+    </div>
+  </div>
+
+  <div class="col-text">
+
+    <section class="step" id="section-sdg" data-vis="img-landscape" data-section="Shared workflows">
       <span class="step-eyebrow"><span class="n">05</span> Shared workflows</span>
-      <h2>From models to shared workflows that move the SDGs</h2>
+      <h2>From models to shared workflows that move SDGs</h2>
       <p>Sovereignty should not stop at national capacity. It should improve the speed at which useful AI spreads among public-interest organizations. This is where open-source infrastructure and reusable AI workflows matter.</p>
-      <p>At Gooey.AI, we think of an AI workflow as a <b>human-readable recipe</b>: prompts, model choices, tools, APIs, knowledge bases, analytics, and specific evaluations bundled around a real use case. A workflow can be easily inspected, improved, forked, translated, and redeployed.</p>
-      <p>That matters because the best AI solutions for global impact must be patterns that spread. If a farmer-advisory workflow works in one region, another organization should be able to inspect it, adapt it to local crops and languages, test it against local benchmarks, and deploy it through WhatsApp, SMS, voice, or web. The same pattern can apply to health, education, public services, cultural preservation, and humanitarian response.</p>
+      <p>At Gooey.AI, we think of an AI workflow as a human-readable recipe: prompts, model choices, tools, APIs, knowledge documents, analytics, and importantly bespoke evaluations bundled around a real use case. A workflow can be easily inspected, improved, forked, translated, and redeployed.</p>
+      <p>That matters because the best AI solutions for global impact must be patterns that spread. If a farmer advisory workflow works in one region, another organization should be able to inspect it, adapt it to local crops and languages, test it against local benchmarks, and deploy it through WhatsApp, SMS, voice, or web.</p>
     </section>
 
-    <section class="step" data-vis="img-dg" data-section="Sidebar · Farmers">
+    <section class="step" id="section-farmers" data-vis="img-dg" data-section="Sidebar · Farmers">
       <span class="step-eyebrow"><i class="fa-regular fa-bookmark"></i> Sidebar · A story of farmers and AI</span>
       <h2>"We built in a day what we'd worked on for three months"</h2>
-      <p><b><a href="https://help.gooey.ai/farmerchat" target="_blank" rel="noopener">Farmer.CHAT</a></b> is one example of what this looks like in practice. Built from the wisdom of thousands of <a href="https://digitalgreen.org/" target="_blank" rel="noopener">Digital Green</a>'s farmer <a href="https://www.youtube.com/user/digitalgreenorg" target="_blank" rel="noopener">videos</a>, farmers can ask a multilingual WhatsApp or Android bot questions by text or voice, upload photos of ailing plants and receive answers in their language, hear audio responses, and access cited videos and references. The interface meets users where they already are: on their phones, in their local language, through ubiquitous messaging channels such as WhatsApp.</p>
+      <p><b><a href="https://help.gooey.ai/farmerchat" target="_blank" rel="noopener">Farmer.Chat</a></b> is one example of what this looks like in practice. Built from the wisdom of thousands of <a href="https://digitalgreen.org/" target="_blank" rel="noopener">Digital Green</a>'s farmer <a href="https://www.youtube.com/user/digitalgreenorg" target="_blank" rel="noopener">videos</a>, farmers can ask a multilingual WhatsApp or Android bot questions by text or voice, upload photos of ailing plants and receive answers in their language.</p>
     </section>
 
     <section class="step" data-vis="img-chat" data-section="Sidebar · Farmers">
-      <span class="step-eyebrow"><i class="fa-regular fa-bookmark"></i> Sidebar · A story of farmers and AI</span>
-      <p>A real Farmer.CHAT exchange: a grower photographs an ailing crop and receives grounded, cited advice — by text or voice — in their own language, on the channel they already use.</p>
-    </section>
-
-    <section class="step" data-vis="art-forks" data-section="Sidebar · Farmers">
-      <span class="step-eyebrow"><i class="fa-regular fa-bookmark"></i> Sidebar · A story of farmers and AI</span>
-      <p>Farmer.CHAT was demo'd at the 2023 UN General Assembly's Science Panel and garnered press including an <a href="https://openai.com/index/digital-green/" target="_blank" rel="noopener">OpenAI case study</a>. Importantly, Farmer.CHAT's <a href="https://gooey.ai/copilot/farmerchat-via-gpt-4o-nuwsqmzp" target="_blank" rel="noopener">AI-workflow recipe</a> — the LLM instructions, model settings, analysis scripts, and knowledge documents — were made available so that other organizations serving smallholder farmers could find, customize, and re-deploy the recipe for their own markets and users. <a href="https://opportunity.org/" target="_blank" rel="noopener">Opportunity International</a> — an 80-year-old NGO with offices in 33 countries — quickly forked and deployed the agriculture chatbot in Malawi (as <a href="https://unlocked.microsoft.com/opportunity-international/" target="_blank" rel="noopener">Ulangizi</a>), Ghana (as <a href="https://www.dbg.com.gh/opportunity-international-development-bank-ghana-launch-a-pilot-ai-chatbot-for-smallholder-farmers/" target="_blank" rel="noopener">Farmer AI</a>, with the Ghana Development Bank), and Kenya (as <a href="https://opportunity.org/news/press-releases/opportunity-international-and-safaricom-launch-new-ai-chatbot-for-smallholder-farmers" target="_blank" rel="noopener">DigiFarm</a>, with support from the country's largest telco, Safaricom).</p>
+      <span class="step-eyebrow"><i class="fa-regular fa-bookmark"></i> Sidebar · Farmers</span>
+      <p>Farmer.Chat was demo'd at the 2023 UN General Assembly's Science Panel and garnered press including an <a href="https://openai.com/index/digital-green/" target="_blank" rel="noopener">OpenAI case-study</a>. Importantly, <a href="https://gooey.ai/copilot/farmerchat-via-gpt-4o-nuwsqmzp" target="_blank" rel="noopener">Farmer.Chat's AI workflow recipe</a> — the LLM instructions, model settings, analysis scripts, knowledge documents — were available so that other organizations serving smallholder farmers could find, customize and re-deploy the AI recipe for their own markets and users. <a href="https://opportunity.org/" target="_blank" rel="noopener">Opportunity International</a> — an 80 year old NGO with offices in 33 countries — quickly forked and deployed the agriculture chatbot in Malawi (as <a href="https://unlocked.microsoft.com/opportunity-international/" target="_blank" rel="noopener">Ulangizi</a>), Ghana (as <a href="https://www.dbg.com.gh/opportunity-international-development-bank-ghana-launch-a-pilot-ai-chatbot-for-smallholder-farmers/" target="_blank" rel="noopener">Farmer AI</a>), and Kenya (as <a href="https://opportunity.org/news/press-releases/opportunity-international-and-safaricom-launch-new-ai-chatbot-for-smallholder-farmers" target="_blank" rel="noopener">DigiFarm</a> with Safaricom).</p>
       <div class="pull"><p>"We built in a day what we had been working on for three months."</p><div class="by">— Paul Essene, Opportunity International</div></div>
-      <p style="margin-top:18px">If a mental-health triage assistant works for one public-health context, another should be able to fork it, replace the knowledge base, adjust safety rules, and run local evaluations. This is what the Wellcome Trust is supporting with their <a href="https://mexa.app/accelerator" target="_blank" rel="noopener">mental-health accelerator</a>, in partnership with Google and Gooey.AI. That is how sovereignty scales: not by hoarding AI, but by spreading the recipes for AI that move forward our shared Sustainable Development Goals.</p>
+      <p style="margin-top:18px">If a mental health triage assistant works for one public health context, another should be able to fork it, replace the knowledge base, adjust safety rules, and run local evaluations. This is what the Wellcome Trust is supporting with their <a href="https://mexa.app/accelerator" target="_blank" rel="noopener">mental-health accelerator</a>, in partnership with Google and Gooey.AI.</p>
     </section>
 
-    <section class="step" data-vis="art-conclusion" data-section="Conclusion">
+  </div>
+</div>
+
+<div class="scrolly scrolly-conclusion">
+
+  <div class="media" aria-hidden="false">
+    <div class="stage">
+      <figure class="figlayer" data-vis="art-conclusion">
+        <div class="lever-grid" aria-label="Four levers for AI sovereignty">
+          <article class="lg-card"><i class="fa-regular fa-ruler"></i><h5>Benchmarks</h5><p>that define what good AI means for their country.</p></article>
+          <article class="lg-card"><i class="fa-regular fa-database"></i><h5>Datasets</h5><p>that make underrepresented communities visible and drive the next wave of productivity for everyone.</p></article>
+          <article class="lg-card"><i class="fa-regular fa-microchip"></i><h5>Deployable models</h5><p>that reduce dependency on any one vendor or country.</p></article>
+          <article class="lg-card"><i class="fa-regular fa-diagram-project"></i><h5>Open markets &amp; workflows</h5><p>that let useful AI spread across sectors and borders.</p></article>
+        </div>
+      </figure>
+      <div class="stage-meta"><b class="step-count">01</b> / <span class="step-total">30</span></div>
+    </div>
+  </div>
+
+  <div class="col-text">
+
+    <section class="step" id="section-conclusion" data-vis="art-conclusion" data-section="Conclusion">
       <span class="step-eyebrow">Conclusion</span>
       <h2>Sovereignty through cooperation</h2>
       <p>AI sovereignty is not digging a moat around national AI systems. It is about ensuring that AI is beneficial, reflective, non-extractive, and open enough to spread.</p>
       <p>Middle powers need to cooperate where cooperation creates leverage:</p>
-      <div class="mini">
-        <div class="m"><i class="fa-regular fa-ruler"></i><div><h5>Benchmarks</h5><p>that define what "good AI" means for their country.</p></div></div>
-        <div class="m"><i class="fa-regular fa-database"></i><div><h5>Datasets</h5><p>that make under-represented communities visible and drive the next wave of productivity for everyone.</p></div></div>
-        <div class="m"><i class="fa-regular fa-microchip"></i><div><h5>Deployable models</h5><p>that reduce dependency on any one vendor or country.</p></div></div>
-        <div class="m"><i class="fa-regular fa-diagram-project"></i><div><h5>Open markets &amp; workflows</h5><p>that let useful AI spread across sectors and borders.</p></div></div>
-      </div>
     </section>
+
+  </div>
+</div>
+
+<div class="scrolly scrolly-finale">
+
+  <div class="col-text">
 
     <section class="step" data-vis="art-final" data-section="Conclusion">
       <span class="step-eyebrow">Conclusion</span>
-      <p>The future of AI will not only be decided in frontier labs and data centers. It will also be decided in classrooms, clinics, farms, public agencies, cultural institutions, and civil-society organizations that ask a more grounded question:</p>
+      <p>The future of AI will not only be decided in frontier labs and data centers. It will also be decided in classrooms, clinics, farms, public agencies, cultural institutions, and civil society organizations that ask a more grounded question:</p>
       <h2 style="font-style:italic;color:var(--gy-ink)">"Does this AI help our people, in our language, on our terms?"</h2>
       <p style="font-family:var(--gy-font-serif);font-size:22px;color:var(--gy-orange)">That is the sovereignty worth building.</p>
     </section>
 
   </div>
 </div>
-
 <!-- ===================== FOOTER ===================== -->
 <footer class="site-footer">
   <div class="wrap">
@@ -493,7 +713,27 @@ text.axlbl{fill:var(--gy-ink-muted);font-size:11.5px;font-weight:600;font-family
         <li><b>Howard Lakougna</b> — Gates Foundation</li>
         <li><b>Archana Prasad</b> — RCA</li>
       </ul>
-      <p class="ref">Reference — World Bank. (2008). <i>The growth report: Strategies for sustained growth and inclusive development.</i> World Bank. <a href="https://documents1.worldbank.org/curated/en/587251468175472382/pdf/41455optmzd0PA18082136807701PUBLIC1.pdf" target="_blank" rel="noopener">documents1.worldbank.org</a></p>
+      <div class="refs">
+        <h4>References</h4>
+        <ol class="ref-list">
+          <li>Caulfield, B. (2024, February 12). NVIDIA CEO: Every country needs sovereign AI. <i>NVIDIA Blog</i>. <a href="https://blogs.nvidia.com/blog/world-governments-summit/" target="_blank" rel="noopener">https://blogs.nvidia.com/blog/world-governments-summit/</a></li>
+          <li>Douillard, A., &amp; the DiLoCo Team. (2026, April 23). Decoupled DiLoCo: A new frontier for resilient, distributed AI training. <i>Google DeepMind</i>. <a href="https://deepmind.google/blog/decoupled-diloco/" target="_blank" rel="noopener">https://deepmind.google/blog/decoupled-diloco/</a></li>
+          <li>Epoch AI. (2025). Data centers cost and capacity visualization. <i>Frontier Data Centers Hub</i>. <a href="https://epoch.ai/data/data-centers?view=graph&amp;tab=cos" target="_blank" rel="noopener">https://epoch.ai/data/data-centers?view=graph&amp;tab=cos</a></li>
+          <li><i>The Economist</i>. (2026, March 25). China is winning the AI talent race. <a href="https://www.economist.com/interactive/science-and-technology/2026/03/25/china-is-winning-the-ai-talent-race" target="_blank" rel="noopener">https://www.economist.com/interactive/science-and-technology/2026/03/25/china-is-winning-the-ai-talent-race</a></li>
+          <li>Gooey.AI. (2026). Low-resource language evaluation work: Kinyarwanda benchmark study. <a href="https://gooey.ai/language" target="_blank" rel="noopener">https://gooey.ai/language</a></li>
+          <li>Henning, M. (2025, October 30). International Criminal Court to ditch Microsoft Office for European open source alternative. <i>Euractiv</i>. <a href="https://www.euractiv.com/news/international-criminal-court-to-ditch-microsoft-office-for-european-open-source-alternative/" target="_blank" rel="noopener">https://www.euractiv.com/news/international-criminal-court-to-ditch-microsoft-office-for-european-open-source-alternative/</a></li>
+          <li>International Energy Agency. (2025). <i>Energy and AI</i>. IEA. <a href="https://www.iea.org/reports/energy-and-ai" target="_blank" rel="noopener">https://www.iea.org/reports/energy-and-ai</a></li>
+          <li>Iyer, R. (2025, November 11). Meta's chief AI scientist Yann LeCun reportedly plans to leave to build his own startup. <i>TechCrunch</i>. <a href="https://techcrunch.com/2025/11/11/metas-chief-ai-scientist-yann-lecun-reportedly-plans-to-leave-to-build-his-own-startup/" target="_blank" rel="noopener">https://techcrunch.com/2025/11/11/metas-chief-ai-scientist-yann-lecun-reportedly-plans-to-leave-to-build-his-own-startup/</a></li>
+          <li>Morabito, C. (2025, October 22). The S&amp;P 500 is more concentrated with AI than ever. Here's how to manage your risk. <i>CNBC</i>. <a href="https://www.cnbc.com/2025/10/22/your-portfolio-may-be-more-tech-heavy-than-you-think.html" target="_blank" rel="noopener">https://www.cnbc.com/2025/10/22/your-portfolio-may-be-more-tech-heavy-than-you-think.html</a></li>
+          <li>OECD. (n.d.). AI Policy Observatory – Artificial intelligence research and publication trends. <a href="https://oecd.ai" target="_blank" rel="noopener">https://oecd.ai</a></li>
+          <li>OpenAI. (2024). Building agricultural database for farmers: Digital Green uses OpenAI to increase farmer income. <i>OpenAI</i>. <a href="https://openai.com/index/digital-green/" target="_blank" rel="noopener">https://openai.com/index/digital-green/</a></li>
+          <li>Press Information Bureau. (2023, July 6). Government of India. <a href="https://www.pib.gov.in/PressReleseDetailm.aspx?PRID=1939473&amp;reg=3&amp;lang=2" target="_blank" rel="noopener">https://www.pib.gov.in/PressReleseDetailm.aspx?PRID=1939473&amp;reg=3&amp;lang=2</a></li>
+          <li>Saad, N. (2026, April 18). What is the Fisa law Trump wants extended and why are lawmakers resisting? <i>BBC News</i>. <a href="https://www.bbc.co.uk/news/articles/ckge8zkr0d2o" target="_blank" rel="noopener">https://www.bbc.co.uk/news/articles/ckge8zkr0d2o</a></li>
+          <li>United Nations. (n.d.). The 17 goals | Sustainable development. <i>United Nations Sustainable Development</i>. <a href="https://sdgs.un.org/goals" target="_blank" rel="noopener">https://sdgs.un.org/goals</a></li>
+          <li>Xiao, B. (2025, June 4). Leaked files reveal how China is using AI to erase the history of the Tiananmen Square massacre. <i>ABC News</i>. <a href="https://www.abc.net.au/news/2025-06-04/beijing-ai-and-censors-erase-tiananmen-square-massacre/105370772" target="_blank" rel="noopener">https://www.abc.net.au/news/2025-06-04/beijing-ai-and-censors-erase-tiananmen-square-massacre/105370772</a></li>
+          <li>World Bank. (2008). <i>The growth report: Strategies for sustained growth and inclusive development</i>. World Bank. <a href="https://documents1.worldbank.org/curated/en/587251468175472382/pdf/41455optmzd0PA18082136807701PUBLIC1.pdf" target="_blank" rel="noopener">https://documents1.worldbank.org/curated/en/587251468175472382/pdf/41455optmzd0PA18082136807701PUBLIC1.pdf</a></li>
+        </ol>
+      </div>
       <div class="foot-brand"><img src="/static/sovereign/assets/gooey-logo.png" alt="Gooey.AI"/><span>© 2026 Gooey.AI — How Middle Powers Cooperate for AI Sovereignty</span></div>
     </div>
   </div>
@@ -536,7 +776,6 @@ const PUB=[
  {n:'United Kingdom',c:PALETTE.green,on:false,d:[5.0,4.8,4.6,4.4,4.2,4.0,3.9,3.8,3.7,3.6,3.6]},
  {n:'Germany',c:PALETTE.blue2,on:false,d:[4.3,4.1,3.9,3.7,3.6,3.4,3.3,3.2,3.1,3.0,3.0]},
  {n:'Korea',c:PALETTE.deep,on:false,d:[3.2,3.2,3.1,3.1,3.0,3.0,3.1,3.1,3.2,3.3,3.4]}];
-const RES=[{n:'China',v:37,c:PALETTE.ink},{n:'United States',v:32,c:PALETTE.orange},{n:'Rest of world',v:31,c:PALETTE.gray}];
 const CLAUDE_COLS=[{k:'op48',label:'Opus 4.8',hl:true,c:PALETTE.orange},{k:'op47',label:'Opus 4.7',c:PALETTE.blue2},{k:'gpt55',label:'GPT-5.5',c:PALETTE.green},{k:'gem31',label:'Gemini 3.1 Pro',c:PALETTE.blue}];
 const CLAUDE=[
  {bench:'Agentic coding',set:'SWE-Bench Pro',unit:'%',v:{op48:69.2,op47:64.3,gpt55:58.6,gem31:54.2}},
@@ -595,18 +834,23 @@ function renderPub(){
   s+=`<path class="linepath" d="${p}" stroke="${ser.c}" stroke-width="${strong?3:2}"/>`;
   ser.d.forEach((v,i)=>{s+=`<circle class="linedot" data-s="${si}" data-i="${i}" cx="${px(i)}" cy="${py(v)}" r="3" fill="${ser.c}"/>`;});
   const ly=py(ser.d[ser.d.length-1]);s+=`<text x="${px(PUB_YEARS.length-1)-3}" y="${ly-7}" text-anchor="end" style="font-size:10.5px;font-weight:700;fill:${ser.c}">${ser.n} ${ser.d[ser.d.length-1]}%</text>`;});
+ s+=`<line class="pub-vline" x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${H-m.b}" stroke="var(--gy-ink-soft)" stroke-width="1" stroke-dasharray="4 3" opacity="0"/>`;
+ s+=`<rect class="pub-hit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent"/>`;
  svg.innerHTML=s;
- svg.querySelectorAll('.linedot').forEach(c=>{c.addEventListener('mouseenter',e=>{const ser=PUB[+c.dataset.s],i=+c.dataset.i;showTip(`<b>${ser.n}</b><div class="tt-row"><span class="tt-k">${PUB_YEARS[i]}</span><span>${ser.d[i]}% of papers</span></div>`,e);c.setAttribute('r',5);});c.addEventListener('mousemove',moveTip);c.addEventListener('mouseleave',()=>{hideTip();c.setAttribute('r',3);});});
+ const hit=svg.querySelector('.pub-hit');const vline=svg.querySelector('.pub-vline');
+ function pubYearIdx(x){let best=0,bestDist=Infinity;PUB_YEARS.forEach((_,i)=>{const d=Math.abs(x-px(i));if(d<bestDist){bestDist=d;best=i;}});return best;}
+ function showPubTip(e,yearIdx){
+  const rows=PUB.filter(ser=>ser.on).map(ser=>`<div class="tt-row"><span class="tt-k">${ser.n}</span><span>${ser.d[yearIdx]}%</span></div>`).join('');
+  if(!rows){hideTip();return;}
+  showTip(`<b>${PUB_YEARS[yearIdx]}</b>${rows}`,e);
+  const x=px(yearIdx);vline.setAttribute('x1',x);vline.setAttribute('x2',x);vline.setAttribute('opacity','0.55');
+  svg.querySelectorAll('.linedot').forEach(c=>c.setAttribute('r',+c.dataset.i===yearIdx?'6':'3'));
+ }
+ function hidePubTip(){hideTip();vline.setAttribute('opacity','0');svg.querySelectorAll('.linedot').forEach(c=>c.setAttribute('r','3'));}
+ hit.addEventListener('mousemove',e=>{const box=svg.getBoundingClientRect();showPubTip(e,pubYearIdx((e.clientX-box.left)/box.width*W));moveTip(e);});
+ hit.addEventListener('mouseleave',hidePubTip);
  const leg=document.getElementById('pubLegend');leg.innerHTML=PUB.map((s,i)=>`<span class="li ${s.on?'':'off'}" data-i="${i}"><span class="sw line" style="background:${s.c}"></span>${s.n}</span>`).join('');
  leg.querySelectorAll('.li').forEach(li=>li.onclick=()=>{PUB[+li.dataset.i].on=!PUB[+li.dataset.i].on;renderPub();});
-}
-function renderDonut(){
- const svg=document.getElementById('resDonut');const cx=115,cy=115,r=82,rin=50;let s='',a0=-Math.PI/2;
- RES.forEach((d,i)=>{const a1=a0+d.v/100*Math.PI*2;const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);const xi0=cx+rin*Math.cos(a0),yi0=cy+rin*Math.sin(a0),xi1=cx+rin*Math.cos(a1),yi1=cy+rin*Math.sin(a1);const lg=(a1-a0)>Math.PI?1:0;
-  s+=`<path data-i="${i}" d="M${x0} ${y0} A${r} ${r} 0 ${lg} 1 ${x1} ${y1} L${xi1} ${yi1} A${rin} ${rin} 0 ${lg} 0 ${xi0} ${yi0} Z" fill="${d.c}" stroke="#fff" stroke-width="2" style="cursor:pointer"/>`;a0=a1;});
- svg.innerHTML=s;
- svg.querySelectorAll('path').forEach(p=>{p.addEventListener('mouseenter',e=>{const d=RES[+p.dataset.i];showTip(`<b>${d.n}</b><div class="tt-row"><span class="tt-k">Top researchers</span><span>${d.v}%</span></div>`,e);p.style.opacity=.82;});p.addEventListener('mousemove',moveTip);p.addEventListener('mouseleave',()=>{hideTip();p.style.opacity=1;});});
- document.getElementById('resLegend').innerHTML=RES.map(d=>`<span class="li"><span class="sw" style="background:${d.c}"></span><b style="font-family:var(--gy-font-serif);font-size:17px">${d.v}%</b>&nbsp;${d.n}</span>`).join('');
 }
 function renderClaude(){
  const svg=document.getElementById('claudeChart');const W=600,H=660,m={l:14,r:14,t:10,b:8};
@@ -639,13 +883,69 @@ function renderGem(){
  svg.innerHTML=s;
 }
 
-/* ---------- art injection ---------- */
-function injectArt(){
- if(typeof window.ART==='undefined')return;
- document.querySelectorAll('.figlayer .artbox').forEach(box=>{
-  const name=box.closest('.figlayer').dataset.vis;
-  if(name==='art-abstract')return;
-  if(window.ART[name]){box.innerHTML=window.ART[name];}
+
+const GLM_COLS=[{k:'glm52',label:'GLM 5.2',hl:true},{k:'glm5',label:'GLM 5'},{k:'g35f',label:'Gemini 3.5 Flash'},{k:'gpt55',label:'GPT-5.5'},{k:'cs46',label:'Claude Sonnet 4.6'},{k:'qwen3',label:'Qwen3'}];
+const GLM=[
+ {cat:'Coding',bench:'SWE-Bench Pro',unit:'%',v:{glm52:58.2,glm5:52.1,g35f:55.1,gpt55:58.6,cs46:null,qwen3:51.4}},
+ {cat:'Coding',bench:'Terminal-Bench 2.1',unit:'%',v:{glm52:71.4,glm5:65.8,g35f:76.2,gpt55:78.2,cs46:69.5,qwen3:68.1}},
+ {cat:'Reasoning',bench:"Humanity's Last Exam",unit:'%',v:{glm52:38.6,glm5:34.2,g35f:40.2,gpt55:41.4,cs46:33.2,qwen3:36.8}},
+ {cat:'Reasoning',bench:'ARC-AGI-2',unit:'%',v:{glm52:68.4,glm5:61.2,g35f:72.1,gpt55:84.6,cs46:58.3,qwen3:64.7}},
+ {cat:'Agentic',bench:'MCP Atlas',unit:'%',v:{glm52:79.2,glm5:72.5,g35f:83.6,gpt55:75.3,cs46:69.5,qwen3:74.8}},
+ {cat:'Multimodal',bench:'MMMU-Pro',unit:'%',v:{glm52:78.1,glm5:74.3,g35f:83.6,gpt55:81.2,cs46:74.5,qwen3:76.9}},
+ {cat:'Expert',bench:'Finance Agent v2',unit:'%',v:{glm52:54.2,glm5:48.6,g35f:57.9,gpt55:51.8,cs46:51.0,qwen3:49.3}},
+ {cat:'Long context',bench:'MRCR v2 (8-needle)',unit:'%',v:{glm52:74.8,glm5:69.1,g35f:77.3,gpt55:94.8,cs46:84.9,qwen3:71.2}}];
+let glmIdx=0;
+function renderGlmControls(){
+ const sel=document.getElementById('glmSel');if(!sel)return;
+ sel.innerHTML=GLM.map((r,i)=>`<option value="${i}" ${i===glmIdx?'selected':''}>${r.cat} — ${r.bench}</option>`).join('');
+ sel.onchange=()=>{glmIdx=+sel.value;renderGlm();};renderGlm();
+}
+function renderGlm(){
+ const row=GLM[glmIdx];const catEl=document.getElementById('glmCat');if(!row||!catEl)return;
+ catEl.textContent=row.cat;
+ const svg=document.getElementById('glmChart');const W=600,H=320,m={l:150,r:54,t:8,b:8};
+ const vals=GLM_COLS.map(c=>row.v[c.k]).filter(v=>v!=null);const max=row.unit==='elo'?Math.max(...vals)*1.1:100;const bh=(H-m.t-m.b)/GLM_COLS.length;
+ let s='';GLM_COLS.forEach((c,i)=>{const v=row.v[c.k];const y=m.t+i*bh+bh*0.2;const w=v==null?0:(v/max)*(W-m.l-m.r);
+  s+=`<text x="${m.l-8}" y="${y+bh*0.4}" text-anchor="end" style="font-size:11.5px;fill:var(--gy-ink);font-weight:${c.hl?700:400}">${c.label}</text>`;
+  if(v==null){s+=`<text x="${m.l+6}" y="${y+bh*0.42}" style="font-size:11px;fill:var(--gy-ink-soft)">not reported</text>`;}
+  else{s+=`<rect x="${m.l}" y="${y}" width="${w}" height="${bh*0.52}" rx="3" fill="${c.hl?PALETTE.orange:PALETTE.purple}" fill-opacity="${c.hl?0.95:0.8}"/><text x="${m.l+w+6}" y="${y+bh*0.42}" style="font-size:11.5px;font-weight:700;fill:var(--gy-ink)">${row.unit==='elo'?v:v+'%'}</text>`;}});
+ svg.innerHTML=s;
+}
+
+function initHScrollSections(){
+ document.querySelectorAll('.scrolly-hscroll').forEach(section=>{
+  const track=section.querySelector('.hscroll-track');
+  const header=section.querySelector('.hscroll-header');
+  const spacer=section.querySelector('.hscroll-spacer');
+  if(!track||!header||!spacer)return;
+
+  function measure(){
+   const maxScroll=Math.max(0,track.scrollWidth-innerWidth);
+   spacer.style.height=maxScroll+'px';
+   return maxScroll;
+  }
+
+  function update(){
+   const maxScroll=measure();
+   const start=section.offsetTop+header.offsetHeight;
+   const y=window.scrollY;
+   if(y<=start){
+    track.style.transform='translateX(0)';
+    return;
+   }
+   if(y>=start+maxScroll){
+    track.style.transform=`translateX(-${maxScroll}px)`;
+    return;
+   }
+   track.style.transform=`translateX(-${y-start}px)`;
+  }
+
+  addEventListener('scroll',update,{passive:true});
+  addEventListener('resize',()=>{measure();update();});
+  if(typeof ResizeObserver!=='undefined'){
+   new ResizeObserver(()=>{measure();update();}).observe(track);
+  }
+  update();
  });
 }
 
@@ -655,9 +955,172 @@ function heroGlobeRect(){
  return {left:hero.right-gs+gs*0.13,top:hero.bottom-gs+gs*0.13,width:gs,height:gs};
 }
 
+function updateMediaDock(){
+ if(document.documentElement.classList.contains('mobile-flow'))return;
+ document.querySelectorAll('.scrolly:not(.scrolly-hscroll)').forEach(scrolly=>{
+  const media=scrolly.querySelector('.media');
+  const anchor=scrolly.querySelector('.step');
+  if(!media||!anchor)return;
+
+  const scrollY=window.scrollY;
+  const scrollyTop=scrolly.offsetTop;
+  const scrollyBottom=scrollyTop+scrolly.offsetHeight;
+  if(scrollY+innerHeight<scrollyTop||scrollY>scrollyBottom){
+   media.classList.remove('media-docked');
+   media.style.removeProperty('--media-y');
+   return;
+  }
+
+  const rect=anchor.getBoundingClientRect();
+  const stageMid=innerHeight*0.5;
+  const anchorY=rect.top+Math.min(rect.height*0.22,180);
+  const offset=Math.max(0,anchorY-stageMid);
+
+  if(offset>4){
+   media.classList.remove('media-docked');
+   media.style.setProperty('--media-y',`${offset}px`);
+   return;
+  }
+
+  media.classList.add('media-docked');
+  media.style.removeProperty('--media-y');
+ });
+}
+
+function updateDesireFly(){
+ if(document.documentElement.classList.contains('mobile-flow'))return;
+ const scrolly=document.querySelector('.scrolly-01');
+ const layer=scrolly?.querySelector('.figlayer[data-vis="img-desire"]');
+ const step=document.getElementById('section-sovereign-desire');
+ if(!layer||!step||!scrolly)return;
+ const rect=step.getBoundingClientRect();
+ const inSection=rect.top<innerHeight&&rect.bottom>0;
+ if(!inSection){
+  layer.classList.remove('fly-in');
+  layer.style.removeProperty('--fly-y');
+  return;
+ }
+ layer.classList.add('active');
+ const stageMid=innerHeight*0.46;
+ const stepAnchor=rect.top+Math.min(rect.height*0.22,180);
+ const offset=Math.max(0,stepAnchor-stageMid);
+ if(offset>4){
+  layer.classList.add('fly-in');
+  layer.style.setProperty('--fly-y',`translateY(${offset}px)`);
+ }else{
+  layer.classList.remove('fly-in');
+  layer.style.removeProperty('--fly-y');
+ }
+}
+
+/* ---------- art injection ---------- */
+function injectArt(){
+ if(typeof window.ART==='undefined')return;
+ document.querySelectorAll('.figlayer .artbox').forEach(box=>{
+  const name=box.closest('.figlayer').dataset.vis;
+  if(name==='art-abstract'||name==='hcards-goals'||name==='hcards-recs')return;
+  if(window.ART[name]){box.innerHTML=window.ART[name];}
+ });
+}
+
+const MOBILE_BP=900;
+const stageOrders=new WeakMap();
+
+function isMobileLayout(){
+ return innerWidth<=MOBILE_BP;
+}
+
+function rememberStageOrders(){
+ document.querySelectorAll('.scrolly:not(.scrolly-hscroll) .stage').forEach(stage=>{
+  if(stageOrders.has(stage))return;
+  const order=[...stage.children].filter(el=>el.classList.contains('figlayer')).map(el=>el.dataset.vis);
+  stageOrders.set(stage,order);
+ });
+}
+
+function ensureInlineSlot(step,vis){
+ let slot=step.nextElementSibling;
+ if(slot?.classList?.contains('inline-vis')&&slot.dataset.vis===vis)return slot;
+ slot=document.createElement('div');
+ slot.className='inline-vis';
+ slot.dataset.vis=vis;
+ step.insertAdjacentElement('afterend',slot);
+ return slot;
+}
+
+function restoreStageFiglayers(stage){
+ const meta=stage.querySelector('.stage-meta');
+ const scrolly=stage.closest('.scrolly');
+ const order=stageOrders.get(stage)||[];
+ order.forEach(vis=>{
+  const layer=scrolly?.querySelector(`.figlayer[data-vis="${vis}"]`);
+  if(layer)stage.insertBefore(layer,meta);
+ });
+}
+
+function syncGlobeHost(mobile){
+ const canvas=document.getElementById('globe');
+ const anchor=document.getElementById('globeHeroAnchor');
+ if(!canvas||!anchor)return;
+ if(mobile){
+  anchor.appendChild(canvas);
+  canvas.classList.add('globe-in-hero');
+  canvas.style.left='';
+  canvas.style.top='';
+  canvas.style.width='';
+  canvas.style.height='';
+  if(window.sovereignGlobeCtrl){
+   window.sovereignGlobeCtrl.setVisible(true);
+   window.sovereignGlobeCtrl.draw();
+  }
+  return;
+ }
+ document.body.appendChild(canvas);
+ canvas.classList.remove('globe-in-hero');
+}
+
+function syncMobileLayout(reactivate){
+ rememberStageOrders();
+ const mobile=isMobileLayout();
+ document.documentElement.classList.toggle('mobile-flow',mobile);
+ document.querySelectorAll('.scrolly:not(.scrolly-hscroll)').forEach(scrolly=>{
+  const stage=scrolly.querySelector('.stage');
+  if(!stage)return;
+  scrolly.querySelectorAll('.col-text .step[data-vis]').forEach(step=>{
+   const vis=step.dataset.vis;
+   if(mobile&&vis==='art-abstract'){
+    const slot=step.nextElementSibling;
+    if(slot?.classList.contains('inline-vis'))slot.remove();
+    return;
+   }
+   const layer=scrolly.querySelector(`.figlayer[data-vis="${vis}"]`);
+   if(!layer)return;
+   const slot=ensureInlineSlot(step,vis);
+   if(mobile){
+    slot.appendChild(layer);
+    layer.classList.add('active');
+   }
+  });
+  if(!mobile)restoreStageFiglayers(stage);
+ });
+ syncGlobeHost(mobile);
+ if(reactivate&&window.sovereignReactivateStep)window.sovereignReactivateStep();
+ if(window.sovereignGlobeReady)window.sovereignGlobeReady();
+}
+
+function initMobileFlow(){
+ rememberStageOrders();
+ let resizeTimer;
+ addEventListener('resize',()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>syncMobileLayout(true),150);
+ });
+ syncMobileLayout(false);
+}
+
 function computeGlobeRects(){
  const hero=document.getElementById('top');
- const scrolly=document.querySelector('.scrolly');
+ const scrolly=document.querySelector('.scrolly-abstract')||document.querySelector('.scrolly');
  const mobile=innerWidth<=900;
  const scrollyPad=mobile?20:32;
  const scrollyWidth=Math.min(1280,innerWidth);
@@ -672,7 +1135,7 @@ function computeGlobeRects(){
  const from={left:innerWidth-heroGs+heroGs*0.13,top:hero.offsetHeight-heroGs+heroGs*0.13,width:heroGs,height:heroGs};
  let to;
  if(mobile){
-  to={left:(innerWidth-size)/2,top:(innerHeight*0.44-size)/2,width:size,height:size};
+  to={left:(innerWidth-size)/2,top:60+(innerHeight*0.44-size)/2,width:size,height:size};
  }else{
   const mediaLeft=scrollyLeft+scrollyPad+contentW*0.42+gap;
   to={left:mediaLeft+contentW*0.58/2-size/2,top:(innerHeight-size)/2,width:size,height:size};
@@ -690,81 +1153,97 @@ function initGlobeFlight(globeCtrl){
 
  function updateGlobeFlight(){
   if(!globeCtrl||!globeCtrl.isReady())return;
-  const currentVis=window.sovereignCurrentVis||'art-abstract';
+  if(!document.documentElement.classList.contains('mobile-flow'))updateMediaDock();
   const scrollY=window.scrollY;
   const tStart=1;
   const tEnd=layout.tEnd;
 
+  if(isMobileLayout()){
+   globeCtrl.setVisible(true);
+   return;
+  }
+
   if(scrollY<tStart){
-   window.sovereignGlobeDocked=false;
    globeCtrl.setVisible(true);
    globeCtrl.setLayout(heroGlobeRect());
    return;
   }
 
-  if(currentVis!=='art-abstract'){
-   window.sovereignGlobeDocked=false;
-   globeCtrl.setVisible(false);
+  const exitStart=tEnd;
+  if(scrollY>=exitStart){
+   const gs=layout.to.width;
+   const drift=scrollY-exitStart;
+   const top=layout.to.top-drift;
+   if(top+gs<=0){
+    globeCtrl.setVisible(false);
+    return;
+   }
+   globeCtrl.setVisible(true);
+   globeCtrl.setLayout({left:layout.to.left,top,width:gs,height:gs});
+   return;
+  }
+
+  if(scrollY>=tStart){
+   globeCtrl.setVisible(true);
+   const t=Math.max(0,Math.min(1,(scrollY-tStart)/(tEnd-tStart)));
+   globeCtrl.setLayout(lerpRect(layout.from,layout.to,t));
    return;
   }
 
   globeCtrl.setVisible(true);
-  const t=Math.max(0,Math.min(1,(scrollY-tStart)/(tEnd-tStart)));
-
-  if(t>=1||window.sovereignGlobeDocked){
-   window.sovereignGlobeDocked=true;
-   globeCtrl.setLayout(layout.to);
-   return;
-  }
-
-  globeCtrl.setLayout(lerpRect(layout.from,layout.to,t));
+  globeCtrl.setLayout(heroGlobeRect());
  }
 
  window.sovereignGlobeReady=()=>{layout=computeGlobeRects();updateGlobeFlight();};
  addEventListener('scroll',updateGlobeFlight,{passive:true});
- addEventListener('resize',()=>{layout=computeGlobeRects();updateGlobeFlight();});
+ addEventListener('resize',()=>{layout=computeGlobeRects();updateGlobeFlight();updateMediaDock();updateDesireFly();});
  updateGlobeFlight();
  return updateGlobeFlight;
 }
 
 /* ---------- scrollytelling controller ---------- */
 function initScrolly(globeCtrl,updateGlobeFlight){
- const steps=[...document.querySelectorAll('.step')];
- const layers={};document.querySelectorAll('.figlayer').forEach(l=>layers[l.dataset.vis]=l);
- const total=steps.length;document.getElementById('stepTotal').textContent=String(total).padStart(2,'0');
- const sectionEl=document.getElementById('stageSection');const countEl=document.getElementById('stepCount');
+ const steps=[...document.querySelectorAll('.scrolly:not(.scrolly-hscroll) .step, .scrolly-hscroll .hscroll-header.step')];
+ const total=steps.length;
+ document.querySelectorAll('.step-total').forEach(el=>{el.textContent=String(total).padStart(2,'0');});
  let current=null;
  function activate(step){
   const vis=step.dataset.vis;if(vis===current)return;current=vis;
   window.sovereignCurrentVis=vis;
-  Object.values(layers).forEach(l=>l.classList.remove('active'));
-  if(layers[vis])layers[vis].classList.add('active');
-  sectionEl.textContent=step.dataset.section||'';
-  countEl.textContent=String(steps.indexOf(step)+1).padStart(2,'0');
-  if(vis==='art-abstract'&&window.scrollY>=document.querySelector('.scrolly').offsetTop){
-   window.sovereignGlobeDocked=true;
+  const scrolly=step.closest('.scrolly');
+  if(!document.documentElement.classList.contains('mobile-flow')){
+   document.querySelectorAll('.figlayer.active').forEach(l=>l.classList.remove('active'));
+   const layer=scrolly?.querySelector(`.figlayer[data-vis="${vis}"]`);
+   if(layer)layer.classList.add('active');
   }
+  const countEl=scrolly?.querySelector('.step-count');
+  if(countEl)countEl.textContent=String(steps.indexOf(step)+1).padStart(2,'0');
+  updateMediaDock();
+  updateDesireFly();
   if(globeCtrl&&updateGlobeFlight)updateGlobeFlight();
  }
+ window.sovereignReactivateStep=()=>{current=null;activate(steps.find(s=>{const r=s.getBoundingClientRect();return r.top<innerHeight*0.52&&r.bottom>innerHeight*0.48;})||steps[0]);};
  const io=new IntersectionObserver(es=>{
   es.forEach(en=>{if(en.isIntersecting)activate(en.target);});
  },{rootMargin:'-48% 0px -48% 0px',threshold:0});
  steps.forEach(s=>io.observe(s));
  activate(steps[0]);
+ addEventListener('scroll',()=>{updateMediaDock();updateDesireFly();},{passive:true});
 }
 
-/* ---------- progress ---------- */
-function initProgress(){
- const pb=document.getElementById('progbar');
- const on=()=>{const h=document.documentElement,sc=h.scrollTop,max=h.scrollHeight-h.clientHeight;pb.style.width=(max>0?sc/max*100:0)+'%';};
+/* ---------- header + progress ---------- */
+function initChrome(){
+ const header=document.getElementById('siteHeader'),pb=document.getElementById('progbar');
+ const on=()=>{const h=document.documentElement,sc=h.scrollTop,max=h.scrollHeight-h.clientHeight;pb.style.width=(max>0?sc/max*100:0)+'%';header.classList.toggle('scrolled',sc>360);};
  addEventListener('scroll',on,{passive:true});on();
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
  const globeCtrl=typeof initGlobe==='function'?initGlobe(document.getElementById('globe')):null;
+ window.sovereignGlobeCtrl=globeCtrl;
  const updateGlobeFlight=globeCtrl?initGlobeFlight(globeCtrl):null;
- renderDC();renderPub();renderDonut();renderClaude();renderGemControls();
- injectArt();initScrolly(globeCtrl,updateGlobeFlight);initProgress();
+ renderDC();renderPub();renderGemControls();renderGlmControls();
+ injectArt();initMobileFlow();initScrolly(globeCtrl,updateGlobeFlight);initHScrollSections();initChrome();
 });
 </script>
 </body>
