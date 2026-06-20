@@ -7,6 +7,7 @@ import requests
 from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import (
+    FileResponse,
     RedirectResponse,
     HTMLResponse,
     PlainTextResponse,
@@ -25,23 +26,9 @@ from routers.custom_api_router import CustomAPIRouter
 app = CustomAPIRouter()
 
 
-@gui.route(app, "/sovereign/")
-def sovereign_page(request: Request):
-    from routers.root import get_og_url_path
-    from daras_ai_v2.meta_content import raw_build_meta_tags
-
-    gui.component("SovereignPage")
-    return dict(
-        meta=raw_build_meta_tags(
-            url=get_og_url_path(request),
-            title="How Middle Powers Cooperate for AI Sovereignty — Gooey.AI",
-            description=(
-                "A scrollytelling essay on what AI sovereignty means and how "
-                "middle powers can achieve it together. By Sean Blagsvedt & "
-                "Archana Prasad, Gooey.AI."
-            ),
-        )
-    )
+@app.get("/sovereignty/", include_in_schema=False)
+def sovereign_page():
+    return FileResponse("static/sovereign/sovereign.html")
 
 
 def serve_static_file(request: Request) -> Response | None:
