@@ -10,9 +10,7 @@ from decouple import config
 from fastapi import FastAPI
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
-from starlette._utils import is_async_callable
 from starlette.exceptions import HTTPException
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -128,12 +126,6 @@ app.add_middleware(
 )
 app.add_middleware(AuthenticationMiddleware, backend=SessionAuthBackend())
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
-
-# monkey patch to make django db work with fastapi
-for route in app.routes:
-    if isinstance(route, APIRoute) and not is_async_callable(route.endpoint):
-        route.endpoint = db_middleware(route.endpoint)
-
 
 if config("ROBOTS_NOINDEX", default=False, cast=bool):
 

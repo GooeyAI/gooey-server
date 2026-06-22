@@ -957,7 +957,11 @@ class RecipeTabs(TabData, Enum):
     )
 
     def url_path(
-        self, page_slug: str, run_slug: str = None, example_id: str = None, **kwargs
+        self,
+        page_slug: str,
+        run_slug: str | None = None,
+        example_id: str | None = None,
+        **kwargs,
     ) -> str:
         kwargs["page_slug"] = page_slug
         if example_id:

@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.functions import Upper
+from django.utils.text import slugify
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
@@ -230,9 +231,11 @@ class PublishedRun(models.Model):
             tags=list(self.tags.all()),
         )
 
-    def get_app_url(self, query_params: dict = None):
-        return Workflow(self.workflow).page_cls.app_url(
-            example_id=self.published_run_id, query_params=query_params
+    def get_app_url(self, query_params: dict | None = None):
+        return Workflow(self.workflow).page_cls.raw_app_url(
+            query_params=query_params,
+            example_id=self.published_run_id,
+            run_slug=slugify(self.title),
         )
 
     def add_version(

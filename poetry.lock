@@ -1317,6 +1317,26 @@ Django = "*"
 packaging = "*"
 
 [[package]]
+name = "django-silky"
+version = "1.2.2"
+description = "Silky smooth profiling for the Django Framework — modernized UI fork of django-silk"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "django_silky-1.2.2-py3-none-any.whl", hash = "sha256:247715afb6d573bbf7fd5614f84cd7dbe676342064dab7a36225c5315033448e"},
+    {file = "django_silky-1.2.2.tar.gz", hash = "sha256:bdd30841b49fdace88a24003af1f20b37a7d3040b87228cee617ec1f9623043e"},
+]
+
+[package.dependencies]
+Django = ">=4.2"
+gprof2dot = ">=2017.09.19"
+sqlparse = "*"
+
+[package.extras]
+formatting = ["autopep8"]
+
+[[package]]
 name = "docker"
 version = "7.0.0"
 description = "A Python library for the Docker Engine API."
@@ -2118,6 +2138,18 @@ protobuf = ">=3.20.2,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4
 
 [package.extras]
 grpc = ["grpcio (>=1.44.0,<2.0.0)"]
+
+[[package]]
+name = "gprof2dot"
+version = "2025.4.14"
+description = "Generate a dot graph from the output of several profilers."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "gprof2dot-2025.4.14-py3-none-any.whl", hash = "sha256:0742e4c0b4409a5e8777e739388a11e1ed3750be86895655312ea7c20bd0090e"},
+    {file = "gprof2dot-2025.4.14.tar.gz", hash = "sha256:35743e2d2ca027bf48fa7cba37021aaf4a27beeae1ae8e05a50b55f1f921a6ce"},
+]
 
 [[package]]
 name = "greenlet"
@@ -8060,4 +8092,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "86114facb1d925ae59a8cf39e60a0a55de60a588c5380718e3605961819235a6"
+content-hash = "707fafd6badb5ab6335856c54aeeeea2aa374bea822e500d853d8e3d1c055bda"

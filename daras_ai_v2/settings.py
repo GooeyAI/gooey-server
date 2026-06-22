@@ -82,6 +82,8 @@ INSTALLED_APPS = [
     "memory",
     "cms",
 ]
+if DEBUG:
+    INSTALLED_APPS.append("silk")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -95,6 +97,11 @@ MIDDLEWARE = [
     "csp.middleware.CSPMiddleware",
     # "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
+if DEBUG:
+    MIDDLEWARE.append("silk.middleware.SilkyMiddleware")
+    SILKY_PYTHON_PROFILER = True
+    SILKY_PYTHON_PROFILER_BINARY = True
+    SILKY_META = True
 
 ROOT_URLCONF = "gooeysite.urls"
 

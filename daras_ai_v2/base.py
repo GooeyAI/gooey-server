@@ -245,8 +245,6 @@ class BasePage:
         query_params: dict[str, str] | None = None,
         path_params: dict | None = None,
     ) -> str:
-        if not tab:
-            tab = RecipeTabs.run
         if query_params is None:
             query_params = {}
 
@@ -256,7 +254,7 @@ class BasePage:
 
         # old urls had example_id as a query param
         example_id = example_id or q_example_id
-        run_slug = None
+        run_slug: str | None = None
         if example_id:
             try:
                 pr = cls.get_pr_from_example_id(example_id=example_id)
@@ -265,6 +263,26 @@ class BasePage:
             if pr and pr.title:
                 run_slug = slugify(pr.title)
 
+        return cls.raw_app_url(
+            query_params=query_params,
+            example_id=example_id,
+            run_slug=run_slug,
+            tab=tab,
+            path_params=path_params,
+        )
+
+    @classmethod
+    def raw_app_url(
+        cls,
+        *,
+        query_params: dict | None = None,
+        example_id: str | None = None,
+        run_slug: str | None = None,
+        tab: RecipeTabs | None = None,
+        path_params: dict | None = None,
+    ):
+        if not tab:
+            tab = RecipeTabs.run
         return str(
             furl(settings.APP_BASE_URL, query_params=query_params)
             / tab.url_path(

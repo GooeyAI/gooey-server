@@ -231,12 +231,10 @@ class SavedRun(models.Model):
     def parent_published_run(self) -> PublishedRun | None:
         return self.parent_version and self.parent_version.published_run
 
-    def get_app_url(self, query_params: dict = None):
-        return Workflow(self.workflow).page_cls.app_url(
-            example_id=self.example_id,
-            run_id=self.run_id,
-            uid=self.uid,
-            query_params=query_params,
+    def get_app_url(self, query_params: dict | None = None):
+        query_params = query_params or {}
+        return Workflow(self.workflow).page_cls.raw_app_url(
+            query_params=query_params | dict(run_id=self.run_id, uid=self.uid),
         )
 
     def to_dict(self) -> dict:
