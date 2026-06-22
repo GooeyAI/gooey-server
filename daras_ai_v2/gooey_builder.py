@@ -255,6 +255,7 @@ class FetchConversations(pydantic.BaseModel):
     # Optional workflow filter. None lists builder conversations across all workflows.
     workflow: int | None = None
 
+
 class WidgetRunMetadata(pydantic.BaseModel):
     title: str
     icon: str | None = None
@@ -266,6 +267,7 @@ class WidgetConversation(pydantic.BaseModel):
     timestamp: str
     url: str
     run_metadata: WidgetRunMetadata | None = None
+
 
 @router.post(
     "/__/gooey-builder/fetch-conversations", dependencies=[fastapi_login_required]

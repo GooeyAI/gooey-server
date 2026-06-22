@@ -587,12 +587,19 @@ class SavedRunAdmin(GooeyModelAdmin):
             f"Started re-running {queryset.count()} tasks in the background.",
         )
 
+
 class RunConversationMessageInline(admin.TabularInline):
     model = SavedRun
     fk_name = "conversation"
     extra = 0
     can_delete = False
-    fields = ["view_run", "view_input_prompt", "view_output_text", "view_user", "updated_at"]
+    fields = [
+        "view_run",
+        "view_input_prompt",
+        "view_output_text",
+        "view_user",
+        "updated_at",
+    ]
     readonly_fields = fields
     ordering = ["-created_at"]
 
