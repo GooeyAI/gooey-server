@@ -136,7 +136,9 @@ export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
       </div>
 
       <div className="d-flex flex-column p-3 gap-2 border-top">
-        <span className="text-break line-clamp-1 m-0">{card.title}</span>
+        <span className="text-break text-truncate line-clamp-1 m-0">
+          {card.title}
+        </span>
         <div className="d-flex align-items-center gap-1 small">
           <CardAuthor author={card.author} />
           {hasAuthor && card.updated_at && <span>·</span>}
@@ -229,7 +231,6 @@ export function SavedWorkflowCard({ card }: { card: WorkflowCardData }) {
 }
 
 export function WorkflowPickerCard({ card }: { card: WorkflowCardData }) {
-  const hasAuthor = !!(card.author?.photo_url || card.author?.name);
   const fallbackLetter = (card.title.trim().charAt(0) || "?").toUpperCase();
 
   return (
@@ -239,20 +240,22 @@ export function WorkflowPickerCard({ card }: { card: WorkflowCardData }) {
     >
       <div className="flex-grow-1 d-flex flex-column justify-content-between min-w-0">
         <div>
-          <LineClamp lines={1} expandable={false}>
+          <LineClamp lines={2} expandable={false}>
             <span className="fw-bold text-break m-0 bold">{card.title}</span>
           </LineClamp>
           {card.description && (
-            <div className="text-muted small line-clamp-2 text-break">
-              {card.description}
+            <div className="text-muted small text-break">
+              <LineClamp lines={3} expandable={false}>
+                {card.description}
+              </LineClamp>
             </div>
           )}
         </div>
-        {hasAuthor && (
+        {/* {hasAuthor && (
           <div className="small text-muted">
             <CardAuthor author={card.author} />
           </div>
-        )}
+        )} */}
       </div>
 
       <div className="flex-shrink-0 align-self-center starter-thumb overflow-hidden rounded bg-light p-0">
@@ -277,23 +280,32 @@ export function WorkflowPicker({ tabs }: { tabs: WorkflowTabData[] }) {
     <section className="mb-5">
       <h4 className="mb-4">What will you build today?</h4>
 
-      <div className="d-inline-flex p-1 rounded-pill mb-4 gap-1 align-items-center bg-light">
-        {tabs.map((tab, i) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={
-              "btn rounded-pill px-3 py-2 border-0 d-flex align-items-center gap-2 text-body workflow-tab-pill " +
-              (i === activeIdx ? "bg-white active" : "bg-transparent")
-            }
-            onClick={() => setActiveIdx(i)}
-          >
-            {tab.icon && (
-              <span dangerouslySetInnerHTML={{ __html: tab.icon }} />
-            )}
-            {tab.title}
-          </button>
-        ))}
+      <div className="overflow-auto mb-4 workflow-tab-scroll">
+        <div className="d-inline-flex p-1 rounded-pill gap-1 align-items-center bg-light">
+          {tabs.map((tab, i) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={
+                "btn rounded-pill px-3 py-2 border-0 d-flex align-items-center gap-2 text-body text-nowrap flex-shrink-0 workflow-tab-pill " +
+                (i === activeIdx ? "bg-white active" : "bg-transparent")
+              }
+              onClick={(e) => {
+                setActiveIdx(i);
+                e.currentTarget.scrollIntoView({
+                  behavior: "smooth",
+                  inline: "nearest",
+                  block: "nearest",
+                });
+              }}
+            >
+              {tab.icon && (
+                <span dangerouslySetInnerHTML={{ __html: tab.icon }} />
+              )}
+              {tab.title}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div key={activeTab.id}>
