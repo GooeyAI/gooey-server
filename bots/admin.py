@@ -587,21 +587,20 @@ class SavedRunAdmin(GooeyModelAdmin):
             f"Started re-running {queryset.count()} tasks in the background.",
         )
 
-
 class RunConversationMessageInline(admin.TabularInline):
     model = SavedRun
     fk_name = "conversation"
     extra = 0
     can_delete = False
-    fields = ["view_run", "view_input_prompt", "view_user", "view_published_run"]
+    fields = ["view_run", "view_input_prompt", "view_output_text", "view_user", "updated_at"]
     readonly_fields = fields
-    ordering = ["created_at"]
+    ordering = ["-created_at"]
 
     def has_add_permission(self, request, obj):
         return False
 
     def get_queryset(self, request):
-        return super().get_queryset(request).order_by("created_at")
+        return super().get_queryset(request).order_by("-created_at")
 
     @admin.display(description="Run")
     def view_run(self, sr: SavedRun):
@@ -611,15 +610,18 @@ class RunConversationMessageInline(admin.TabularInline):
     def view_input_prompt(self, sr: SavedRun):
         return (sr.state or {}).get("input_prompt") or ""
 
+    @admin.display(description="Output Text")
+    def view_output_text(self, sr: SavedRun):
+        from daras_ai.image_input import truncate_text_words
+
+        state = sr.state or {}
+        output = state.get("raw_output_text") or state.get("output_text") or []
+        return truncate_text_words(output[0] if output else "", 100)
+
     @admin.display(description="User")
     def view_user(self, sr: SavedRun):
         user = AppUser.objects.filter(uid=sr.uid).first()
         return user and change_obj_url(user)
-
-    @admin.display(description="Published Run")
-    def view_published_run(self, sr: SavedRun):
-        pr = sr.parent_published_run()
-        return pr and change_obj_url(pr)
 
 
 @admin.register(RunConversation)

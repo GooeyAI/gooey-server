@@ -226,9 +226,10 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
     # conversation, or to a specific prior builder turn when continuing -- so
     # comparing the resolved run against the published template is the real signal.
     is_continuation = builder_sr != builder_pr.saved_run
+    new_builder_sr = workflow_sr.parent_builder_saved_run
     RunConversation.attach_run(
-        sr=workflow_sr,
-        parent_sr=prev_child,
+        sr=new_builder_sr,
+        parent_sr=prev_child.parent_builder_saved_run,
         is_continuation=is_continuation,
         surface=SavedRun.Surface.builder_child,
         title=request_body.get("input_prompt") or "",
