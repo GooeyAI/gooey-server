@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import typing
-from typing import Any
 
 import pydantic
 
@@ -255,13 +254,24 @@ class FetchConversations(pydantic.BaseModel):
     # Optional workflow filter. None lists builder conversations across all workflows.
     workflow: int | None = None
 
+class WidgetRunMetadata(pydantic.BaseModel):
+    title: str
+    icon: str | None = None
+    emoji: str | None = None
+
+
+class WidgetConversation(pydantic.BaseModel):
+    title: str
+    timestamp: str
+    url: str
+    run_metadata: WidgetRunMetadata | None = None
 
 @router.post(
     "/__/gooey-builder/fetch-conversations", dependencies=[fastapi_login_required]
 )
 def fetch_builder_conversations(
     request: fastapi.Request, body: FetchConversations
-) -> list[dict]:
+) -> list[WidgetConversation]:
     from bots.models import RunConversation
 
     qs = RunConversation.objects.for_listing(
@@ -269,13 +279,13 @@ def fetch_builder_conversations(
         surface=SavedRun.Surface.builder_child,
         uid=request.user.uid,
     ).order_by("-updated_at")[: body.limit]
-    return export_run_conversations(qs, include_workflow=True)
+    return export_run_conversations(qs, include_run_metadata=True)
 
 
 @router.post("/__/agent/fetch-conversations", dependencies=[fastapi_login_required])
 def fetch_chat_conversations(
     request: fastapi.Request, body: FetchConversations
-) -> list[dict]:
+) -> list[WidgetConversation]:
     from bots.models import RunConversation
     from daras_ai_v2.workflow_url_input import url_to_runs
 
@@ -300,25 +310,30 @@ def fetch_chat_conversations(
 
 
 def export_run_conversations(
-    qs, include_workflow: bool = False
-) -> list[dict[str, Any]]:
+    qs, include_run_metadata: bool = False
+) -> list[WidgetConversation]:
     return [
-        _export_run_conversation(convo, include_workflow)
+        _export_run_conversation(convo, include_run_metadata)
         for convo in qs.select_related("last_run__parent_version__published_run")
     ]
 
 
-def _export_run_conversation(convo, include_workflow: bool = False) -> dict[str, Any]:
+def _export_run_conversation(
+    convo, include_run_metadata: bool = False
+) -> WidgetConversation:
     sr = convo.last_run
     pr = sr and sr.parent_published_run()
-    result = dict(
+    result = WidgetConversation(
         title=convo.title or "",
         timestamp=convo.updated_at.isoformat(),
         url=sr.get_app_url() if sr else "",
     )
-    if include_workflow:
-        result["secondaryTitle"] = _last_run_title(sr, pr)
-        result["icon"] = _last_run_photo(sr, pr)
+    if include_run_metadata:
+        result.run_metadata = WidgetRunMetadata(
+            title=_last_run_title(sr, pr),
+            icon=_last_run_photo(sr, pr),
+            emoji=Workflow(sr.workflow).emoji if sr else None,
+        )
     return result
 
 
