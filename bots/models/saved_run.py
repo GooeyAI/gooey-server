@@ -413,6 +413,7 @@ class SavedRun(models.Model):
             error_type=self.error_type,
             error_params=self.error_params,
             price=self.price,
+            conversation_id=self.conversation_id,
             **kwargs,
         )
 
