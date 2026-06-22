@@ -303,7 +303,8 @@ def fetch_chat_conversations(
             workspace=get_current_workspace(request.user, request.session),
             surface=SavedRun.Surface.run,
         )
-        .filter(last_run__parent_version__published_run=pr)
+        .filter(messages__parent_version__published_run=pr)
+        .distinct()
         .order_by("-updated_at")[: body.limit]
     )
     return export_run_conversations(qs)
