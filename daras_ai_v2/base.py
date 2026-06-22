@@ -2218,7 +2218,7 @@ class BasePage:
 
         self.dump_state_to_sr(self._get_validated_state(), sr)
 
-        if self.supports_conversations:
+        if self.supports_conversations and sr.surface == SavedRun.Surface.run:
             from bots.models import RunConversation
 
             RunConversation.attach_run(

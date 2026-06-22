@@ -82,7 +82,7 @@ class RunConversation(models.Model):
         else:
             convo = cls.objects.create(
                 workspace_id=sr.workspace_id,
-                uid=sr.uid,
+                uid=sr.uid or "",
                 workflow=sr.workflow,
                 surface=surface,
                 title=title,
