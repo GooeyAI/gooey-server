@@ -50,8 +50,6 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
     "Marketing & SEO": [
         RelatedQnAPage,
         SEOSummaryPage,
-        GoogleGPTPage,
-        SocialLookupEmailPage,
     ],
     "LLMs, RAG, & Synthetic Data": [
         BulkRunnerPage,
@@ -59,7 +57,6 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         DocExtractPage,
         CompareLLMPage,
         DocSearchPage,
-        SmartGPTPage,
         DocSummaryPage,
         FunctionsPage,
     ],
@@ -70,16 +67,11 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         TextToSpeechPage,
         AsrPage,
         Text2AudioPage,
-        TranslationPage,
     ],
     "Images": [
         Img2ImgPage,
         CompareText2ImgPage,
-        ObjectInpaintingPage,
         FaceInpaintingPage,
-        EmailFaceInpaintingPage,
-        GoogleImageGenPage,
-        ImageSegmentationPage,
         CompareUpscalerPage,
         ModelTrainerPage,
     ],
@@ -97,9 +89,17 @@ all_hidden_pages = [
 # exposed as API
 all_api_pages = all_home_pages.copy() + [
     ChyronPlantPage,
+    EmailFaceInpaintingPage,
+    GoogleGPTPage,
+    GoogleImageGenPage,
+    ImageSegmentationPage,
     LetterWriterPage,
     EmbeddingsPage,
+    ObjectInpaintingPage,
     RelatedQnADocPage,
+    SmartGPTPage,
+    SocialLookupEmailPage,
+    TranslationPage,
 ]
 
 # pytest suite
