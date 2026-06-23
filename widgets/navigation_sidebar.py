@@ -10,7 +10,7 @@ from gooey_gui.types.navigation_sidebar_props import (
 )
 
 
-def build_props(request: Request) -> NavigationSidebarProps:
+def build_props(request: Request, default_collapsed: bool = False) -> NavigationSidebarProps:
     from routers.root import explore_page, home_page
     from routers.account import saved_route
 
@@ -53,4 +53,5 @@ def build_props(request: Request) -> NavigationSidebarProps:
         ],
         active_key=active_key,
         new_href="/explore2/",
+        default_collapsed=default_collapsed,
     )

@@ -841,11 +841,21 @@ def side_bar_page_wrapper(
         disabled=not display_gooey_builder,
     )
 
+    # Persist collapse state: read from session_state (set by React onChange),
+    # fall back to session (previously persisted), write back to session.
+    _nav_collapsed_key = "nav-sidebar:default-collapsed"
+    try:
+        default_collapsed = request.session[_nav_collapsed_key] = gui.session_state[
+            _nav_collapsed_key
+        ]
+    except KeyError:
+        default_collapsed = request.session.get(_nav_collapsed_key, False)
+
     with page_content, gui.div(className="d-flex min-vh-100 w-100"):
         gui.html(templates.get_template("gtag.html").render(**context))
 
         # Left nav rail
-        gui.model_component(build_props(request))
+        gui.model_component(build_props(request, default_collapsed=default_collapsed))
 
         # Main content area
         with gui.div(className="d-flex flex-column flex-grow-1 min-w-0"):
