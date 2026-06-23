@@ -115,6 +115,36 @@ def test_attach_run_does_not_continue_across_surface(test_workspace, test_user):
     assert RunConversation.objects.count() == 2
 
 
+def test_attach_run_is_atomic_on_failure(test_workspace, test_user, monkeypatch):
+    """A failure on the second write must roll back the first, leaving no half state.
+
+    Uses the continuation path so the conversation already exists: sr.save()
+    (the first write) succeeds, then convo.save() (the second) blows up. Without
+    the transaction the run would be left pointing at a conversation whose head
+    was never advanced.
+    """
+    parent = _make_run(workspace=test_workspace, uid=test_user.uid, run_id="p_atomic")
+    parent_convo = _attach(parent, parent_sr=None, title="thread")
+
+    child = _make_run(workspace=test_workspace, uid=test_user.uid, run_id="c_atomic")
+
+    # Patch only after the parent conversation exists, so attach() reuses it
+    # (no create()) and reaches the final convo.save().
+    def boom(self, *args, **kwargs):
+        raise RuntimeError("simulated failure after run is linked")
+
+    monkeypatch.setattr(RunConversation, "save", boom)
+
+    with pytest.raises(RuntimeError):
+        _attach(child, parent_sr=parent)
+
+    # The child's sr.save() must have rolled back: no dangling link, head unmoved.
+    child.refresh_from_db()
+    parent_convo.refresh_from_db()
+    assert child.conversation_id is None
+    assert parent_convo.last_run_id == parent.id
+
+
 def test_attach_run_does_not_continue_across_workflow(test_workspace, test_user):
     parent = _make_run(workspace=test_workspace, uid=test_user.uid, run_id="p5")
     parent_convo = _attach(parent, parent_sr=None)
