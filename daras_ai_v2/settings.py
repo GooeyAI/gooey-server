@@ -287,6 +287,12 @@ GCP_REGION = config("GCP_REGION", default="")
 
 GS_MEDIA_PATH = config("GS_MEDIA_PATH", default="daras_ai/media")
 GS_STATIC_PATH = config("GS_STATIC_PATH", default="gooeyai/static")
+
+# Cloudflare Pages site that hosts our static html pages (e.g. /sovereign).
+# Unmatched urls are proxied here by routers.static_pages.serve_static_file.
+CLOUDFLARE_PAGES_URL = config(
+    "CLOUDFLARE_PAGES_URL", default="https://gooey-static-pages.pages.dev"
+)
 MAX_UPLOAD_SIZE = config("MAX_UPLOAD_SIZE", default=1024 * 1024 * 250, cast=int)
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")

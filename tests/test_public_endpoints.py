@@ -17,7 +17,6 @@ from daras_ai_v2.fastapi_tricks import get_route_path
 from routers import facebook_api
 from routers.root import RecipeTabs, integrations_stats_route
 from routers.slack_api import slack_connect_redirect, slack_connect_redirect_shortcuts
-from routers.static_pages import webflow_upload
 from server import app
 
 client = TestClient(app)
@@ -28,7 +27,6 @@ excluded_endpoints = [
     slack_connect_redirect_shortcuts.__name__,
     "get_run_status",  # needs query params
     "get_balance",  # needs authentication
-    webflow_upload.__name__,  # needs admin authentication
 ]
 
 route_paths = [
