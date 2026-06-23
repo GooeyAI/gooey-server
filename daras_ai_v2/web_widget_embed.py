@@ -198,23 +198,30 @@ def get_builder_conversation_messages(conversation: "RunConversation") -> list[d
     """Replay a builder conversation from its turns, one message pair per turn,
     each carrying the exact point-in-time URLs.
 
-    saved_run_url   -> the workflow snapshot (builder_child) at that turn
-    builder_run_url -> the builder agent run (builder_prompt) that produced it
+    A turn's message *is* the builder_prompt (agent) run -- the conversation log
+    shows what was said, not what was built (see RunConversation.attach_run call
+    in gooey_builder.py). For each prompt run:
+
+    builder_run_url -> the builder agent run (builder_prompt) itself
+    saved_run_url   -> the workflow snapshot (builder_child) that turn produced,
+                       reached via the reverse FK child_builder_saved_runs
     """
     from daras_ai_v2.bots import parse_bot_html
 
     messages: list[dict] = []
-    turns = conversation.messages.select_related("parent_builder_saved_run").order_by(
-        "created_at"
-    )
-    for child in turns:
-        prompt_sr = child.parent_builder_saved_run
-        if prompt_sr is None:
-            continue
+    prompt_runs = conversation.messages.prefetch_related(
+        "child_builder_saved_runs"
+    ).order_by("created_at")
+    for prompt_sr in prompt_runs:
         state = prompt_sr.state or {}
         input_prompt = state.get("input_prompt") or ""
         raw_output = state.get("raw_output_text") or state.get("output_text") or [""]
         output_text = raw_output[0] if raw_output else ""
+
+        # The workflow snapshot this prompt produced (1:1 in the builder path).
+        children = list(prompt_sr.child_builder_saved_runs.all())
+        child = children[0] if children else None
+
         messages.append(
             dict(
                 role=CHATML_ROLE_USER,
@@ -228,7 +235,7 @@ def get_builder_conversation_messages(conversation: "RunConversation") -> list[d
                 type="final_response",
                 status="completed",
                 output_text=[parse_bot_html(output_text)[1]],
-                saved_run_url=child.get_app_url(),
+                saved_run_url=child.get_app_url() if child else None,
                 builder_run_url=prompt_sr.get_app_url(),
             )
         )
