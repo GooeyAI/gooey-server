@@ -19,4 +19,5 @@ export * from "./HomePage";
 export * from "./InsufficientCredits";
 export * from "./LoginForm";
 export * from "./PaymentRequired";
+export * from "./NavigationSidebar";
 export * from "./Sidebar";
