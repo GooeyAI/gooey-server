@@ -33,10 +33,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='runconversation',
-            index=models.Index(fields=['workflow', 'workspace', 'surface', '-updated_at'], name='bots_runcon_workflo_e34598_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='runconversation',
-            index=models.Index(fields=['workflow', 'uid', 'surface', '-updated_at'], name='bots_runcon_workflo_596447_idx'),
+            index=models.Index(fields=['workspace', 'surface', 'uid', '-updated_at'], name='bots_runcon_workspa_31c3c5_idx'),
         ),
     ]
