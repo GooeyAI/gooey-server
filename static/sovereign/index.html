@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- GOOEY-BASE-HREF -->
     <title>How Middle Powers Cooperate for AI Sovereignty — Gooey.AI</title>
     <meta
       name="description"
@@ -36,9 +37,9 @@
       @font-face {
         font-family: "Domine";
         src:
-          url("/static/sovereign/assets/fonts/Domine-VariableFont_wght.ttf")
+          url("assets/fonts/Domine-VariableFont_wght.ttf")
             format("truetype-variations"),
-          url("/static/sovereign/assets/fonts/Domine-VariableFont_wght.ttf")
+          url("assets/fonts/Domine-VariableFont_wght.ttf")
             format("truetype");
         font-weight: 400 700;
         font-style: normal;
@@ -157,6 +158,30 @@
       }
       .site-header.scrolled .h-title {
         opacity: 1;
+      }
+      .site-header .login-btn {
+        margin-left: auto;
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        padding: 9px 22px;
+        border-radius: 12px;
+        background: transparent;
+        color: var(--gy-ink);
+        border: 1.5px solid var(--gy-line);
+        font-family: var(--gy-font-sans);
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1;
+        text-decoration: none;
+        white-space: nowrap;
+        transition:
+          border-color 0.15s ease,
+          background 0.15s ease;
+      }
+      .site-header .login-btn:hover {
+        border-color: var(--gy-line-strong);
+        background: var(--gy-surface-100);
       }
 
       /* HERO */
@@ -1543,11 +1568,14 @@
     <header class="site-header" id="siteHeader">
       <img
         class="logo"
-        src="/static/sovereign/assets/gooey-logo.png"
+        src="assets/gooey-logo.png"
         alt="Gooey.AI"
       />
       <span class="h-title"
         >How Middle Powers Cooperate for AI Sovereignty</span
+      >
+      <a class="login-btn" href="https://gooey.ai/login/"
+        >Login</a
       >
     </header>
 
@@ -1560,13 +1588,13 @@
         <div class="hero-authors">
           <div class="faces">
             <img
-              src="/static/sovereign/assets/sean-blagsvedt.jpg"
+              src="assets/sean-blagsvedt.jpg"
               width="56"
               height="56"
               alt="Sean Blagsvedt"
             />
             <img
-              src="/static/sovereign/assets/archana-prasad.jpg"
+              src="assets/archana-prasad.jpg"
               width="56"
               height="56"
               alt="Archana Prasad"
@@ -1637,7 +1665,7 @@
       >
         <figure class="step-img-slide-figure">
           <img
-            src="/static/sovereign/images/image42.png"
+            src="images/image42.png"
             alt="How Middle Powers Cooperate for AI Sovereignty — infographic summarizing AI sovereignty goals and recommendations"
           />
         </figure>
@@ -1753,7 +1781,7 @@
           </figure>
           <figure class="figlayer" data-vis="img-wright">
             <img
-              src="/static/sovereign/images/image1.png"
+              src="images/image1.png"
               alt="Nonzero: The Logic of Human Destiny by Robert Wright"
             />
             <figcaption>
@@ -1873,7 +1901,7 @@
         <div class="hscroll-track" aria-label="Goals — scroll horizontally">
           <article class="hcard">
             <img
-              src="/static/sovereign/images/image13.png"
+              src="images/image13.png"
               alt="Beneficial to local citizens, communities, and businesses"
             />
             <h3>Beneficial to local citizens, communities, and businesses</h3>
@@ -1884,7 +1912,7 @@
           </article>
           <article class="hcard">
             <img
-              src="/static/sovereign/images/image6.png"
+              src="images/image6.png"
               alt="Reflective of local languages, culture, and productivity needs"
             />
             <h3>
@@ -1908,7 +1936,7 @@
           </article>
           <article class="hcard">
             <img
-              src="/static/sovereign/images/image17.png"
+              src="images/image17.png"
               alt="Not extractive, surveilled nor suspendable by other nations"
             />
             <h3>Not extractive, surveilled nor suspendable by other nations</h3>
@@ -1937,7 +1965,7 @@
           </article>
           <article class="hcard">
             <img
-              src="/static/sovereign/images/image46.png"
+              src="images/image46.png"
               alt="World map showing AI workflows and expertise spreading across Germany, Nigeria, Kenya, India, Indonesia, and Brazil"
             />
             <h3>Positively impactful with benefits and expertise spreading</h3>
@@ -1980,7 +2008,7 @@
           </figure>
           <figure class="figlayer" data-vis="chart-gemini">
             <img
-              src="/static/sovereign/images/image43.png"
+              src="images/image43.png"
               alt="Gemini 3.5 Flash performance benchmarks — coding, agentic, UI control, expert tasks, multimodal, long context, and reasoning"
             />
             <figcaption>
@@ -1995,7 +2023,7 @@
           </figure>
           <figure class="figlayer" data-vis="chart-glm">
             <img
-              src="/static/sovereign/images/image44.png"
+              src="images/image44.png"
               alt="LLM Performance Evaluation — GLM 5.2 benchmarks across SWE-bench Pro, Terminal-Bench, NL2Repo, DeepSWE, ProgramBench, MCP-Atlas, Tool-Decathlon, and Humanity's Last Exam"
             />
             <figcaption>
@@ -2010,7 +2038,7 @@
           </figure>
           <figure class="figlayer" data-vis="img-bench">
             <img
-              src="/static/sovereign/images/image22.png"
+              src="images/image22.png"
               alt="Benchmark opportunity for middle powers — agriculture and local productivity"
             />
           </figure>
@@ -2018,18 +2046,18 @@
           <figure class="figlayer" data-vis="img-culture7">
             <div class="culture-stack">
               <img
-                src="/static/sovereign/images/image26.png"
+                src="images/image26.png"
                 alt="Van Gogh landscape vs Kamala Harris in the style of Van Gogh (DALL·E 3)"
               />
               <img
-                src="/static/sovereign/images/image27.png"
+                src="images/image27.png"
                 alt="Madhubani painting vs Kamala Harris in the style of a Madhubani painting"
               />
             </div>
           </figure>
           <figure class="figlayer" data-vis="img-culture8">
             <img
-              src="/static/sovereign/images/image36.gif"
+              src="images/image36.gif"
               alt="Indian miniature-style painting — two women in traditional dress riding a motorcycle past a street scene"
             />
             <figcaption>
@@ -2264,7 +2292,7 @@
               </p>
               <figure class="step-text-cols-figure">
                 <img
-                  src="/static/sovereign/images/image45.png"
+                  src="images/image45.png"
                   alt="Hausa Evaluation of Audio AI Models — accuracy vs latency scatter plot comparing AI models on Hausa language tasks"
                 />
                 <figcaption>
@@ -2295,7 +2323,7 @@
               </p>
               <figure class="step-text-cols-figure">
                 <img
-                  src="/static/sovereign/images/image47.png"
+                  src="images/image47.png"
                   alt="Dataset to trained image to custom video — fine-tuning image models on Global South cultural datasets"
                 />
                 <figcaption>
@@ -2312,7 +2340,7 @@
               </figure>
               <figure class="step-text-cols-figure">
                 <img
-                  src="/static/sovereign/images/image48.gif"
+                  src="images/image48.gif"
                   alt="Custom video — miniature-style painting of two women in traditional dress riding a motorcycle"
                 />
                 <figcaption>
@@ -2839,7 +2867,7 @@
           </div>
           <figure class="step-text-cols-figure step-text-cols-figure-below">
             <img
-              src="/static/sovereign/images/image49.png"
+              src="images/image49.png"
               alt="Today vs with AI standards — app talking to OpenAI APIs compared with app talking via AI Standard APIs to private and open source providers"
             />
           </figure>
@@ -2855,7 +2883,7 @@
         <div class="stage">
           <figure class="figlayer" data-vis="img-landscape">
             <img
-              src="/static/sovereign/images/image3.png"
+              src="images/image3.png"
               alt="The Agriculture AI Landscape (Figure 8)"
             />
             <figcaption>
@@ -2864,7 +2892,7 @@
           </figure>
           <figure class="figlayer" data-vis="img-dg">
             <img
-              src="/static/sovereign/images/image23.png"
+              src="images/image23.png"
               alt="Digital Green impact: 17% income increase; 4.1M farmers reached"
             />
             <figcaption>
@@ -2874,7 +2902,7 @@
           </figure>
           <figure class="figlayer" data-vis="img-chat">
             <img
-              src="/static/sovereign/images/image7.png"
+              src="images/image7.png"
               alt="Farmer.CHAT WhatsApp exchange"
             />
             <figcaption>
@@ -3313,7 +3341,7 @@
           </div>
           <div class="foot-brand">
             <img
-              src="/static/sovereign/assets/gooey-logo.png"
+              src="assets/gooey-logo.png"
               alt="Gooey.AI"
             /><span
               >© 2026 Gooey.AI — How Middle Powers Cooperate for AI
@@ -3327,8 +3355,8 @@
     <div class="tip" id="tip" role="tooltip"></div>
     <canvas id="globe" aria-hidden="true"></canvas>
 
-    <script src="/static/sovereign/art.js"></script>
-    <script src="/static/sovereign/globe.js"></script>
+    <script src="art.js"></script>
+    <script src="globe.js"></script>
     <script>
       const PALETTE = {
         ink: "#0A1021",

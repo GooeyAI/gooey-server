@@ -1,5 +1,5 @@
 (function () {
-  const GRID_URL = "/static/sovereign/globe-grid.bin";
+  const GRID_URL = "globe-grid.bin";
   const GRID_WIDTH = 360;
   const GRID_HEIGHT = 180;
   const ROTATION_SPEED = 0.0018;
