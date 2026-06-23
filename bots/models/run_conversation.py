@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db import models
+from django.db import models, transaction
 
 from bots.models.saved_run import SavedRun
 
@@ -99,20 +99,22 @@ class RunConversation(models.Model):
             parent_convo = parent_sr.conversation
             if parent_convo.accepts_turn(sr, surface):
                 convo = parent_convo
-        if convo is None:
-            convo = cls.objects.create(
-                workspace_id=sr.workspace_id,
-                uid=sr.uid or "",
-                workflow=sr.workflow,
-                surface=surface,
-                title=title,
-            )
 
-        sr.conversation = convo
-        sr.save(update_fields=["conversation"])
+        with transaction.atomic():
+            if convo is None:
+                convo = cls.objects.create(
+                    workspace_id=sr.workspace_id,
+                    uid=sr.uid or "",
+                    workflow=sr.workflow,
+                    surface=surface,
+                    title=title,
+                )
 
-        convo.last_run = sr
-        if not convo.title:
-            convo.title = title
-        convo.save(update_fields=["last_run", "title", "updated_at"])
+            sr.conversation = convo
+            sr.save(update_fields=["conversation"])
+
+            convo.last_run = sr
+            if not convo.title:
+                convo.title = title
+            convo.save(update_fields=["last_run", "title", "updated_at"])
         return convo
