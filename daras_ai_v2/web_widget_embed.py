@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 
 import gooey_gui as gui
@@ -15,6 +15,9 @@ from daras_ai_v2.language_model import (
     get_entry_text,
 )
 from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
+
+if TYPE_CHECKING:
+    from bots.models import RunConversation
 
 
 def load_chat_widget_lib():
@@ -191,7 +194,7 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
     return messages
 
 
-def get_builder_conversation_messages(conversation) -> list[dict]:
+def get_builder_conversation_messages(conversation: "RunConversation") -> list[dict]:
     """Replay a builder conversation from its turns, one message pair per turn,
     each carrying the exact point-in-time URLs.
 

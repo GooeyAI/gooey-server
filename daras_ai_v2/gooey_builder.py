@@ -195,7 +195,7 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
     # copy the workflow_url into a new run linked to
     # builder_sr so the chat widget can navigate the user to a workflow page
     # that knows which builder iteration produced it
-    workflow_page_cls, prev_child, workflow_pr = url_to_runs(body.workflow_url)
+    _workflow_page_cls, prev_child, workflow_pr = url_to_runs(body.workflow_url)
     workflow_sr = prev_child.clone(
         parent_pr=workflow_pr,
         uid=request.user.uid,
@@ -207,7 +207,7 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
 
     workflow_url = workflow_sr.get_app_url()
     builder_run_url = body.builder_run_url or get_default_builder_pr().get_app_url()
-    builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
+    _builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
     request_body = chat_widget_input_to_request_body(
         builder_sr.state, body.input_data or builder_sr.state
     )
