@@ -29,6 +29,7 @@ def backfill_run_conversations(apps, schema_editor):
 
     convo_of_run = {}  # SavedRun.id -> RunConversation.id (parents seen so far)
     convo_scope = {}  # RunConversation.id -> (workspace_id, uid, surface)
+    convo_title = {}  # RunConversation.id -> title (back-filled from later turns)
     convo_head = {}  # RunConversation.id -> (last_run_id, last_ts)
     pending = []  # (saved_run_id, conversation_id) to bulk-assign
 
@@ -76,6 +77,10 @@ def backfill_run_conversations(apps, schema_editor):
                 .id
             )
             convo_scope[convo_id] = (sr.workspace_id, sr.uid or "", sr.surface)
+            convo_title[convo_id] = title
+        elif not convo_title.get(convo_id) and title:
+            # Mirror attach_run: fill a blank title from a later turn's prompt.
+            convo_title[convo_id] = title
 
         convo_of_run[sr.id] = convo_id
         convo_head[convo_id] = (sr.id, sr.created_at)
@@ -85,7 +90,7 @@ def backfill_run_conversations(apps, schema_editor):
             pending = []
 
     _flush_assignments(db_alias, SavedRun, pending)
-    _flush_heads(db_alias, RunConversation, convo_head)
+    _flush_heads(db_alias, RunConversation, convo_head, convo_title)
 
 
 def _run_signal(sr):
@@ -112,10 +117,10 @@ def _flush_assignments(db_alias, SavedRun, pending):
         )
 
 
-def _flush_heads(db_alias, RunConversation, convo_head):
+def _flush_heads(db_alias, RunConversation, convo_head, convo_title):
     for convo_id, (last_run_id, last_ts) in convo_head.items():
         RunConversation.objects.using(db_alias).filter(id=convo_id).update(
-            last_run_id=last_run_id, updated_at=last_ts
+            last_run_id=last_run_id, updated_at=last_ts, title=convo_title[convo_id]
         )
 
 
