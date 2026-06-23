@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('bots', '0123_alter_publishedrun_workflow_alter_savedrun_workflow_and_more'),
+        ('bots', '0125_alter_tag_options_publishedrun_is_featured_tag_color_and_more'),
         ('workspaces', '0016_alter_workspacemembership_balance'),
     ]
 
