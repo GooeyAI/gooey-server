@@ -28,6 +28,7 @@ def backfill_run_conversations(apps, schema_editor):
     _disable_auto_timestamps(RunConversation)
 
     convo_of_run = {}  # SavedRun.id -> RunConversation.id (parents seen so far)
+    convo_scope = {}  # RunConversation.id -> (workspace_id, uid, surface)
     convo_head = {}  # RunConversation.id -> (last_run_id, last_ts)
     pending = []  # (saved_run_id, conversation_id) to bulk-assign
 
@@ -49,9 +50,17 @@ def backfill_run_conversations(apps, schema_editor):
 
         is_continuation, title = _run_signal(sr)
 
+        # Mirror the live attach_run guard: only continue the parent's thread when
+        # it shares this run's full scope (workflow is always VIDEO_BOTS here).
         convo_id = None
         if is_continuation and sr.parent_id:
-            convo_id = convo_of_run.get(sr.parent_id)
+            candidate = convo_of_run.get(sr.parent_id)
+            if candidate is not None and convo_scope.get(candidate) == (
+                sr.workspace_id,
+                sr.uid or "",
+                sr.surface,
+            ):
+                convo_id = candidate
         if convo_id is None:
             convo_id = (
                 RunConversation.objects.using(db_alias)
@@ -66,6 +75,7 @@ def backfill_run_conversations(apps, schema_editor):
                 )
                 .id
             )
+            convo_scope[convo_id] = (sr.workspace_id, sr.uid or "", sr.surface)
 
         convo_of_run[sr.id] = convo_id
         convo_head[convo_id] = (sr.id, sr.created_at)
