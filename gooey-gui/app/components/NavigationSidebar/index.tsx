@@ -2,6 +2,9 @@ import "./NavigationSidebar.css";
 
 import type { CustomComponentProps } from "~/components";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
+import { useState, useEffect, useRef } from "react";
+
+const NAV_COLLAPSED_KEY = "nav-sidebar:default-collapsed";
 
 function GooeyBot({ size = 18 }: { size?: number }) {
   return (
@@ -21,56 +24,171 @@ function GooeyBot({ size = 18 }: { size?: number }) {
   );
 }
 
+/** Dark tooltip that appears to the right of a collapsed rail item on hover. */
+function RailTooltip({ label }: { label: string }) {
+  return <span className="rail-tooltip">{label}</span>;
+}
+
+/** A single nav item row — handles both expanded and collapsed rendering. */
+function NavItem({
+  icon,
+  label,
+  href,
+  isActive,
+  collapsed,
+}: {
+  icon: string;
+  label: string;
+  href: string;
+  isActive: boolean;
+  collapsed: boolean;
+}) {
+  const baseClass = [
+    "nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none",
+    collapsed ? "justify-content-center px-0 py-2" : "px-2 py-2",
+    isActive ? "fw-bold bg-body-secondary text-body" : "text-body",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <a href={href} className={baseClass + (collapsed ? " position-relative" : "")}>
+      <i className={icon} style={{ width: 18, textAlign: "center", flexShrink: 0 }} />
+      {collapsed ? (
+        <RailTooltip label={label} />
+      ) : (
+        <span>{label}</span>
+      )}
+    </a>
+  );
+}
+
 export function NavigationSidebar({
   logo_image_url,
   nav_items,
   active_key,
   new_href,
+  default_collapsed,
+  onChange,
+  state,
 }: CustomComponentProps & NavigationSidebarProps) {
+  const [collapsed, setCollapsed] = useState(default_collapsed);
+  // Track whether we should skip the first effect run (no-op on mount if value unchanged).
+  const mounted = useRef(false);
+
+  // Mirror the Sidebar.tsx pattern: when collapsed changes, persist via state + onChange().
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      // Only post on mount if the value differs from what the server sent.
+      if (state[NAV_COLLAPSED_KEY] === collapsed) return;
+    }
+    state[NAV_COLLAPSED_KEY] = collapsed;
+    onChange();
+  }, [collapsed]);
+
+  const navClass = [
+    "nav-sidebar d-flex flex-column p-2 border-end bg-body",
+    collapsed ? "nav-sidebar--collapsed" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <nav className="nav-sidebar d-flex flex-column p-2 border-end bg-body">
-      {/* Header: logo + GooeyBot glyph */}
-      <div className="d-flex align-items-center gap-2 p-2 mb-1" style={{ height: 56 }}>
-        <a href="/" className="d-flex align-items-center gap-2 text-body text-decoration-none">
+    <nav
+      className={navClass}
+      onClick={
+        collapsed
+          ? (e) => {
+              // Expand when clicking the rail background (not a child link/button).
+              if (e.currentTarget === e.target) setCollapsed(false);
+            }
+          : undefined
+      }
+    >
+      {/* Header: logo + wordmark + collapse toggle */}
+      <div
+        className="d-flex align-items-center p-2 mb-1"
+        style={{ height: 56, gap: collapsed ? 0 : 8, justifyContent: collapsed ? "center" : "space-between" }}
+      >
+        <a
+          href="/"
+          className="d-flex align-items-center gap-2 text-body text-decoration-none"
+          style={{ minWidth: 0, overflow: "hidden" }}
+        >
           <GooeyBot size={24} />
-          <img
-            src={logo_image_url}
-            alt="Gooey.AI"
-            height={22}
-            className="img-fluid"
-          />
+          {!collapsed && (
+            <img
+              src={logo_image_url}
+              alt="Gooey.AI"
+              height={22}
+              className="img-fluid"
+              style={{ flexShrink: 0 }}
+            />
+          )}
         </a>
+
+        {!collapsed && (
+          <button
+            className="btn btn-link text-body p-1 d-flex align-items-center"
+            style={{ lineHeight: 1 }}
+            title="Collapse sidebar"
+            onClick={() => setCollapsed(true)}
+          >
+            <i className="fa-regular fa-sidebar" />
+          </button>
+        )}
+
+        {collapsed && (
+          <button
+            className="btn btn-link text-body p-0 d-flex align-items-center position-relative"
+            style={{ lineHeight: 1, marginLeft: 0 }}
+            title="Expand sidebar"
+            onClick={() => setCollapsed(false)}
+          >
+            <RailTooltip label="Expand" />
+          </button>
+        )}
       </div>
 
       {/* Sticky "New" button */}
       <a
         href={new_href}
-        className="btn btn-primary d-flex align-items-center gap-2 mb-2 fw-semibold"
+        className={[
+          "btn btn-primary d-flex align-items-center mb-2 fw-semibold",
+          collapsed ? "justify-content-center px-0" : "gap-2",
+        ].join(" ")}
+        title={collapsed ? "New" : undefined}
+        style={{ position: "relative" }}
       >
         <i className="fa-regular fa-plus" />
-        New
+        {collapsed ? <RailTooltip label="New" /> : <span>New</span>}
       </a>
 
       {/* Primary nav items */}
       <div className="d-flex flex-column gap-1">
-        {nav_items.map((item) => {
-          const isActive = item.key === active_key;
-          return (
-            <a
-              key={item.key}
-              href={item.href}
-              className={[
-                "d-flex align-items-center gap-2 px-2 py-2 rounded text-decoration-none",
-                isActive
-                  ? "fw-bold bg-body-secondary text-body"
-                  : "text-body",
-              ].join(" ")}
-            >
-              <i className={item.icon} style={{ width: 18, textAlign: "center" }} />
-              <span>{item.label}</span>
-            </a>
-          );
-        })}
+        {nav_items.map((item) => (
+          <NavItem
+            key={item.key}
+            icon={item.icon}
+            label={item.label}
+            href={item.href}
+            isActive={item.key === active_key}
+            collapsed={collapsed}
+          />
+        ))}
+
+        {/* When collapsed, Recent appears as a single clock item */}
+        {collapsed && (
+          <NavItem
+            key="recent-collapsed"
+            icon="fa-regular fa-clock-rotate-left"
+            label="Recent"
+            href="#"
+            isActive={false}
+            collapsed={collapsed}
+          />
+        )}
       </div>
 
       {/* Later tasks: recent/saved lists, identity menu, builder button — stubbed */}

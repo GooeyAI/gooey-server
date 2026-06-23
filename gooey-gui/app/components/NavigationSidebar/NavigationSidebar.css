@@ -9,6 +9,10 @@
   transition: width 200ms ease;
 }
 
+.nav-sidebar--collapsed {
+  width: 66px;
+}
+
 /* Thin custom scrollbar for the rail */
 .nav-sidebar::-webkit-scrollbar {
   width: 4px;
@@ -23,4 +27,32 @@
 .nav-sidebar {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+/* Collapsed nav item links: full-width centered icon */
+.nav-sidebar--collapsed .nav-item-link {
+  width: 100%;
+}
+
+/* Rail tooltip — dark pill that appears to the right on hover */
+.rail-tooltip {
+  display: none;
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #212529;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Show tooltip only inside the collapsed rail */
+.nav-sidebar--collapsed .position-relative:hover > .rail-tooltip {
+  display: block;
 }
