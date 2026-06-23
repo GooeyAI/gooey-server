@@ -1,0 +1,26 @@
+.nav-sidebar {
+  width: 264px;
+  flex: none;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 200ms ease;
+}
+
+/* Thin custom scrollbar for the rail */
+.nav-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.nav-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nav-sidebar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+.nav-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
