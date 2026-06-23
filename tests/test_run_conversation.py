@@ -17,33 +17,6 @@ def test_workspace(transactional_db, test_user):
     return Workspace.objects.create(created_by=test_user, is_personal=True)
 
 
-def _make_run(
-    *,
-    workspace,
-    uid,
-    run_id,
-    workflow=Workflow.VIDEO_BOTS,
-    surface=SavedRun.Surface.run,
-):
-    return SavedRun.objects.create(
-        run_id=run_id,
-        uid=uid,
-        workspace=workspace,
-        workflow=workflow,
-        surface=surface,
-    )
-
-
-def _attach(sr, *, parent_sr, surface=SavedRun.Surface.run, title=""):
-    return RunConversation.attach_run(
-        sr=sr,
-        parent_sr=parent_sr,
-        is_continuation=parent_sr is not None,
-        surface=surface,
-        title=title,
-    )
-
-
 def test_attach_run_starts_new_conversation(test_workspace, test_user):
     sr = _make_run(workspace=test_workspace, uid=test_user.uid, run_id="r1")
     convo = _attach(sr, parent_sr=None, title="hello")
@@ -159,3 +132,30 @@ def test_attach_run_does_not_continue_across_workflow(test_workspace, test_user)
 
     assert child_convo.id != parent_convo.id
     assert RunConversation.objects.count() == 2
+
+
+def _make_run(
+    *,
+    workspace,
+    uid,
+    run_id,
+    workflow=Workflow.VIDEO_BOTS,
+    surface=SavedRun.Surface.run,
+):
+    return SavedRun.objects.create(
+        run_id=run_id,
+        uid=uid,
+        workspace=workspace,
+        workflow=workflow,
+        surface=surface,
+    )
+
+
+def _attach(sr, *, parent_sr, surface=SavedRun.Surface.run, title=""):
+    return RunConversation.attach_run(
+        sr=sr,
+        parent_sr=parent_sr,
+        is_continuation=parent_sr is not None,
+        surface=surface,
+        title=title,
+    )

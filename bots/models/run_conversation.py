@@ -67,22 +67,6 @@ class RunConversation(models.Model):
     def __str__(self):
         return f"{self.get_surface_display()} conversation: {self.title[:40]!r}"
 
-    def accepts_turn(self, sr: SavedRun, surface: int) -> bool:
-        """Whether a turn (`sr`, produced on `surface`) belongs to this thread.
-
-        A continuation may join its parent's conversation only when every scope
-        boundary lines up. SavedRun.parent carries no workspace/uid constraint,
-        so without this check a turn could attach to a conversation owned by a
-        different workspace, user, surface, or workflow -- mis-grouping turns
-        and leaking threads across users in shared workspaces.
-        """
-        return (
-            self.workspace_id == sr.workspace_id
-            and (self.uid or "") == (sr.uid or "")
-            and self.workflow == sr.workflow
-            and self.surface == surface
-        )
-
     @classmethod
     def attach_run(
         cls,
@@ -123,3 +107,19 @@ class RunConversation(models.Model):
                 convo.title = title
             convo.save(update_fields=["last_run", "title", "updated_at"])
         return convo
+
+    def accepts_turn(self, sr: SavedRun, surface: int) -> bool:
+        """Whether a turn (`sr`, produced on `surface`) belongs to this thread.
+
+        A continuation may join its parent's conversation only when every scope
+        boundary lines up. SavedRun.parent carries no workspace/uid constraint,
+        so without this check a turn could attach to a conversation owned by a
+        different workspace, user, surface, or workflow -- mis-grouping turns
+        and leaking threads across users in shared workspaces.
+        """
+        return (
+            self.workspace_id == sr.workspace_id
+            and (self.uid or "") == (sr.uid or "")
+            and self.workflow == sr.workflow
+            and self.surface == surface
+        )
