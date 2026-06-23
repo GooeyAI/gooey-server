@@ -54,9 +54,14 @@ class RunConversation(models.Model):
     objects = RunConversationQuerySet.as_manager()
 
     class Meta:
+        # Every listing query filters (workspace, surface) and sorts by
+        # -updated_at; workflow/uid are optional residual filters. workspace is
+        # always present and far more selective than workflow, so a single
+        # workspace-leading index covers the builder sidebar, chat widget, and
+        # history tab. surface precedes uid so (workspace, surface) stays a clean
+        # prefix for the no-uid queries.
         indexes = [
-            models.Index(fields=["workflow", "workspace", "surface", "-updated_at"]),
-            models.Index(fields=["workflow", "uid", "surface", "-updated_at"]),
+            models.Index(fields=["workspace", "surface", "uid", "-updated_at"]),
         ]
 
     def __str__(self):
