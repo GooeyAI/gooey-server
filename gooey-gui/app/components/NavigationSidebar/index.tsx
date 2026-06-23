@@ -3,6 +3,7 @@ import "./NavigationSidebar.css";
 import type { CustomComponentProps } from "~/components";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
+import { WorkflowList } from "./WorkflowList";
 
 const NAV_COLLAPSED_KEY = "nav-sidebar:default-collapsed";
 
@@ -69,10 +70,15 @@ export function NavigationSidebar({
   active_key,
   new_href,
   default_collapsed,
+  saved_workflows,
+  recent_workflows,
+  saved_href,
   onChange,
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
   const [collapsed, setCollapsed] = useState(default_collapsed);
+  const [savedOpen, setSavedOpen] = useState(true);
+  const [recentOpen, setRecentOpen] = useState(true);
   // Track whether we should skip the first effect run (no-op on mount if value unchanged).
   const mounted = useRef(false);
 
@@ -191,7 +197,48 @@ export function NavigationSidebar({
         )}
       </div>
 
-      {/* Later tasks: recent/saved lists, identity menu, builder button — stubbed */}
+      {/* Saved tree — only when expanded and there are saved workflows */}
+      {!collapsed && saved_workflows.length > 0 && (
+        <div className="mt-2">
+          <button
+            className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
+            style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+            onClick={() => setSavedOpen((v) => !v)}
+          >
+            <span className="flex-grow-1 text-start">Saved</span>
+            <i className={`fa-regular fa-chevron-${savedOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
+          </button>
+          {savedOpen && (
+            <div className="saved-tree">
+              <WorkflowList items={saved_workflows} indent />
+              {saved_href && (
+                <a
+                  href={saved_href}
+                  className="d-block text-body-secondary text-decoration-none px-2 py-1"
+                  style={{ fontSize: "0.8rem" }}
+                >
+                  View all
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recent list — only when expanded and there are recent workflows */}
+      {!collapsed && recent_workflows.length > 0 && (
+        <div className="mt-2">
+          <button
+            className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
+            style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+            onClick={() => setRecentOpen((v) => !v)}
+          >
+            <span className="flex-grow-1 text-start">Recent</span>
+            <i className={`fa-regular fa-chevron-${recentOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
+          </button>
+          {recentOpen && <WorkflowList items={recent_workflows} />}
+        </div>
+      )}
     </nav>
   );
 }
