@@ -399,6 +399,12 @@ class SavedRun(models.Model):
             uid = self.uid
         if workspace_id is None:
             workspace_id = self.workspace_id
+        # RunConversation is scoped to (workspace, uid); only carry it over when
+        # the clone stays in the same scope, else clear it to avoid cross-scope leak.
+        if uid == self.uid and workspace_id == self.workspace_id:
+            conversation_id = self.conversation_id
+        else:
+            conversation_id = None
         return SavedRun(
             parent_id=self.id,
             parent_version_id=parent_version_id,
@@ -413,7 +419,7 @@ class SavedRun(models.Model):
             error_type=self.error_type,
             error_params=self.error_params,
             price=self.price,
-            conversation_id=self.conversation_id,
+            conversation_id=conversation_id,
             **kwargs,
         )
 
