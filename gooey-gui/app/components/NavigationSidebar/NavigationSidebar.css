@@ -56,3 +56,17 @@
 .nav-sidebar--collapsed .position-relative:hover > .rail-tooltip {
   display: block;
 }
+
+/* Saved tree vertical line */
+.saved-tree {
+  position: relative;
+}
+.saved-tree::before {
+  content: "";
+  position: absolute;
+  left: 19px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--bs-border-color);
+}
