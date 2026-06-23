@@ -35,6 +35,33 @@ if typing.TYPE_CHECKING:
 app = CustomAPIRouter()
 
 
+@app.get("/workspaces/switch/{workspace_id}/")
+def switch_workspace_route(request: Request, workspace_id: int):
+    """Set the current workspace in the session, then redirect to ?next= (or Home).
+
+    Used by the NavigationSidebar identity menu. Validates that the user is a
+    member of the target workspace before switching.
+    """
+    from routers.base_auth import safe_next_url
+    from routers.root import home_page
+
+    if not request.user or request.user.is_anonymous:
+        redirect_url = furl("/login", query_params={"next": str(request.url)})
+        return RedirectResponse(str(redirect_url))
+
+    if not any(w.id == workspace_id for w in request.user.cached_workspaces):
+        raise HTTPException(
+            status_code=403,
+            detail="You are not a member of this workspace.",
+        )
+
+    set_current_workspace(request.session, workspace_id)
+
+    return RedirectResponse(
+        safe_next_url(request.query_params, default=get_route_path(home_page))
+    )
+
+
 @gui.route(app, "/workspaces/create/")
 def create_workspace_route(
     request: Request,

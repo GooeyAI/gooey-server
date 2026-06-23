@@ -4,6 +4,7 @@ import type { CustomComponentProps } from "~/components";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
 import { WorkflowList } from "./WorkflowList";
+import { IdentityMenu } from "./IdentityMenu";
 
 const NAV_COLLAPSED_KEY = "nav-sidebar:default-collapsed";
 
@@ -73,6 +74,12 @@ export function NavigationSidebar({
   saved_workflows,
   recent_workflows,
   saved_href,
+  user,
+  current_workspace,
+  workspaces,
+  menu_links,
+  logout_href,
+  switch_workspace_href,
   onChange,
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
@@ -237,6 +244,21 @@ export function NavigationSidebar({
             <i className={`fa-regular fa-chevron-${recentOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
           </button>
           {recentOpen && <WorkflowList items={recent_workflows} />}
+        </div>
+      )}
+
+      {/* Footer identity (logged-in only; anonymous arrives in a later task) */}
+      {user && (
+        <div className="mt-auto pt-2">
+          <IdentityMenu
+            user={user}
+            currentWorkspace={current_workspace}
+            workspaces={workspaces}
+            menuLinks={menu_links}
+            logoutHref={logout_href}
+            switchWorkspaceHref={switch_workspace_href}
+            collapsed={collapsed}
+          />
         </div>
       )}
     </nav>

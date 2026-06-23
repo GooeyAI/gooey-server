@@ -57,6 +57,19 @@
   display: block;
 }
 
+/* Identity footer popover — opens above the footer button. Sized to its own
+   content so it stays usable even when the rail is collapsed (66px). */
+.identity-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  min-width: 220px;
+  max-width: 280px;
+  max-height: 70vh;
+  z-index: 1050;
+}
+
 /* Saved tree vertical line */
 .saved-tree {
   position: relative;
