@@ -835,12 +835,6 @@ def side_bar_page_wrapper(
 
     display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]
 
-    sidebar, page_content = sidebar_layout(
-        key="builder-sidebar",
-        session=request.session,
-        disabled=not display_gooey_builder,
-    )
-
     # Persist collapse state: read from session_state (set by React onChange),
     # fall back to session (previously persisted), write back to session.
     _nav_collapsed_key = "nav-sidebar:default-collapsed"
@@ -851,44 +845,53 @@ def side_bar_page_wrapper(
     except KeyError:
         default_collapsed = request.session.get(_nav_collapsed_key, False)
 
-    with page_content, gui.div(className="d-flex min-vh-100 w-100"):
-        gui.html(templates.get_template("gtag.html").render(**context))
-
-        # Left nav rail
+    with gui.div(className="d-flex min-vh-100 w-100"):
+        # Left nav rail — full-bleed, flush to the viewport edge.
         gui.model_component(build_props(request, default_collapsed=default_collapsed))
 
-        # Main content area
+        # Main content column. The Builder sidebar is mounted INSIDE this column
+        # (not around the whole row) so its container does not clamp or indent
+        # the full-width rail.
         with gui.div(className="d-flex flex-column flex-grow-1 min-w-0"):
-            gui.html(copy_to_clipboard_scripts)
+            sidebar, page_content = sidebar_layout(
+                key="builder-sidebar",
+                session=request.session,
+                disabled=not display_gooey_builder,
+            )
+            with page_content, gui.div(
+                className="d-flex flex-column min-vh-100 w-100"
+            ):
+                gui.html(templates.get_template("gtag.html").render(**context))
+                gui.html(copy_to_clipboard_scripts)
 
-            if request.user and not request.user.is_anonymous:
-                launcher_div = gui.div()
+                if request.user and not request.user.is_anonymous:
+                    launcher_div = gui.div()
 
-                current_workspace = global_workspace_selector(
-                    request.user, request.session
-                )
+                    current_workspace = global_workspace_selector(
+                        request.user, request.session
+                    )
 
-                if display_gooey_builder:
-                    with launcher_div:
-                        render_gooey_builder_launcher(
-                            sidebar_key="builder-sidebar",
-                            request=request,
-                            workspace=current_workspace,
-                        )
-                    with sidebar:
-                        render_gooey_builder(
-                            sidebar_key="builder-sidebar",
-                            request=request,
-                            page=page,
-                        )
-            else:
-                current_workspace = None
+                    if display_gooey_builder:
+                        with launcher_div:
+                            render_gooey_builder_launcher(
+                                sidebar_key="builder-sidebar",
+                                request=request,
+                                workspace=current_workspace,
+                            )
+                        with sidebar:
+                            render_gooey_builder(
+                                sidebar_key="builder-sidebar",
+                                request=request,
+                                page=page,
+                            )
+                else:
+                    current_workspace = None
 
-            with gui.div(id="main-content", className=className):
-                yield current_workspace
+                with gui.div(id="main-content", className=className):
+                    yield current_workspace
 
-            gui.html(templates.get_template("footer.html").render(**context))
-            gui.html(templates.get_template("login_scripts.html").render(**context))
+                gui.html(templates.get_template("footer.html").render(**context))
+                gui.html(templates.get_template("login_scripts.html").render(**context))
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):
