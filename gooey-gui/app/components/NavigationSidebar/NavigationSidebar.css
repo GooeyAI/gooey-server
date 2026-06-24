@@ -10,6 +10,90 @@
 
 .nav-sidebar--collapsed {
   width: 66px;
+  cursor: e-resize;
+}
+
+.gooey-bot-icon {
+  display: block;
+  transition: opacity 100ms ease;
+}
+
+.nav-sidebar-header {
+  height: 56px;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.nav-sidebar--collapsed .nav-sidebar-header {
+  gap: 0;
+  justify-content: center;
+}
+
+.nav-brand {
+  min-width: 0;
+}
+
+a.nav-brand {
+  overflow: hidden;
+}
+
+.nav-brand__mark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.nav-brand__wordmark {
+  flex-shrink: 0;
+}
+
+.nav-brand__expand-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.nav-brand--collapsed:hover .gooey-bot-icon {
+  opacity: 0;
+}
+
+.nav-brand--collapsed:hover .nav-brand__expand-icon {
+  opacity: 1;
+}
+
+.nav-item-inner-link {
+  min-width: 0;
+}
+
+.nav-chevron-btn {
+  line-height: 1;
+}
+
+.nav-chevron-icon {
+  font-size: 11px;
+}
+
+.nav-section-toggle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gooey-builder-btn__photo {
+  object-fit: cover;
+}
+
+.gooey-builder-btn__subtitle {
+  font-size: 0.7rem;
 }
 
 /* Only the middle region scrolls; header + New (above) and the footer (below)
@@ -42,6 +126,72 @@
   width: 100%;
 }
 
+.nav-workflow-thumb {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+}
+
+/* Gooey Builder button: a cyan brand-color light that travels around the
+   border. A conic-gradient "comet" rotates and is masked down to just the
+   border ring, so the bright arc sweeps left→right and around the perimeter.
+   #03dac5 is the Gooey brand cyan (see the spinner accent in custom.css). */
+@property --gooey-builder-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.gooey-builder-btn {
+  /* Faint always-on cyan rim so the perimeter reads even between sweeps. */
+  border-color: rgba(3, 218, 197, 0.35) !important;
+}
+
+.gooey-builder-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px; /* ring thickness */
+  background: conic-gradient(
+    from var(--gooey-builder-angle),
+    rgba(3, 218, 197, 0) 0deg,
+    rgba(3, 218, 197, 0) 70deg,
+    rgba(3, 218, 197, 0.9) 130deg,
+    #a5ffee 160deg,
+    rgba(3, 218, 197, 0.9) 190deg,
+    rgba(3, 218, 197, 0) 250deg,
+    rgba(3, 218, 197, 0) 360deg
+  );
+  /* Mask out the center, leaving only the padding-width border ring. */
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: gooey-builder-orbit 2.8s linear infinite;
+}
+
+@keyframes gooey-builder-orbit {
+  to {
+    --gooey-builder-angle: 360deg;
+  }
+}
+
+/* Respect reduced-motion: park the light as a static cyan rim. */
+@media (prefers-reduced-motion: reduce) {
+  .gooey-builder-btn::before {
+    animation: none;
+  }
+  .gooey-builder-btn {
+    border-color: rgba(3, 218, 197, 0.7) !important;
+  }
+}
+
 /* Hover + active (current page) background for nav items */
 .nav-item-link {
   transition: background-color 100ms ease;
@@ -51,6 +201,27 @@
 }
 .nav-item-link--active {
   background-color: rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-recent-item {
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.sidebar-recent-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Current page: the saved/recent row whose href matches the URL. */
+.sidebar-recent-item--active {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-recent-item-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
 }
 
 /* Rail tooltip — dark pill that appears to the right on hover */
@@ -76,17 +247,57 @@
   display: block;
 }
 
-/* Identity footer popover — opens above the footer button. Sized to its own
-   content so it stays usable even when the rail is collapsed (66px). */
-.identity-menu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  width: max-content;
-  min-width: 220px;
-  max-width: 280px;
+/* Identity / workspace Tippy box: opt out of the global `.tippy-box` width
+   override in custom.css (min-width: 20–50vw !important), which is meant for
+   text tooltips, and drop the default content padding so the panel fills it. */
+.tippy-box[data-theme~="identity-menu"] {
+  min-width: 0 !important;
+  max-width: none !important;
+  background-color: transparent;
+}
+.tippy-box[data-theme~="identity-menu"] > .tippy-content {
+  padding: 0;
+}
+
+/* Identity / workspace popover (rendered in a Tippy portal at <body>, so the
+   rail's overflow clip no longer affects it). */
+.identity-menu-panel {
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 12px;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.16);
+  padding: 6px;
+  min-width: 240px;
+  max-width: 300px;
   max-height: 70vh;
-  z-index: 1050;
+  overflow-y: auto;
+}
+
+/* Each menu/workspace row: rounded, with a hover background. */
+.identity-menu-item {
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.identity-menu-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* The current-workspace selector row at the top is subtly highlighted. */
+.identity-ws-current {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Circular icon slot; size the FontAwesome fallback (home/company glyph). */
+.identity-ws-icon {
+  font-size: 16px;
+}
+.identity-ws-icon > img,
+.identity-ws-icon > .workspace-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 /* Saved tree vertical line */
@@ -96,7 +307,7 @@
 .saved-tree::before {
   content: "";
   position: absolute;
-  left: 19px;
+  left: 15px;
   top: 0;
   bottom: 0;
   width: 1px;
@@ -126,10 +337,10 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 264px;
+    width: 70vw;
     max-width: 85vw;
     height: 100vh;
-    z-index: 1045;
+    z-index: 9999;
     transform: translateX(-100%);
     transition: transform 200ms ease;
     box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);

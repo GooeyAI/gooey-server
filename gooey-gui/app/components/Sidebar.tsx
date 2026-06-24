@@ -61,7 +61,7 @@ export function Sidebar({
 
   if (disabled) {
     return (
-      <div className="container-xl">
+      <div className="container-fluid">
         <RenderedChildren
           children={pageDiv.children}
           onChange={onChange}
@@ -82,7 +82,7 @@ export function Sidebar({
   if (isOpen) {
     pageClassName = "mx-2 w-100";
   } else {
-    pageClassName = "container-xxl";
+    pageClassName = "container-fluid";
   }
 
   const sidebarContainerStyles = sidebarWidth

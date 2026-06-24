@@ -21,6 +21,7 @@ class WorkspaceData(pydantic.BaseModel):
     id: int
     name: str
     icon_html: str  # workspace.html_icon()
+    subtitle: str = ""  # e.g. "Personal" or "Org · 12 members"
     is_current: bool = False
 
 
@@ -61,6 +62,7 @@ class NavigationSidebarProps(pydantic.BaseModel):
     menu_links: list[MenuLinkData] = []
     logout_href: str = ""
     switch_workspace_href: str = ""  # POST/GET target, {workspace_id} templated by React
+    add_workspace_href: str = ""
     login_href: str = "/login/"
 
     # gooey builder (Task 7)

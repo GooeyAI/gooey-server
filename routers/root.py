@@ -208,7 +208,9 @@ def explore_page(
 ):
     from widgets import explore
 
-    with page_wrapper(request, search_filters=search_filters, show_search_bar=False):
+    with side_bar_page_wrapper(
+        request, search_filters=search_filters, show_search_bar=False
+    ):
         explore.render(request, search_filters)
 
     return {

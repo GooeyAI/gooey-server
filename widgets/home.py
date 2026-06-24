@@ -112,9 +112,40 @@ def _load_recent_workflows(
     workspace: Workspace | None,
     limit: int = RECENT_WORKFLOW_LIST_LIMIT,
 ) -> list[WorkflowCardData]:
+    return [
+        card for card, _photo in _load_recent_workflow_cards(user, workspace, limit)
+    ]
+
+
+def _load_recent_workflow_cards(
+    user: AppUser | None,
+    workspace: Workspace | None,
+    limit: int = RECENT_WORKFLOW_LIST_LIMIT,
+) -> list[tuple[WorkflowCardData, str | None]]:
+    """Recent run cards each paired with their parent published run's photo.
+
+    The photo lets thumbnail-only surfaces (e.g. the navigation sidebar) fall
+    back to the published run's curated image — mirroring `_pr_preview` — when
+    the run itself has no image-bearing preview (e.g. a chat copilot run).
+    """
     if user is None or workspace is None:
         return []
 
+    ids = _recent_run_ids(user, workspace, limit)
+    author = author_from_user(user, current_user=user)
+    srs = (
+        SavedRun.objects.filter(id__in=ids)
+        .select_related("parent_version__published_run", "workflow_metadata")
+        .order_by("-updated_at")
+    )
+    out: list[tuple[WorkflowCardData, str | None]] = []
+    for sr in srs:
+        pr = sr.parent_published_run()
+        out.append((_history_card(sr, author=author), (pr and pr.photo_url) or None))
+    return out
+
+
+def _recent_run_ids(user: AppUser, workspace: Workspace, limit: int) -> list[int]:
     qs = (
         SavedRun.objects.filter(
             uid=user.uid, workspace=workspace, surface=SavedRun.Surface.run
