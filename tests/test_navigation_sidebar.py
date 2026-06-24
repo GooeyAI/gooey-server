@@ -39,6 +39,8 @@ def test_build_props_populates_identity(
     assert any(w.is_current for w in props.workspaces)
     assert props.logout_href
     assert "{workspace_id}" in props.switch_workspace_href
+    # full primary nav for logged-in users
+    assert {item.key for item in props.nav_items} == {"home", "explore", "saved"}
     labels = {m.label for m in props.menu_links}
     assert {"Profile", "Billing", "Members"} <= labels
 
@@ -50,4 +52,11 @@ def test_build_props_anonymous(transactional_db):
     assert props.current_workspace is None
     assert props.workspaces == []
     assert props.switch_workspace_href == ""
-    assert props.menu_links == []
+    # reduced rail: only Explore as a primary item
+    assert [item.key for item in props.nav_items] == ["explore"]
+    # public links only — no account links for anonymous users
+    labels = {m.label for m in props.menu_links}
+    assert labels
+    assert not ({"Profile", "Billing", "Members"} & labels)
+    # Sign In points at the login flow with a return path
+    assert "/login" in props.login_href
