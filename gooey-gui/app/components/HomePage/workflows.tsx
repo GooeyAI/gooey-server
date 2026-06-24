@@ -190,8 +190,10 @@ export function SavedWorkflowCard({ card }: { card: WorkflowCardData }) {
             </span>
           </div>
           {card.description && (
-            <div className="text-muted small line-clamp-2 text-break mt-1">
-              {card.description}
+            <div className="text-muted small text-break mt-1">
+              <LineClamp lines={2} expandable={false}>
+                {card.description}
+              </LineClamp>
             </div>
           )}
         </div>

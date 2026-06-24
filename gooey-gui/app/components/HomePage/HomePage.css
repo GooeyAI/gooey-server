@@ -25,6 +25,7 @@
 .saved-card-thumb {
   width: 72px;
   min-height: 72px;
+  max-height: 72px;
   align-self: stretch;
   object-fit: cover;
 }
