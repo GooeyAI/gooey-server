@@ -283,9 +283,9 @@ else:
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
 
-GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
+GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/62fbdac8-6f0a-11f1-8c7e-02420a000130/gooey-logo-text.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"
-GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d628be8a-9207-11ef-8aee-02420a000186/984x272%20rect%20gooey%20logo.png"
+GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/62fbdac8-6f0a-11f1-8c7e-02420a000130/gooey-logo-text.png"
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 

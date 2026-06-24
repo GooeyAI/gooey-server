@@ -22,7 +22,7 @@ export function HomePage({
   news_items,
 }: CustomComponentProps & HomePageProps) {
   return (
-    <div className="container-xxl my-4">
+    <div className="mt-4">
       {workspace_header && <WorkspaceHeader header={workspace_header} />}
       {greeting && <h1 className="mb-5">Welcome, {greeting}.</h1>}
 
