@@ -869,7 +869,9 @@ def side_bar_page_wrapper(
                 gui.html(copy_to_clipboard_scripts)
 
                 if request.user and not request.user.is_anonymous:
-                    current_workspace = global_workspace_selector(
+                    # The rail's IdentityMenu owns the workspace switcher, so we
+                    # only need the current workspace here (no header dropdown).
+                    current_workspace = get_current_workspace(
                         request.user, request.session
                     )
 
