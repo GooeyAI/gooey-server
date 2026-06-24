@@ -87,6 +87,8 @@ export function NavigationSidebar({
   const [collapsed, setCollapsed] = useState(default_collapsed);
   const [savedOpen, setSavedOpen] = useState(true);
   const [recentOpen, setRecentOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   // Track whether we should skip the first effect run (no-op on mount if value unchanged).
   const mounted = useRef(false);
 
@@ -101,209 +103,268 @@ export function NavigationSidebar({
     onChange();
   }, [collapsed]);
 
+  // Below lg (992px) the rail becomes an off-canvas drawer; the desktop
+  // collapse state is ignored so the drawer always shows its full content.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 991.98px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const railCollapsed = !isMobile && collapsed;
+
   const navClass = [
     "nav-sidebar d-flex flex-column p-2 border-end bg-body",
-    collapsed ? "nav-sidebar--collapsed" : "",
+    railCollapsed ? "nav-sidebar--collapsed" : "",
+    isMobile && drawerOpen ? "nav-sidebar--drawer-open" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <nav
-      className={navClass}
-      onClick={
-        collapsed
-          ? (e) => {
-              // Expand when clicking the rail background (not a child link/button).
-              if (e.currentTarget === e.target) setCollapsed(false);
-            }
-          : undefined
-      }
-    >
-      {/* Header: logo + wordmark + collapse toggle */}
-      <div
-        className="d-flex align-items-center p-2 mb-1"
-        style={{ height: 56, gap: collapsed ? 0 : 8, justifyContent: collapsed ? "center" : "space-between" }}
-      >
+    <>
+      {/* Mobile top bar (below lg): hamburger + logo. Hidden on desktop. */}
+      <div className="nav-mobile-topbar d-lg-none d-flex align-items-center gap-2 px-2 border-bottom bg-body">
+        <button
+          type="button"
+          className="btn btn-link text-body p-2 d-flex align-items-center"
+          style={{ lineHeight: 1 }}
+          title="Open menu"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <i className="fa-regular fa-bars fa-lg" />
+        </button>
         <a
           href="/"
           className="d-flex align-items-center gap-2 text-body text-decoration-none"
-          style={{ minWidth: 0, overflow: "hidden" }}
         >
-          <GooeyBot size={24} />
-          {!collapsed && (
-            <img
-              src={logo_image_url}
-              alt="Gooey.AI"
-              height={22}
-              className="img-fluid"
-              style={{ flexShrink: 0 }}
-            />
-          )}
+          <GooeyBot size={22} />
+          <img
+            src={logo_image_url}
+            alt="Gooey.AI"
+            height={20}
+            className="img-fluid"
+          />
         </a>
-
-        {!collapsed && (
-          <button
-            className="btn btn-link text-body p-1 d-flex align-items-center"
-            style={{ lineHeight: 1 }}
-            title="Collapse sidebar"
-            onClick={() => setCollapsed(true)}
-          >
-            <i className="fa-regular fa-sidebar" />
-          </button>
-        )}
-
-        {collapsed && (
-          <button
-            className="btn btn-link text-body p-0 d-flex align-items-center position-relative"
-            style={{ lineHeight: 1, marginLeft: 0 }}
-            title="Expand sidebar"
-            onClick={() => setCollapsed(false)}
-          >
-            <RailTooltip label="Expand" />
-          </button>
-        )}
       </div>
 
-      {/* Sticky "New" button (logged-in only) */}
-      {user && (
-        <a
-          href={new_href}
-          className={[
-            "btn btn-primary d-flex align-items-center mb-2 fw-semibold",
-            collapsed ? "justify-content-center px-0" : "gap-2",
-          ].join(" ")}
-          title={collapsed ? "New" : undefined}
-          style={{ position: "relative" }}
+      {/* Scrim behind the open drawer (mobile only) */}
+      {isMobile && drawerOpen && (
+        <div className="nav-scrim" onClick={() => setDrawerOpen(false)} />
+      )}
+
+      <nav
+        className={navClass}
+        onClick={
+          railCollapsed
+            ? (e) => {
+                // Expand when clicking the rail background (not a child link/button).
+                if (e.currentTarget === e.target) setCollapsed(false);
+              }
+            : undefined
+        }
+      >
+        {/* Header: logo + wordmark + collapse (desktop) / close (mobile) */}
+        <div
+          className="d-flex align-items-center p-2 mb-1"
+          style={{
+            height: 56,
+            gap: railCollapsed ? 0 : 8,
+            justifyContent: railCollapsed ? "center" : "space-between",
+          }}
         >
-          <i className="fa-regular fa-plus" />
-          {collapsed ? <RailTooltip label="New" /> : <span>New</span>}
-        </a>
-      )}
-
-      {/* Primary nav items */}
-      <div className="d-flex flex-column gap-1">
-        {nav_items.map((item) => (
-          <NavItem
-            key={item.key}
-            icon={item.icon}
-            label={item.label}
-            href={item.href}
-            isActive={item.key === active_key}
-            collapsed={collapsed}
-          />
-        ))}
-
-        {/* When collapsed, Recent appears as a single clock item (logged-in) */}
-        {collapsed && user && (
-          <NavItem
-            key="recent-collapsed"
-            icon="fa-regular fa-clock-rotate-left"
-            label="Recent"
-            href="#"
-            isActive={false}
-            collapsed={collapsed}
-          />
-        )}
-      </div>
-
-      {/* Anonymous rail: public links (Docs/API/…) rendered directly in the rail */}
-      {!user && !collapsed && menu_links.length > 0 && (
-        <div className="d-flex flex-column gap-1 mt-2">
-          {menu_links.map((link, i) => (
-            <a
-              key={i}
-              href={link.href}
-              className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body"
-            >
-              {link.icon && (
-                <i
-                  className={link.icon}
-                  style={{ width: 18, textAlign: "center", flexShrink: 0 }}
-                />
-              )}
-              <span>{link.label}</span>
-            </a>
-          ))}
-        </div>
-      )}
-
-      {/* Saved tree — only when expanded and there are saved workflows */}
-      {!collapsed && saved_workflows.length > 0 && (
-        <div className="mt-2">
-          <button
-            className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
-            style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
-            onClick={() => setSavedOpen((v) => !v)}
-          >
-            <span className="flex-grow-1 text-start">Saved</span>
-            <i className={`fa-regular fa-chevron-${savedOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
-          </button>
-          {savedOpen && (
-            <div className="saved-tree">
-              <WorkflowList items={saved_workflows} indent />
-              {saved_href && (
-                <a
-                  href={saved_href}
-                  className="d-block text-body-secondary text-decoration-none px-2 py-1"
-                  style={{ fontSize: "0.8rem" }}
-                >
-                  View all
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Recent list — only when expanded and there are recent workflows */}
-      {!collapsed && recent_workflows.length > 0 && (
-        <div className="mt-2">
-          <button
-            className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
-            style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
-            onClick={() => setRecentOpen((v) => !v)}
-          >
-            <span className="flex-grow-1 text-start">Recent</span>
-            <i className={`fa-regular fa-chevron-${recentOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
-          </button>
-          {recentOpen && <WorkflowList items={recent_workflows} />}
-        </div>
-      )}
-
-      {/* Footer: identity menu when logged in, Sign In row when anonymous */}
-      <div className="mt-auto pt-2">
-        {user ? (
-          <IdentityMenu
-            user={user}
-            currentWorkspace={current_workspace}
-            workspaces={workspaces}
-            menuLinks={menu_links}
-            logoutHref={logout_href}
-            switchWorkspaceHref={switch_workspace_href}
-            collapsed={collapsed}
-          />
-        ) : (
           <a
-            href={login_href}
-            className={[
-              "d-flex align-items-center w-100 text-body text-decoration-none rounded p-2 bg-hover-light position-relative",
-              collapsed ? "justify-content-center" : "gap-2",
-            ].join(" ")}
-            title={collapsed ? "Sign In" : undefined}
+            href="/"
+            className="d-flex align-items-center gap-2 text-body text-decoration-none"
+            style={{ minWidth: 0, overflow: "hidden" }}
           >
-            <i
-              className="fa-regular fa-right-to-bracket"
-              style={{ width: 18, textAlign: "center", flexShrink: 0 }}
-            />
-            {collapsed ? (
-              <RailTooltip label="Sign In" />
-            ) : (
-              <span className="fw-semibold">Sign In</span>
+            <GooeyBot size={24} />
+            {!railCollapsed && (
+              <img
+                src={logo_image_url}
+                alt="Gooey.AI"
+                height={22}
+                className="img-fluid"
+                style={{ flexShrink: 0 }}
+              />
             )}
           </a>
+
+          {isMobile ? (
+            <button
+              type="button"
+              className="btn btn-link text-body p-1 d-flex align-items-center"
+              style={{ lineHeight: 1 }}
+              title="Close menu"
+              onClick={() => setDrawerOpen(false)}
+            >
+              <i className="fa-regular fa-xmark fa-lg" />
+            </button>
+          ) : !collapsed ? (
+            <button
+              type="button"
+              className="btn btn-link text-body p-1 d-flex align-items-center"
+              style={{ lineHeight: 1 }}
+              title="Collapse sidebar"
+              onClick={() => setCollapsed(true)}
+            >
+              <i className="fa-regular fa-sidebar" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-link text-body p-0 d-flex align-items-center position-relative"
+              style={{ lineHeight: 1, marginLeft: 0 }}
+              title="Expand sidebar"
+              onClick={() => setCollapsed(false)}
+            >
+              <RailTooltip label="Expand" />
+            </button>
+          )}
+        </div>
+
+        {/* Sticky "New" button (logged-in only) */}
+        {user && (
+          <a
+            href={new_href}
+            className={[
+              "btn btn-primary d-flex align-items-center mb-2 fw-semibold",
+              railCollapsed ? "justify-content-center px-0" : "gap-2",
+            ].join(" ")}
+            title={railCollapsed ? "New" : undefined}
+            style={{ position: "relative" }}
+          >
+            <i className="fa-regular fa-plus" />
+            {railCollapsed ? <RailTooltip label="New" /> : <span>New</span>}
+          </a>
         )}
-      </div>
-    </nav>
+
+        {/* Primary nav items */}
+        <div className="d-flex flex-column gap-1">
+          {nav_items.map((item) => (
+            <NavItem
+              key={item.key}
+              icon={item.icon}
+              label={item.label}
+              href={item.href}
+              isActive={item.key === active_key}
+              collapsed={railCollapsed}
+            />
+          ))}
+
+          {/* When collapsed, Recent appears as a single clock item (logged-in) */}
+          {railCollapsed && user && (
+            <NavItem
+              key="recent-collapsed"
+              icon="fa-regular fa-clock-rotate-left"
+              label="Recent"
+              href="#"
+              isActive={false}
+              collapsed={railCollapsed}
+            />
+          )}
+        </div>
+
+        {/* Anonymous rail: public links (Docs/API/…) rendered directly in the rail */}
+        {!user && !railCollapsed && menu_links.length > 0 && (
+          <div className="d-flex flex-column gap-1 mt-2">
+            {menu_links.map((link, i) => (
+              <a
+                key={i}
+                href={link.href}
+                className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body"
+              >
+                {link.icon && (
+                  <i
+                    className={link.icon}
+                    style={{ width: 18, textAlign: "center", flexShrink: 0 }}
+                  />
+                )}
+                <span>{link.label}</span>
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* Saved tree — only when expanded and there are saved workflows */}
+        {!railCollapsed && saved_workflows.length > 0 && (
+          <div className="mt-2">
+            <button
+              className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
+              style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+              onClick={() => setSavedOpen((v) => !v)}
+            >
+              <span className="flex-grow-1 text-start">Saved</span>
+              <i className={`fa-regular fa-chevron-${savedOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
+            </button>
+            {savedOpen && (
+              <div className="saved-tree">
+                <WorkflowList items={saved_workflows} indent />
+                {saved_href && (
+                  <a
+                    href={saved_href}
+                    className="d-block text-body-secondary text-decoration-none px-2 py-1"
+                    style={{ fontSize: "0.8rem" }}
+                  >
+                    View all
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Recent list — only when expanded and there are recent workflows */}
+        {!railCollapsed && recent_workflows.length > 0 && (
+          <div className="mt-2">
+            <button
+              className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
+              style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+              onClick={() => setRecentOpen((v) => !v)}
+            >
+              <span className="flex-grow-1 text-start">Recent</span>
+              <i className={`fa-regular fa-chevron-${recentOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
+            </button>
+            {recentOpen && <WorkflowList items={recent_workflows} />}
+          </div>
+        )}
+
+        {/* Footer: identity menu when logged in, Sign In row when anonymous */}
+        <div className="mt-auto pt-2">
+          {user ? (
+            <IdentityMenu
+              user={user}
+              currentWorkspace={current_workspace}
+              workspaces={workspaces}
+              menuLinks={menu_links}
+              logoutHref={logout_href}
+              switchWorkspaceHref={switch_workspace_href}
+              collapsed={railCollapsed}
+            />
+          ) : (
+            <a
+              href={login_href}
+              className={[
+                "d-flex align-items-center w-100 text-body text-decoration-none rounded p-2 bg-hover-light position-relative",
+                railCollapsed ? "justify-content-center" : "gap-2",
+              ].join(" ")}
+              title={railCollapsed ? "Sign In" : undefined}
+            >
+              <i
+                className="fa-regular fa-right-to-bracket"
+                style={{ width: 18, textAlign: "center", flexShrink: 0 }}
+              />
+              {railCollapsed ? (
+                <RailTooltip label="Sign In" />
+              ) : (
+                <span className="fw-semibold">Sign In</span>
+              )}
+            </a>
+          )}
+        </div>
+      </nav>
+    </>
   );
 }
