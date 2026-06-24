@@ -4,8 +4,7 @@
   height: 100vh;
   position: sticky;
   top: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   transition: width 200ms ease;
 }
 
@@ -13,18 +12,27 @@
   width: 66px;
 }
 
-/* Thin custom scrollbar for the rail */
-.nav-sidebar::-webkit-scrollbar {
+/* Only the middle region scrolls; header + New (above) and the footer (below)
+   stay pinned. */
+.nav-scroll-region {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Thin custom scrollbar for the scroll region */
+.nav-scroll-region::-webkit-scrollbar {
   width: 4px;
 }
-.nav-sidebar::-webkit-scrollbar-track {
+.nav-scroll-region::-webkit-scrollbar-track {
   background: transparent;
 }
-.nav-sidebar::-webkit-scrollbar-thumb {
+.nav-scroll-region::-webkit-scrollbar-thumb {
   background-color: rgba(0, 0, 0, 0.15);
   border-radius: 2px;
 }
-.nav-sidebar {
+.nav-scroll-region {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
@@ -32,6 +40,17 @@
 /* Collapsed nav item links: full-width centered icon */
 .nav-sidebar--collapsed .nav-item-link {
   width: 100%;
+}
+
+/* Hover + active (current page) background for nav items */
+.nav-item-link {
+  transition: background-color 100ms ease;
+}
+.nav-item-link:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+.nav-item-link--active {
+  background-color: rgba(0, 0, 0, 0.08);
 }
 
 /* Rail tooltip — dark pill that appears to the right on hover */
