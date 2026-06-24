@@ -119,7 +119,6 @@ from usage_costs.twilio_usage_cost import (
     get_ivr_price_credits_and_seconds,
 )
 from widgets.demo_button import render_demo_buttons_header
-from widgets.prompt_library import render_prompt_library
 from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
 
@@ -915,7 +914,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
             style=dict(maxHeight="50vh"),
             help=field_desc(self.RequestModel, "bot_script"),
         )
-        render_prompt_library()
 
         language_model = language_model_selector(
             label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
