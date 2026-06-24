@@ -845,7 +845,9 @@ def side_bar_page_wrapper(
     except KeyError:
         default_collapsed = request.session.get(_nav_collapsed_key, False)
 
-    with gui.div(className="d-flex min-vh-100 w-100"):
+    # Column on mobile (rail collapses to an off-canvas drawer + top bar),
+    # row on desktop (rail beside content).
+    with gui.div(className="d-flex flex-column flex-lg-row min-vh-100 w-100"):
         # Left nav rail — full-bleed, flush to the viewport edge.
         gui.model_component(build_props(request, default_collapsed=default_collapsed))
 
