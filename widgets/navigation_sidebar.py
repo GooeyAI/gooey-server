@@ -40,7 +40,7 @@ def _card_to_nav_workflow(card: WorkflowCardData) -> NavWorkflowData:
 def build_props(request: Request, default_collapsed: bool = False) -> NavigationSidebarProps:
     from routers.root import explore_page, home_page
     from routers.account import account_route, members_route, profile_route, saved_route
-    from routers.base_auth import logout
+    from routers.base_auth import get_login_url, logout
     from routers.workspace import switch_workspace_route
     from widgets.home import _load_recent_workflows, _load_saved_workflows, _saved_workflows_href
     from workspaces.widgets import get_current_workspace
@@ -71,14 +71,49 @@ def build_props(request: Request, default_collapsed: bool = False) -> Navigation
     recent_cards = _load_recent_workflows(user, workspace)[:10]
     saved_cards = _load_saved_workflows(user, workspace)
 
+    explore_item = NavItemData(
+        key="explore",
+        label="Explore",
+        icon="fa-regular fa-magnifying-glass",
+        href=explore_path,
+    )
+    # Public links shared by both rails (Docs/API/Blog/…). Explore is dropped
+    # here since it is already a primary nav item.
+    public_links = [
+        MenuLinkData(label=label, href=url, icon=settings.HEADER_ICONS.get(url))
+        for url, label in settings.HEADER_LINKS
+        if label != "Explore"
+    ]
+
     nav_user: NavUserData | None = None
     current_workspace_data: WorkspaceData | None = None
     workspaces_data: list[WorkspaceData] = []
-    menu_links: list[MenuLinkData] = []
     logout_href = ""
     switch_workspace_href = ""
 
-    if not is_anonymous:
+    if is_anonymous:
+        # Reduced rail: logo + Explore + public links, with a Sign In footer.
+        nav_items = [explore_item]
+        menu_links = public_links
+        login_href = get_login_url(request)
+    else:
+        nav_items = [
+            NavItemData(
+                key="home",
+                label="Home",
+                icon="fa-regular fa-house",
+                href=home_path,
+            ),
+            explore_item,
+            NavItemData(
+                key="saved",
+                label="Saved",
+                icon="fa-regular fa-floppy-disk",
+                href=saved_path,
+            ),
+        ]
+        login_href = "/login/"
+
         nav_user = NavUserData(
             name=user.display_name or user.first_name(),
             initial=(user.first_name() or "?")[:1].upper(),
@@ -112,13 +147,8 @@ def build_props(request: Request, default_collapsed: bool = False) -> Navigation
                 href=get_route_path(members_route),
                 icon="fa-regular fa-users",
             ),
+            *public_links,
         ]
-        for url, label in settings.HEADER_LINKS:
-            if label == "Explore":
-                continue  # already a primary nav item
-            menu_links.append(
-                MenuLinkData(label=label, href=url, icon=settings.HEADER_ICONS.get(url))
-            )
 
         logout_href = get_route_path(logout)
 
@@ -129,26 +159,7 @@ def build_props(request: Request, default_collapsed: bool = False) -> Navigation
 
     return NavigationSidebarProps(
         logo_image_url=settings.GOOEY_LOGO_IMG,
-        nav_items=[
-            NavItemData(
-                key="home",
-                label="Home",
-                icon="fa-regular fa-house",
-                href=home_path,
-            ),
-            NavItemData(
-                key="explore",
-                label="Explore",
-                icon="fa-regular fa-magnifying-glass",
-                href=explore_path,
-            ),
-            NavItemData(
-                key="saved",
-                label="Saved",
-                icon="fa-regular fa-floppy-disk",
-                href=saved_path,
-            ),
-        ],
+        nav_items=nav_items,
         active_key=active_key,
         new_href="/explore2/",
         default_collapsed=default_collapsed,
@@ -161,4 +172,5 @@ def build_props(request: Request, default_collapsed: bool = False) -> Navigation
         menu_links=menu_links,
         logout_href=logout_href,
         switch_workspace_href=switch_workspace_href,
+        login_href=login_href,
     )

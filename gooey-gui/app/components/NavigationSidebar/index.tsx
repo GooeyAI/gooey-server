@@ -80,6 +80,7 @@ export function NavigationSidebar({
   menu_links,
   logout_href,
   switch_workspace_href,
+  login_href,
   onChange,
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
@@ -164,19 +165,21 @@ export function NavigationSidebar({
         )}
       </div>
 
-      {/* Sticky "New" button */}
-      <a
-        href={new_href}
-        className={[
-          "btn btn-primary d-flex align-items-center mb-2 fw-semibold",
-          collapsed ? "justify-content-center px-0" : "gap-2",
-        ].join(" ")}
-        title={collapsed ? "New" : undefined}
-        style={{ position: "relative" }}
-      >
-        <i className="fa-regular fa-plus" />
-        {collapsed ? <RailTooltip label="New" /> : <span>New</span>}
-      </a>
+      {/* Sticky "New" button (logged-in only) */}
+      {user && (
+        <a
+          href={new_href}
+          className={[
+            "btn btn-primary d-flex align-items-center mb-2 fw-semibold",
+            collapsed ? "justify-content-center px-0" : "gap-2",
+          ].join(" ")}
+          title={collapsed ? "New" : undefined}
+          style={{ position: "relative" }}
+        >
+          <i className="fa-regular fa-plus" />
+          {collapsed ? <RailTooltip label="New" /> : <span>New</span>}
+        </a>
+      )}
 
       {/* Primary nav items */}
       <div className="d-flex flex-column gap-1">
@@ -191,8 +194,8 @@ export function NavigationSidebar({
           />
         ))}
 
-        {/* When collapsed, Recent appears as a single clock item */}
-        {collapsed && (
+        {/* When collapsed, Recent appears as a single clock item (logged-in) */}
+        {collapsed && user && (
           <NavItem
             key="recent-collapsed"
             icon="fa-regular fa-clock-rotate-left"
@@ -203,6 +206,27 @@ export function NavigationSidebar({
           />
         )}
       </div>
+
+      {/* Anonymous rail: public links (Docs/API/…) rendered directly in the rail */}
+      {!user && !collapsed && menu_links.length > 0 && (
+        <div className="d-flex flex-column gap-1 mt-2">
+          {menu_links.map((link, i) => (
+            <a
+              key={i}
+              href={link.href}
+              className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body"
+            >
+              {link.icon && (
+                <i
+                  className={link.icon}
+                  style={{ width: 18, textAlign: "center", flexShrink: 0 }}
+                />
+              )}
+              <span>{link.label}</span>
+            </a>
+          ))}
+        </div>
+      )}
 
       {/* Saved tree — only when expanded and there are saved workflows */}
       {!collapsed && saved_workflows.length > 0 && (
@@ -247,9 +271,9 @@ export function NavigationSidebar({
         </div>
       )}
 
-      {/* Footer identity (logged-in only; anonymous arrives in a later task) */}
-      {user && (
-        <div className="mt-auto pt-2">
+      {/* Footer: identity menu when logged in, Sign In row when anonymous */}
+      <div className="mt-auto pt-2">
+        {user ? (
           <IdentityMenu
             user={user}
             currentWorkspace={current_workspace}
@@ -259,8 +283,27 @@ export function NavigationSidebar({
             switchWorkspaceHref={switch_workspace_href}
             collapsed={collapsed}
           />
-        </div>
-      )}
+        ) : (
+          <a
+            href={login_href}
+            className={[
+              "d-flex align-items-center w-100 text-body text-decoration-none rounded p-2 bg-hover-light position-relative",
+              collapsed ? "justify-content-center" : "gap-2",
+            ].join(" ")}
+            title={collapsed ? "Sign In" : undefined}
+          >
+            <i
+              className="fa-regular fa-right-to-bracket"
+              style={{ width: 18, textAlign: "center", flexShrink: 0 }}
+            />
+            {collapsed ? (
+              <RailTooltip label="Sign In" />
+            ) : (
+              <span className="fw-semibold">Sign In</span>
+            )}
+          </a>
+        )}
+      </div>
     </nav>
   );
 }
