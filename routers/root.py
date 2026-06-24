@@ -708,7 +708,7 @@ def render_recipe_page(
 
     page.load_state()
 
-    with page_wrapper(request, page=page):
+    with side_bar_page_wrapper(request, page=page):
         page.render()
 
     return dict(
@@ -849,7 +849,9 @@ def side_bar_page_wrapper(
     # row on desktop (rail beside content).
     with gui.div(className="d-flex flex-column flex-lg-row min-vh-100 w-100"):
         # Left nav rail — full-bleed, flush to the viewport edge.
-        gui.model_component(build_props(request, default_collapsed=default_collapsed))
+        gui.model_component(
+            build_props(request, default_collapsed=default_collapsed, page=page)
+        )
 
         # Main content column. The Builder sidebar is mounted INSIDE this column
         # (not around the whole row) so its container does not clamp or indent
@@ -867,19 +869,13 @@ def side_bar_page_wrapper(
                 gui.html(copy_to_clipboard_scripts)
 
                 if request.user and not request.user.is_anonymous:
-                    launcher_div = gui.div()
-
                     current_workspace = global_workspace_selector(
                         request.user, request.session
                     )
 
+                    # The rail's own Builder button replaces the old fixed
+                    # launcher; only mount the sidebar contents here.
                     if display_gooey_builder:
-                        with launcher_div:
-                            render_gooey_builder_launcher(
-                                sidebar_key="builder-sidebar",
-                                request=request,
-                                workspace=current_workspace,
-                            )
                         with sidebar:
                             render_gooey_builder(
                                 sidebar_key="builder-sidebar",

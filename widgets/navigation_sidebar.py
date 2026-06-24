@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import typing
+
 from starlette.requests import Request
 
 from daras_ai_v2 import settings
@@ -11,6 +13,7 @@ from gooey_gui.types.home_page_props import (
     WorkflowCardData,
 )
 from gooey_gui.types.navigation_sidebar_props import (
+    GooeyBuilderData,
     MenuLinkData,
     NavItemData,
     NavUserData,
@@ -18,6 +21,9 @@ from gooey_gui.types.navigation_sidebar_props import (
     NavigationSidebarProps,
     WorkspaceData,
 )
+
+if typing.TYPE_CHECKING:
+    from daras_ai_v2.base import BasePage
 
 
 def _card_to_nav_workflow(card: WorkflowCardData) -> NavWorkflowData:
@@ -37,8 +43,12 @@ def _card_to_nav_workflow(card: WorkflowCardData) -> NavWorkflowData:
     )
 
 
-def build_props(request: Request, default_collapsed: bool = False) -> NavigationSidebarProps:
-    from routers.root import explore_page, home_page
+def build_props(
+    request: Request,
+    default_collapsed: bool = False,
+    page: "BasePage | None" = None,
+) -> NavigationSidebarProps:
+    from routers.root import RecipeTabs, explore_page, home_page
     from routers.account import account_route, members_route, profile_route, saved_route
     from routers.base_auth import get_login_url, logout
     from routers.workspace import switch_workspace_route
@@ -157,6 +167,30 @@ def build_props(request: Request, default_collapsed: bool = False) -> Navigation
             switch_workspace_route, path_params={"workspace_id": 0}
         ).replace("/0/", "/{workspace_id}/")
 
+    # Gooey Builder button: only on recipe run/preview pages where the builder
+    # can launch. Photo comes from the same branding source as the old launcher.
+    gooey_builder_data: GooeyBuilderData | None = None
+    if page is not None and page.tab in (RecipeTabs.run, RecipeTabs.preview):
+        from daras_ai_v2.gooey_builder import (
+            DEFAULT_GOOEY_BUILDER_PHOTO_URL,
+            can_launch_gooey_builder,
+        )
+
+        if can_launch_gooey_builder(request, workspace):
+            from bots.models import BotIntegration
+
+            try:
+                bi = BotIntegration.objects.get(
+                    id=settings.GOOEY_BUILDER_INTEGRATION_ID
+                )
+            except BotIntegration.DoesNotExist:
+                pass
+            else:
+                photo_url = bi.get_web_widget_branding().get(
+                    "photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL
+                )
+                gooey_builder_data = GooeyBuilderData(photo_url=photo_url)
+
     return NavigationSidebarProps(
         logo_image_url=settings.GOOEY_LOGO_IMG,
         nav_items=nav_items,
@@ -173,4 +207,5 @@ def build_props(request: Request, default_collapsed: bool = False) -> Navigation
         logout_href=logout_href,
         switch_workspace_href=switch_workspace_href,
         login_href=login_href,
+        gooey_builder=gooey_builder_data,
     )

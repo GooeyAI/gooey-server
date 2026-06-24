@@ -81,6 +81,7 @@ export function NavigationSidebar({
   logout_href,
   switch_workspace_href,
   login_href,
+  gooey_builder,
   onChange,
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
@@ -145,6 +146,7 @@ export function NavigationSidebar({
             src={logo_image_url}
             alt="Gooey.AI"
             height={20}
+            width={100}
             className="img-fluid"
           />
         </a>
@@ -186,6 +188,7 @@ export function NavigationSidebar({
                 src={logo_image_url}
                 alt="Gooey.AI"
                 height={22}
+                width={120}
                 className="img-fluid"
                 style={{ flexShrink: 0 }}
               />
@@ -230,7 +233,7 @@ export function NavigationSidebar({
           <a
             href={new_href}
             className={[
-              "btn btn-primary d-flex align-items-center mb-2 fw-semibold",
+              "btn d-flex align-items-center mb-2 fw-semibold",
               railCollapsed ? "justify-content-center px-0" : "gap-2",
             ].join(" ")}
             title={railCollapsed ? "New" : undefined}
@@ -293,11 +296,19 @@ export function NavigationSidebar({
           <div className="mt-2">
             <button
               className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
-              style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
               onClick={() => setSavedOpen((v) => !v)}
             >
               <span className="flex-grow-1 text-start">Saved</span>
-              <i className={`fa-regular fa-chevron-${savedOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
+              <i
+                className={`fa-regular fa-chevron-${savedOpen ? "down" : "right"}`}
+                style={{ fontSize: 11 }}
+              />
             </button>
             {savedOpen && (
               <div className="saved-tree">
@@ -321,18 +332,54 @@ export function NavigationSidebar({
           <div className="mt-2">
             <button
               className="btn btn-link text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
-              style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
               onClick={() => setRecentOpen((v) => !v)}
             >
               <span className="flex-grow-1 text-start">Recent</span>
-              <i className={`fa-regular fa-chevron-${recentOpen ? "down" : "right"}`} style={{ fontSize: 11 }} />
+              <i
+                className={`fa-regular fa-chevron-${recentOpen ? "down" : "right"}`}
+                style={{ fontSize: 11 }}
+              />
             </button>
             {recentOpen && <WorkflowList items={recent_workflows} />}
           </div>
         )}
 
-        {/* Footer: identity menu when logged in, Sign In row when anonymous */}
-        <div className="mt-auto pt-2">
+        {/* Footer group: Gooey Builder button (recipe pages) above identity */}
+        <div className="mt-auto pt-2 d-flex flex-column gap-2">
+          {gooey_builder && (
+            <button
+              type="button"
+              className={[
+                "btn btn-light border d-flex align-items-center position-relative",
+                railCollapsed ? "justify-content-center p-1" : "gap-2 p-2",
+              ].join(" ")}
+              title={railCollapsed ? "Gooey Builder" : undefined}
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("builder-sidebar:open"))
+              }
+            >
+              <img
+                src={gooey_builder.photo_url}
+                alt=""
+                width={28}
+                height={28}
+                className="rounded-circle flex-shrink-0"
+                style={{ objectFit: "cover" }}
+              />
+              {railCollapsed ? (
+                <RailTooltip label="Gooey Builder" />
+              ) : (
+                <span className="fw-semibold">Gooey Builder</span>
+              )}
+            </button>
+          )}
+
           {user ? (
             <IdentityMenu
               user={user}
