@@ -8,6 +8,24 @@
 
 **Tech Stack:** Python 3.10 / pydantic / FastAPI + `gooey_gui`; React 17 + TypeScript; Bootstrap 5 utilities; FontAwesome Pro kit (already loaded globally).
 
+## Progress (as of 2026-06-24)
+
+- ✅ **Task 1** Foundation rail — `9994e3f6`
+- ✅ **Task 2** Collapse + session persistence — `add3cb55`
+- ✅ **Task 3** Recent + Saved lists — `125f8b08`
+- ✅ **Task 4** Identity menu + workspace switch — `9be7ef11` (verified live: popover, workspace switch)
+- ✅ **Full-width layout fix** — `7573d043` (Builder sidebar now mounts *inside* the content column so the rail is full-bleed)
+- ✅ **Task 5** Anonymous reduced rail — `9730dc93` (verified live)
+- ✅ **Task 6** Mobile off-canvas drawer — `bc87b750` (verified at 390px + 1440px)
+- ✅ **Task 7** Gooey Builder button on recipe pages — `75f25782` (verified live: button opens existing Builder sidebar)
+- ✅ **Duplicate workspace selector removed** from `side_bar_page_wrapper` — `02746f67`
+- ⏸️ **Task 8** Global rollout + retire `page_wrapper` — **PAUSED by user.**
+
+**Open items for Task 8 (when resumed):**
+- Remaining `page_wrapper` callers: `routers/root.py` (193, 211, 225, 259, 497, 655), `routers/account.py` (`account_page_wrapper` + line 59), `routers/local_auth.py` (43, 70). Then delete `page_wrapper`.
+- **⚠️ Explore search bar:** `page_wrapper` renders the header search (`show_search_bar`/`search_filters`/mobile search button); `side_bar_page_wrapper` does not. Migrating Explore drops in-page search — needs a rail-search design decision first (user flagged).
+- **Uncommitted (user's WIP, intentionally not on the branch):** `daras_ai_v2/settings.py` (logo URLs), `gooey-gui/app/components/Sidebar.tsx` (`container-xl`→`container-fluid`), `gooey-gui/app/components/HomePage/index.tsx` (dropped `container-xxl my-4`). The `Sidebar.tsx` change is global and becomes relevant once all pages use the rail.
+
 ## Global Constraints
 
 *Every task's requirements implicitly include this section. Copy exact values verbatim.*
