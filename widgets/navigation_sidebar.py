@@ -26,14 +26,28 @@ if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
 
-def _card_to_nav_workflow(card: WorkflowCardData) -> NavWorkflowData:
+def _workspace_subtitle(ws) -> str:
+    """Subtitle for the workspace switcher rows, e.g. "Personal" or
+    "Org · 12 members"."""
+    if ws.is_personal:
+        return "Personal"
+    n = ws.memberships.filter(deleted__isnull=True).count()
+    return f"Org · {n} member" + ("" if n == 1 else "s")
+
+
+def _card_to_nav_workflow(
+    card: WorkflowCardData, fallback_image: str | None = None
+) -> NavWorkflowData:
     image_url: str | None = None
     preview = card.preview
     if isinstance(preview, MediaPreview):
         image_url = preview.preview_img or preview.url
     elif isinstance(preview, IconPreview):
         image_url = preview.image_url
-    # ChatPreview → no image
+    # ChatPreview (and image-less previews) carry no thumbnail → fall back to
+    # the parent published run's photo, like `_pr_preview`.
+    if not image_url:
+        image_url = fallback_image
 
     return NavWorkflowData(
         title=card.title,
@@ -51,8 +65,12 @@ def build_props(
     from routers.root import RecipeTabs, explore_page, home_page
     from routers.account import account_route, members_route, profile_route, saved_route
     from routers.base_auth import get_login_url, logout
-    from routers.workspace import switch_workspace_route
-    from widgets.home import _load_recent_workflows, _load_saved_workflows, _saved_workflows_href
+    from routers.workspace import create_workspace_route, switch_workspace_route
+    from widgets.home import (
+        _load_recent_workflow_cards,
+        _load_saved_workflows,
+        _saved_workflows_href,
+    )
     from workspaces.widgets import get_current_workspace
 
     home_path = get_route_path(home_page)
@@ -78,7 +96,7 @@ def build_props(
         user = request.user
         workspace = get_current_workspace(user, request.session)
 
-    recent_cards = _load_recent_workflows(user, workspace, limit=10)
+    recent_cards = _load_recent_workflow_cards(user, workspace, limit=10)
     saved_cards = _load_saved_workflows(user, workspace)
 
     explore_item = NavItemData(
@@ -100,6 +118,7 @@ def build_props(
     workspaces_data: list[WorkspaceData] = []
     logout_href = ""
     switch_workspace_href = ""
+    add_workspace_href = ""
 
     if is_anonymous:
         # Reduced rail: logo + Explore + public links, with a Sign In footer.
@@ -135,6 +154,7 @@ def build_props(
                 id=ws.id,
                 name=ws.display_name(user),
                 icon_html=ws.html_icon(),
+                subtitle=_workspace_subtitle(ws),
                 is_current=workspace is not None and ws.id == workspace.id,
             )
             workspaces_data.append(ws_data)
@@ -166,6 +186,8 @@ def build_props(
         switch_workspace_href = get_route_path(
             switch_workspace_route, path_params={"workspace_id": 0}
         ).replace("/0/", "/{workspace_id}/")
+
+        add_workspace_href = get_route_path(create_workspace_route)
 
     # Gooey Builder button: only on recipe run/preview pages where the builder
     # can launch. Photo comes from the same branding source as the old launcher.
@@ -199,13 +221,17 @@ def build_props(
         default_collapsed=default_collapsed,
         saved_href=_saved_workflows_href(workspace),
         saved_workflows=[_card_to_nav_workflow(c) for c in saved_cards],
-        recent_workflows=[_card_to_nav_workflow(c) for c in recent_cards],
+        recent_workflows=[
+            _card_to_nav_workflow(card, fallback_image=photo)
+            for card, photo in recent_cards
+        ],
         user=nav_user,
         current_workspace=current_workspace_data,
         workspaces=workspaces_data,
         menu_links=menu_links,
         logout_href=logout_href,
         switch_workspace_href=switch_workspace_href,
+        add_workspace_href=add_workspace_href,
         login_href=login_href,
         gooey_builder=gooey_builder_data,
     )
