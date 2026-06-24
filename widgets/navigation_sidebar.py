@@ -78,7 +78,7 @@ def build_props(
         user = request.user
         workspace = get_current_workspace(user, request.session)
 
-    recent_cards = _load_recent_workflows(user, workspace)[:10]
+    recent_cards = _load_recent_workflows(user, workspace, limit=10)
     saved_cards = _load_saved_workflows(user, workspace)
 
     explore_item = NavItemData(

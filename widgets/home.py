@@ -132,6 +132,7 @@ def _get_greeting(user: AppUser) -> str | None:
 def _load_recent_workflows(
     user: AppUser | None,
     workspace: Workspace | None,
+    limit: int = RECENT_WORKFLOW_LIST_LIMIT,
 ) -> list[WorkflowCardData]:
     if user is None or workspace is None:
         return []
@@ -151,7 +152,7 @@ def _load_recent_workflows(
             continue
         seen_published_runs.add(sr["published_run_id"])
         ids.append(sr["id"])
-        if len(ids) >= RECENT_WORKFLOW_LIST_LIMIT:
+        if len(ids) >= limit:
             break
 
     return [
