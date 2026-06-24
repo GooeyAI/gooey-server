@@ -16,6 +16,7 @@ export interface WorkspaceData {
   id: number;
   name: string;
   icon_html: string;
+  subtitle: string;
   is_current: boolean;
 }
 export interface MenuLinkData {
@@ -45,6 +46,7 @@ export interface NavigationSidebarProps {
   menu_links: MenuLinkData[];
   logout_href: string;
   switch_workspace_href: string;
+  add_workspace_href: string;
   login_href: string;
   gooey_builder: GooeyBuilderData | null;
   default_collapsed: boolean;
