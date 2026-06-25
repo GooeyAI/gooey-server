@@ -348,10 +348,13 @@ def azure_tts_voices() -> dict[str, dict[str, str]]:
 def bark_selector(*, language_filter: str = ""):
     voice_options = list(BARK_ALLOWED_PROMPTS)
     if language_filter:
-        voice_options = [None] + filter_models_by_language(
-            language_filter,
-            {key: [key.split("_")[0]] for key in voice_options if key is not None},
-        )
+        voice_options = [
+            None,
+            *filter_models_by_language(
+                language_filter,
+                {key: [key.split("_")[0]] for key in voice_options if key is not None},
+            ),
+        ]
     gui.selectbox(
         label="""
         ###### Bark History Prompt
