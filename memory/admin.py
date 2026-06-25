@@ -14,6 +14,7 @@ class MemoryEntryAdmin(GooeyModelAdmin):
         "created_at",
         "updated_at",
     )
+    list_filter = ("scope", "updated_at")
     search_fields = ("user_id", "key", "value")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = (

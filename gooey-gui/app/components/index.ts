@@ -7,6 +7,7 @@ export type CustomComponentProps = {
   state: Record<string, any>;
 };
 
+export * from "./WorkspaceMemoryTable";
 export * from "./bulkProgress/BulkProgressCard";
 export * from "./ComposioAuthRequired";
 export * from "./ExploreBuilderPrompt";

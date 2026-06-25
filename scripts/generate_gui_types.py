@@ -120,8 +120,11 @@ def write_schema(schema_path: Path, schema: dict) -> None:
 
 
 def strip_generated_root_union(types_source: str) -> str:
+    # json-schema-to-typescript emits the synthetic root union on a single line
+    # for a few models and wraps it across lines for many; match either form up
+    # to the first terminating semicolon.
     return re.sub(
-        r"^export type Tmp\w+ =(?:\n  \| [^\n]+)+;\n*",
+        r"^export type Tmp\w+ =[\s\S]*?;\n*",
         "",
         types_source,
         count=1,
