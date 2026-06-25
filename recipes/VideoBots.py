@@ -990,7 +990,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
                 options=asr_languages_without_dialects()
             )
 
-            col1, col2 = gui.columns(2, responsive=False)
+            col1, col2 = gui.columns(2)
             with col1:
                 asr_model = asr_model_selector(
                     key="asr_model",
