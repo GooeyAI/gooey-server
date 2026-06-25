@@ -1,6 +1,5 @@
 import typing
 
-
 import gooey_gui as gui
 import langcodes
 
@@ -144,11 +143,7 @@ def lang_format_func(tag: str, *, default: str = "Auto Detect") -> str:
 
 
 def are_languages_same(tag1: str, tag2: str) -> bool:
-    import langcodes
-
-    """
-    Check if two language codes represent the same language.
-    """
+    """Check if two language codes represent the same language."""
     try:
         return (
             langcodes.Language.get(tag1).language
@@ -159,8 +154,6 @@ def are_languages_same(tag1: str, tag2: str) -> bool:
 
 
 def normalised_lang_in_collection(tag: str, collection: typing.Iterable[str]) -> str:
-    import langcodes
-
     if tag in collection:
         return tag
 

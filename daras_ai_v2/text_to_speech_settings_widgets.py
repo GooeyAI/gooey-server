@@ -426,7 +426,6 @@ def uberduck_selector():
         ###### Voice name (Uberduck)
         """,
         key="uberduck_voice_name",
-        format_func=lambda option: f"{option}",
         options=UBERDUCK_VOICES.keys(),
     )
 
@@ -624,7 +623,14 @@ def elevenlabs_settings():
 
 
 def google_tts_language_codes() -> list[str]:
-    return sorted({voice.language_codes[0] for voice in google_tts_voices().values()})
+    import google.auth.exceptions
+
+    try:
+        return sorted(
+            {voice.language_codes[0] for voice in google_tts_voices().values()}
+        )
+    except google.auth.exceptions.DefaultCredentialsError:
+        return []
 
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
@@ -635,7 +641,7 @@ def google_tts_voices() -> dict[str, "texttospeech.Voice"]:
         texttospeech.TextToSpeechClient().list_voices().voices
     )
     voices.sort(key=_voice_sort_key)
-    return {voice.name: voice for voice in voices if voice.language_codes}
+    return {voice.name: voice for voice in voices}
 
 
 def _pretty_voice(voice) -> str:
