@@ -9,6 +9,10 @@ from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.language_filters import (
+    filter_languages,
+    filter_models_by_language,
+)
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from managed_secrets.models import ManagedSecret
 from managed_secrets.widgets import edit_secret_button_with_dialog
@@ -103,69 +107,70 @@ ELEVEN_LABS_MODELS = {
     "eleven_multilingual_v1": "Multilingual V1",
 }
 
-ELEVEN_LABS_SUPPORTED_LANGS = [
-    "English",
-    "Japanese",
-    "Chinese",
-    "German",
-    "Hindi",
-    "French",
-    "Korean",
-    "Portuguese",
-    "Italian",
-    "Spanish",
-    "Indonesian",
-    "Dutch",
-    "Turkish",
-    "Filipino",
-    "Polish",
-    "Swedish",
-    "Bulgarian",
-    "Romanian",
-    "Arabic",
-    "Czech",
-    "Greek",
-    "Finnish",
-    "Croatian",
-    "Malay",
-    "Slovak",
-    "Danish",
-    "Tamil",
-    "Ukrainian",
-    "Russian",
-]
+ELEVEN_LABS_TTS_SUPPORTED_LANGUAGES = [
+    ("English", "en"), ("Japanese", "ja"), ("Chinese", "zh"), ("German", "de"), ("Hindi", "hi"), ("French", "fr"),
+    ("Korean", "ko"), ("Portuguese", "pt"), ("Italian", "it"), ("Spanish", "es"), ("Indonesian", "id"),
+    ("Dutch", "nl"), ("Turkish", "tr"), ("Filipino", "fil"), ("Polish", "pl"), ("Swedish", "sv"),
+    ("Bulgarian", "bg"), ("Romanian", "ro"), ("Arabic", "ar"), ("Czech", "cs"), ("Greek", "el"),
+    ("Finnish", "fi"), ("Croatian", "hr"), ("Malay", "ms"), ("Slovak", "sk"), ("Danish", "da"),
+    ("Tamil", "ta"), ("Ukrainian", "uk"), ("Russian", "ru"),
+]  # fmt: skip
 
-BARK_SUPPORTED_LANGS = [
-    ("English", "en"),
-    ("German", "de"),
-    ("Spanish", "es"),
-    ("French", "fr"),
-    ("Hindi", "hi"),
-    ("Italian", "it"),
-    ("Japanese", "ja"),
-    ("Korean", "ko"),
-    ("Polish", "pl"),
-    ("Portuguese", "pt"),
-    ("Russian", "ru"),
-    ("Turkish", "tr"),
+# https://platform.openai.com/docs/guides/text-to-speech
+OPENAI_TTS_SUPPORTED_LANGUAGES: list[str] = [
+    "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",
+    "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
+    "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy",
+]  # fmt: skip
+
+BARK_TTS_SUPPORTED_LANGUAGES = [
+    ("English", "en"), ("German", "de"), ("Spanish", "es"), ("French", "fr"), ("Hindi", "hi"), ("Italian", "it"),
+    ("Japanese", "ja"), ("Korean", "ko"), ("Polish", "pl"), ("Portuguese", "pt"), ("Russian", "ru"), ("Turkish", "tr"),
     ("Chinese", "zh"),
-]
+]  # fmt: skip
 
 BARK_ALLOWED_PROMPTS = {
     None: "———",
     "announcer": "Announcer",
 } | {
     f"{code}_speaker_{n}": f"Speaker {n} ({lang})"
-    for lang, code in BARK_SUPPORTED_LANGS
+    for lang, code in BARK_TTS_SUPPORTED_LANGUAGES
     for n in range(10)
 }
 
 
-def text_to_speech_provider_selector(page):
+def tts_supported_languages_by_provider() -> dict[TextToSpeechProviders, list[str]]:
+    from modal_functions.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
+
+    return {
+        TextToSpeechProviders.GOOGLE_TTS: google_tts_language_codes(),
+        TextToSpeechProviders.AZURE_TTS: azure_tts_language_codes(),
+        TextToSpeechProviders.MMS_TTS: MMS_TTS_SUPPORTED_LANGUAGES,
+        TextToSpeechProviders.BARK: [code for _, code in BARK_TTS_SUPPORTED_LANGUAGES],
+        TextToSpeechProviders.ELEVEN_LABS: [
+            code for _, code in ELEVEN_LABS_TTS_SUPPORTED_LANGUAGES
+        ],
+        TextToSpeechProviders.OPEN_AI: OPENAI_TTS_SUPPORTED_LANGUAGES,
+        TextToSpeechProviders.UBERDUCK: ["en"],
+        TextToSpeechProviders.GHANA_NLP: ["tw"],
+    }
+
+
+def text_to_speech_provider_selector(page, *, language_filter: str | None = None):
+    tts_provider_options = TextToSpeechProviders
+    if language_filter:
+        tts_provider_options = filter_models_by_language(
+            language_filter, tts_supported_languages_by_provider()
+        )
+        if not tts_provider_options:
+            gui.session_state["tts_provider"] = None
+            gui.error("No TTS provider available for the selected language.", icon="⚠️")
+            return None
+
     col1, col2 = gui.columns(2)
     with col1:
         tts_provider = enum_selector(
-            TextToSpeechProviders,
+            tts_provider_options,
             "###### Text-to-Speech Provider",
             key="tts_provider",
             use_selectbox=True,
@@ -173,21 +178,21 @@ def text_to_speech_provider_selector(page):
     with col2:
         match tts_provider:
             case TextToSpeechProviders.BARK.name:
-                bark_selector()
+                bark_selector(language_filter=language_filter)
             case TextToSpeechProviders.GOOGLE_TTS.name:
-                google_tts_selector()
+                google_tts_selector(language_filter=language_filter)
             case TextToSpeechProviders.UBERDUCK.name:
                 uberduck_selector()
             case TextToSpeechProviders.ELEVEN_LABS.name:
                 elevenlabs_selector(page)
             case TextToSpeechProviders.AZURE_TTS.name:
-                azure_tts_selector()
+                azure_tts_selector(language_filter=language_filter)
             case TextToSpeechProviders.OPEN_AI.name:
                 openai_tts_selector()
             case TextToSpeechProviders.GHANA_NLP.name:
                 ghana_nlp_tts_selector()
             case TextToSpeechProviders.MMS_TTS.name:
-                mms_tts_selector()
+                mms_tts_selector(language_filter=language_filter)
     return tts_provider
 
 
@@ -216,15 +221,18 @@ def ghana_nlp_tts_selector():
     )
 
 
-def mms_tts_selector():
+def mms_tts_selector(*, language_filter: str = ""):
     options = mms_tts_language_options()
+    language_options = list(options.keys())
+    if language_filter:
+        language_options = filter_languages(language_filter, language_options)
     gui.selectbox(
         label="""
         ###### MMS TTS Language
         """,
         key="mms_tts_language",
         format_func=lambda lang: options[lang],
-        options=options,
+        options=language_options,
     )
 
 
@@ -263,18 +271,24 @@ def openai_tts_settings():
     )
 
 
-def azure_tts_selector():
+def azure_tts_selector(*, language_filter: str = ""):
     if settings.AZURE_SPEECH_KEY:
         voices = azure_tts_voices()
     else:
         voices = {}
+    voice_options = list(voices.keys())
+    if language_filter:
+        voice_options = filter_models_by_language(
+            language_filter,
+            {voice: [voices[voice]["Locale"]] for voice in voice_options},
+        )
     gui.selectbox(
         label="""
         ###### Azure TTS Voice name
         """,
         key="azure_voice_name",
         format_func=lambda voice: f"{voices[voice].get('DisplayName')} - {voices[voice].get('LocaleName')}",
-        options=voices.keys(),
+        options=voice_options,
     )
 
 
@@ -302,6 +316,12 @@ def azure_tts_settings():
     )
 
 
+def azure_tts_language_codes() -> list[str]:
+    if not settings.AZURE_SPEECH_KEY:
+        return []
+    return sorted({voice["Locale"] for voice in azure_tts_voices().values()})
+
+
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def azure_tts_voices() -> dict[str, dict[str, str]]:
     # E.g., {"af-ZA-AdriNeural": {
@@ -325,18 +345,24 @@ def azure_tts_voices() -> dict[str, dict[str, str]]:
     return {voice.get("ShortName", "Unknown"): voice for voice in res.json()}
 
 
-def bark_selector():
+def bark_selector(*, language_filter: str = ""):
+    voice_options = list(BARK_ALLOWED_PROMPTS)
+    if language_filter:
+        voice_options = [None] + filter_models_by_language(
+            language_filter,
+            {key: [key.split("_")[0]] for key in voice_options if key is not None},
+        )
     gui.selectbox(
         label="""
         ###### Bark History Prompt
         """,
         key="bark_history_prompt",
         format_func=BARK_ALLOWED_PROMPTS.__getitem__,
-        options=BARK_ALLOWED_PROMPTS.keys(),
+        options=voice_options,
     )
 
 
-def google_tts_selector():
+def google_tts_selector(*, language_filter: str | None = None):
     import google.auth.exceptions
 
     try:
@@ -344,13 +370,19 @@ def google_tts_selector():
     except google.auth.exceptions.DefaultCredentialsError:
         gui.error("Error fetching Google TTS voices. Please check your credentials.")
         return
+    voice_options = list(voices.keys())
+    if language_filter:
+        voice_options = filter_models_by_language(
+            language_filter,
+            {voice: [voices[voice].language_codes[0]] for voice in voice_options},
+        )
     gui.selectbox(
         label="""
         ###### Voice name (Google TTS)
         """,
         key="google_voice_name",
-        format_func=voices.__getitem__,
-        options=voices.keys(),
+        format_func=lambda voice: _pretty_voice(voices[voice]),
+        options=voice_options,
     )
     gui.caption(
         "*Please refer to the list of voice names [here](https://cloud.google.com/text-to-speech/docs/voices)*",
@@ -583,19 +615,24 @@ def elevenlabs_settings():
     ):
         gui.caption("With Multilingual V2 voice model", style={"fontSize": "0.8rem"})
         gui.caption(
-            ", ".join(ELEVEN_LABS_SUPPORTED_LANGS), style={"fontSize": "0.8rem"}
+            ", ".join(label for label, _ in ELEVEN_LABS_TTS_SUPPORTED_LANGUAGES),
+            style={"fontSize": "0.8rem"},
         )
 
 
+def google_tts_language_codes() -> list[str]:
+    return sorted({voice.language_codes[0] for voice in google_tts_voices().values()})
+
+
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
-def google_tts_voices() -> dict[str, str]:
+def google_tts_voices() -> dict[str, "texttospeech.Voice"]:
     from google.cloud import texttospeech
 
     voices: list[texttospeech.Voice] = list(
         texttospeech.TextToSpeechClient().list_voices().voices
     )
     voices.sort(key=_voice_sort_key)
-    return {voice.name: _pretty_voice(voice) for voice in voices}
+    return {voice.name: voice for voice in voices if voice.language_codes}
 
 
 def _pretty_voice(voice) -> str:

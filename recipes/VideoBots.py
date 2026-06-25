@@ -26,7 +26,6 @@ from daras_ai_v2.asr import (
     TranslationModels,
     asr_language_selector,
     asr_model_selector,
-    language_filter_selector,
     run_asr,
     run_translate,
     should_translate_lang,
@@ -56,7 +55,10 @@ from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
-from daras_ai_v2.language_filters import asr_languages_without_dialects
+from daras_ai_v2.language_filters import (
+    asr_languages_without_dialects,
+    language_filter_selector,
+)
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_SYSTEM,
@@ -1058,7 +1060,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
     def text_to_speech_settings(self):
         with gui.div(className="pt-2 ps-1"):
-            text_to_speech_provider_selector(self)
+            selected_filter_language = language_filter_selector(
+                options=asr_languages_without_dialects()
+            )
+            text_to_speech_provider_selector(
+                self, language_filter=selected_filter_language
+            )
 
         gui.newline()
 

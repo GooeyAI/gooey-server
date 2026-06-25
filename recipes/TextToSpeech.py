@@ -16,6 +16,10 @@ from daras_ai_v2.asr import GHANA_API_AUTH_HEADERS
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task_outfile
+from daras_ai_v2.language_filters import (
+    language_filter_selector,
+    tts_languages_without_dialects,
+)
 from daras_ai_v2.loom_video_widget import youtube_video
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -103,7 +107,10 @@ class TextToSpeechPage(BasePage):
             """,
             key="text_prompt",
         )
-        text_to_speech_provider_selector(self)
+        selected_filter_language = language_filter_selector(
+            options=tts_languages_without_dialects(),
+        )
+        text_to_speech_provider_selector(self, language_filter=selected_filter_language)
 
     def validate_form_v2(self):
         assert gui.session_state.get("text_prompt"), "Text input cannot be empty"
