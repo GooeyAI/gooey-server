@@ -58,6 +58,7 @@ from daras_ai_v2.glossary import validate_glossary_document
 from daras_ai_v2.language_filters import (
     asr_languages_without_dialects,
     language_filter_selector,
+    tts_languages_without_dialects,
 )
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
@@ -987,7 +988,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
             # drop down to filter models based on the selected language
             selected_filter_language = language_filter_selector(
-                options=asr_languages_without_dialects()
+                options=asr_languages_without_dialects(),
+                key="asr_language_filter",
             )
 
             col1, col2 = gui.columns(2)
@@ -1063,7 +1065,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
     def text_to_speech_settings(self):
         with gui.div(className="pt-2 ps-1"):
             selected_filter_language = language_filter_selector(
-                options=asr_languages_without_dialects()
+                options=tts_languages_without_dialects(),
+                key="tts_language_filter",
             )
             text_to_speech_provider_selector(
                 self, language_filter=selected_filter_language
