@@ -23,13 +23,43 @@ class _TriggerData(typing.NamedTuple):
     db_value: int
 
 
-class ScopeParts(GooeyEnum):
-    workspace = "workspaces"
-    member = "members"
-    saved_workflow = "saved"
-    platform_user = "users"
-    deployment = "deployments"
-    conversation = "conversations"
+class ScopePart(typing.NamedTuple):
+    value: str
+    label: str
+    icon: str
+
+
+class ScopeParts(ScopePart, GooeyEnum):
+    workspace = ScopePart(
+        value="workspaces",
+        label="Workspace",
+        icon=icons.company,
+    )
+    member = ScopePart(
+        value="members",
+        label="Member",
+        icon=icons.profile,
+    )
+    saved_workflow = ScopePart(
+        value="saved",
+        label="Saved Workflow",
+        icon=icons.save,
+    )
+    platform_user = ScopePart(
+        value="users",
+        label="Platform User",
+        icon=icons.platform_user,
+    )
+    deployment = ScopePart(
+        value="deployments",
+        label="Deployment",
+        icon=icons.deployment,
+    )
+    conversation = ScopePart(
+        value="conversations",
+        label="Conversation",
+        icon=icons.conversation,
+    )
 
     def get_user_id_fmt(
         self,
@@ -73,34 +103,34 @@ class FunctionScope(typing.NamedTuple):
 class FunctionScopes(FunctionScope, GooeyEnum):
     workspace = FunctionScope(
         db_value=1,
-        icon=icons.company,
+        icon=ScopeParts.workspace.icon,
         label="Workspace Members",
         parts=(ScopeParts.workspace,),
     )
 
     workspace_member = FunctionScope(
         db_value=2,
-        icon=icons.profile,
+        icon=ScopeParts.member.icon,
         label="My Runs & Deployments",
         parts=(ScopeParts.workspace, ScopeParts.member),
     )
 
     deployment_user = FunctionScope(
         db_value=3,
-        icon=f'<img width="24" height="24" src="{icons.integrations_img}">',
-        label="&nbsp; User of any Deployment",
+        icon=ScopeParts.deployment.icon,
+        label="User of any Deployment",
         parts=(ScopeParts.workspace, ScopeParts.deployment, ScopeParts.platform_user),
     )
 
     saved_workflow = FunctionScope(
         db_value=4,
-        icon=icons.save,
+        icon=ScopeParts.saved_workflow.icon,
         label="Saved Workflow",
         parts=(ScopeParts.workspace, ScopeParts.saved_workflow),
     )
     saved_workflow_user = FunctionScope(
         db_value=5,
-        icon='<i class="fa-regular fa-user-message"></i>',
+        icon=ScopeParts.platform_user.icon,
         label="User of Saved Workflow",
         parts=(
             ScopeParts.workspace,
@@ -111,7 +141,7 @@ class FunctionScopes(FunctionScope, GooeyEnum):
 
     conversation = FunctionScope(
         db_value=6,
-        icon='<i class="fa-regular fa-message"></i>',
+        icon=ScopeParts.conversation.icon,
         label="Chat Conversation",
         parts=(
             ScopeParts.workspace,
@@ -146,7 +176,7 @@ class FunctionScopes(FunctionScope, GooeyEnum):
             case cls.deployment_user if workspace:
                 icon = (
                     '<div style="position: relative; display: inline-block; margin-left: -4px; margin-right: 10px;">'
-                    f"{scope.icon}"
+                    f'<img width="24" height="24" src="{icons.integrations_img}">'
                     '<span class="fa-stack" style="position: absolute; bottom: -12px; left: 8px;">'
                     '<i class="fa-solid fa-circle fa-xl" style="color: rgba(200, 200, 200, 0.6);"></i>'
                     '<i class="fa-solid fa-user-message fa-xs fa-stack-1x" color="darkslategrey"></i>'
