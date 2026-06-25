@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import typing
 
-import gooey_gui as gui
 from django.db import models
 from pydantic import BaseModel, Field
 from typing_extensions import NotRequired, TypedDict
@@ -14,8 +13,9 @@ from daras_ai_v2.pydantic_validation import HttpUrlStr
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
-    from bots.models import PublishedRun
+    from bots.models import PublishedRun, SavedRun
     from workspaces.models import Workspace
+    from memory.models import MemoryEntry
 
 
 class _TriggerData(typing.NamedTuple):
@@ -31,38 +31,75 @@ class ScopeParts(GooeyEnum):
     deployment = "deployments"
     conversation = "conversations"
 
+    def get_user_id_fmt(
+        self,
+        *,
+        workspace: Workspace,
+        user: AppUser | None,
+        published_run: PublishedRun | None,
+        variables: dict,
+    ) -> str:
+        value = None
+        match self:
+            case ScopeParts.workspace:
+                value = workspace.id
+            case ScopeParts.member:
+                if user is None:
+                    raise UserError("Missing user for member scope.")
+                value = user.id
+            case ScopeParts.saved_workflow:
+                if published_run is None:
+                    raise UserError("Missing published run for saved workflow scope.")
+                value = published_run.published_run_id
+            case ScopeParts.platform_user:
+                value = _resolve_platform_user(variables)
+            case ScopeParts.deployment:
+                value = variables.get("integration_id")
+            case ScopeParts.conversation:
+                value = variables.get("conversation_id")
+        if value:
+            return f"{self.value}/{value}"
+        else:
+            return str(self.value)
+
 
 class FunctionScope(typing.NamedTuple):
+    db_value: int
     icon: str
     label: str
-    parts: tuple[ScopeParts] = []
+    parts: typing.Sequence[ScopeParts] = ()
 
 
 class FunctionScopes(FunctionScope, GooeyEnum):
     workspace = FunctionScope(
+        db_value=1,
         icon=icons.company,
         label="Workspace Members",
         parts=(ScopeParts.workspace,),
     )
 
     workspace_member = FunctionScope(
+        db_value=2,
         icon=icons.profile,
         label="My Runs & Deployments",
         parts=(ScopeParts.workspace, ScopeParts.member),
     )
 
     deployment_user = FunctionScope(
+        db_value=3,
         icon=f'<img width="24" height="24" src="{icons.integrations_img}">',
         label="&nbsp; User of any Deployment",
         parts=(ScopeParts.workspace, ScopeParts.deployment, ScopeParts.platform_user),
     )
 
     saved_workflow = FunctionScope(
+        db_value=4,
         icon=icons.save,
         label="Saved Workflow",
         parts=(ScopeParts.workspace, ScopeParts.saved_workflow),
     )
     saved_workflow_user = FunctionScope(
+        db_value=5,
         icon='<i class="fa-regular fa-user-message"></i>',
         label="User of Saved Workflow",
         parts=(
@@ -73,6 +110,7 @@ class FunctionScopes(FunctionScope, GooeyEnum):
     )
 
     conversation = FunctionScope(
+        db_value=6,
         icon='<i class="fa-regular fa-message"></i>',
         label="Chat Conversation",
         parts=(
@@ -155,38 +193,72 @@ class FunctionScopes(FunctionScope, GooeyEnum):
         workspace: Workspace,
         user: AppUser | None = None,
         published_run: PublishedRun | None = None,
+        variables: dict | None = None,
     ) -> str:
-        if scope:
-            scope_parts = set(scope.parts)
-        else:
-            scope_parts = {ScopeParts.workspace}
-
-        parts = []
-        if ScopeParts.workspace in scope_parts:
-            parts += [ScopeParts.workspace.value, workspace.id]
-        if ScopeParts.member in scope_parts:
-            if user is None:
-                raise UserError("Missing user for member scope.")
-            parts += [ScopeParts.member.value, user.id]
-        if ScopeParts.saved_workflow in scope_parts:
-            if published_run is None:
-                raise UserError("Missing published run for saved workflow scope.")
-            parts += [ScopeParts.saved_workflow.value, published_run.published_run_id]
-        variables = gui.session_state.get("variables", {})
-        if ScopeParts.deployment in scope_parts:
-            parts += [ScopeParts.deployment.value, variables.get("integration_id")]
-        if ScopeParts.platform_user in scope_parts:
-            platform_user_id = (
-                variables.get("slack_user_id")
-                or variables.get("web_user_id")
-                or variables.get("user_wa_phone_number")
-                or variables.get("user_twilio_phone_number")
+        if scope is None:
+            scope = cls.workspace
+        return "/".join(
+            part.get_user_id_fmt(
+                workspace=workspace,
+                user=user,
+                published_run=published_run,
+                variables=variables or {},
             )
-            parts += [ScopeParts.platform_user.value, platform_user_id]
-        if ScopeParts.conversation in scope_parts:
-            parts += [ScopeParts.conversation.value, variables.get("conversation_id")]
+            for part in scope.parts
+        )
 
-        return "/".join(str(part) for part in parts if part)
+    def build_memory_entry(
+        self,
+        *,
+        saved_run: SavedRun,
+        workspace: Workspace,
+        user: AppUser | None,
+        published_run: PublishedRun | None,
+        variables: dict | None = None,
+    ) -> MemoryEntry:
+        from memory.models import MemoryEntry
+
+        variables = variables or {}
+
+        return MemoryEntry(
+            user_id=self.get_user_id_for_scope(
+                scope=self,
+                workspace=workspace,
+                user=user,
+                published_run=published_run,
+                variables=variables,
+            ),
+            saved_run=saved_run,
+            scope=self.db_value,
+            workspace=workspace,
+            member=user,
+            saved_workflow=published_run,
+            platform_user=_resolve_platform_user(variables) or "",
+            deployment_id=_decode_api_hashid(variables.get("integration_id")),
+            conversation_id=_decode_api_hashid(variables.get("conversation_id")),
+        )
+
+
+def _resolve_platform_user(variables: dict) -> str | None:
+    return (
+        variables.get("slack_user_id")
+        or variables.get("web_user_id")
+        or variables.get("user_wa_phone_number")
+        or variables.get("user_twilio_phone_number")
+    )
+
+
+def _decode_api_hashid(value: str | None) -> int | None:
+    if not value:
+        return None
+    # Imported lazily: routers.bots_api imports the models layer, so a top-level
+    # import here would create a circular import.
+    from routers.bots_api import api_hashids
+
+    decoded = api_hashids.decode(value)
+    if not decoded:
+        return None
+    return decoded[0]
 
 
 class FunctionTrigger(_TriggerData, GooeyEnum):

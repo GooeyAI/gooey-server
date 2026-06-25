@@ -7,7 +7,6 @@ from enum import Enum
 
 import gooey_gui as gui
 import requests
-from django.utils import timezone
 from functools import cached_property
 from furl import furl
 from pydantic import BaseModel, Field
@@ -142,8 +141,8 @@ class FunctionsPage(BasePage):
         yield "Running your code..."
 
         variables = request.variables or {}
-        gooey_memory_before, memory_user_id = self._load_gooey_memory_for_scope(
-            request.memory_scope
+        memory_entry, gooey_memory_before = self._load_gooey_memory_for_scope(
+            request.memory_scope, variables
         )
         gooey_memory_after = None
 
@@ -169,7 +168,7 @@ class FunctionsPage(BasePage):
                     response=response,
                 )
         self._apply_gooey_memory_updates(
-            memory_user_id=memory_user_id,
+            memory_entry=memory_entry,
             before=gooey_memory_before,
             after=gooey_memory_after,
         )
@@ -187,45 +186,43 @@ class FunctionsPage(BasePage):
         return secret.name, secret.value
 
     def _load_gooey_memory_for_scope(
-        self, memory_scope: str | None
-    ) -> tuple[dict[str, typing.Any], str | None]:
+        self, memory_scope: str | None, variables: dict | None
+    ) -> tuple[MemoryEntry | None, dict[str, typing.Any] | None]:
         if not memory_scope:
-            return {}, None
+            return None, {}
 
         scope = FunctionScopes.get(memory_scope)
         if not scope:
-            return {}, None
+            return None, {}
 
         try:
-            user_id = FunctionScopes.get_user_id_for_scope(
-                scope=scope,
+            memory_entry = scope.build_memory_entry(
+                saved_run=self.current_sr,
                 workspace=self.current_workspace,
                 user=self.request.user,
                 published_run=self.calling_pr,
+                variables=variables,
             )
         except UserError:
-            return {}, None
-
-        if not user_id:
-            return {}, None
+            return None, {}
 
         snapshot = {
             entry.key: entry.value
-            for entry in MemoryEntry.objects.filter(user_id=user_id).only(
+            for entry in MemoryEntry.objects.filter(user_id=memory_entry.user_id).only(
                 "key", "value"
             )
         }
-        return snapshot, user_id
+        return memory_entry, snapshot
 
     def _apply_gooey_memory_updates(
         self,
         *,
-        memory_user_id: str | None,
+        memory_entry: MemoryEntry | None,
         before: dict[str, typing.Any] | None,
         after: dict[str, typing.Any] | None,
     ) -> None:
         if (
-            not memory_user_id
+            not memory_entry
             or not isinstance(after, dict)
             or not isinstance(before, dict)
         ):
@@ -233,17 +230,11 @@ class FunctionsPage(BasePage):
         for op, key in _diff_gooey_memory_keys(before, after):
             match op:
                 case "delete":
-                    MemoryEntry.objects.filter(user_id=memory_user_id, key=key).delete()
+                    MemoryEntry.objects.filter(
+                        user_id=memory_entry.user_id, key=key
+                    ).delete()
                 case "upsert":
-                    MemoryEntry.objects.update_or_create(
-                        user_id=memory_user_id,
-                        key=key,
-                        defaults=dict(
-                            value=after[key],
-                            saved_run=self.current_sr,
-                            updated_at=timezone.now(),
-                        ),
-                    )
+                    memory_entry.write(key, after[key])
 
     def get_price_roundoff(self, state: dict) -> float:
         if CalledFunction.objects.filter(function_run=self.current_sr).exists():

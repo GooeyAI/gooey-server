@@ -79,6 +79,7 @@ class AppUserAdmin(GooeyModelAdmin):
                         "view_embedded_files",
                         "view_uploaded_files",
                         "view_transactions",
+                        "view_memory_entries",
                     ),
                     ("created_at", "updated_at", "upgraded_from_anonymous_at"),
                     open_in_links,
@@ -138,6 +139,7 @@ class AppUserAdmin(GooeyModelAdmin):
         "view_embedded_files",
         "view_uploaded_files",
         "view_transactions",
+        "view_memory_entries",
         "open_in_firebase",
         "open_in_stripe",
         "personal_workspace",
@@ -209,6 +211,10 @@ class AppUserAdmin(GooeyModelAdmin):
             instance_id=user.id,
             show_add=False,
         )
+
+    @admin.display(description="Memory Entries")
+    def view_memory_entries(self, user: models.AppUser):
+        return list_related_html_url(user.memory_entries, show_add=False)
 
     @admin.display(description="Total Payments")
     def total_payments(self, user: models.AppUser):
