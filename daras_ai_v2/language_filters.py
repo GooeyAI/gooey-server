@@ -93,7 +93,7 @@ def filter_languages(
 def language_filter_selector(
     *,
     options: list[str],
-    label: str = '<i class="fa-sharp-duotone fa-solid fa-bars-filter"></i> &nbsp; Filter by Language',
+    label: str = '<i class="fa-sharp-duotone fa-solid fa-bars-filter"></i> &nbsp; Filter to',
     key: str = "language_filter",
 ) -> str | None:
     clear_key = key + ":clear"
