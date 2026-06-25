@@ -5,7 +5,6 @@ export interface MemoryScope {
 }
 export interface MemoryEntryDetail {
   icon: string;
-  label: string;
   value: string;
 }
 export interface MemoryEntryRow {
@@ -16,8 +15,22 @@ export interface MemoryEntryRow {
   details: MemoryEntryDetail[];
   updated_at_label: string;
 }
+export interface MemoryFilterOption {
+  value: string;
+  label: string;
+  icon: string | null;
+}
+export interface MemoryFilterField {
+  key: string;
+  label: string;
+  icon: string;
+  selected: MemoryFilterOption | null;
+}
 export interface WorkspaceMemoryTableProps {
   description: string;
+  filters: MemoryFilterField[];
+  options_url: string;
+  search: string;
   entries: MemoryEntryRow[];
   next_page_url: string | null;
   delete_url: string;

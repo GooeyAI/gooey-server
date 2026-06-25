@@ -70,11 +70,6 @@ class MemoryEntry(models.Model):
         verbose_name_plural = "Memory Entries"
         indexes = [
             models.Index(fields=["workspace", "-updated_at"]),
-            models.Index(fields=["workspace", "member", "-updated_at"]),
-            models.Index(fields=["workspace", "saved_workflow", "-updated_at"]),
-            models.Index(fields=["workspace", "platform_user", "-updated_at"]),
-            models.Index(fields=["workspace", "deployment", "-updated_at"]),
-            models.Index(fields=["workspace", "conversation", "-updated_at"]),
         ]
 
     def __str__(self):

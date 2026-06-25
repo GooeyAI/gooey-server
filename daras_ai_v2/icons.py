@@ -57,6 +57,9 @@ alert = '<i class="fa-solid fa-triangle-exclamation"></i>'
 search = '<i class="fa-solid fa-magnifying-glass"></i>'
 library = '<i class="fa-solid fa-book"></i>'
 memory = '<i class="fa-regular fa-brain"></i>'
+platform_user = '<i class="fa-regular fa-user-message"></i>'
+deployment = '<i class="fa-regular fa-robot"></i>'
+conversation = '<i class="fa-regular fa-message"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

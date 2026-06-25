@@ -1,9 +1,11 @@
 import queue
 import threading
+import typing
 import uuid
 from threading import Thread
 from typing import Any
 
+from django.db import models
 import hashids
 from fastapi import HTTPException
 from furl import furl
@@ -37,6 +39,15 @@ app = CustomAPIRouter()
 
 api_hashids = hashids.Hashids(salt=settings.HASHIDS_API_SALT)
 MSG_ID_PREFIX = "web-"
+
+M = typing.TypeVar("M", bound=models.Model)
+
+
+def get_api_hashid_or_404(model: typing.Type[M], hashid: str) -> M:
+    try:
+        return model.objects.get(id=api_hashids.decode(hashid)[0])
+    except (IndexError, model.DoesNotExist) as e:
+        raise HTTPException(status_code=404) from e
 
 
 class CreateStreamRequestBase(BaseModel):
