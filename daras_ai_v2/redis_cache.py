@@ -20,14 +20,17 @@ def get_redis_cache():
 F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
 
-def redis_cache_decorator(fn: F | None = None, ex=None) -> F:
+def redis_cache_decorator(fn: F | None = None, *, ex=None, version: int = 1) -> F:
     def decorator(fn: F) -> F:
         @wraps(fn)
         def wrapper(*args, **kwargs):
             # hash the args and kwargs so they are not too long
             args_hash = hashlib.sha256(f"{args}{kwargs}".encode()).hexdigest()
             # create a readable cache key
-            cache_key = f"gooey/redis-cache-decorator/v1/{fn.__name__}/{args_hash}"
+            # bump version when cached return shape changes
+            cache_key = (
+                f"gooey/redis-cache-decorator/v{version}/{fn.__name__}/{args_hash}"
+            )
             # lock the cache key so that only one thread can run the function
             with redis_lock(cache_key):
                 # get the redis cache

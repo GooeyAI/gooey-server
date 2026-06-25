@@ -633,7 +633,7 @@ def google_tts_language_codes() -> list[str]:
         return []
 
 
-@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY, version=2)
 def google_tts_voices() -> dict[str, "texttospeech.Voice"]:
     from google.cloud import texttospeech
 
