@@ -718,6 +718,6 @@ def list_view_editor(
             render_labels()
     gui.session_state[key] = new_lst
     if add_btn_label:
-        with gui.center():
+        with gui.center(className="mb-3"):
             gui.button(f"{icons.add} {add_btn_label}", key=add_key, type=add_btn_type)
     return new_lst
