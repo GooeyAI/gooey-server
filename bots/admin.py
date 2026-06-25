@@ -29,6 +29,7 @@ from bots.models import (
     Platform,
     PublishedRun,
     PublishedRunVersion,
+    RunConversation,
     SavedRun,
     Tag,
     Workflow,
@@ -506,6 +507,7 @@ class SavedRunAdmin(GooeyModelAdmin):
         "surface",
         "parent_builder_saved_run",
         "view_bot_message",
+        "view_conversation",
     ]
 
     ordering = ["-updated_at"]
@@ -528,7 +530,10 @@ class SavedRunAdmin(GooeyModelAdmin):
         )
 
     def lookup_allowed(self, key, value):
-        if key in ["parent_version__published_run__id__exact"]:
+        if key in [
+            "parent_version__published_run__id__exact",
+            "conversation__id__exact",
+        ]:
             return True
         return super().lookup_allowed(key, value)
 
@@ -564,6 +569,10 @@ class SavedRunAdmin(GooeyModelAdmin):
     def view_bot_message(self, saved_run: SavedRun):
         return change_obj_url(saved_run.messages.first())
 
+    @admin.display(description="Conversation")
+    def view_conversation(self, saved_run: SavedRun):
+        return saved_run.conversation and change_obj_url(saved_run.conversation)
+
     @admin.action(description="Re-Run Tasks")
     def rerun_tasks(self, request, queryset):
         sr: SavedRun
@@ -577,6 +586,117 @@ class SavedRunAdmin(GooeyModelAdmin):
             request,
             f"Started re-running {queryset.count()} tasks in the background.",
         )
+
+
+class RunConversationMessageInline(admin.TabularInline):
+    model = SavedRun
+    fk_name = "conversation"
+    extra = 0
+    can_delete = False
+    fields = [
+        "view_run",
+        "view_input_prompt",
+        "view_output_text",
+        "view_user",
+        "updated_at",
+    ]
+    readonly_fields = fields
+    ordering = ["-created_at"]
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by("-created_at")
+
+    @admin.display(description="Run")
+    def view_run(self, sr: SavedRun):
+        return change_obj_url(sr)
+
+    @admin.display(description="Input Prompt")
+    def view_input_prompt(self, sr: SavedRun):
+        return (sr.state or {}).get("input_prompt") or ""
+
+    @admin.display(description="Output Text")
+    def view_output_text(self, sr: SavedRun):
+        from daras_ai.image_input import truncate_text_words
+
+        state = sr.state or {}
+        output = state.get("raw_output_text") or state.get("output_text") or []
+        return truncate_text_words(output[0] if output else "", 100)
+
+    @admin.display(description="User")
+    def view_user(self, sr: SavedRun):
+        user = AppUser.objects.filter(uid=sr.uid).first()
+        return user and change_obj_url(user)
+
+
+@admin.register(RunConversation)
+class RunConversationAdmin(GooeyModelAdmin):
+    list_display = [
+        "__str__",
+        "title",
+        "view_workflow",
+        "surface",
+        "view_messages",
+        "view_last_run",
+        "view_user",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = ["workflow", "surface", "created_at"]
+    search_fields = ["id", "title", "uid"]
+    autocomplete_fields = ["workspace"]
+    fields = [
+        "workspace",
+        "view_user",
+        "view_workflow",
+        "surface",
+        "title",
+        "view_last_run",
+        "created_at",
+        "updated_at",
+    ]
+    readonly_fields = [
+        "view_user",
+        "view_workflow",
+        "view_last_run",
+        "created_at",
+        "updated_at",
+    ]
+    inlines = [RunConversationMessageInline]
+    ordering = ["-updated_at"]
+    actions = [export_to_csv, export_to_excel]
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(__msg_count=Count("messages"))
+            .select_related("last_run")
+        )
+
+    @admin.display(description="Workflow", ordering="workflow")
+    def view_workflow(self, convo: RunConversation):
+        try:
+            label = Workflow(convo.workflow).label
+        except ValueError:
+            return convo.workflow
+        wm = WorkflowMetadata.objects.filter(workflow=convo.workflow).first()
+        return change_obj_url(wm, label=label) if wm else label
+
+    @admin.display(description="User", ordering="uid")
+    def view_user(self, convo: RunConversation):
+        user = AppUser.objects.filter(uid=convo.uid).first()
+        return user and change_obj_url(user)
+
+    @admin.display(description="Messages", ordering="__msg_count")
+    def view_messages(self, convo: RunConversation):
+        return list_related_html_url(convo.messages, show_add=False)
+
+    @admin.display(description="Last Run")
+    def view_last_run(self, convo: RunConversation):
+        return convo.last_run and change_obj_url(convo.last_run)
 
 
 class LastActiveDeltaFilter(admin.SimpleListFilter):

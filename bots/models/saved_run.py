@@ -186,6 +186,15 @@ class SavedRun(models.Model):
         default=None,
         help_text="The Parent Gooey Builder SavedRun that created this run",
     )
+    conversation = models.ForeignKey(
+        "bots.RunConversation",
+        on_delete=models.SET_NULL,
+        related_name="messages",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="The conversation this run is a turn of (VideoBots grouping).",
+    )
     redirect_url = models.TextField(
         blank=True,
         default="",
@@ -373,6 +382,12 @@ class SavedRun(models.Model):
             uid = self.uid
         if workspace_id is None:
             workspace_id = self.workspace_id
+        # RunConversation is scoped to (workspace, uid); only carry it over when
+        # the clone stays in the same scope, else clear it to avoid cross-scope leak.
+        if uid == self.uid and workspace_id == self.workspace_id:
+            conversation_id = self.conversation_id
+        else:
+            conversation_id = None
         return SavedRun(
             parent_id=self.id,
             parent_version_id=parent_version_id,
@@ -387,6 +402,7 @@ class SavedRun(models.Model):
             error_type=self.error_type,
             error_params=self.error_params,
             price=self.price,
+            conversation_id=conversation_id,
             **kwargs,
         )
 

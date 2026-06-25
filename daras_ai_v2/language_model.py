@@ -153,6 +153,42 @@ def get_entry_text(entry: ConversationEntry) -> str:
     )
 
 
+# Prefix lines we inject into a user message's text so the LLM can "see" its
+# attachments inline: the "Image URLs:"/"Document URLs:" lines from
+# format_chat_entry() and the OCR "Extracted Text:" line from the copilot's
+# document-understanding step. They're for the model only and must be stripped
+# before a saved message is shown in a chat UI (attachments render separately).
+LLM_INPUT_PREFIXES = ("Image URLs:", "Document URLs:", "Extracted Text:")
+
+
+def strip_llm_input_prefixes(text: str) -> str:
+    # format_chat_entry() joins the prefixes and the user's text with "\n\n" and
+    # always puts the user's text last, so drop the leading prefix segments only.
+    parts = text.split("\n\n")
+    while parts and parts[0].startswith(LLM_INPUT_PREFIXES):
+        parts.pop(0)
+    return "\n\n".join(parts)
+
+
+def get_entry_display_text(entry: ConversationEntry) -> str:
+    """The user-visible text of a message, without the LLM-only attachment prefixes."""
+    return strip_llm_input_prefixes(get_entry_text(entry))
+
+
+def get_entry_documents(entry: ConversationEntry) -> list[str]:
+    """Document URLs from a message. Unlike images, documents aren't kept as
+    structured content parts -- format_chat_entry() only records them in the
+    "Document URLs:" text line, so parse them back out of the text."""
+    for part in get_entry_text(entry).split("\n\n"):
+        if part.startswith("Document URLs:"):
+            return [
+                url.strip()
+                for url in part[len("Document URLs:") :].split(",")
+                if url.strip()
+            ]
+    return []
+
+
 ResponseFormatType = typing.Literal["text", "json_object"]
 
 
