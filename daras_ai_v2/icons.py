@@ -56,6 +56,7 @@ info = "<i class='fa-regular fa-circle-info'></i>"
 alert = '<i class="fa-solid fa-triangle-exclamation"></i>'
 search = '<i class="fa-solid fa-magnifying-glass"></i>'
 library = '<i class="fa-solid fa-book"></i>'
+memory = '<i class="fa-regular fa-brain"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

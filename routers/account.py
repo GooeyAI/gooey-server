@@ -20,6 +20,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.profiles import edit_user_profile_page
 from daras_ai_v2.urls import paginate_queryset, paginate_button
 from managed_secrets.widgets import manage_secrets_table
+from memory.routers import memory_route
 from payments.webhooks import PaypalWebhookHandler
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, page_wrapper, get_og_url_path
@@ -253,6 +254,7 @@ class AccountTabs(TabData, Enum):
     members = TabData(title=f"{icons.company} Members", route=members_route)
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
+    memory = TabData(title=f"{icons.memory} Memory", route=memory_route)
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
 
     @property
