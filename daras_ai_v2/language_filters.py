@@ -101,28 +101,35 @@ def language_filter_selector(
     if gui.session_state.pop(clear_key, None):
         gui.session_state[key] = None
 
-    with gui.div(className="d-flex align-items-center"):
+    with gui.div(
+        className="d-flex flex-column flex-md-row align-items-md-center gap-2"
+    ):
         if label:
-            with gui.div(className="me-3 text-muted"):
+            with gui.div(className="text-muted flex-shrink-0"):
                 gui.caption(label, unsafe_allow_html=True)
 
-        with gui.div(style=dict(minWidth="200px")):
-            language_filter = gui.selectbox(
-                label="",
-                label_visibility="collapsed",
-                key=key,
-                format_func=lambda tag: lang_format_func(tag, default="All Languages"),
-                options=options,
-                allow_none=True,
-            )
+        with gui.div(className="d-flex align-items-center w-100 w-md-auto"):
+            with gui.div(
+                className="flex-grow-1 flex-md-grow-0", style=dict(minWidth="200px")
+            ):
+                language_filter = gui.selectbox(
+                    label="",
+                    label_visibility="collapsed",
+                    key=key,
+                    format_func=lambda tag: lang_format_func(
+                        tag, default="All Languages"
+                    ),
+                    options=options,
+                    allow_none=True,
+                )
 
-        if language_filter:
-            gui.button(
-                '<i class="fa-solid fa-circle-xmark"></i>',
-                type="tertiary",
-                key=clear_key,
-                className="px-2 py-1 ms-1",
-            )
+            if language_filter:
+                gui.button(
+                    '<i class="fa-solid fa-circle-xmark"></i>',
+                    type="tertiary",
+                    key=clear_key,
+                    className="px-2 py-1 ms-1 flex-shrink-0",
+                )
 
     return language_filter
 
