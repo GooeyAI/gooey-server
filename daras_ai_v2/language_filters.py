@@ -1,5 +1,7 @@
 import typing
 
+
+import gooey_gui as gui
 import langcodes
 
 from daras_ai_v2 import settings
@@ -38,6 +40,26 @@ def asr_languages_without_dialects() -> list[str]:
     )
 
 
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
+def tts_languages_without_dialects() -> list[str]:
+    from daras_ai_v2.text_to_speech_settings_widgets import (
+        tts_supported_languages_by_provider,
+    )
+
+    return sorted(
+        set(
+            lang
+            for tag in flatten(tts_supported_languages_by_provider().values())
+            if (lang := normalized_lang_or_none(tag))
+        )
+    )
+
+
+def sort_language_options(options: list[str | None], sort_by: str | None):
+    sort_by = sort_by or "en"
+    options.sort(key=lambda tag: tag and are_languages_same(tag, sort_by), reverse=True)
+
+
 def filter_models_by_language(
     language_filter: str | None,
     supported_languages_by_model: dict[T, typing.Iterable[str]],
@@ -67,6 +89,51 @@ def filter_languages(
             collection,
         )
     )
+
+
+def language_filter_selector(
+    *,
+    options: list[str],
+    label: str = '<i class="fa-sharp-duotone fa-solid fa-bars-filter"></i> &nbsp; Filter by Language',
+    key: str = "language_filter",
+) -> str | None:
+    clear_key = key + ":clear"
+    if gui.session_state.pop(clear_key, None):
+        gui.session_state[key] = None
+
+    with gui.div(className="d-flex align-items-center"):
+        if label:
+            with gui.div(className="me-3 text-muted"):
+                gui.caption(label, unsafe_allow_html=True)
+
+        with gui.div(style=dict(minWidth="200px")):
+            language_filter = gui.selectbox(
+                label="",
+                label_visibility="collapsed",
+                key=key,
+                format_func=lambda tag: lang_format_func(tag, default="All Languages"),
+                options=options,
+                allow_none=True,
+            )
+
+        if language_filter:
+            gui.button(
+                '<i class="fa-solid fa-circle-xmark"></i>',
+                type="tertiary",
+                key=clear_key,
+                className="px-2 py-1 ms-1",
+            )
+
+    return language_filter
+
+
+def lang_format_func(tag: str, *, default: str = "Auto Detect") -> str:
+    if not tag:
+        return default
+    try:
+        return f"{langcodes.Language.get(tag).display_name()} | {tag}"
+    except langcodes.LanguageTagError:
+        return tag
 
 
 def are_languages_same(tag1: str, tag2: str) -> bool:

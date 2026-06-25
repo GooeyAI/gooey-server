@@ -39,8 +39,9 @@ from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_filters import (
     filter_languages,
     filter_models_by_language,
+    lang_format_func,
     normalised_lang_in_collection,
-    are_languages_same,
+    sort_language_options,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
@@ -725,58 +726,6 @@ def asr_language_selector(
         options=options,
         allow_none=allow_none,
     )
-
-
-def sort_language_options(options: list[str | None], sort_by: str | None):
-    sort_by = sort_by or "en"
-    options.sort(key=lambda tag: tag and are_languages_same(tag, sort_by), reverse=True)
-
-
-def language_filter_selector(
-    *,
-    options: list[str],
-    label: str = '<i class="fa-sharp-duotone fa-solid fa-bars-filter"></i> &nbsp; Filter by Language',
-    key: str = "language_filter",
-) -> str:
-    clear_key = key + ":clear"
-    if gui.session_state.pop(clear_key, None):
-        gui.session_state[key] = None
-
-    with gui.div(className="d-flex align-items-center"):
-        if label:
-            with gui.div(className="me-3 text-muted"):
-                gui.caption(label, unsafe_allow_html=True)
-
-        with gui.div(style=dict(minWidth="200px")):
-            language_filter = gui.selectbox(
-                label="",
-                label_visibility="collapsed",
-                key=key,
-                format_func=lambda tag: lang_format_func(tag, default="All Languages"),
-                options=options,
-                allow_none=True,
-            )
-
-        if language_filter:
-            gui.button(
-                '<i class="fa-solid fa-circle-xmark"></i>',
-                type="tertiary",
-                key=clear_key,
-                className="px-2 py-1 ms-1",
-            )
-
-    return language_filter
-
-
-def lang_format_func(tag: str, *, default: str = "Auto Detect") -> str:
-    import langcodes
-
-    if not tag:
-        return default
-    try:
-        return f"{langcodes.Language.get(tag).display_name()} | {tag}"
-    except langcodes.LanguageTagError:
-        return tag
 
 
 def run_translate(
