@@ -11,13 +11,19 @@ class MemoryEntryAdmin(GooeyModelAdmin):
     list_display = (
         "user_id",
         "key",
-        "saved_run",
         "created_at",
         "updated_at",
     )
     search_fields = ("user_id", "key", "value")
     readonly_fields = ("created_at", "updated_at")
-    autocomplete_fields = ("saved_run",)
+    autocomplete_fields = (
+        "saved_run",
+        "workspace",
+        "member",
+        "saved_workflow",
+        "deployment",
+        "conversation",
+    )
 
     formfield_overrides = {
         models.JSONField: {"widget": JSONEditorWidget},

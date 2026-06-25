@@ -1,7 +1,6 @@
 from __future__ import annotations
 import typing
 
-from django.utils import timezone
 
 from functions.models import FunctionScopes
 from functions.base_llm_tool import (
@@ -10,10 +9,19 @@ from functions.base_llm_tool import (
 from memory.models import MemoryEntry
 
 if typing.TYPE_CHECKING:
-    from bots.models import SavedRun
+    pass
 
 
-class GooeyMemoryLLMToolRead(BaseLLMTool):
+class GooeyMemoryLLMTool(BaseLLMTool):
+    scope: FunctionScopes | None
+    memory_entry: MemoryEntry
+
+    def bind(self, memory_entry: MemoryEntry):
+        self.memory_entry = memory_entry
+        return self
+
+
+class GooeyMemoryLLMToolRead(GooeyMemoryLLMTool):
     name = "GOOEY_MEMORY_READ_VALUE"
 
     def __init__(self, scope: FunctionScopes | None):
@@ -31,20 +39,17 @@ class GooeyMemoryLLMToolRead(BaseLLMTool):
             required=["key"],
         )
 
-    def bind(self, user_id: str, saved_run: SavedRun):
-        self.user_id = user_id
-        self.saved_run = saved_run
-        return self
-
     def call(self, key: str) -> dict:
         try:
-            value = MemoryEntry.objects.get(user_id=self.user_id, key=key).value
+            value = MemoryEntry.objects.get(
+                user_id=self.memory_entry.user_id, key=key
+            ).value
         except MemoryEntry.DoesNotExist:
             return {"success": False, "error": f"Key not found: {key}"}
         return {"success": True, "key": key, "value": value}
 
 
-class GooeyMemoryLLMToolWrite(BaseLLMTool):
+class GooeyMemoryLLMToolWrite(GooeyMemoryLLMTool):
     name = "GOOEY_MEMORY_WRITE_VALUE"
 
     def __init__(self, scope: FunctionScopes):
@@ -66,23 +71,12 @@ class GooeyMemoryLLMToolWrite(BaseLLMTool):
             required=["key", "value"],
         )
 
-    def bind(self, user_id: str, saved_run: SavedRun):
-        self.user_id = user_id
-        self.saved_run = saved_run
-        return self
-
     def call(self, key: str, value) -> dict:
-        MemoryEntry.objects.update_or_create(
-            user_id=self.user_id,
-            key=key,
-            defaults=dict(
-                value=value, saved_run=self.saved_run, updated_at=timezone.now()
-            ),
-        )
+        self.memory_entry.write(key, value)
         return {"success": True}
 
 
-class GooeyMemoryLLMToolDelete(BaseLLMTool):
+class GooeyMemoryLLMToolDelete(GooeyMemoryLLMTool):
     name = "GOOEY_MEMORY_DELETE_VALUE"
 
     def __init__(self, scope: FunctionScopes):
@@ -100,11 +94,6 @@ class GooeyMemoryLLMToolDelete(BaseLLMTool):
             required=["key"],
         )
 
-    def bind(self, user_id: str, saved_run: SavedRun):
-        self.user_id = user_id
-        self.saved_run = saved_run
-        return self
-
     def call(self, key: str) -> dict:
-        MemoryEntry.objects.filter(user_id=self.user_id, key=key).delete()
+        MemoryEntry.objects.filter(user_id=self.memory_entry.user_id, key=key).delete()
         return {"success": True}

@@ -104,6 +104,7 @@ class WorkspaceAdmin(GooeySafeDeleteAdmin):
             "view_api_keys",
             "view_bot_integrations",
             "view_uploaded_files",
+            "view_memory_entries",
         ),
         ("created_at", "updated_at"),
         "open_in_stripe",
@@ -129,6 +130,7 @@ class WorkspaceAdmin(GooeySafeDeleteAdmin):
         "view_api_keys",
         "view_bot_integrations",
         "view_uploaded_files",
+        "view_memory_entries",
         "total_payments",
         "total_charged",
         "total_usage_cost",
@@ -197,6 +199,10 @@ class WorkspaceAdmin(GooeySafeDeleteAdmin):
             instance_id=workspace.id,
             show_add=False,
         )
+
+    @admin.display(description="Memory Entries")
+    def view_memory_entries(self, workspace: models.Workspace):
+        return list_related_html_url(workspace.memory_entries, show_add=False)
 
     @admin.display(description="Total Payments")
     def total_payments(self, workspace: models.Workspace):

@@ -234,6 +234,7 @@ class BotIntegrationAdmin(GooeyModelAdmin):
         "view_analysis_results",
         "view_conversations",
         "view_messsages",
+        "view_memory_entries",
         "created_at",
         "updated_at",
         "api_integration_stats_url",
@@ -296,6 +297,7 @@ class BotIntegrationAdmin(GooeyModelAdmin):
                 "fields": [
                     "view_conversations",
                     "view_messsages",
+                    "view_memory_entries",
                     "created_at",
                     "updated_at",
                 ]
@@ -328,6 +330,10 @@ class BotIntegrationAdmin(GooeyModelAdmin):
     @admin.display(description="Conversations")
     def view_conversations(self, bi: BotIntegration):
         return list_related_html_url(bi.conversations)
+
+    @admin.display(description="Memory Entries")
+    def view_memory_entries(self, bi: BotIntegration):
+        return list_related_html_url(bi.memory_entries, show_add=False)
 
     @admin.display(description="Has Analysis Runs", boolean=True)
     def has_analysis_runs(self, bi: BotIntegration):
@@ -418,6 +424,7 @@ class PublishedRunAdmin(GooeyModelAdmin):
         "view_runs",
         "run_count",
         "view_bot_integrations",
+        "view_memory_entries",
         "created_at",
         "updated_at",
     ]
@@ -458,6 +465,10 @@ class PublishedRunAdmin(GooeyModelAdmin):
             query_param="published_run__id__exact",
             instance_id=published_run.id,
         )
+
+    @admin.display(description="Memory Entries")
+    def view_memory_entries(self, published_run: PublishedRun):
+        return list_related_html_url(published_run.memory_entries, show_add=False)
 
 
 @admin.register(SavedRun)
@@ -506,6 +517,7 @@ class SavedRunAdmin(GooeyModelAdmin):
         "surface",
         "parent_builder_saved_run",
         "view_bot_message",
+        "view_memory_entries",
     ]
 
     ordering = ["-updated_at"]
@@ -563,6 +575,10 @@ class SavedRunAdmin(GooeyModelAdmin):
     @admin.display(description="View Bot Message")
     def view_bot_message(self, saved_run: SavedRun):
         return change_obj_url(saved_run.messages.first())
+
+    @admin.display(description="Memory Entries")
+    def view_memory_entries(self, saved_run: SavedRun):
+        return list_related_html_url(saved_run.memory_entries, show_add=False)
 
     @admin.action(description="Re-Run Tasks")
     def rerun_tasks(self, request, queryset):
@@ -644,6 +660,7 @@ class ConversationAdmin(GooeyModelAdmin):
         "view_last_msg",
         "view_messages",
         "view_feedbacks",
+        "view_memory_entries",
     ]
     list_filter = ["bot_integration", "created_at", LastActiveDeltaFilter]
     autocomplete_fields = ["bot_integration"]
@@ -698,6 +715,10 @@ class ConversationAdmin(GooeyModelAdmin):
             convo.id,
             show_add=False,
         )
+
+    @admin.display(description="Memory Entries")
+    def view_memory_entries(self, convo: Conversation):
+        return list_related_html_url(convo.memory_entries, show_add=False)
 
     def view_last_active_delta(self, convo: Conversation):
         return timesince(datetime.datetime.now() - convo.last_active_delta())

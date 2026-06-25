@@ -345,11 +345,9 @@ class NewConversationLLMTool(BaseLLMTool):
         return {"success": True}
 
 
-INBUILT_TOOLKITS = {
-    tool.name: tool
-    for tool in [
-        GooeyMemoryLLMToolRead,
-        GooeyMemoryLLMToolWrite,
-        GooeyMemoryLLMToolDelete,
-    ]
-}
+MEMORY_TOOLS = (
+    GooeyMemoryLLMToolRead,
+    GooeyMemoryLLMToolWrite,
+    GooeyMemoryLLMToolDelete,
+)
+INBUILT_TOOLKITS = {tool.name: tool for tool in MEMORY_TOOLS}

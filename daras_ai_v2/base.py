@@ -16,8 +16,6 @@ from random import Random
 from textwrap import dedent
 from time import sleep
 
-
-import gooey_gui as gui
 import sentry_sdk
 from django.db.models import Q, Sum
 from django.utils.text import slugify
@@ -27,6 +25,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
 
+import gooey_gui as gui
 from ai_models.llm_openapi import patch_ai_model_schema_enums
 from app_users.models import AppUser, AppUserTransaction
 from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
@@ -40,8 +39,7 @@ from bots.models import (
 )
 from bots.models.published_run import Tag
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2 import exceptions
-from daras_ai_v2 import icons, settings
+from daras_ai_v2 import exceptions, icons, settings
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
@@ -50,10 +48,10 @@ from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
-from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.openapi_tricks import (
     get_full_pydantic_schema,
 )
+from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
@@ -61,17 +59,6 @@ from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
-from functions.composio_tools import ComposioLLMTool
-from functions.inbuilt_tools import (
-    INBUILT_TOOLKITS,
-    get_inbuilt_tools,
-)
-from functions.models import (
-    FunctionScopes,
-    FunctionTrigger,
-    RecipeFunction,
-    VariableSchema,
-)
 from functions.base_llm_tool import (
     BaseLLMTool,
     call_recipe_functions,
@@ -79,6 +66,15 @@ from functions.base_llm_tool import (
     get_workflow_tools_from_state,
     is_functions_enabled,
     render_called_functions,
+)
+from functions.composio_tools import ComposioLLMTool
+from functions.inbuilt_tools import get_inbuilt_tools
+from functions.memory_tools import GooeyMemoryLLMTool
+from functions.models import (
+    FunctionScopes,
+    FunctionTrigger,
+    RecipeFunction,
+    VariableSchema,
 )
 from functions.workflow_tools import WorkflowLLMTool
 from gooeysite.custom_create import get_or_create_lazy
@@ -1476,21 +1472,23 @@ class BasePage:
                         workspace=self.current_workspace,
                         user=self.request.user,
                         published_run=self.current_pr,
+                        variables=gui.session_state.get("variables"),
                     ),
                     redirect_url=self.current_app_url(
                         query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
                     ),
                 )
-            case _ if tool.name in INBUILT_TOOLKITS:
-                return tool.bind(
-                    user_id=FunctionScopes.get_user_id_for_scope(
-                        tool.scope,
-                        workspace=self.current_workspace,
-                        user=self.request.user,
-                        published_run=self.current_pr,
-                    ),
+            case GooeyMemoryLLMTool():
+                if not tool.scope:
+                    tool.scope = FunctionScopes.workspace
+                memory_entry = tool.scope.build_memory_entry(
                     saved_run=self.current_sr,
+                    workspace=self.current_workspace,
+                    user=self.request.user,
+                    published_run=self.current_pr,
+                    variables=gui.session_state.get("variables"),
                 )
+                return tool.bind(memory_entry)
             case _:
                 return tool
 
