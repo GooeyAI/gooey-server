@@ -134,5 +134,6 @@ jobs:
           TEST_SLACK_TEAM_ID: ${{ secrets.TEST_SLACK_TEAM_ID }}
           TEST_SLACK_USER_ID: ${{ secrets.TEST_SLACK_USER_ID }}
           TEST_SLACK_AUTH_TOKEN: ${{ secrets.TEST_SLACK_AUTH_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           poetry run ./scripts/run-tests.sh
