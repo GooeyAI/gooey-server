@@ -132,42 +132,10 @@ def _get_greeting(user: AppUser) -> str | None:
 def _load_recent_workflows(
     user: AppUser | None,
     workspace: Workspace | None,
-    limit: int = RECENT_WORKFLOW_LIST_LIMIT,
 ) -> list[WorkflowCardData]:
-    return [
-        card for card, _photo in _load_recent_workflow_cards(user, workspace, limit)
-    ]
-
-
-def _load_recent_workflow_cards(
-    user: AppUser | None,
-    workspace: Workspace | None,
-    limit: int = RECENT_WORKFLOW_LIST_LIMIT,
-) -> list[tuple[WorkflowCardData, str | None]]:
-    """Recent run cards each paired with their parent published run's photo.
-
-    The photo lets thumbnail-only surfaces (e.g. the navigation sidebar) fall
-    back to the published run's curated image — mirroring `_pr_preview` — when
-    the run itself has no image-bearing preview (e.g. a chat copilot run).
-    """
     if user is None or workspace is None:
         return []
 
-    ids = _recent_run_ids(user, workspace, limit)
-    author = author_from_user(user, current_user=user)
-    srs = (
-        SavedRun.objects.filter(id__in=ids)
-        .select_related("parent_version__published_run")
-        .order_by("-updated_at")
-    )
-    out: list[tuple[WorkflowCardData, str | None]] = []
-    for sr in srs:
-        pr = sr.parent_published_run()
-        out.append((_history_card(sr, author=author), (pr and pr.photo_url) or None))
-    return out
-
-
-def _recent_run_ids(user: AppUser, workspace: Workspace, limit: int) -> list[int]:
     qs = (
         SavedRun.objects.filter(
             uid=user.uid, workspace=workspace, surface=SavedRun.Surface.run
@@ -183,15 +151,30 @@ def _recent_run_ids(user: AppUser, workspace: Workspace, limit: int) -> list[int
             continue
         seen_published_runs.add(sr["published_run_id"])
         ids.append(sr["id"])
-        if len(ids) >= limit:
+        if len(ids) >= RECENT_WORKFLOW_LIST_LIMIT:
             break
-    return ids
+
+    return [
+        _history_card(sr, author=author_from_user(user, current_user=user))
+        for sr in SavedRun.objects.filter(id__in=ids).order_by("-updated_at")
+    ]
 
 
 def _load_saved_workflows(
     user: AppUser | None,
     workspace: Workspace | None,
 ) -> list[WorkflowCardData]:
+    return [
+        _saved_card(pr, author=author_from_user(pr.last_edited_by, current_user=user))
+        for pr in saved_published_runs(user, workspace)
+    ]
+
+
+def saved_published_runs(
+    user: AppUser | None,
+    workspace: Workspace | None,
+    limit: int = WORKFLOW_LIST_LIMIT,
+) -> list[PublishedRun]:
     if user is None or workspace is None:
         return []
     pr_filter = Q(workspace=workspace)
@@ -202,19 +185,12 @@ def _load_saved_workflows(
         .order_by("-created_at")
         .values("change_notes")[:1]
     )
-    prs = list(
+    return list(
         PublishedRun.objects.filter(pr_filter)
         .select_related("last_edited_by", "saved_run", "workspace")
         .annotate(latest_change_notes=Subquery(latest_change_notes))
-        .order_by("-updated_at")[:WORKFLOW_LIST_LIMIT]
+        .order_by("-updated_at")[:limit]
     )
-    return [
-        _saved_card(
-            pr,
-            author=author_from_user(pr.last_edited_by, current_user=user),
-        )
-        for pr in prs
-    ]
 
 
 def _load_workflow_tabs(

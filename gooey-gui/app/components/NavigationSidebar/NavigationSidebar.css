@@ -37,20 +37,6 @@ a.nav-brand {
   overflow: hidden;
 }
 
-.nav-brand__mark {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.nav-brand__wordmark {
-  flex-shrink: 0;
-}
-
 .nav-brand__expand-icon {
   position: absolute;
   inset: 0;
@@ -73,27 +59,26 @@ a.nav-brand {
   min-width: 0;
 }
 
-.nav-chevron-btn {
-  line-height: 1;
-}
-
 .nav-chevron-icon {
   font-size: 11px;
+  transition: opacity 100ms ease;
 }
 
-.nav-section-toggle {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.nav-section-toggle .nav-chevron-icon {
+  opacity: 0;
 }
 
-.gooey-builder-btn__photo {
-  object-fit: cover;
+.nav-section-toggle:hover .nav-chevron-icon {
+  opacity: 1;
 }
 
-.gooey-builder-btn__subtitle {
-  font-size: 0.7rem;
+
+/* The primary-nav block fills the height between the pinned header and footer
+   (and can shrink below its content via min-height:0) so its inner
+   .nav-scroll-region scrolls instead of pushing the footer past the 100vh nav. */
+.nav-primary-items {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Only the middle region scrolls; header + New (above) and the footer (below)
@@ -103,25 +88,23 @@ a.nav-brand {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-/* Thin custom scrollbar for the scroll region */
-.nav-scroll-region::-webkit-scrollbar {
-  width: 4px;
-}
-.nav-scroll-region::-webkit-scrollbar-track {
-  background: transparent;
-}
-.nav-scroll-region::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
-}
-.nav-scroll-region {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
-/* Collapsed nav item links: full-width centered icon */
+.nav-scroll-region::-webkit-scrollbar {
+  width: 4px;
+}
+
+.nav-scroll-region::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav-scroll-region::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
 .nav-sidebar--collapsed .nav-item-link {
   width: 100%;
 }
@@ -195,6 +178,7 @@ a.nav-brand {
 /* Hover + active (current page) background for nav items */
 .nav-item-link {
   transition: background-color 100ms ease;
+  text-decoration: none;
 }
 .nav-item-link:hover {
   background-color: rgba(0, 0, 0, 0.05);
@@ -216,6 +200,21 @@ a.nav-brand {
 /* Current page: the saved/recent row whose href matches the URL. */
 .sidebar-recent-item--active {
   background-color: rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-saved-view-all {
+  display: block;
+  margin: 2px 0 4px 2rem;
+  padding: 4px 8px;
+  color: var(--bs-body-color);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.sidebar-saved-view-all:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .sidebar-recent-item-icon {
@@ -247,57 +246,48 @@ a.nav-brand {
   display: block;
 }
 
-/* Identity / workspace Tippy box: opt out of the global `.tippy-box` width
-   override in custom.css (min-width: 20–50vw !important), which is meant for
-   text tooltips, and drop the default content padding so the panel fills it. */
-.tippy-box[data-theme~="identity-menu"] {
+.tippy-box[data-theme~="account-menu"] {
   min-width: 0 !important;
   max-width: none !important;
   background-color: transparent;
 }
-.tippy-box[data-theme~="identity-menu"] > .tippy-content {
+
+.tippy-box[data-theme~="account-menu"] > .tippy-content {
   padding: 0;
 }
 
-/* Identity / workspace popover (rendered in a Tippy portal at <body>, so the
-   rail's overflow clip no longer affects it). */
-.identity-menu-panel {
-  background-color: var(--bs-body-bg);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 12px;
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.16);
-  padding: 6px;
-  min-width: 240px;
+.account-menu-panel {
+  min-width: 300px;
   max-width: 300px;
   max-height: 70vh;
   overflow-y: auto;
 }
 
-/* Each menu/workspace row: rounded, with a hover background. */
-.identity-menu-item {
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 100ms ease;
-}
-.identity-menu-item:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-/* The current-workspace selector row at the top is subtly highlighted. */
-.identity-ws-current {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-/* Circular icon slot; size the FontAwesome fallback (home/company glyph). */
-.identity-ws-icon {
+/* Circular workspace icon slot; sizes the FontAwesome fallback glyph. */
+.account-menu-icon {
+  width: 28px;
+  height: 28px;
   font-size: 16px;
 }
-.identity-ws-icon > img,
-.identity-ws-icon > .workspace-icon {
+
+.account-menu-icon > img,
+.account-menu-icon > .workspace-icon {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
+}
+
+/* User avatar (photo or initial fallback) in the account button. */
+.account-menu-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+/* Fixed-width icon column so account-menu row labels line up. */
+.account-menu-row-icon {
+  width: 20px;
 }
 
 /* Saved tree vertical line */

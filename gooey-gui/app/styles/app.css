@@ -377,7 +377,10 @@ button .gui-html-container,
       min-width: var(--sidebar_mobile_width);
       width: var(--sidebar_mobile_width);
       max-width: var(--sidebar_mobile_width);
-      z-index: 100;
+      /* Full-screen mobile takeover must sit above the nav top bar
+         (.nav-mobile-topbar, z-index 1030) but below the nav scrim/drawer
+         (1044 / 9999) so reopening the nav still layers correctly. */
+      z-index: 1035;
       border-left: 1px solid #e0e0e0;
       border-right: none;
       height: calc(100dvh); /* 4px for the progress bar */

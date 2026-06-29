@@ -3,17 +3,31 @@ import "./NavigationSidebar.css";
 import clsx from "clsx";
 import type { CustomComponentProps } from "~/components";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
+import type { Placement } from "tippy.js";
 import { useState, useEffect, useRef } from "react";
-import { IdentityMenu } from "./IdentityMenu";
 import { PrimaryNavItems } from "./PrimaryNavItems";
+import { WorkspaceAccountMenu } from "./WorkspaceAccountMenu";
 
 const NAV_COLLAPSED_KEY = "nav-sidebar:default-collapsed";
+// Keep in sync with SWITCH_WORKSPACE_KEY in workspaces/widgets.py
+const SWITCH_WORKSPACE_KEY = "--switch-workspace";
+// Matches the Sidebar `name`/`key` used for the Builder panel (sidebar_layout
+// in widgets/sidebar.py). Sidebar.tsx persists its open state under this key,
+// so the rail can read it to stay in sync across page navigations.
+const BUILDER_SIDEBAR_KEY = "builder-sidebar";
+// Below this width the rail becomes an off-canvas drawer (matches the CSS
+// breakpoint in NavigationSidebar.css).
+const MOBILE_MEDIA_QUERY = "(max-width: 991.98px)";
+
+function isMobileViewport() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(MOBILE_MEDIA_QUERY).matches;
+}
 
 export function NavigationSidebar({
   logo_image_url,
   nav_items,
   active_key,
-  new_href,
   default_collapsed,
   saved_workflows,
   recent_workflows,
@@ -22,32 +36,41 @@ export function NavigationSidebar({
   workspaces,
   menu_links,
   logout_href,
-  switch_workspace_href,
-  add_workspace_href,
+  add_workspace_onclick,
   login_href,
   gooey_builder,
   onChange,
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
-  const [collapsed, setCollapsed] = useState(default_collapsed);
+  const builderInitiallyOpen = Boolean(state[BUILDER_SIDEBAR_KEY]);
+  const [collapsed, setCollapsed] = useState(
+    builderInitiallyOpen || default_collapsed
+  );
   const [isMobile, setIsMobile] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [builderCollapsedRail, setBuilderCollapsedRail] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(builderInitiallyOpen);
   const mounted = useRef(false);
 
+  const railCollapsed = !isMobile && collapsed;
+  const drawerOpen = isMobile && !collapsed;
+
   useEffect(() => {
+    if (isMobile || builderOpen) return;
     if (!mounted.current) {
       mounted.current = true;
       if (state[NAV_COLLAPSED_KEY] === collapsed) return;
     }
     state[NAV_COLLAPSED_KEY] = collapsed;
     onChange();
-  }, [collapsed]);
+  }, [collapsed, isMobile, builderOpen]);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 991.98px)");
-    const update = () => setIsMobile(mq.matches);
+    const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
+    const update = () => {
+      setIsMobile(mq.matches);
+      // Entering mobile always starts with the drawer closed (batched with the
+      // isMobile update so `drawerOpen` never flips true in between).
+      if (mq.matches) setCollapsed(true);
+    };
     update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
@@ -56,33 +79,36 @@ export function NavigationSidebar({
   useEffect(() => {
     const onOpen = () => {
       setBuilderOpen(true);
-      setBuilderCollapsedRail(true);
-      setDrawerOpen(false);
+      setCollapsed(true);
     };
     const onClose = () => {
       setBuilderOpen(false);
-      setBuilderCollapsedRail(false);
+      // Closing the Builder re-expands the rail on desktop, but must not pop
+      // the drawer open on mobile.
+      if (!isMobileViewport()) setCollapsed(false);
     };
-    window.addEventListener("builder-sidebar:open", onOpen);
-    window.addEventListener("builder-sidebar:close", onClose);
+    window.addEventListener(`${BUILDER_SIDEBAR_KEY}:open`, onOpen);
+    window.addEventListener(`${BUILDER_SIDEBAR_KEY}:close`, onClose);
     return () => {
-      window.removeEventListener("builder-sidebar:open", onOpen);
-      window.removeEventListener("builder-sidebar:close", onClose);
+      window.removeEventListener(`${BUILDER_SIDEBAR_KEY}:open`, onOpen);
+      window.removeEventListener(`${BUILDER_SIDEBAR_KEY}:close`, onClose);
     };
   }, []);
 
-  const railCollapsed = !isMobile && (collapsed || builderCollapsedRail);
-
   const expandRail = (e?: React.MouseEvent) => {
     e?.preventDefault();
-    setBuilderCollapsedRail(false);
     setCollapsed(false);
   };
 
+  const switchWorkspace = (workspaceId: number) => {
+    state[SWITCH_WORKSPACE_KEY] = String(workspaceId);
+    onChange();
+  };
+
   const navClass = clsx(
-    "nav-sidebar d-flex flex-column p-2 border-end bg-body",
+    "nav-sidebar d-flex flex-column border-end bg-body",
     railCollapsed && "nav-sidebar--collapsed",
-    isMobile && drawerOpen && "nav-sidebar--drawer-open"
+    drawerOpen && "nav-sidebar--drawer-open"
   );
 
   return (
@@ -91,8 +117,18 @@ export function NavigationSidebar({
         logoImageUrl={logo_image_url}
         isMobile={isMobile}
         drawerOpen={drawerOpen}
-        onDrawerOpen={() => setDrawerOpen(true)}
-        onDrawerClose={() => setDrawerOpen(false)}
+        onDrawerOpen={() => setCollapsed(false)}
+        onDrawerClose={() => setCollapsed(true)}
+        gooeyBuilder={gooey_builder}
+        builderOpen={builderOpen}
+        user={user}
+        currentWorkspace={current_workspace}
+        workspaces={workspaces}
+        menuLinks={menu_links}
+        logoutHref={logout_href}
+        onSwitchWorkspace={switchWorkspace}
+        addWorkspaceOnClick={add_workspace_onclick}
+        loginHref={login_href}
       />
 
       <nav
@@ -105,14 +141,12 @@ export function NavigationSidebar({
           isMobile={isMobile}
           onExpand={expandRail}
           onCollapse={() => setCollapsed(true)}
-          onDrawerClose={() => setDrawerOpen(false)}
+          onDrawerClose={() => setCollapsed(true)}
         />
 
         <PrimaryNavItems
           navItems={nav_items}
           activeKey={active_key}
-          newHref={new_href}
-          savedWorkflows={saved_workflows}
           recentWorkflows={recent_workflows}
           user={user}
           menuLinks={menu_links}
@@ -123,13 +157,14 @@ export function NavigationSidebar({
           gooeyBuilder={gooey_builder}
           railCollapsed={railCollapsed}
           builderOpen={builderOpen}
+          isMobile={isMobile}
           user={user}
           currentWorkspace={current_workspace}
           workspaces={workspaces}
           menuLinks={menu_links}
           logoutHref={logout_href}
-          switchWorkspaceHref={switch_workspace_href}
-          addWorkspaceHref={add_workspace_href}
+          onSwitchWorkspace={switchWorkspace}
+          addWorkspaceOnClick={add_workspace_onclick}
           loginHref={login_href}
         />
       </nav>
@@ -141,89 +176,54 @@ function NavigationFooter({
   gooeyBuilder,
   railCollapsed,
   builderOpen,
+  isMobile,
   user,
   currentWorkspace,
   workspaces,
   menuLinks,
   logoutHref,
-  switchWorkspaceHref,
-  addWorkspaceHref,
+  onSwitchWorkspace,
+  addWorkspaceOnClick,
   loginHref,
 }: {
   gooeyBuilder: NavigationSidebarProps["gooey_builder"];
   railCollapsed: boolean;
   builderOpen: boolean;
+  isMobile: boolean;
   user: NavigationSidebarProps["user"];
   currentWorkspace: NavigationSidebarProps["current_workspace"];
   workspaces: NavigationSidebarProps["workspaces"];
   menuLinks: NavigationSidebarProps["menu_links"];
   logoutHref: string;
-  switchWorkspaceHref: string;
-  addWorkspaceHref: string;
+  onSwitchWorkspace: (workspaceId: number) => void;
+  addWorkspaceOnClick: string;
   loginHref: string;
 }) {
   return (
-    <div className="flex-shrink-0 pt-2 d-flex flex-column gap-2">
-      {gooeyBuilder && !(railCollapsed && builderOpen) && (
-        <button
-          type="button"
-          className={clsx(
-            "gooey-builder-btn btn btn-light border d-flex align-items-center position-relative",
-            railCollapsed ? "justify-content-center p-1" : "gap-2 p-2"
-          )}
-          title={railCollapsed ? "Gooey Builder" : undefined}
-          onClick={(e) => {
-            e.stopPropagation();
-            window.dispatchEvent(new CustomEvent("builder-sidebar:open"));
-          }}
-        >
-          <img
-            src={gooeyBuilder.photo_url}
-            alt=""
-            width={28}
-            height={28}
-            className="gooey-builder-btn__photo rounded-circle flex-shrink-0"
-          />
-          {railCollapsed ? (
-            <RailTooltip label="Gooey Builder" />
-          ) : (
-            <span className="d-flex flex-column text-start lh-sm">
-              <span className="gooey-builder-btn__subtitle text-muted">
-                Build with AI
-              </span>
-              <span className="fw-semibold">Gooey Builder</span>
-            </span>
-          )}
-        </button>
-      )}
-
-      {user ? (
-        <IdentityMenu
-          user={user}
-          currentWorkspace={currentWorkspace ?? null}
-          workspaces={workspaces}
-          menuLinks={menuLinks}
-          logoutHref={logoutHref}
-          switchWorkspaceHref={switchWorkspaceHref}
-          addWorkspaceHref={addWorkspaceHref}
-          collapsed={railCollapsed}
+    <div className="flex-shrink-0 p-2 d-flex flex-column gap-2">
+      {/* On mobile the Gooey Builder launcher lives in the top bar, not the drawer. */}
+      {gooeyBuilder && !builderOpen && !isMobile && (
+        <GooeyBuilderButton
+          gooeyBuilder={gooeyBuilder}
+          compact={railCollapsed}
         />
-      ) : (
-        <a
-          href={loginHref}
-          className={clsx(
-            "d-flex align-items-center w-100 text-body text-decoration-none rounded p-2 bg-hover-light position-relative",
-            railCollapsed ? "justify-content-center" : "gap-2"
-          )}
-          title={railCollapsed ? "Sign In" : undefined}
-        >
-          <i className="fa-regular fa-right-to-bracket nav-item-icon" />
-          {railCollapsed ? (
-            <RailTooltip label="Sign In" />
-          ) : (
-            <span className="fw-semibold">Sign In</span>
-          )}
-        </a>
+      )}
+      {/* On mobile the account menu lives in the top bar, not the drawer. */}
+      {!isMobile && (
+        <div className="border-top pt-2">
+          <AccountSection
+            user={user}
+            currentWorkspace={currentWorkspace}
+            workspaces={workspaces}
+            menuLinks={menuLinks}
+            logoutHref={logoutHref}
+            onSwitchWorkspace={onSwitchWorkspace}
+            addWorkspaceOnClick={addWorkspaceOnClick}
+            loginHref={loginHref}
+            compact={railCollapsed}
+            placement="top-start"
+          />
+        </div>
       )}
     </div>
   );
@@ -235,12 +235,32 @@ function NavigationHeaderMobile({
   drawerOpen,
   onDrawerOpen,
   onDrawerClose,
+  gooeyBuilder,
+  builderOpen,
+  user,
+  currentWorkspace,
+  workspaces,
+  menuLinks,
+  logoutHref,
+  onSwitchWorkspace,
+  addWorkspaceOnClick,
+  loginHref,
 }: {
   logoImageUrl: string;
   isMobile: boolean;
   drawerOpen: boolean;
   onDrawerOpen: () => void;
   onDrawerClose: () => void;
+  gooeyBuilder: NavigationSidebarProps["gooey_builder"];
+  builderOpen: boolean;
+  user: NavigationSidebarProps["user"];
+  currentWorkspace: NavigationSidebarProps["current_workspace"];
+  workspaces: NavigationSidebarProps["workspaces"];
+  menuLinks: NavigationSidebarProps["menu_links"];
+  logoutHref: string;
+  onSwitchWorkspace: (workspaceId: number) => void;
+  addWorkspaceOnClick: string;
+  loginHref: string;
 }) {
   return (
     <>
@@ -266,12 +286,120 @@ function NavigationHeaderMobile({
             className="img-fluid"
           />
         </a>
+        <div className="ms-auto d-flex align-items-center gap-1">
+          {gooeyBuilder && !builderOpen && (
+            <GooeyBuilderButton gooeyBuilder={gooeyBuilder} compact />
+          )}
+          <AccountSection
+            user={user}
+            currentWorkspace={currentWorkspace}
+            workspaces={workspaces}
+            menuLinks={menuLinks}
+            logoutHref={logoutHref}
+            onSwitchWorkspace={onSwitchWorkspace}
+            addWorkspaceOnClick={addWorkspaceOnClick}
+            loginHref={loginHref}
+            compact
+            placement="bottom-end"
+          />
+        </div>
       </div>
 
       {isMobile && drawerOpen && (
         <div className="nav-scrim" onClick={onDrawerClose} />
       )}
     </>
+  );
+}
+
+function AccountSection({
+  user,
+  currentWorkspace,
+  workspaces,
+  menuLinks,
+  logoutHref,
+  onSwitchWorkspace,
+  addWorkspaceOnClick,
+  loginHref,
+  compact,
+  placement,
+}: {
+  user: NavigationSidebarProps["user"];
+  currentWorkspace: NavigationSidebarProps["current_workspace"];
+  workspaces: NavigationSidebarProps["workspaces"];
+  menuLinks: NavigationSidebarProps["menu_links"];
+  logoutHref: string;
+  onSwitchWorkspace: (workspaceId: number) => void;
+  addWorkspaceOnClick: string;
+  loginHref: string;
+  compact: boolean;
+  placement: Placement;
+}) {
+  if (user) {
+    return (
+      <WorkspaceAccountMenu
+        user={user}
+        currentWorkspace={currentWorkspace ?? null}
+        workspaces={workspaces}
+        menuLinks={menuLinks}
+        logoutHref={logoutHref}
+        onSwitchWorkspace={onSwitchWorkspace}
+        addWorkspaceOnClick={addWorkspaceOnClick}
+        compact={compact}
+        placement={placement}
+      />
+    );
+  }
+
+  return (
+    <a
+      href={loginHref}
+      className={clsx(
+        "d-flex align-items-center text-body text-decoration-none rounded p-2 bg-hover-light position-relative",
+        compact ? "justify-content-center" : "w-100 gap-2"
+      )}
+      title={compact ? "Sign In" : undefined}
+    >
+      <i className="fa-regular fa-right-to-bracket nav-item-icon" />
+      {!compact && <span className="fw-semibold">Sign In</span>}
+    </a>
+  );
+}
+
+function GooeyBuilderButton({
+  gooeyBuilder,
+  compact,
+}: {
+  gooeyBuilder: NonNullable<NavigationSidebarProps["gooey_builder"]>;
+  compact: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={clsx(
+        "gooey-builder-btn btn btn-light border d-flex align-items-center position-relative",
+        compact ? "justify-content-center p-1" : "gap-2 p-2"
+      )}
+      title={"Gooey Builder"}
+      onClick={(e) => {
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent(`${BUILDER_SIDEBAR_KEY}:open`));
+      }}
+    >
+      <img
+        src={gooeyBuilder.photo_url}
+        alt=""
+        width={28}
+        height={28}
+        className="rounded-circle flex-shrink-0"
+      />
+      {!compact && (
+        <span className="d-flex flex-column text-start lh-sm small">
+          <span className="text-muted small">Build with AI</span>
+          <span className="fw-semibold">Gooey Builder</span>
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -311,7 +439,7 @@ function NavigationHeader({
         ) : (
           <button
             type="button"
-            className="btn text-muted p-1 d-flex align-items-center"
+            className="btn text-muted p-1 d-flex align-items-center bg-hover-light"
             title="Collapse sidebar"
             onClick={onCollapse}
           >
@@ -332,10 +460,10 @@ function NavBrand({
   onExpand?: (e?: React.MouseEvent) => void;
 }) {
   const mark = (
-    <span className="nav-brand__mark" aria-hidden="true">
+    <span className="position-relative" aria-hidden="true">
       <GooeyBot size={24} />
       {collapsed && (
-        <i className="fa-regular fa-sidebar nav-brand__expand-icon " />
+        <i className="fa-regular fa-sidebar nav-brand__expand-icon fs-5 text-muted" />
       )}
     </span>
   );
@@ -368,10 +496,6 @@ function NavBrand({
       />
     </a>
   );
-}
-
-function RailTooltip({ label }: { label: string }) {
-  return <span className="rail-tooltip">{label}</span>;
 }
 
 function GooeyBot({ size = 18 }: { size?: number }) {

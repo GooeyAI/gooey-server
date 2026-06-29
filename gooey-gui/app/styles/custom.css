@@ -52,7 +52,7 @@
 }
 
 .btn.btn-theme.replicate-nav.active:hover {
-  background:  #a5ffee; /* mint */;
+  background: #a5ffee; /* mint */
   color: black;
   border: 1px solid transparent;
 }
@@ -177,8 +177,18 @@ a:hover {
   text-decoration-thickness: 2px;
 }
 
-h1, h2, h3, h4, h5, h6, .table > thead > tr > th, strong, .bold, .semibold {
-    font-family: avenir-lt-w01_85-heavy1475544,avenir-lt-w05_85-heavy,"avenir-lt-w05_85-heavy","Space Grotesk", sans-serif;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.table > thead > tr > th,
+strong,
+.bold,
+.semibold {
+  font-family: avenir-lt-w01_85-heavy1475544, avenir-lt-w05_85-heavy,
+    "avenir-lt-w05_85-heavy", "Space Grotesk", sans-serif;
 }
 h1 {
   font-size: 32px;
@@ -514,7 +524,7 @@ textarea:disabled {
 .btn {
   margin: 0 0 0 1px;
   border-radius: 6px;
- /* font-weight: 800; */
+  /* font-weight: 800; */
 }
 
 .btn.btn-theme {
@@ -540,10 +550,10 @@ textarea:disabled {
   background-color: #fff0f5;
   color: #000;
   */
-    border: 1px solid #c9c9c9;
-    transition: all .2s ease-in;
-    background-color: #fff;
-    color: black;
+  border: 1px solid #c9c9c9;
+  transition: all 0.2s ease-in;
+  background-color: #fff;
+  color: black;
 }
 .btn-theme.btn-secondary:hover {
   background-color: #fff0f5; /* #a5ffee; mint */
@@ -563,10 +573,6 @@ textarea:disabled {
   color: black;
   border: 1px solid transparent;
 }
-
-
-
-
 
 .bg-light {
   padding: 15px 20px;
@@ -714,10 +720,13 @@ a.text-primary:hover {
 }
 
 .border-hover {
-  transition: border-color 0.10s ease;
+  transition: border-color 0.1s ease;
 }
 .border-hover:hover {
-  border-color: var(--tile-hover-color, var(--bs-secondary, #dee2e6)) !important;
+  border-color: var(
+    --tile-hover-color,
+    var(--bs-secondary, #dee2e6)
+  ) !important;
 }
 .tile-icon {
   transition: color 0.1s ease;
@@ -735,7 +744,7 @@ a.text-primary:hover {
   display: none;
 }
 
-.cm-theme  {
+.cm-theme {
   overflow: auto;
 }
 .cm-theme :first-child {
@@ -906,7 +915,7 @@ button {
 }
 
 /* Cross-browser support (vendor prefixes) */
-.gooey-switch + label:before, 
+.gooey-switch + label:before,
 .gooey-switch + label:after {
   -webkit-transition: all 0.2s ease;
   -moz-transition: all 0.2s ease;
@@ -931,7 +940,8 @@ button {
   }
 }
 
-.ag-horizontal-left-spacer, .ag-body-viewport {
+.ag-horizontal-left-spacer,
+.ag-body-viewport {
   background-color: #f7f7f7;
 }
 

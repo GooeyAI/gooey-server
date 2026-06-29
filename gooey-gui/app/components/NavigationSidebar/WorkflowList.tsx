@@ -1,8 +1,8 @@
-import type { NavWorkflowData } from "@gooey-types/navigation_sidebar_props";
+import type { NavWorkflowItem } from "@gooey-types/navigation_sidebar_props";
 import { useLocation } from "@remix-run/react";
 
 type WorkflowListProps = {
-  items: NavWorkflowData[];
+  items: NavWorkflowItem[];
   indent?: boolean;
 };
 
@@ -10,13 +10,10 @@ function normalizePath(path: string): string {
   return path.replace(/\/+$/, "") || "/";
 }
 
-/** Whether `href` points at the page we're currently on. Example/published-run
- *  links are identified by their path; specific runs by the run_id + uid query
- *  params (see app_url() in daras_ai_v2/base.py). */
-function hrefMatchesLocation(
+export function hrefMatchesLocation(
   href: string,
   pathname: string,
-  search: string,
+  search: string
 ): boolean {
   let target: URL;
   try {
@@ -40,7 +37,7 @@ function WorkflowRowItem({
   item,
   isActive,
 }: {
-  item: NavWorkflowData;
+  item: NavWorkflowItem;
   isActive: boolean;
 }) {
   return (
@@ -61,22 +58,14 @@ function WorkflowRowItem({
             height={20}
             className="nav-workflow-thumb rounded-circle flex-shrink-0"
           />
-        ) : item.icon && item.icon.includes("fa-") ? (
-          <i className={item.icon} />
         ) : item.icon ? (
-          // workflow_icon can be an emoji rather than a FontAwesome class
-          <span>{item.icon}</span>
-        ) : (
-          <i
-            className="fa-regular fa-clock"
-            style={{
-              width: 20,
-              textAlign: "center",
-              flexShrink: 0,
-              fontSize: 14,
-            }}
+          // workflow_icon is FontAwesome icon HTML (or a bare emoji); render
+          // both as-is rather than treating it as a class name.
+          <span
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: item.icon }}
           />
-        )}
+        ) : null}
       </span>
       <p
         className={
