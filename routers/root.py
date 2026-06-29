@@ -39,7 +39,7 @@ from daras_ai_v2.settings import templates
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
-from widgets.sidebar import sidebar_layout
+from widgets.sidebar import persist_toggle_state, sidebar_layout
 from widgets.workflow_search import SearchFilters, render_search_bar_with_redirect
 from workspaces.widgets import (
     get_current_workspace,
@@ -208,7 +208,7 @@ def explore_page(
 ):
     from widgets import explore
 
-    with side_bar_page_wrapper(
+    with sidebar_page_wrapper(
         request, search_filters=search_filters, show_search_bar=False
     ):
         explore.render(request, search_filters)
@@ -236,7 +236,7 @@ def explore2_page(request: Request):
 def home_page(request: Request):
     from widgets import home
 
-    with side_bar_page_wrapper(request):
+    with sidebar_page_wrapper(request):
         home.render(request)
 
     return {
@@ -710,7 +710,7 @@ def render_recipe_page(
 
     page.load_state()
 
-    with side_bar_page_wrapper(request, page=page):
+    with sidebar_page_wrapper(request, page=page):
         page.render()
 
     return dict(
@@ -824,61 +824,45 @@ def page_wrapper(
 
 
 @contextmanager
-def side_bar_page_wrapper(
+def sidebar_page_wrapper(
     request: Request,
     className="",
     search_filters: typing.Optional[SearchFilters] = None,
     show_search_bar: bool = True,
     page: typing.Optional["BasePage"] = None,
 ):
-    from widgets.navigation_sidebar import build_props
+    from widgets import navigation_sidebar
 
     context = {"request": request, "block_incognito": True}
 
     display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]
 
-    # Persist collapse state: read from session_state (set by React onChange),
-    # fall back to session (previously persisted), write back to session.
-    _nav_collapsed_key = "nav-sidebar:default-collapsed"
-    try:
-        default_collapsed = request.session[_nav_collapsed_key] = gui.session_state[
-            _nav_collapsed_key
-        ]
-    except KeyError:
-        default_collapsed = request.session.get(_nav_collapsed_key, False)
+    default_collapsed = persist_toggle_state(
+        "nav-sidebar:default-collapsed", session=request.session, default=False
+    )
 
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
     # row on desktop (rail beside content).
     with gui.div(className="d-flex flex-column flex-lg-row min-vh-100 w-100"):
-        # Left nav rail — full-bleed, flush to the viewport edge.
-        gui.model_component(
-            build_props(request, default_collapsed=default_collapsed, page=page)
+        navigation_sidebar.render(
+            request, default_collapsed=default_collapsed, page=page
         )
 
-        # Main content column. The Builder sidebar is mounted INSIDE this column
-        # (not around the whole row) so its container does not clamp or indent
-        # the full-width rail.
         with gui.div(className="d-flex flex-column flex-grow-1 min-w-0"):
             sidebar, page_content = sidebar_layout(
                 key="builder-sidebar",
                 session=request.session,
                 disabled=not display_gooey_builder,
             )
-            with page_content, gui.div(
-                className="d-flex flex-column min-vh-100 w-100"
-            ):
+            with page_content, gui.div(className="d-flex flex-column min-vh-100 w-100"):
                 gui.html(templates.get_template("gtag.html").render(**context))
                 gui.html(copy_to_clipboard_scripts)
 
                 if request.user and not request.user.is_anonymous:
-                    # The rail's IdentityMenu owns the workspace switcher, so we
-                    # only need the current workspace here (no header dropdown).
                     current_workspace = get_current_workspace(
                         request.user, request.session
                     )
 
-                    # The rail's own Builder button replaces the old fixed
-                    # launcher; only mount the sidebar contents here.
                     if display_gooey_builder:
                         with sidebar:
                             render_gooey_builder(
@@ -889,11 +873,16 @@ def side_bar_page_wrapper(
                 else:
                     current_workspace = None
 
-                with gui.div(id="main-content", className=className):
-                    yield current_workspace
+                # Cap the readable content width while the nav rail stays
+                # full-bleed; the container centers content on wide viewports.
+                with gui.div(className="container-fluid"):
+                    with gui.div(id="main-content", className=className):
+                        yield current_workspace
 
-                gui.html(templates.get_template("footer.html").render(**context))
-                gui.html(templates.get_template("login_scripts.html").render(**context))
+                    gui.html(templates.get_template("footer.html").render(**context))
+                    gui.html(
+                        templates.get_template("login_scripts.html").render(**context)
+                    )
 
 
 def _render_mobile_search_button(request: Request, search_filters: SearchFilters):

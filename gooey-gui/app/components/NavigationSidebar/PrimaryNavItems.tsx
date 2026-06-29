@@ -1,18 +1,16 @@
 import clsx from "clsx";
-import { useState } from "react";
+import React, { useState } from "react";
 import type {
   MenuLinkData,
   NavItemData,
   NavUserData,
-  NavWorkflowData,
+  NavWorkflowItem,
 } from "@gooey-types/navigation_sidebar_props";
 import { WorkflowList } from "./WorkflowList";
 
 export function PrimaryNavItems({
   navItems,
   activeKey,
-  newHref,
-  savedWorkflows,
   recentWorkflows,
   user,
   menuLinks,
@@ -20,72 +18,40 @@ export function PrimaryNavItems({
 }: {
   navItems: NavItemData[];
   activeKey: string | null | undefined;
-  newHref: string;
-  savedWorkflows: NavWorkflowData[];
-  recentWorkflows: NavWorkflowData[];
+  recentWorkflows: NavWorkflowItem[];
   user: NavUserData | null | undefined;
   menuLinks: MenuLinkData[];
   railCollapsed: boolean;
 }) {
-  const [savedOpen, setSavedOpen] = useState(true);
   const [recentOpen, setRecentOpen] = useState(true);
 
+  const home = navItems.filter((item) => item.key === "home")[0];
   return (
-    <>
-      {user && (
-        <div className="flex-shrink-0">
-          <NavItem
-            icon="fa-regular fa-plus"
-            label="New"
-            href={newHref}
-            isActive={false}
-            collapsed={railCollapsed}
-          />
-        </div>
+    <div className="px-2 pt-2 nav-primary-items d-flex flex-column">
+      {home && (
+        <NavItem
+          icon={home.icon}
+          label={home.label}
+          href={home.href}
+          isActive={home.key === activeKey}
+          collapsed={railCollapsed}
+        />
       )}
 
+      {/* scrollable region */}
       <div className="nav-scroll-region d-flex flex-column gap-1 mt-1">
         {navItems.map((item) => {
-          if (item.key === "saved" && !railCollapsed && user) {
+          if (item.key === "home") return null;
+          if (item.items.length > 0 && !railCollapsed) {
             return (
-              <div key={item.key}>
-                <div
-                  className={clsx(
-                    "nav-item-link d-flex align-items-center gap-2 rounded px-2 py-2",
-                    item.key === activeKey
-                      ? "fw-bold nav-item-link--active text-body"
-                      : "text-body",
-                  )}
-                >
-                  <a
-                    href={item.href}
-                    className="nav-item-inner-link d-flex align-items-center gap-2 flex-grow-1 text-reset text-decoration-none"
-                  >
-                    <i className={clsx(item.icon, "nav-item-icon")} />
-                    <span>{item.label}</span>
-                  </a>
-                  {savedWorkflows.length > 0 && (
-                    <button
-                      type="button"
-                      className="nav-chevron-btn btn text-body p-0 d-flex align-items-center"
-                      title={savedOpen ? "Collapse" : "Expand"}
-                      onClick={() => setSavedOpen((v) => !v)}
-                    >
-                      <i
-                        className={clsx(
-                          "nav-chevron-icon fa-regular",
-                          savedOpen ? "fa-chevron-down" : "fa-chevron-right",
-                        )}
-                      />
-                    </button>
-                  )}
-                </div>
-                {savedOpen && savedWorkflows.length > 0 && (
-                  <div className="saved-tree">
-                    <WorkflowList items={savedWorkflows} indent />
-                  </div>
-                )}
-              </div>
+              <NavItemChildren
+                key={item.key}
+                icon={item.icon}
+                label={item.label}
+                href={item.href}
+                isActive={item.key === activeKey}
+                items={item.items}
+              />
             );
           }
           return (
@@ -100,43 +66,31 @@ export function PrimaryNavItems({
           );
         })}
 
-        {railCollapsed && user && (
-          <NavItem
-            key="recent-collapsed"
-            icon="fa-regular fa-clock-rotate-left"
-            label="Recent"
-            href="#"
-            isActive={false}
-            collapsed={railCollapsed}
-          />
-        )}
-
         {!user &&
           !railCollapsed &&
-          menuLinks.map((link, i) => (
+          menuLinks.map((link) => (
             <a
-              key={i}
+              key={`${link.href}:${link.label}`}
               href={link.href}
               className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body"
             >
-              {link.icon && (
-                <i className={clsx(link.icon, "nav-item-icon")} />
-              )}
+              {link.icon && <i className={clsx(link.icon, "nav-item-icon")} />}
               <span>{link.label}</span>
             </a>
           ))}
 
         {!railCollapsed && recentWorkflows.length > 0 && (
-          <div className="mt-3">
+          <div className="mt-3 pe-1 nav-section-toggle fs-6">
             <button
-              className="nav-section-toggle btn text-body text-decoration-none d-flex align-items-center gap-1 px-2 py-1 w-100"
+              type="button"
+              className="nav-item-link d-flex align-items-center fw-semibold gap-1 px-1 py-1 w-100 rounded"
               onClick={() => setRecentOpen((v) => !v)}
             >
-              <span className="flex-grow-1 text-start">Recent</span>
+              <span className="text-start small text-muted">Recent</span>
               <i
                 className={clsx(
-                  "fa-regular",
-                  recentOpen ? "fa-chevron-down" : "fa-chevron-right",
+                  "fa-regular text-muted nav-chevron-icon",
+                  recentOpen ? "fa-chevron-down" : "fa-chevron-right"
                 )}
               />
             </button>
@@ -144,7 +98,7 @@ export function PrimaryNavItems({
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -154,30 +108,99 @@ function NavItem({
   href,
   isActive,
   collapsed,
+  children,
 }: {
   icon: string;
   label: string;
   href: string;
   isActive: boolean;
   collapsed: boolean;
+  children?: React.ReactNode;
 }) {
   return (
     <a
-      href={href}
       className={clsx(
-        "nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none",
+        "nav-item-link d-flex align-items-center gap-2 rounded",
         collapsed ? "justify-content-center px-0 py-2" : "px-2 py-2",
         isActive ? "fw-bold nav-item-link--active text-body" : "text-body",
         collapsed && "position-relative",
+        children && "nav-section-toggle"
       )}
-      onClick={collapsed ? (e) => e.preventDefault() : undefined}
+      href={href}
+      onClick={(e) => e.stopPropagation()} // avoid opening the sidebar
     >
-      <i className={clsx(icon, "nav-item-icon")} />
-      {collapsed ? <RailTooltip label={label} /> : <span>{label}</span>}
+      <span
+        className={clsx(
+          "d-flex align-items-center gap-2 flex-grow-1",
+          collapsed && "justify-content-center"
+        )}
+      >
+        <i className={clsx(icon, "nav-item-icon", !isActive && "text-muted")} />
+        {!collapsed && <span>{label}</span>}
+      </span>
+      {children}
     </a>
   );
 }
 
-function RailTooltip({ label }: { label: string }) {
-  return <span className="rail-tooltip">{label}</span>;
+function NavItemChildren({
+  icon,
+  label,
+  href,
+  isActive,
+  items,
+}: {
+  icon: string;
+  label: string;
+  href: string;
+  isActive: boolean;
+  items: NavWorkflowItem[];
+}) {
+  const [open, setOpen] = useState(true);
+
+  // No children → behaves like a plain nav item (label links to href).
+  if (items.length === 0) {
+    return (
+      <NavItem
+        icon={icon}
+        label={label}
+        href={href}
+        isActive={isActive}
+        collapsed={false}
+      />
+    );
+  }
+
+  return (
+    <React.Fragment>
+      <NavItem
+        icon={icon}
+        label={label}
+        href={href}
+        isActive={isActive}
+        collapsed={false}
+      >
+        {/* the space after the label toggles the nested items open/closed */}
+        <span
+          className="flex-grow-1 d-flex align-items-center justify-content-end flex-grow-1"
+          onClick={(e) => {
+            e.preventDefault();
+            setOpen((isOpen) => !isOpen);
+          }}
+        >
+          <i
+            className={clsx(
+              "nav-chevron-icon fa-regular",
+              open ? "fa-chevron-down" : "fa-chevron-right"
+            )}
+          />
+        </span>
+      </NavItem>
+      {open && (
+        <div className="saved-tree">
+          <WorkflowList items={items} indent />
+        </div>
+      )}
+    </React.Fragment>
+  );
 }

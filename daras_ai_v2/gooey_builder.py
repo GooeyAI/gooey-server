@@ -114,7 +114,7 @@ def render_gooey_builder(
     config["showRunLink"] = True
     config["showToolCalls"] = True
     config["enableSourcePreview"] = False
-    config["enableConversations"] = True
+    config["enableConversations"] = False
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 

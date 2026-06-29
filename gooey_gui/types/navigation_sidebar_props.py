@@ -3,18 +3,19 @@ from __future__ import annotations
 import pydantic
 
 
+class NavWorkflowItem(pydantic.BaseModel):
+    title: str
+    href: str
+    image_url: str | None = None
+    icon: str | None = None  # FA class fallback when no image
+
+
 class NavItemData(pydantic.BaseModel):
     key: str
     label: str
     icon: str  # FontAwesome class, e.g. "fa-regular fa-house"
     href: str
-
-
-class NavWorkflowData(pydantic.BaseModel):
-    title: str
-    href: str
-    image_url: str | None = None
-    icon: str | None = None  # FA class fallback when no image
+    items: list[NavWorkflowItem] = []  # nested children, e.g. saved workflows
 
 
 class WorkspaceData(pydantic.BaseModel):
@@ -23,6 +24,7 @@ class WorkspaceData(pydantic.BaseModel):
     icon_html: str  # workspace.html_icon()
     subtitle: str = ""  # e.g. "Personal" or "Org · 12 members"
     is_current: bool = False
+    is_personal: bool = False
 
 
 class MenuLinkData(pydantic.BaseModel):
@@ -33,7 +35,6 @@ class MenuLinkData(pydantic.BaseModel):
 
 class NavUserData(pydantic.BaseModel):
     name: str
-    initial: str
     photo_url: str | None = None
 
 
@@ -44,29 +45,21 @@ class GooeyBuilderData(pydantic.BaseModel):
 class NavigationSidebarProps(pydantic.BaseModel):
     _component: str = "NavigationSidebar"
 
-    # primary nav (Task 1)
     logo_image_url: str
     nav_items: list[NavItemData] = []
     active_key: str | None = None
-    new_href: str
+    recent_workflows: list[NavWorkflowItem] = []
 
-    # workflow lists (Task 3)
-    saved_href: str = ""
-    saved_workflows: list[NavWorkflowData] = []
-    recent_workflows: list[NavWorkflowData] = []
-
-    # identity / workspace / menu (Task 4) + anonymous (Task 5)
     user: NavUserData | None = None  # None => anonymous
     current_workspace: WorkspaceData | None = None
     workspaces: list[WorkspaceData] = []
     menu_links: list[MenuLinkData] = []
     logout_href: str = ""
-    switch_workspace_href: str = ""  # POST/GET target, {workspace_id} templated by React
-    add_workspace_href: str = ""
+    # JS onClick handler string (workspaces.widgets.open_create_workspace_popup_js),
+    # run client-side like a server-rendered onClick — not a plain URL.
+    add_workspace_onclick: str = ""
     login_href: str = "/login/"
 
-    # gooey builder (Task 7)
     gooey_builder: GooeyBuilderData | None = None
 
-    # collapse (Task 2)
     default_collapsed: bool = False
