@@ -33,13 +33,7 @@ def global_workspace_selector(user: AppUser, session: dict):
         pass
     workspaces = user.cached_workspaces
 
-    if switch_workspace_id := gui.session_state.pop(SWITCH_WORKSPACE_KEY, None):
-        try:
-            if str(session[SESSION_SELECTED_WORKSPACE]) == switch_workspace_id:
-                raise gui.RedirectException(get_route_path(members_route))
-        except KeyError:
-            pass
-        set_current_workspace(session, int(switch_workspace_id))
+    handle_workspace_switch(session)
 
     try:
         current = [
@@ -167,6 +161,21 @@ def global_workspace_selector(user: AppUser, session: dict):
         )
 
     return current
+
+
+def handle_workspace_switch(session: dict):
+    switch_workspace_id = gui.session_state.pop(SWITCH_WORKSPACE_KEY, None)
+    if not switch_workspace_id:
+        return
+
+    from routers.account import members_route
+
+    try:
+        if str(session[SESSION_SELECTED_WORKSPACE]) == switch_workspace_id:
+            raise gui.RedirectException(get_route_path(members_route))
+    except KeyError:
+        pass
+    set_current_workspace(session, int(switch_workspace_id))
 
 
 def workspace_selector_link(

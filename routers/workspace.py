@@ -39,7 +39,7 @@ app = CustomAPIRouter()
 def switch_workspace_route(request: Request, workspace_id: int):
     """Set the current workspace in the session, then redirect to ?next= (or Home).
 
-    Used by the NavigationSidebar identity menu. Validates that the user is a
+    Used by the NavigationSidebar account menu. Validates that the user is a
     member of the target workspace before switching.
     """
     from routers.base_auth import safe_next_url

@@ -330,16 +330,21 @@ PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
 DOCS_URL = config("DOCS_URL", "https://docs.gooey.ai")
 BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
 CONTACT_URL = config("CONTACT_URL", "https://gooey.ai/contact")
+API_URL = config("API_URL", "/api/")
 
 HEADER_LINKS = [
     (EXPLORE_URL, "Explore"),
     (DOCS_URL, "Docs"),
-    ("/api/", "API"),
+    (API_URL, "API"),
     (BLOG_URL, "Blog"),
     ("/pricing", "Pricing"),
     (CONTACT_URL, "Contact"),
 ]
-HEADER_ICONS = {}
+
+HEADER_ICONS = {
+    API_URL: "fa-regular fa-code",
+    DOCS_URL: "fa-regular fa-book",
+}
 
 SERPER_API_KEY = config("SERPER_API_KEY", None)
 GOOGLE_GEOCODING_API_KEY = config("GOOGLE_GEOCODING_API_KEY", default="")
