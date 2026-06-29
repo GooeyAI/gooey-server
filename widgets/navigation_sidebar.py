@@ -1,92 +1,47 @@
 from __future__ import annotations
 
-import typing
+from typing import TYPE_CHECKING
 
+import gooey_gui as gui
 from starlette.requests import Request
 
 from daras_ai_v2 import settings
+from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
-from gooey_gui.types.home_page_props import (
-    ChatPreview,
-    IconPreview,
-    MediaPreview,
-    WorkflowCardData,
-)
 from gooey_gui.types.navigation_sidebar_props import (
     GooeyBuilderData,
     MenuLinkData,
     NavItemData,
     NavUserData,
-    NavWorkflowData,
+    NavWorkflowItem,
     NavigationSidebarProps,
     WorkspaceData,
 )
 
-if typing.TYPE_CHECKING:
-    from daras_ai_v2.base import BasePage
+if TYPE_CHECKING:
+    from app_users.models import AppUser
+    from bots.models import PublishedRun, SavedRun
+    from workspaces.models import Workspace
+
+RECENT_WORKFLOW_LIST_LIMIT = 20
 
 
-def _workspace_subtitle(ws) -> str:
-    """Subtitle for the workspace switcher rows, e.g. "Personal" or
-    "Org · 12 members"."""
-    if ws.is_personal:
-        return "Personal"
-    n = ws.memberships.filter(deleted__isnull=True).count()
-    return f"Org · {n} member" + ("" if n == 1 else "s")
-
-
-def _card_to_nav_workflow(
-    card: WorkflowCardData, fallback_image: str | None = None
-) -> NavWorkflowData:
-    image_url: str | None = None
-    preview = card.preview
-    if isinstance(preview, MediaPreview):
-        image_url = preview.preview_img or preview.url
-    elif isinstance(preview, IconPreview):
-        image_url = preview.image_url
-    # ChatPreview (and image-less previews) carry no thumbnail → fall back to
-    # the parent published run's photo, like `_pr_preview`.
-    if not image_url:
-        image_url = fallback_image
-
-    return NavWorkflowData(
-        title=card.title,
-        href=card.href,
-        icon=card.workflow_icon,
-        image_url=image_url,
-    )
-
-
-def build_props(
+def render(
     request: Request,
     default_collapsed: bool = False,
-    page: "BasePage | None" = None,
-) -> NavigationSidebarProps:
-    from routers.root import RecipeTabs, explore_page, home_page
-    from routers.account import account_route, members_route, profile_route, saved_route
+    page: BasePage | None = None,
+) -> None:
     from routers.base_auth import get_login_url, logout
-    from routers.workspace import create_workspace_route, switch_workspace_route
-    from widgets.home import (
-        _load_recent_workflow_cards,
-        _load_saved_workflows,
-        _saved_workflows_href,
+    from routers.root import explore_page, home_page
+    from widgets.home import _saved_workflows_href
+    from workspaces.widgets import (
+        get_current_workspace,
+        handle_workspace_switch,
+        open_create_workspace_popup_js,
     )
-    from workspaces.widgets import get_current_workspace
 
     home_path = get_route_path(home_page)
     explore_path = get_route_path(explore_page)
-    saved_path = get_route_path(saved_route)
-
-    current_path = request.url.path
-
-    if current_path == home_path or current_path.rstrip("/") == home_path.rstrip("/"):
-        active_key: str | None = "home"
-    elif current_path == explore_path or current_path.rstrip("/") == explore_path.rstrip("/"):
-        active_key = "explore"
-    elif current_path == saved_path or current_path.rstrip("/") == saved_path.rstrip("/"):
-        active_key = "saved"
-    else:
-        active_key = None
 
     is_anonymous = request.user is None or request.user.is_anonymous
     if is_anonymous:
@@ -94,144 +49,313 @@ def build_props(
         workspace = None
     else:
         user = request.user
+        handle_workspace_switch(request.session)
         workspace = get_current_workspace(user, request.session)
 
-    recent_cards = _load_recent_workflow_cards(user, workspace, limit=10)
-    saved_cards = _load_saved_workflows(user, workspace)
+    saved_path = _saved_workflows_href(workspace)
+    workspaces = _load_workspaces(user, workspace)
 
+    active_key = _active_nav_key(
+        request.url.path,
+        {"home": home_path, "explore": explore_path, "saved": saved_path},
+    )
+
+    gui.model_component(
+        NavigationSidebarProps(
+            logo_image_url=settings.GOOEY_LOGO_IMG,
+            nav_items=_load_nav_items(
+                is_anonymous,
+                home_path=home_path,
+                explore_path=explore_path,
+                saved_path=saved_path,
+                saved_workflows=_load_saved_workflows(user, workspace),
+            ),
+            active_key=active_key,
+            default_collapsed=default_collapsed,
+            recent_workflows=_load_recent_workflows(
+                user, workspace, limit=RECENT_WORKFLOW_LIST_LIMIT
+            ),
+            user=_get_nav_user(user),
+            current_workspace=next((ws for ws in workspaces if ws.is_current), None),
+            workspaces=workspaces,
+            menu_links=_load_menu_links(is_anonymous),
+            logout_href="" if is_anonymous else get_route_path(logout),
+            add_workspace_onclick=(
+                "" if is_anonymous else open_create_workspace_popup_js()
+            ),
+            login_href=get_login_url(request) if is_anonymous else "/login/",
+            gooey_builder=_load_gooey_builder_data(request, workspace, page),
+        )
+    )
+
+
+def _load_nav_items(
+    is_anonymous: bool,
+    *,
+    home_path: str,
+    explore_path: str,
+    saved_path: str,
+    saved_workflows: list[NavWorkflowItem],
+) -> list[NavItemData]:
     explore_item = NavItemData(
         key="explore",
         label="Explore",
         icon="fa-regular fa-magnifying-glass",
         href=explore_path,
     )
-    # Public links shared by both rails (Docs/API/Blog/…). Explore is dropped
-    # here since it is already a primary nav item.
+    if is_anonymous:
+        return [explore_item]
+    return [
+        NavItemData(
+            key="home",
+            label="Home",
+            icon="fa-regular fa-house",
+            href=home_path,
+        ),
+        explore_item,
+        NavItemData(
+            key="saved",
+            label="Saved",
+            icon="fa-regular fa-floppy-disk",
+            href=saved_path,
+            items=saved_workflows,
+        ),
+    ]
+
+
+def _load_menu_links(is_anonymous: bool) -> list[MenuLinkData]:
     public_links = [
         MenuLinkData(label=label, href=url, icon=settings.HEADER_ICONS.get(url))
         for url, label in settings.HEADER_LINKS
         if label != "Explore"
     ]
-
-    nav_user: NavUserData | None = None
-    current_workspace_data: WorkspaceData | None = None
-    workspaces_data: list[WorkspaceData] = []
-    logout_href = ""
-    switch_workspace_href = ""
-    add_workspace_href = ""
-
     if is_anonymous:
-        # Reduced rail: logo + Explore + public links, with a Sign In footer.
-        nav_items = [explore_item]
-        menu_links = public_links
-        login_href = get_login_url(request)
-    else:
-        nav_items = [
-            NavItemData(
-                key="home",
-                label="Home",
-                icon="fa-regular fa-house",
-                href=home_path,
-            ),
-            explore_item,
-            NavItemData(
-                key="saved",
-                label="Saved",
-                icon="fa-regular fa-floppy-disk",
-                href=saved_path,
-            ),
-        ]
-        login_href = "/login/"
+        return public_links
 
-        nav_user = NavUserData(
-            name=user.display_name or user.first_name(),
-            initial=(user.first_name() or "?")[:1].upper(),
-            photo_url=user.photo_url or None,
-        )
+    from routers.account import account_route, profile_route
 
-        for ws in user.cached_workspaces:
-            ws_data = WorkspaceData(
-                id=ws.id,
-                name=ws.display_name(user),
-                icon_html=ws.html_icon(),
-                subtitle=_workspace_subtitle(ws),
-                is_current=workspace is not None and ws.id == workspace.id,
-            )
-            workspaces_data.append(ws_data)
-            if ws_data.is_current:
-                current_workspace_data = ws_data
+    return [
+        MenuLinkData(
+            label="Profile",
+            href=get_route_path(profile_route),
+            icon="fa-regular fa-user",
+        ),
+        MenuLinkData(
+            label="Billing",
+            href=get_route_path(account_route),
+            icon="fa-regular fa-credit-card",
+        ),
+        *public_links,
+    ]
 
-        menu_links = [
-            MenuLinkData(
-                label="Profile",
-                href=get_route_path(profile_route),
-                icon="fa-regular fa-address-card",
-            ),
-            MenuLinkData(
-                label="Billing",
-                href=get_route_path(account_route),
-                icon="fa-regular fa-square-dollar",
-            ),
-            MenuLinkData(
-                label="Members",
-                href=get_route_path(members_route),
-                icon="fa-regular fa-users",
-            ),
-            *public_links,
-        ]
 
-        logout_href = get_route_path(logout)
-
-        # Path template; React substitutes the real id per workspace row.
-        switch_workspace_href = get_route_path(
-            switch_workspace_route, path_params={"workspace_id": 0}
-        ).replace("/0/", "/{workspace_id}/")
-
-        add_workspace_href = get_route_path(create_workspace_route)
-
-    # Gooey Builder button: only on recipe run/preview pages where the builder
-    # can launch. Photo comes from the same branding source as the old launcher.
-    gooey_builder_data: GooeyBuilderData | None = None
-    if page is not None and page.tab in (RecipeTabs.run, RecipeTabs.preview):
-        from daras_ai_v2.gooey_builder import (
-            DEFAULT_GOOEY_BUILDER_PHOTO_URL,
-            can_launch_gooey_builder,
-        )
-
-        if can_launch_gooey_builder(request, workspace):
-            from bots.models import BotIntegration
-
-            try:
-                bi = BotIntegration.objects.get(
-                    id=settings.GOOEY_BUILDER_INTEGRATION_ID
-                )
-            except BotIntegration.DoesNotExist:
-                pass
-            else:
-                photo_url = bi.get_web_widget_branding().get(
-                    "photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL
-                )
-                gooey_builder_data = GooeyBuilderData(photo_url=photo_url)
-
-    return NavigationSidebarProps(
-        logo_image_url=settings.GOOEY_LOGO_IMG,
-        nav_items=nav_items,
-        active_key=active_key,
-        new_href="/explore2/",
-        default_collapsed=default_collapsed,
-        saved_href=_saved_workflows_href(workspace),
-        saved_workflows=[_card_to_nav_workflow(c) for c in saved_cards],
-        recent_workflows=[
-            _card_to_nav_workflow(card, fallback_image=photo)
-            for card, photo in recent_cards
-        ],
-        user=nav_user,
-        current_workspace=current_workspace_data,
-        workspaces=workspaces_data,
-        menu_links=menu_links,
-        logout_href=logout_href,
-        switch_workspace_href=switch_workspace_href,
-        add_workspace_href=add_workspace_href,
-        login_href=login_href,
-        gooey_builder=gooey_builder_data,
+def _get_nav_user(user: AppUser | None) -> NavUserData | None:
+    if user is None:
+        return None
+    user_name = user.display_name or user.first_name(fallback="User")
+    return NavUserData(
+        name=user_name,
+        photo_url=user.photo_url or None,
     )
+
+
+def _load_workspaces(
+    user: AppUser | None,
+    current_workspace: Workspace | None,
+) -> list[WorkspaceData]:
+    if user is None:
+        return []
+    return [
+        WorkspaceData(
+            id=ws.id,
+            name=ws.display_name(user),
+            icon_html=ws.html_icon(),
+            subtitle=_workspace_subtitle(ws),
+            is_current=current_workspace is not None and ws.id == current_workspace.id,
+            is_personal=ws.is_personal,
+        )
+        for ws in user.cached_workspaces
+    ]
+
+
+def _load_saved_workflows(
+    user: AppUser | None,
+    workspace: Workspace | None,
+) -> list[NavWorkflowItem]:
+    from widgets.home import saved_published_runs
+
+    return [_pr_to_nav_workflow(pr) for pr in saved_published_runs(user, workspace)]
+
+
+def _load_recent_workflows(
+    user: AppUser | None,
+    workspace: Workspace | None,
+    limit: int = 20,
+) -> list[NavWorkflowItem]:
+    srs = _recent_run_srs(user, workspace, limit)
+    return [_sr_to_nav_workflow(sr) for sr in srs]
+
+
+def _recent_run_srs(
+    user: AppUser | None,
+    workspace: Workspace | None,
+    limit: int,
+) -> list[SavedRun]:
+    """Hydrate the recent runs we'll actually render, newest first.
+
+    Split from id selection so we only materialise the ~`limit` rows shown,
+    rather than the whole scan window.
+    """
+    from django.db.models import F
+    from bots.models import SavedRun
+
+    ids = _recent_run_ids(user, workspace, limit)
+    if not ids:
+        return []
+    return list(
+        SavedRun.objects.filter(id__in=ids)
+        .select_related("parent_version__published_run")
+        .annotate(builder_prompt=F("parent_builder_saved_run__state__input_prompt"))
+        .order_by("-updated_at")
+    )
+
+
+def _recent_run_ids(
+    user: AppUser | None,
+    workspace: Workspace | None,
+    limit: int,
+) -> list[int]:
+    if user is None or workspace is None:
+        return []
+
+    from django.db.models import F
+    from bots.models import SavedRun
+    from widgets.home import RECENT_WORKFLOW_SCAN_LIMIT
+
+    history_runs = (
+        SavedRun.objects.filter(
+            uid=user.uid, workspace=workspace, surface=SavedRun.Surface.run
+        )
+        .annotate(published_run_id=F("parent_version__published_run_id"))
+        .order_by("-updated_at")
+        .values("id", "published_run_id", "updated_at")[:RECENT_WORKFLOW_SCAN_LIMIT]
+    )
+    builder_runs = (
+        SavedRun.objects.filter(
+            uid=user.uid, workspace=workspace, surface=SavedRun.Surface.builder_child
+        )
+        .order_by("-updated_at")
+        .values("id", "updated_at")[:limit]
+    )
+
+    picked: list[tuple] = []  # (updated_at, id)
+    seen_published_runs: set[int | None] = set()
+    for row in history_runs:
+        if row["published_run_id"] in seen_published_runs:
+            continue
+        seen_published_runs.add(row["published_run_id"])
+        picked.append((row["updated_at"], row["id"]))
+        if len(picked) >= limit:
+            break
+    picked.extend((row["updated_at"], row["id"]) for row in builder_runs)
+
+    picked.sort(key=lambda row: row[0], reverse=True)
+    return [id_ for _, id_ in picked[:limit]]
+
+
+def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
+    from bots.models import SavedRun
+    from bots.models.workflow import Workflow
+    from widgets.home import get_workflow_metadata
+
+    workflow = Workflow(sr.workflow)
+    metadata = get_workflow_metadata(workflow)
+    pr = sr.parent_published_run()
+
+    if sr.surface == SavedRun.Surface.builder_child:
+        title = (sr.builder_prompt or "").strip()
+    else:
+        title = _history_title(sr, pr)
+
+    return NavWorkflowItem(
+        title=title or (pr and pr.title) or workflow.label,
+        href=sr.get_app_url(),
+        icon=_workflow_icon(metadata),
+        image_url=(pr and pr.photo_url) or None,
+    )
+
+
+def _pr_to_nav_workflow(pr: PublishedRun) -> NavWorkflowItem:
+    from bots.models.workflow import Workflow
+    from widgets.home import get_workflow_metadata
+
+    workflow = Workflow(pr.workflow)
+    metadata = get_workflow_metadata(workflow)
+    return NavWorkflowItem(
+        title=pr.title or workflow.label,
+        href=pr.get_app_url(),
+        icon=_workflow_icon(metadata),
+        image_url=pr.photo_url or None,
+    )
+
+
+def _history_title(sr: SavedRun, pr: PublishedRun | None) -> str:
+    from bots.models.workflow import Workflow
+    from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
+
+    return get_title_breadcrumbs(
+        Workflow(sr.workflow).page_cls, sr, pr
+    ).title_with_prefix()
+
+
+def _workflow_icon(metadata) -> str:
+    return (metadata and (metadata.fa_icon or metadata.emoji)) or ""
+
+
+def _load_gooey_builder_data(
+    request: Request,
+    workspace: Workspace | None,
+    page: BasePage | None,
+) -> GooeyBuilderData | None:
+    from routers.root import RecipeTabs
+
+    if page is None or page.tab not in (RecipeTabs.run, RecipeTabs.preview):
+        return None
+
+    from daras_ai_v2.gooey_builder import can_launch_gooey_builder
+
+    if not can_launch_gooey_builder(request, workspace):
+        return None
+
+    from bots.models import BotIntegration
+    from daras_ai_v2.gooey_builder import DEFAULT_GOOEY_BUILDER_PHOTO_URL
+
+    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
+        return None
+    try:
+        bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
+    except BotIntegration.DoesNotExist:
+        return None
+    photo_url = bi.get_web_widget_branding().get(
+        "photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL
+    )
+    return GooeyBuilderData(photo_url=photo_url)
+
+
+def _active_nav_key(current_path: str, route_paths: dict[str, str]) -> str | None:
+    normalized_current = _normalize_path(current_path)
+    for key, path in route_paths.items():
+        if normalized_current == _normalize_path(path):
+            return key
+    return None
+
+
+def _normalize_path(path: str) -> str:
+    return path.rstrip("/") or "/"
+
+
+def _workspace_subtitle(ws) -> str:
+    if ws.is_personal:
+        return "Personal"
+    member_count = ws.memberships.filter(deleted__isnull=True).count()
+    return f"Org · {member_count} member" + ("" if member_count == 1 else "s")
