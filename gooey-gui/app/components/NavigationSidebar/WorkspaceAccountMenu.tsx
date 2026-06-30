@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import type { Placement } from "tippy.js";
 import type {
-  MenuLinkData,
+  NavAccountData,
   NavUserData,
   WorkspaceData,
 } from "@gooey-types/navigation_sidebar_props";
@@ -32,41 +32,33 @@ const MENU_ROW_ACTION_CLASS = clsx(
   "bg-transparent bg-hover-light"
 );
 
-type WorkspaceAccountMenuProps = {
-  user: NavUserData;
-  currentWorkspace: WorkspaceData | null;
-  workspaces: WorkspaceData[];
-  menuLinks: MenuLinkData[];
-  logoutHref: string;
-  onSwitchWorkspace: (workspaceId: number) => void;
-  addWorkspaceOnClick: string;
-  compact: boolean;
-  placement?: Placement;
-};
-
 export function WorkspaceAccountMenu({
-  user,
-  currentWorkspace,
-  workspaces,
-  menuLinks,
-  logoutHref,
+  account,
   onSwitchWorkspace,
-  addWorkspaceOnClick,
   compact,
   placement = "top-start",
-}: WorkspaceAccountMenuProps) {
+}: {
+  account: NavAccountData;
+  onSwitchWorkspace: (workspaceId: number) => void;
+  compact: boolean;
+  placement?: Placement;
+}) {
   const [open, setOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+
+  // The menu only renders for signed-in users; bail out otherwise so the rest
+  // can rely on `account.user` being present.
+  if (!account.user) return null;
 
   const closeMenu = () => {
     setWorkspaceOpen(false);
     setOpen(false);
   };
 
-  const accountLabel = currentWorkspace?.name || user.name;
+  const accountLabel = account.current_workspace?.name || account.user.name;
   const menuContent = (
     <div className={MENU_PANEL_CLASS}>
-      {currentWorkspace && (
+      {account.current_workspace && (
         <>
           <Tippy
             visible={workspaceOpen}
@@ -80,9 +72,8 @@ export function WorkspaceAccountMenu({
             popperOptions={WORKSPACE_SWITCHER_POPPER_OPTIONS}
             content={
               <WorkspaceSwitcher
-                workspaces={workspaces}
+                account={account}
                 onSwitchWorkspace={onSwitchWorkspace}
-                addWorkspaceOnClick={addWorkspaceOnClick}
                 onSelect={closeMenu}
               />
             }
@@ -94,9 +85,9 @@ export function WorkspaceAccountMenu({
               aria-expanded={workspaceOpen}
               onClick={() => setWorkspaceOpen((isOpen) => !isOpen)}
             >
-              <WorkspaceIcon html={currentWorkspace.icon_html} />
+              <WorkspaceIcon html={account.current_workspace.icon_html} />
               <span className="flex-grow-1 text-truncate min-w-0">
-                {currentWorkspace.name}
+                {account.current_workspace.name}
               </span>
               <i className="fa-regular fa-chevron-right text-body-secondary flex-shrink-0 small" />
             </button>
@@ -105,7 +96,7 @@ export function WorkspaceAccountMenu({
         </>
       )}
 
-      {menuLinks.map((link) => (
+      {account.menu_links.map((link) => (
         <AccountMenuItem
           key={`${link.href}:${link.label}`}
           href={link.href}
@@ -116,11 +107,11 @@ export function WorkspaceAccountMenu({
         </AccountMenuItem>
       ))}
 
-      {logoutHref && (
+      {account.logout_href && (
         <>
           <hr className="my-1" />
           <AccountMenuItem
-            href={logoutHref}
+            href={account.logout_href}
             icon="fa-regular fa-arrow-right-from-bracket"
             onClick={closeMenu}
           >
@@ -163,22 +154,22 @@ export function WorkspaceAccountMenu({
         )}
         title={compact ? accountLabel : undefined}
       >
-        {currentWorkspace ? (
-          <WorkspaceIcon html={currentWorkspace.icon_html} />
+        {account.current_workspace ? (
+          <WorkspaceIcon html={account.current_workspace.icon_html} />
         ) : (
-          <Avatar user={user} />
+          <Avatar user={account.user} />
         )}
         {!compact && (
           <>
             <span className="flex-grow-1 text-start overflow-hidden min-w-0">
               <span className="d-block text-truncate fw-semibold">
-                {user.name}
+                {account.user.name}
               </span>
-              {currentWorkspace && (
+              {account.current_workspace && (
                 <span className="d-block text-truncate text-body-secondary small">
-                  {currentWorkspace.is_personal
+                  {account.current_workspace.is_personal
                     ? "Personal"
-                    : currentWorkspace.name}
+                    : account.current_workspace.name}
                 </span>
               )}
             </span>
@@ -191,19 +182,17 @@ export function WorkspaceAccountMenu({
 }
 
 function WorkspaceSwitcher({
-  workspaces,
+  account,
   onSwitchWorkspace,
-  addWorkspaceOnClick,
   onSelect,
 }: {
-  workspaces: WorkspaceData[];
+  account: NavAccountData;
   onSwitchWorkspace: (workspaceId: number) => void;
-  addWorkspaceOnClick: string;
   onSelect: () => void;
 }) {
   return (
     <div className={MENU_PANEL_CLASS}>
-      {workspaces.map((workspace) => (
+      {account.workspaces.map((workspace) => (
         <WorkspaceMenuItem
           key={workspace.id}
           workspace={workspace}
@@ -215,13 +204,13 @@ function WorkspaceSwitcher({
           onSelect={onSelect}
         />
       ))}
-      {addWorkspaceOnClick && (
+      {account.add_workspace_onclick && (
         <>
           <hr className="my-1" />
           <AccountMenuItem
             icon="fa-regular fa-plus"
             onClick={(event: MouseEvent<HTMLElement>) => {
-              runGuiHandler(addWorkspaceOnClick, event);
+              runGuiHandler(account.add_workspace_onclick, event);
               onSelect();
             }}
           >

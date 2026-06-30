@@ -42,14 +42,7 @@ class GooeyBuilderData(pydantic.BaseModel):
     photo_url: str
 
 
-class NavigationSidebarProps(pydantic.BaseModel):
-    _component: str = "NavigationSidebar"
-
-    logo_image_url: str
-    nav_items: list[NavItemData] = []
-    active_key: str | None = None
-    recent_workflows: list[NavWorkflowItem] = []
-
+class NavAccountData(pydantic.BaseModel):
     user: NavUserData | None = None  # None => anonymous
     current_workspace: WorkspaceData | None = None
     workspaces: list[WorkspaceData] = []
@@ -60,6 +53,14 @@ class NavigationSidebarProps(pydantic.BaseModel):
     add_workspace_onclick: str = ""
     login_href: str = "/login/"
 
-    gooey_builder: GooeyBuilderData | None = None
 
+class NavigationSidebarProps(pydantic.BaseModel):
+    _component: str = "NavigationSidebar"
+
+    logo_image_url: str
+    nav_items: list[NavItemData] = []
+    active_key: str | None = None
+    recent_workflows: list[NavWorkflowItem] = []
+    account: NavAccountData = pydantic.Field(default_factory=NavAccountData)
+    gooey_builder: GooeyBuilderData | None = None
     default_collapsed: bool = False

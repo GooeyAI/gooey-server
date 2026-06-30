@@ -33,12 +33,7 @@ export interface NavUserData {
 export interface GooeyBuilderData {
   photo_url: string;
 }
-export interface NavigationSidebarProps {
-  logo_image_url: string;
-  nav_items: NavItemData[];
-  active_key: string | null;
-  saved_workflows: NavWorkflowItem[];
-  recent_workflows: NavWorkflowItem[];
+export interface NavAccountData {
   user: NavUserData | null;
   current_workspace: WorkspaceData | null;
   workspaces: WorkspaceData[];
@@ -46,6 +41,13 @@ export interface NavigationSidebarProps {
   logout_href: string;
   add_workspace_onclick: string;
   login_href: string;
+}
+export interface NavigationSidebarProps {
+  logo_image_url: string;
+  nav_items: NavItemData[];
+  active_key: string | null;
+  recent_workflows: NavWorkflowItem[];
+  account: NavAccountData;
   gooey_builder: GooeyBuilderData | null;
   default_collapsed: boolean;
 }

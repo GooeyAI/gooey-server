@@ -11,6 +11,7 @@ from daras_ai_v2.fastapi_tricks import get_route_path
 from gooey_gui.types.navigation_sidebar_props import (
     GooeyBuilderData,
     MenuLinkData,
+    NavAccountData,
     NavItemData,
     NavUserData,
     NavWorkflowItem,
@@ -75,15 +76,19 @@ def render(
             recent_workflows=_load_recent_workflows(
                 user, workspace, limit=RECENT_WORKFLOW_LIST_LIMIT
             ),
-            user=_get_nav_user(user),
-            current_workspace=next((ws for ws in workspaces if ws.is_current), None),
-            workspaces=workspaces,
-            menu_links=_load_menu_links(is_anonymous),
-            logout_href="" if is_anonymous else get_route_path(logout),
-            add_workspace_onclick=(
-                "" if is_anonymous else open_create_workspace_popup_js()
+            account=NavAccountData(
+                user=_get_nav_user(user),
+                current_workspace=next(
+                    (ws for ws in workspaces if ws.is_current), None
+                ),
+                workspaces=workspaces,
+                menu_links=_load_menu_links(is_anonymous),
+                logout_href="" if is_anonymous else get_route_path(logout),
+                add_workspace_onclick=(
+                    "" if is_anonymous else open_create_workspace_popup_js()
+                ),
+                login_href=get_login_url(request) if is_anonymous else "/login/",
             ),
-            login_href=get_login_url(request) if is_anonymous else "/login/",
             gooey_builder=_load_gooey_builder_data(request, workspace, page),
         )
     )
