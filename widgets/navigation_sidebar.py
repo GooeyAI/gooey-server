@@ -22,6 +22,7 @@ from gooey_gui.types.navigation_sidebar_props import (
 if TYPE_CHECKING:
     from app_users.models import AppUser
     from bots.models import PublishedRun, SavedRun
+    from bots.models.workflow import WorkflowMetadata
     from workspaces.models import Workspace
 
 RECENT_WORKFLOW_LIST_LIMIT = 20
@@ -170,17 +171,35 @@ def _load_workspaces(
 ) -> list[WorkspaceData]:
     if user is None:
         return []
+    workspaces = user.cached_workspaces
+    member_counts = _workspace_member_counts(workspaces)
     return [
         WorkspaceData(
             id=ws.id,
             name=ws.display_name(user),
             icon_html=ws.html_icon(),
-            subtitle=_workspace_subtitle(ws),
+            subtitle=_workspace_subtitle(ws, member_counts.get(ws.id, 0)),
             is_current=current_workspace is not None and ws.id == current_workspace.id,
             is_personal=ws.is_personal,
         )
-        for ws in user.cached_workspaces
+        for ws in workspaces
     ]
+
+
+def _workspace_member_counts(workspaces: list[Workspace]) -> dict[int, int]:
+    """Member counts for org workspaces in one query (avoids a COUNT per row)."""
+    from django.db.models import Count
+    from workspaces.models import WorkspaceMembership
+
+    org_ids = [ws.id for ws in workspaces if not ws.is_personal]
+    return dict(
+        WorkspaceMembership.objects.filter(
+            workspace_id__in=org_ids, deleted__isnull=True
+        )
+        .values("workspace_id")
+        .annotate(n=Count("id"))
+        .values_list("workspace_id", "n")
+    )
 
 
 def _load_saved_workflows(
@@ -219,7 +238,7 @@ def _recent_run_srs(
         return []
     return list(
         SavedRun.objects.filter(id__in=ids)
-        .select_related("parent_version__published_run")
+        .select_related("parent_version__published_run__saved_run")
         .annotate(builder_prompt=F("parent_builder_saved_run__state__input_prompt"))
         .order_by("-updated_at")
     )
@@ -280,7 +299,7 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
     if sr.surface == SavedRun.Surface.builder_child:
         title = (sr.builder_prompt or "").strip()
     else:
-        title = _history_title(sr, pr)
+        title = _history_title(sr, pr, metadata)
 
     return NavWorkflowItem(
         title=title or (pr and pr.title) or workflow.label,
@@ -304,12 +323,14 @@ def _pr_to_nav_workflow(pr: PublishedRun) -> NavWorkflowItem:
     )
 
 
-def _history_title(sr: SavedRun, pr: PublishedRun | None) -> str:
+def _history_title(
+    sr: SavedRun, pr: PublishedRun | None, metadata: WorkflowMetadata
+) -> str:
     from bots.models.workflow import Workflow
     from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 
     return get_title_breadcrumbs(
-        Workflow(sr.workflow).page_cls, sr, pr
+        Workflow(sr.workflow).page_cls, sr, pr, metadata=metadata
     ).title_with_prefix()
 
 
@@ -359,8 +380,7 @@ def _normalize_path(path: str) -> str:
     return path.rstrip("/") or "/"
 
 
-def _workspace_subtitle(ws) -> str:
+def _workspace_subtitle(ws, member_count: int) -> str:
     if ws.is_personal:
         return "Personal"
-    member_count = ws.memberships.filter(deleted__isnull=True).count()
     return f"Org · {member_count} member" + ("" if member_count == 1 else "s")
