@@ -2,7 +2,11 @@ import "./NavigationSidebar.css";
 
 import clsx from "clsx";
 import type { CustomComponentProps } from "~/components";
-import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
+import type {
+  GooeyBuilderData,
+  NavAccountData,
+  NavigationSidebarProps,
+} from "@gooey-types/navigation_sidebar_props";
 import type { Placement } from "tippy.js";
 import { useState, useEffect, useRef } from "react";
 import { PrimaryNavItems } from "./PrimaryNavItems";
@@ -29,15 +33,8 @@ export function NavigationSidebar({
   nav_items,
   active_key,
   default_collapsed,
-  saved_workflows,
   recent_workflows,
-  user,
-  current_workspace,
-  workspaces,
-  menu_links,
-  logout_href,
-  add_workspace_onclick,
-  login_href,
+  account,
   gooey_builder,
   onChange,
   state,
@@ -114,21 +111,15 @@ export function NavigationSidebar({
   return (
     <div>
       <NavigationHeaderMobile
-        logoImageUrl={logo_image_url}
+        logo_image_url={logo_image_url}
         isMobile={isMobile}
         drawerOpen={drawerOpen}
         onDrawerOpen={() => setCollapsed(false)}
         onDrawerClose={() => setCollapsed(true)}
-        gooeyBuilder={gooey_builder}
+        gooey_builder={gooey_builder}
         builderOpen={builderOpen}
-        user={user}
-        currentWorkspace={current_workspace}
-        workspaces={workspaces}
-        menuLinks={menu_links}
-        logoutHref={logout_href}
+        account={account}
         onSwitchWorkspace={switchWorkspace}
-        addWorkspaceOnClick={add_workspace_onclick}
-        loginHref={login_href}
       />
 
       <nav
@@ -136,7 +127,7 @@ export function NavigationSidebar({
         onClick={railCollapsed ? () => expandRail() : undefined}
       >
         <NavigationHeader
-          logoImageUrl={logo_image_url}
+          logo_image_url={logo_image_url}
           railCollapsed={railCollapsed}
           isMobile={isMobile}
           onExpand={expandRail}
@@ -145,27 +136,20 @@ export function NavigationSidebar({
         />
 
         <PrimaryNavItems
-          navItems={nav_items}
-          activeKey={active_key}
-          recentWorkflows={recent_workflows}
-          user={user}
-          menuLinks={menu_links}
+          nav_items={nav_items}
+          active_key={active_key}
+          recent_workflows={recent_workflows}
+          account={account}
           railCollapsed={railCollapsed}
         />
 
         <NavigationFooter
-          gooeyBuilder={gooey_builder}
+          gooey_builder={gooey_builder}
           railCollapsed={railCollapsed}
           builderOpen={builderOpen}
           isMobile={isMobile}
-          user={user}
-          currentWorkspace={current_workspace}
-          workspaces={workspaces}
-          menuLinks={menu_links}
-          logoutHref={logout_href}
+          account={account}
           onSwitchWorkspace={switchWorkspace}
-          addWorkspaceOnClick={add_workspace_onclick}
-          loginHref={login_href}
         />
       </nav>
     </div>
@@ -173,53 +157,32 @@ export function NavigationSidebar({
 }
 
 function NavigationFooter({
-  gooeyBuilder,
+  gooey_builder,
   railCollapsed,
   builderOpen,
   isMobile,
-  user,
-  currentWorkspace,
-  workspaces,
-  menuLinks,
-  logoutHref,
+  account,
   onSwitchWorkspace,
-  addWorkspaceOnClick,
-  loginHref,
 }: {
-  gooeyBuilder: NavigationSidebarProps["gooey_builder"];
+  gooey_builder: NavigationSidebarProps["gooey_builder"];
   railCollapsed: boolean;
   builderOpen: boolean;
   isMobile: boolean;
-  user: NavigationSidebarProps["user"];
-  currentWorkspace: NavigationSidebarProps["current_workspace"];
-  workspaces: NavigationSidebarProps["workspaces"];
-  menuLinks: NavigationSidebarProps["menu_links"];
-  logoutHref: string;
+  account: NavAccountData;
   onSwitchWorkspace: (workspaceId: number) => void;
-  addWorkspaceOnClick: string;
-  loginHref: string;
 }) {
   return (
     <div className="flex-shrink-0 p-2 d-flex flex-column gap-2">
       {/* On mobile the Gooey Builder launcher lives in the top bar, not the drawer. */}
-      {gooeyBuilder && !builderOpen && !isMobile && (
-        <GooeyBuilderButton
-          gooeyBuilder={gooeyBuilder}
-          compact={railCollapsed}
-        />
+      {gooey_builder && !builderOpen && !isMobile && (
+        <GooeyBuilderButton gooey_builder={gooey_builder} compact={railCollapsed} />
       )}
       {/* On mobile the account menu lives in the top bar, not the drawer. */}
       {!isMobile && (
         <div className="border-top pt-2">
           <AccountSection
-            user={user}
-            currentWorkspace={currentWorkspace}
-            workspaces={workspaces}
-            menuLinks={menuLinks}
-            logoutHref={logoutHref}
+            account={account}
             onSwitchWorkspace={onSwitchWorkspace}
-            addWorkspaceOnClick={addWorkspaceOnClick}
-            loginHref={loginHref}
             compact={railCollapsed}
             placement="top-start"
           />
@@ -230,37 +193,25 @@ function NavigationFooter({
 }
 
 function NavigationHeaderMobile({
-  logoImageUrl,
+  logo_image_url,
   isMobile,
   drawerOpen,
   onDrawerOpen,
   onDrawerClose,
-  gooeyBuilder,
+  gooey_builder,
   builderOpen,
-  user,
-  currentWorkspace,
-  workspaces,
-  menuLinks,
-  logoutHref,
+  account,
   onSwitchWorkspace,
-  addWorkspaceOnClick,
-  loginHref,
 }: {
-  logoImageUrl: string;
+  logo_image_url: NavigationSidebarProps["logo_image_url"];
   isMobile: boolean;
   drawerOpen: boolean;
   onDrawerOpen: () => void;
   onDrawerClose: () => void;
-  gooeyBuilder: NavigationSidebarProps["gooey_builder"];
+  gooey_builder: NavigationSidebarProps["gooey_builder"];
   builderOpen: boolean;
-  user: NavigationSidebarProps["user"];
-  currentWorkspace: NavigationSidebarProps["current_workspace"];
-  workspaces: NavigationSidebarProps["workspaces"];
-  menuLinks: NavigationSidebarProps["menu_links"];
-  logoutHref: string;
+  account: NavAccountData;
   onSwitchWorkspace: (workspaceId: number) => void;
-  addWorkspaceOnClick: string;
-  loginHref: string;
 }) {
   return (
     <>
@@ -279,7 +230,7 @@ function NavigationHeaderMobile({
         >
           <GooeyBot size={22} />
           <img
-            src={logoImageUrl}
+            src={logo_image_url}
             alt="Gooey.AI"
             height={20}
             width={100}
@@ -287,18 +238,12 @@ function NavigationHeaderMobile({
           />
         </a>
         <div className="ms-auto d-flex align-items-center gap-1">
-          {gooeyBuilder && !builderOpen && (
-            <GooeyBuilderButton gooeyBuilder={gooeyBuilder} compact />
+          {gooey_builder && !builderOpen && (
+            <GooeyBuilderButton gooey_builder={gooey_builder} compact />
           )}
           <AccountSection
-            user={user}
-            currentWorkspace={currentWorkspace}
-            workspaces={workspaces}
-            menuLinks={menuLinks}
-            logoutHref={logoutHref}
+            account={account}
             onSwitchWorkspace={onSwitchWorkspace}
-            addWorkspaceOnClick={addWorkspaceOnClick}
-            loginHref={loginHref}
             compact
             placement="bottom-end"
           />
@@ -313,38 +258,21 @@ function NavigationHeaderMobile({
 }
 
 function AccountSection({
-  user,
-  currentWorkspace,
-  workspaces,
-  menuLinks,
-  logoutHref,
+  account,
   onSwitchWorkspace,
-  addWorkspaceOnClick,
-  loginHref,
   compact,
   placement,
 }: {
-  user: NavigationSidebarProps["user"];
-  currentWorkspace: NavigationSidebarProps["current_workspace"];
-  workspaces: NavigationSidebarProps["workspaces"];
-  menuLinks: NavigationSidebarProps["menu_links"];
-  logoutHref: string;
+  account: NavAccountData;
   onSwitchWorkspace: (workspaceId: number) => void;
-  addWorkspaceOnClick: string;
-  loginHref: string;
   compact: boolean;
   placement: Placement;
 }) {
-  if (user) {
+  if (account.user) {
     return (
       <WorkspaceAccountMenu
-        user={user}
-        currentWorkspace={currentWorkspace ?? null}
-        workspaces={workspaces}
-        menuLinks={menuLinks}
-        logoutHref={logoutHref}
+        account={account}
         onSwitchWorkspace={onSwitchWorkspace}
-        addWorkspaceOnClick={addWorkspaceOnClick}
         compact={compact}
         placement={placement}
       />
@@ -353,7 +281,7 @@ function AccountSection({
 
   return (
     <a
-      href={loginHref}
+      href={account.login_href}
       className={clsx(
         "d-flex align-items-center text-body text-decoration-none rounded p-2 bg-hover-light position-relative",
         compact ? "justify-content-center" : "w-100 gap-2"
@@ -367,10 +295,10 @@ function AccountSection({
 }
 
 function GooeyBuilderButton({
-  gooeyBuilder,
+  gooey_builder,
   compact,
 }: {
-  gooeyBuilder: NonNullable<NavigationSidebarProps["gooey_builder"]>;
+  gooey_builder: GooeyBuilderData;
   compact: boolean;
 }) {
   return (
@@ -387,7 +315,7 @@ function GooeyBuilderButton({
       }}
     >
       <img
-        src={gooeyBuilder.photo_url}
+        src={gooey_builder.photo_url}
         alt=""
         width={28}
         height={28}
@@ -404,14 +332,14 @@ function GooeyBuilderButton({
 }
 
 function NavigationHeader({
-  logoImageUrl,
+  logo_image_url,
   railCollapsed,
   isMobile,
   onExpand,
   onCollapse,
   onDrawerClose,
 }: {
-  logoImageUrl: string;
+  logo_image_url: NavigationSidebarProps["logo_image_url"];
   railCollapsed: boolean;
   isMobile: boolean;
   onExpand: (e?: React.MouseEvent) => void;
@@ -421,7 +349,7 @@ function NavigationHeader({
   return (
     <div className="nav-sidebar-header d-flex align-items-center p-2 mb-1 flex-shrink-0">
       <NavBrand
-        logoImageUrl={logoImageUrl}
+        logo_image_url={logo_image_url}
         collapsed={railCollapsed}
         onExpand={onExpand}
       />
@@ -451,11 +379,11 @@ function NavigationHeader({
 }
 
 function NavBrand({
-  logoImageUrl,
+  logo_image_url,
   collapsed,
   onExpand,
 }: {
-  logoImageUrl: string;
+  logo_image_url: NavigationSidebarProps["logo_image_url"];
   collapsed: boolean;
   onExpand?: (e?: React.MouseEvent) => void;
 }) {
@@ -488,7 +416,7 @@ function NavBrand({
     >
       {mark}
       <img
-        src={logoImageUrl}
+        src={logo_image_url}
         alt="Gooey.AI"
         height={22}
         width={120}
