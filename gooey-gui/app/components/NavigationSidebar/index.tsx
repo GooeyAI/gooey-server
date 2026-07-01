@@ -9,6 +9,7 @@ import type {
 } from "@gooey-types/navigation_sidebar_props";
 import type { Placement } from "tippy.js";
 import { useState, useEffect, useRef, Fragment } from "react";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 import { PrimaryNavItems } from "./PrimaryNavItems";
 import { WorkspaceAccountMenu } from "./WorkspaceAccountMenu";
 
@@ -250,6 +251,7 @@ function NavigationHeaderMobile({
             onSwitchWorkspace={onSwitchWorkspace}
             compact
             placement="bottom-end"
+            mobile
           />
         </div>
       </div>
@@ -266,11 +268,13 @@ function AccountSection({
   onSwitchWorkspace,
   compact,
   placement,
+  mobile = false,
 }: {
   account: NavAccountData;
   onSwitchWorkspace: (workspaceId: number) => void;
   compact: boolean;
   placement: Placement;
+  mobile?: boolean;
 }) {
   if (account.user) {
     return (
@@ -284,15 +288,76 @@ function AccountSection({
   }
 
   return (
+    <SignedOutAccount account={account} compact={compact} mobile={mobile} />
+  );
+}
+
+function SignedOutAccount({
+  account,
+  compact,
+  mobile,
+}: {
+  account: NavAccountData;
+  compact: boolean;
+  mobile: boolean;
+}) {
+  // Mobile top bar (horizontal): always keep the "Sign In" text, and show the
+  // Google icon button beside it when Firebase auth is on.
+  if (mobile) {
+    return (
+      <div className="d-flex align-items-center gap-1">
+        <SignInLink href={account.login_href} />
+        {account.enable_firebase_auth && <GoogleSignInButton compact />}
+      </div>
+    );
+  }
+
+  // Collapsed rail (narrow, vertical): room for a single icon-sized affordance.
+  if (compact) {
+    if (account.enable_firebase_auth) return <GoogleSignInButton compact />;
+    return <SignInLink href={account.login_href} iconOnly />;
+  }
+
+  // Expanded rail: full Google button + subtle "Sign In" link (or just the link
+  // when Firebase auth is off).
+  if (account.enable_firebase_auth) {
+    return (
+      <div className="d-flex flex-column align-items-stretch gap-1">
+        <GoogleSignInButton compact={false} />
+        <SignInLink href={account.login_href} subtle block />
+      </div>
+    );
+  }
+  return <SignInLink href={account.login_href} block />;
+}
+
+function SignInLink({
+  href,
+  iconOnly = false,
+  subtle = false,
+  block = false,
+}: {
+  href: string;
+  iconOnly?: boolean;
+  subtle?: boolean;
+  block?: boolean;
+}) {
+  return (
     <a
-      href={account.login_href}
+      href={href}
       className={clsx(
-        "d-flex align-items-center text-body text-decoration-none rounded p-2 bg-hover-light position-relative",
-        compact ? "justify-content-center" : "w-100 gap-2"
+        "d-flex align-items-center justify-content-center text-decoration-none rounded p-2 bg-hover-light position-relative",
+        !iconOnly && "gap-2",
+        block && "w-100",
+        subtle ? "text-muted small" : "text-body"
       )}
-      title={compact ? "Sign In" : undefined}
+      title={iconOnly ? "Sign In" : undefined}
     >
-      {!compact && <span className="fw-semibold">Sign In</span>}
+      {iconOnly ? (
+        <i className="fa-regular fa-arrow-right-to-bracket" />
+      ) : (
+        <span className={clsx(!subtle && "fw-semibold")}>Sign In</span>
+      )}
     </a>
   );
 }

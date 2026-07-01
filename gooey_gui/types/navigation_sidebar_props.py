@@ -50,6 +50,7 @@ class NavAccountData(pydantic.BaseModel):
     logout_href: str = ""
     add_workspace_url: str = ""
     login_href: str = "/login/"
+    enable_firebase_auth: bool = False
 
 
 class NavigationSidebarProps(pydantic.BaseModel):
