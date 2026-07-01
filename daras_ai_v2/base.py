@@ -17,6 +17,7 @@ from textwrap import dedent
 from time import sleep
 
 import sentry_sdk
+import yarl
 from django.db.models import Q, Sum
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -283,15 +284,15 @@ class BasePage:
     ):
         if not tab:
             tab = RecipeTabs.run
-        return str(
-            furl(settings.APP_BASE_URL, query_params=query_params)
-            / tab.url_path(
-                page_slug=cls.canonical_slug(),
-                run_slug=run_slug,
-                example_id=example_id,
-                **(path_params or {}),
-            )
-        )
+        url = yarl.URL(settings.APP_BASE_URL) / tab.url_path(
+            page_slug=cls.canonical_slug(),
+            run_slug=run_slug,
+            example_id=example_id,
+            **(path_params or {}),
+        ).lstrip("/")
+        if query_params:
+            url = url.with_query(query_params)
+        return str(url)
 
     @classmethod
     def api_url(

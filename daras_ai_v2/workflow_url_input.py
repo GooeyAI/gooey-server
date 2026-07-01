@@ -1,8 +1,9 @@
 import typing
 
+import yarl
+
 import gooey_gui as gui
 from django.db.models import Q
-from furl import furl
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, Workflow
@@ -138,7 +139,7 @@ def resolve_workflow_url(url: str) -> tuple[type[BasePage], dict]:
     match = resolve_url(url)
     assert match, "Not a valid Gooey.AI URL"
     page_cls = page_slug_map[normalize_slug(match.matched_params["page_slug"])]
-    example_id, run_id, uid = extract_query_params(furl(url).query.params)
+    example_id, run_id, uid = extract_query_params(yarl.URL(url).query)
     example_id = example_id or match.matched_params.get("example_id") or ""
     query_params = dict(example_id=example_id, run_id=run_id, uid=uid)
     return page_cls, query_params
