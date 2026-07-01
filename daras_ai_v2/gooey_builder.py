@@ -33,58 +33,6 @@ if typing.TYPE_CHECKING:
 DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg"
 
 
-def render_gooey_builder_launcher(
-    sidebar_key: str,
-    request: fastapi.Request,
-    workspace: Workspace | None,
-):
-    if not can_launch_gooey_builder(request, workspace):
-        return
-
-    try:
-        bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
-    except BotIntegration.DoesNotExist:
-        return
-    branding = bi.get_web_widget_branding()
-    photo_url = branding.get("photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL)
-
-    with gui.styled("& button:hover { scale: 1.2; }"):
-        with gui.div(
-            className="position-fixed d-none d-xxl-block",
-            style={"bottom": "24px", "left": "16px", "zIndex": "99"},
-        ):
-            with gui.tag(
-                "button",
-                type="button",
-                className=f"btn btn-secondary border-0 p-0 {sidebar_key}-button",
-                onClick=f"window.dispatchEvent(new CustomEvent(`{sidebar_key}:open`))",
-                style={
-                    "width": "56px",
-                    "height": "56px",
-                    "borderRadius": "50%",
-                    "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
-                },
-            ):
-                gui.html(
-                    f"<img src='{photo_url}' style='width: 56px; height: 56px; border-radius: 50%;' />"
-                )
-
-    with gui.tag(
-        "button",
-        type="button",
-        className=f"border-0 m-0 btn btn-secondary rounded-pill d-xxl-none p-0 {sidebar_key}-button",
-        onClick=f"window.dispatchEvent(new CustomEvent(`{sidebar_key}:open`))",
-        style={
-            "width": "36px",
-            "height": "36px",
-            "borderRadius": "50%",
-        },
-    ):
-        gui.html(
-            f"<img src='{photo_url}' style='width: 36px; height: 36px; border-radius: 50%;' />"
-        )
-
-
 class GooeyBuilderWorkflow(typing.TypedDict):
     current_url: str
     current_user: str

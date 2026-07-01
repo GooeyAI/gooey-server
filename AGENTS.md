@@ -31,4 +31,4 @@
 ## New Pages
 
 - If you are asked to create a new page, create a React component for that page, add the corresponding Python route/page entrypoint, and render that React component from the new Python route.
-- When the page should live inside the standard Gooey page shell, render the component under `page_wrapper` as appropriate instead of building a separate ad hoc layout path.
+- When the page should live inside the standard Gooey page shell, render the component under `sidebar_page_wrapper` as appropriate instead of building a separate ad hoc layout path.
