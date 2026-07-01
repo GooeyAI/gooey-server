@@ -38,20 +38,18 @@ a.nav-brand {
 }
 
 .nav-brand__expand-icon {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: none !important;
   opacity: 0;
   transition: opacity 100ms ease;
 }
 
 .nav-brand--collapsed:hover .gooey-bot-icon {
   opacity: 0;
+  display: none;
 }
 
 .nav-brand--collapsed:hover .nav-brand__expand-icon {
+  display: block !important;
   opacity: 1;
 }
 
@@ -221,29 +219,6 @@ a.nav-brand {
   width: 20px;
   height: 20px;
   object-fit: cover;
-}
-
-/* Rail tooltip — dark pill that appears to the right on hover */
-.rail-tooltip {
-  display: none;
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  background-color: #212529;
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-  padding: 4px 8px;
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-/* Show tooltip only inside the collapsed rail */
-.nav-sidebar--collapsed .position-relative:hover > .rail-tooltip {
-  display: block;
 }
 
 .tippy-box[data-theme~="account-menu"] {

@@ -48,9 +48,7 @@ class NavAccountData(pydantic.BaseModel):
     workspaces: list[WorkspaceData] = []
     menu_links: list[MenuLinkData] = []
     logout_href: str = ""
-    # JS onClick handler string (workspaces.widgets.open_create_workspace_popup_js),
-    # run client-side like a server-rendered onClick — not a plain URL.
-    add_workspace_onclick: str = ""
+    add_workspace_url: str = ""
     login_href: str = "/login/"
 
 

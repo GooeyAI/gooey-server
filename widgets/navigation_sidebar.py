@@ -37,9 +37,9 @@ def render(
     from routers.root import explore_page, home_page
     from widgets.home import _saved_workflows_href
     from workspaces.widgets import (
+        get_create_workspace_popup_url,
         get_current_workspace,
         handle_workspace_switch,
-        open_create_workspace_popup_js,
     )
 
     home_path = get_route_path(home_page)
@@ -61,6 +61,11 @@ def render(
         request.url.path,
         {"home": home_path, "explore": explore_path, "saved": saved_path},
     )
+
+    if is_anonymous:
+        add_workspace_url = ""
+    else:
+        add_workspace_url, _ = get_create_workspace_popup_url()
 
     gui.model_component(
         NavigationSidebarProps(
@@ -85,9 +90,7 @@ def render(
                 workspaces=workspaces,
                 menu_links=_load_menu_links(is_anonymous),
                 logout_href="" if is_anonymous else get_route_path(logout),
-                add_workspace_onclick=(
-                    "" if is_anonymous else open_create_workspace_popup_js()
-                ),
+                add_workspace_url=add_workspace_url,
                 login_href=get_login_url(request) if is_anonymous else "/login/",
             ),
             gooey_builder=_load_gooey_builder_data(request, workspace, page),

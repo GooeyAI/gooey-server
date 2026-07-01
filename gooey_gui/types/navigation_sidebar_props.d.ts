@@ -39,7 +39,7 @@ export interface NavAccountData {
   workspaces: WorkspaceData[];
   menu_links: MenuLinkData[];
   logout_href: string;
-  add_workspace_onclick: string;
+  add_workspace_url: string;
   login_href: string;
 }
 export interface NavigationSidebarProps {
