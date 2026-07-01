@@ -279,6 +279,13 @@ a.nav-brand {
   background-color: var(--bs-border-color);
 }
 
+/* Google Sign-In icon button sometimes drops its SVG; keep the 40px box so the
+   icon stays visible (mirrors the old google_one_tap_button.html hack). */
+.nav-google-signin div:has(> svg) {
+  min-width: 40px;
+  min-height: 40px;
+}
+
 /* ── Mobile: rail becomes an off-canvas drawer below lg (992px) ────────── */
 
 /* Slim top bar (hamburger + logo); hidden on desktop via d-lg-none. */

@@ -41,6 +41,7 @@ export interface NavAccountData {
   logout_href: string;
   add_workspace_url: string;
   login_href: string;
+  enable_firebase_auth: boolean;
 }
 export interface NavigationSidebarProps {
   logo_image_url: string;
