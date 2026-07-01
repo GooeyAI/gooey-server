@@ -39,7 +39,6 @@ def asr_languages_without_dialects() -> list[str]:
     )
 
 
-@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def tts_languages_without_dialects() -> list[str]:
     from daras_ai_v2.text_to_speech_settings_widgets import (
         tts_supported_languages_by_provider,
