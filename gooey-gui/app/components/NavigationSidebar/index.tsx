@@ -8,7 +8,7 @@ import type {
   NavigationSidebarProps,
 } from "@gooey-types/navigation_sidebar_props";
 import type { Placement } from "tippy.js";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { PrimaryNavItems } from "./PrimaryNavItems";
 import { WorkspaceAccountMenu } from "./WorkspaceAccountMenu";
 
@@ -58,6 +58,7 @@ export function NavigationSidebar({
     }
     state[NAV_COLLAPSED_KEY] = collapsed;
     onChange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, isMobile, builderOpen]);
 
   useEffect(() => {
@@ -175,7 +176,10 @@ function NavigationFooter({
     <div className="flex-shrink-0 p-2 d-flex flex-column gap-2">
       {/* On mobile the Gooey Builder launcher lives in the top bar, not the drawer. */}
       {gooey_builder && !builderOpen && !isMobile && (
-        <GooeyBuilderButton gooey_builder={gooey_builder} compact={railCollapsed} />
+        <GooeyBuilderButton
+          gooey_builder={gooey_builder}
+          compact={railCollapsed}
+        />
       )}
       {/* On mobile the account menu lives in the top bar, not the drawer. */}
       {!isMobile && (
@@ -288,7 +292,6 @@ function AccountSection({
       )}
       title={compact ? "Sign In" : undefined}
     >
-      <i className="fa-regular fa-right-to-bracket nav-item-icon" />
       {!compact && <span className="fw-semibold">Sign In</span>}
     </a>
   );
@@ -371,7 +374,7 @@ function NavigationHeader({
             title="Collapse sidebar"
             onClick={onCollapse}
           >
-            <i className="fa-regular fa-sidebar"></i>
+            <i className="fa-regular fa-sidebar fs-5"></i>
           </button>
         ))}
     </div>
@@ -388,12 +391,12 @@ function NavBrand({
   onExpand?: (e?: React.MouseEvent) => void;
 }) {
   const mark = (
-    <span className="position-relative" aria-hidden="true">
+    <Fragment>
       <GooeyBot size={24} className="gooey-bot-icon" />
       {collapsed && (
-        <i className="fa-regular fa-sidebar nav-brand__expand-icon fs-5 text-muted" />
+        <i className="fa-regular fa-sidebar nav-brand__expand-icon fs-5" />
       )}
-    </span>
+    </Fragment>
   );
 
   if (collapsed) {

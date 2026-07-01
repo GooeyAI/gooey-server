@@ -67,7 +67,6 @@ export function WorkspaceAccountMenu({
             animation="scale"
             duration={120}
             placement="right-start"
-            appendTo={() => document.body}
             zIndex={11001}
             popperOptions={WORKSPACE_SWITCHER_POPPER_OPTIONS}
             content={
@@ -173,7 +172,6 @@ export function WorkspaceAccountMenu({
                 </span>
               )}
             </span>
-            <i className="fa-regular fa-chevron-right text-body-secondary flex-shrink-0 small" />
           </>
         )}
       </button>
@@ -204,15 +202,14 @@ function WorkspaceSwitcher({
           onSelect={onSelect}
         />
       ))}
-      {account.add_workspace_onclick && (
+      {account.add_workspace_url && (
         <>
           <hr className="my-1" />
           <AccountMenuItem
             icon="fa-regular fa-plus"
-            onClick={(event: MouseEvent<HTMLElement>) => {
-              runGuiHandler(account.add_workspace_onclick, event);
-              onSelect();
-            }}
+            href={account.add_workspace_url}
+            target="_blank"
+            onClick={onSelect}
           >
             Add workspace
           </AccountMenuItem>
@@ -220,13 +217,6 @@ function WorkspaceSwitcher({
       )}
     </div>
   );
-}
-
-function runGuiHandler(js: string, event: MouseEvent<HTMLElement>) {
-  if (!js) return;
-  // eslint-disable-next-line no-new-func
-  const fn = new Function("event", js);
-  fn.call(event.currentTarget, event.nativeEvent);
 }
 
 function WorkspaceMenuItem({
@@ -271,7 +261,7 @@ function WorkspaceMenuItem({
         className={className}
         onClick={() => {
           onSwitch();
-          onSelect();
+          onSelect(); // close the menu
         }}
       >
         {content}
@@ -284,11 +274,13 @@ function WorkspaceMenuItem({
 
 function AccountMenuItem({
   href,
+  target,
   icon,
   onClick,
   children,
 }: {
   href?: string;
+  target?: string;
   icon?: string | null;
   onClick?: (event: MouseEvent<HTMLElement>) => void;
   children: ReactNode;
@@ -302,7 +294,13 @@ function AccountMenuItem({
 
   if (href) {
     return (
-      <a href={href} className={MENU_ROW_ACTION_CLASS} onClick={onClick}>
+      <a
+        href={href}
+        target={target}
+        rel={target === "_blank" ? "noopener" : undefined}
+        className={MENU_ROW_ACTION_CLASS}
+        onClick={onClick}
+      >
         {content}
       </a>
     );

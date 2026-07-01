@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import React, { useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import type {
   NavAccountData,
   NavItemData,
@@ -101,7 +101,7 @@ function NavItem({
   item: NavItemData;
   isActive: boolean;
   collapsed: boolean;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <a
@@ -150,7 +150,7 @@ function NavItemChildren({
   }
 
   return (
-    <React.Fragment>
+    <Fragment>
       <NavItem item={item} isActive={isActive} collapsed={false}>
         {/* the space after the label toggles the nested items open/closed */}
         <span
@@ -173,6 +173,6 @@ function NavItemChildren({
           <WorkflowList items={item.items} indent />
         </div>
       )}
-    </React.Fragment>
+    </Fragment>
   );
 }

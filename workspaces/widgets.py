@@ -240,19 +240,9 @@ def open_create_workspace_popup_js(
     selected_plan: typing.Optional["PricingPlan"] = None,
     seat_selection: typing.Optional["SeatSelection"] = None,
 ):
-    from routers.workspace import create_workspace_route
-    from routers.account import account_route
-
-    next_url = get_route_path(account_route)
-    popup_url = furl(
-        get_route_path(create_workspace_route), query_params={"next": next_url}
+    popup_url, next_url = get_create_workspace_popup_url(
+        selected_plan=selected_plan, seat_selection=seat_selection
     )
-    if selected_plan:
-        popup_url.query.params["selected_plan"] = selected_plan.db_value
-        if seat_selection:
-            popup_url.query.params["selected_seat_type"] = seat_selection[0].key
-            popup_url.query.params["selected_seat_count"] = str(seat_selection[1])
-        next_url = ""  # don't redirect as we are already on the account page
 
     # language=javascript
     return """
@@ -276,9 +266,38 @@ def open_create_workspace_popup_js(
             gui.navigate(popupUrl);
         }
         """ % (
-        str(popup_url),
+        popup_url,
         next_url,
     )
+
+
+def get_create_workspace_popup_url(
+    selected_plan: typing.Optional["PricingPlan"] = None,
+    seat_selection: typing.Optional["SeatSelection"] = None,
+) -> tuple[str, str]:
+    """Build ``(popup_url, next_url)`` for the create-workspace flow.
+
+    ``popup_url`` opens the workspace-creation popup; ``next_url`` is where the
+    opener should navigate once the popup posts ``workspaceCreated`` (empty
+    string => rerun in place). Shared by the server-rendered onClick
+    (``open_create_workspace_popup_js``) and the React navigation sidebar so both
+    follow the exact same logic.
+    """
+    from routers.workspace import create_workspace_route
+    from routers.account import account_route
+
+    next_url = get_route_path(account_route)
+    popup_url = furl(
+        get_route_path(create_workspace_route), query_params={"next": next_url}
+    )
+    if selected_plan:
+        popup_url.query.params["selected_plan"] = selected_plan.db_value
+        if seat_selection:
+            popup_url.query.params["selected_seat_type"] = seat_selection[0].key
+            popup_url.query.params["selected_seat_count"] = str(seat_selection[1])
+        next_url = ""  # don't redirect as we are already on the account page
+
+    return str(popup_url), next_url
 
 
 def get_workspace_domain_name_options(
