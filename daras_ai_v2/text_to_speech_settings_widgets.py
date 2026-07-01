@@ -139,6 +139,7 @@ BARK_ALLOWED_PROMPTS = {
 }
 
 
+@redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def tts_supported_languages_by_provider() -> dict[TextToSpeechProviders, list[str]]:
     from modal_functions.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
 
