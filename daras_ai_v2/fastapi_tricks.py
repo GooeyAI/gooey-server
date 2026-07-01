@@ -1,5 +1,6 @@
 import os.path
 import typing
+from functools import lru_cache
 from urllib.parse import parse_qs
 
 import fastapi
@@ -23,7 +24,7 @@ async def request_form(request: Request):
     return await request.form()
 
 
-async def request_body(request: Request):
+async def request_body(request: Request) -> bytes:
     return await request.body()
 
 
@@ -75,9 +76,18 @@ def get_app_route_url(
 
 
 def get_route_path(route_fn: typing.Callable, path_params: dict = None) -> str:
+    params = path_params or {}
+    cache_params = tuple(sorted((key, str(value)) for key, value in params.items()))
+    return _cached_route_path(route_fn.__name__, cache_params)
+
+
+@lru_cache(maxsize=1024)
+def _cached_route_path(
+    route_name: str, path_params: tuple[tuple[str, str], ...]
+) -> str:
     from server import app
 
-    return os.path.join(app.url_path_for(route_fn.__name__, **(path_params or {})), "")
+    return os.path.join(app.url_path_for(route_name, **dict(path_params)), "")
 
 
 def _login_required(request: Request):
