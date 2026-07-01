@@ -2,24 +2,39 @@ from __future__ import annotations
 
 import typing
 from contextlib import contextmanager
-from urllib.parse import urlencode
+
+from django.http import HttpRequest
+from django.http.request import HttpHeaders
+import fastapi
 
 F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
 
 @contextmanager
-def silk_collect(fn: F, args: tuple[typing.Any, ...], kwargs: dict[str, typing.Any]):
+def silk_collect(fn: F, args: tuple, kwargs: dict, request: fastapi.Request | None):
     if not silk_enabled():
         yield
         return
 
-    django_request = django_request_for_call(fn, args, kwargs)
+    if request:
+        path = request.url.path
+        query_string = request.url.query
+        headers = dict(request.headers)
+    else:
+        path = f"{fn.__module__}.{fn.__qualname__}"
+        query_string = ""
+        headers = {}
+    body = ", ".join(
+        [str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()]
+    ).encode()
+
+    django_request = django_request_for_call(path, query_string, headers, body)
     silk_request = start_silk_collection(django_request)
-    profile_name = f"{fn.__module__}.{fn.__qualname__}"
+
     try:
         from silk.profiling.profiler import silk_profile
 
-        with silk_profile(name=profile_name):
+        with silk_profile(name=path):
             yield
     finally:
         finish_silk_collection(silk_request)
@@ -32,15 +47,8 @@ def silk_enabled() -> bool:
 
 
 def django_request_for_call(
-    fn: typing.Callable[..., typing.Any],
-    args: tuple[typing.Any, ...],
-    kwargs: dict[str, typing.Any],
-):
-    from django.http import HttpRequest
-
-    path = f"{fn.__module__}.{fn.__qualname__}"
-    query_string = _format_call_args(args, kwargs)
-
+    path: str, query_string: str, headers: dict, body: bytes
+) -> HttpRequest:
     django_request = HttpRequest()
     django_request.method = "CALL"
     django_request.path = path
@@ -48,31 +56,12 @@ def django_request_for_call(
     django_request.META = {
         "REQUEST_METHOD": django_request.method,
         "PATH_INFO": path,
-        "CONTENT_TYPE": "",
         "QUERY_STRING": query_string,
     }
-    # Silk reads request.body; a bare HttpRequest has no stream/_read_started.
-    django_request._body = b""
+    for name, value in headers.items():
+        django_request.META[HttpHeaders.to_wsgi_name(name)] = value
+    django_request._body = body
     return django_request
-
-
-def _format_call_args(
-    args: tuple[typing.Any, ...],
-    kwargs: dict[str, typing.Any],
-) -> str:
-    parts: dict[str, str] = {}
-    for index, arg in enumerate(args):
-        parts[f"arg{index}"] = _arg_repr(arg)
-    for key, value in kwargs.items():
-        parts[key] = _arg_repr(value)
-    return urlencode(parts)
-
-
-def _arg_repr(value: typing.Any, *, max_len: int = 120) -> str:
-    text = repr(value)
-    if len(text) <= max_len:
-        return text
-    return text[: max_len - 3] + "..."
 
 
 def start_silk_collection(django_request):
