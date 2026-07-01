@@ -211,7 +211,7 @@ class WhatsappBot(BotInterface):
                 {
                     "type": "text",
                     "text": {
-                        "body": text or "\u200b",
+                        "body": _wa_body_text(text),
                         "preview_url": True,
                     },
                 },
@@ -321,7 +321,7 @@ def _build_msg_buttons(
                 {
                     "type": "text",
                     "text": {
-                        "body": text or "\u200b",
+                        "body": _wa_body_text(text),
                         "preview_url": True,
                     },
                 }
@@ -353,7 +353,7 @@ def _build_interactive_location_msg(text: str | None) -> dict:
         "interactive": {
             "type": "location_request_message",
             "action": {"name": "send_location"},
-            "body": {"text": text or "\u200b"},
+            "body": {"text": _wa_body_text(text)},
         },
     }
 
@@ -379,10 +379,16 @@ def _build_interactive_button_msg(
         "interactive": {
             "type": "button",
             "action": {"buttons": buttons_wa},
-            "body": {"text": text or "\u200b"},
+            "body": {"text": _wa_body_text(text)},
         },
     }
     return interactive_message
+
+
+def _wa_body_text(text: str | None) -> str:
+    if text and text.strip():
+        return text
+    return "\u200b"
 
 
 def send_wa_msgs_raw(
