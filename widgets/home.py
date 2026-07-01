@@ -164,6 +164,17 @@ def _load_saved_workflows(
     user: AppUser | None,
     workspace: Workspace | None,
 ) -> list[WorkflowCardData]:
+    return [
+        _saved_card(pr, author=author_from_user(pr.last_edited_by, current_user=user))
+        for pr in saved_published_runs(user, workspace)
+    ]
+
+
+def saved_published_runs(
+    user: AppUser | None,
+    workspace: Workspace | None,
+    limit: int = WORKFLOW_LIST_LIMIT,
+) -> list[PublishedRun]:
     if user is None or workspace is None:
         return []
     pr_filter = Q(workspace=workspace)
@@ -174,19 +185,12 @@ def _load_saved_workflows(
         .order_by("-created_at")
         .values("change_notes")[:1]
     )
-    prs = list(
+    return list(
         PublishedRun.objects.filter(pr_filter)
         .select_related("last_edited_by", "saved_run", "workspace")
         .annotate(latest_change_notes=Subquery(latest_change_notes))
-        .order_by("-updated_at")[:WORKFLOW_LIST_LIMIT]
+        .order_by("-updated_at")[:limit]
     )
-    return [
-        _saved_card(
-            pr,
-            author=author_from_user(pr.last_edited_by, current_user=user),
-        )
-        for pr in prs
-    ]
 
 
 def _load_workflow_tabs(
