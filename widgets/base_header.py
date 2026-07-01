@@ -10,7 +10,7 @@ from widgets.workflow_search import SearchFilters
 
 if typing.TYPE_CHECKING:
     from app_users.models import AppUser
-    from bots.models import PublishedRun, SavedRun, Workflow
+    from bots.models import PublishedRun, SavedRun, WorkflowMetadata
     from daras_ai_v2.breadcrumbs import TitleBreadCrumbs
     from workspaces.models import Workspace
 
@@ -26,8 +26,7 @@ def render_header_title(tb: "TitleBreadCrumbs"):
         gui.write("# " + tb.title_with_prefix_url())
 
 
-def render_help_button(workflow: "Workflow"):
-    meta = workflow.get_or_create_metadata()
+def render_help_button(meta: "WorkflowMetadata"):
     if not meta.help_url:
         return
 

@@ -81,8 +81,7 @@ def render_saved_workflow_preview(
                         )
                 if not output_url:
                     with gui.div(className="col-2 text-center m-auto"):
-                        workflow = Workflow(published_run.workflow)
-                        metadata = workflow.get_or_create_metadata()
+                        metadata = published_run.get_workflow_metadata()
                         gui.write(f"# {metadata.emoji}")
 
             render_footer_breadcrumbs(

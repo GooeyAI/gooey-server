@@ -77,7 +77,7 @@ def get_app_route_url(
 
 def get_route_path(route_fn: typing.Callable, path_params: dict = None) -> str:
     params = path_params or {}
-    cache_params = tuple(sorted((key, str(value)) for key, value in params.items()))
+    cache_params = tuple((key, str(value)) for key, value in params.items())
     return _cached_route_path(route_fn.__name__, cache_params)
 
 
