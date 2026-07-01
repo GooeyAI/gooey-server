@@ -28,7 +28,6 @@ from auth.auth_backend import (
 from daras_ai_v2 import settings, gooey_builder
 from daras_ai_v2.github_tools import github_url_for_exc
 from daras_ai_v2.settings import templates
-from gooeysite.bg_db_conn import db_middleware
 from memory import routers as memory_routers
 from routers import (
     account,
