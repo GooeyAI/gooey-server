@@ -101,7 +101,7 @@ class PaymentProvider(models.IntegerChoices):
 
 
 class AppUser(models.Model):
-    uid = models.CharField(max_length=255, unique=True)
+    uid = models.CharField(max_length=128, unique=True)
 
     password = models.CharField(max_length=255, blank=True, default="")
 
@@ -283,9 +283,9 @@ class AppUser(models.Model):
         from workspaces.models import Workspace
 
         return list(
-            Workspace.objects.filter(
-                memberships__user=self, memberships__deleted__isnull=True
-            ).order_by("-is_personal", "-created_at")
+            Workspace.objects.select_related("created_by")
+            .filter(memberships__user=self, memberships__deleted__isnull=True)
+            .order_by("-is_personal", "-created_at")
         ) or [self.get_or_create_personal_workspace()[0]]
 
     def get_handle(self) -> Handle | None:
