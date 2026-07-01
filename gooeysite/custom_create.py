@@ -3,10 +3,14 @@ import typing
 from django.db import transaction, IntegrityError
 from django.db.models import Model
 
+T = typing.TypeVar("T", bound=Model)
+
 
 def get_or_create_lazy(
-    model: typing.Type[Model], create: typing.Callable[..., dict] = None, **kwargs
-):
+    model: typing.Type[T],
+    create: typing.Callable[[dict], T] | None = None,
+    **kwargs,
+) -> tuple[T, bool]:
     """
     Look up an object with the given kwargs, creating one if necessary.
     Return a tuple of (object, created), where created is a boolean
@@ -22,7 +26,7 @@ def get_or_create_lazy(
         # Try to create an object using passed params.
         try:
             with transaction.atomic(using=self.db):
-                return create(**kwargs), True
+                return create(kwargs), True
         except IntegrityError:
             try:
                 return self.get(**kwargs), False

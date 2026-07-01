@@ -156,7 +156,9 @@ def get_published_run_options(
     if current_user:
         # user's saved runs
         pr_query |= Q(created_by=current_user)
-    saved_runs_and_examples = PublishedRun.objects.filter(
+    saved_runs_and_examples = PublishedRun.objects.select_related(
+        "saved_run__workflow_metadata"
+    ).filter(
         pr_query,
         workflow=page_cls.workflow,
     )

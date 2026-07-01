@@ -102,7 +102,9 @@ def render_gooey_builder(
         return
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
-    bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
+    bi = BotIntegration.objects.select_related("published_run").get(
+        id=settings.GOOEY_BUILDER_INTEGRATION_ID
+    )
     config = bi.get_web_widget_config(
         hostname="gooey.ai", target="#gooey-builder-embed"
     )

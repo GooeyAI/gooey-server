@@ -28,7 +28,7 @@ def build_meta_tags(
     state: dict,
 ) -> list[dict]:
     sr, pr = page.current_sr_pr
-    metadata = page.workflow.get_or_create_metadata()
+    metadata = sr.get_workflow_metadata()
 
     title = meta_title_for_page(
         page=page,
@@ -145,7 +145,7 @@ def meta_title_for_page(
                 # use the short title for non-root examples
                 part = metadata.short_title
                 # add the creator's name
-                user = sr.get_creator()
+                user = sr.created_by
                 if user and user.display_name:
                     part += f" by {user.display_name}"
                 parts.append(part)

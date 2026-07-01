@@ -17,7 +17,7 @@ from daras_ai_v2.crypto import get_random_doc_id
 from functions.models import CalledFunctionResponse
 from gooeysite.bg_db_conn import get_celery_result_db_safe
 from . import Platform
-from .workflow import Workflow
+from .workflow import Workflow, WorkflowMetadata
 
 if typing.TYPE_CHECKING:
     import celery.result
@@ -71,8 +71,26 @@ class SavedRun(models.Model):
     workflow = models.IntegerField(
         choices=Workflow.choices, default=Workflow.VIDEO_BOTS
     )
+    workflow_metadata = models.ForeignObject(
+        "bots.WorkflowMetadata",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        from_fields=["workflow"],
+        to_fields=["workflow"],
+        related_name="saved_runs",
+    )
     run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
+    created_by = models.ForeignObject(
+        "app_users.AppUser",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        from_fields=["uid"],
+        to_fields=["uid"],
+        related_name="saved_runs",
+    )
     workspace = models.ForeignKey(
         "workspaces.Workspace",
         on_delete=models.SET_NULL,
@@ -228,6 +246,11 @@ class SavedRun(models.Model):
         ).title_with_prefix()
         return title or self.get_app_url()
 
+    def get_workflow_metadata(self) -> WorkflowMetadata:
+        return (
+            self.workflow_metadata or Workflow(self.workflow).get_or_create_metadata()
+        )
+
     def parent_published_run(self) -> PublishedRun | None:
         return self.parent_version and self.parent_version.published_run
 
@@ -333,12 +356,6 @@ class SavedRun(models.Model):
     def wait_for_celery_result(self, result: celery.result.AsyncResult):
         get_celery_result_db_safe(result)
         self.refresh_from_db()
-
-    def get_creator(self) -> AppUser | None:
-        if self.uid:
-            return AppUser.objects.filter(uid=self.uid).first()
-        else:
-            return None
 
     @admin.display(description="Open in Gooey")
     def open_in_gooey(self):
