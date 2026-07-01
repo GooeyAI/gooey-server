@@ -1,11 +1,10 @@
 import typing
-import html
 
 import gooey_gui as gui
 from furl import furl
 
-from app_users.models import AppUser, obscure_phone_number
-from daras_ai_v2 import icons, settings
+from app_users.models import AppUser
+from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_route_path
 from handles.models import COMMON_EMAIL_DOMAINS
 from .models import Workspace
@@ -17,150 +16,6 @@ if typing.TYPE_CHECKING:
 
 SESSION_SELECTED_WORKSPACE = "selected-workspace-id"
 SWITCH_WORKSPACE_KEY = "--switch-workspace"
-
-
-def global_workspace_selector(user: AppUser, session: dict):
-    from routers.account import (
-        members_route,
-        profile_route,
-        explore_in_current_workspace,
-    )
-    from routers.base_auth import logout
-
-    try:
-        del user.cached_workspaces  # invalidate cache on every re-render
-    except AttributeError:
-        pass
-    workspaces = user.cached_workspaces
-
-    handle_workspace_switch(session)
-
-    try:
-        current = [
-            w for w in workspaces if w.id == session[SESSION_SELECTED_WORKSPACE]
-        ][0]
-    except (KeyError, IndexError):
-        current = workspaces[0]
-
-    with gui.styled("& > button { padding-top: 5px; }"), gui.div():
-        popover, content = gui.popover(interactive=True, placement="bottom")
-
-    with popover:
-        if current.is_personal and current.created_by_id == user.id:
-            if len(workspaces) == 1:
-                display_name = user.first_name()
-            else:
-                display_name = "Personal"
-        else:
-            display_name = current.display_name(user)
-        with gui.div(className="d-inline-flex align-items-center gap-2 text-truncate"):
-            gui.html(f"{current.html_icon()}")
-            gui.html(
-                html.escape(display_name),
-                className="d-none d-md-inline text-truncate",
-                style={"maxWidth": "150px"},
-            )
-            gui.html('<i class="ps-1 fa-regular fa-chevron-down"></i>')
-
-    with (
-        content,
-        gui.div(
-            className="d-flex flex-column bg-white border border-dark rounded shadow mx-2 overflow-hidden",
-        ),
-    ):
-        row_height = "2.2rem"
-
-        for workspace in workspaces:
-            with gui.tag(
-                "button",
-                className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
-                name=SWITCH_WORKSPACE_KEY,
-                type="submit",
-                value=str(workspace.id),
-                style=dict(height=row_height),
-            ):
-                with gui.div(className="row align-items-center"):
-                    with gui.div(className="col-2 d-flex justify-content-center"):
-                        gui.html(workspace.html_icon())
-                    with gui.div(
-                        className="col-10 d-flex justify-content-between align-items-center"
-                    ):
-                        with gui.div(className="pe-3"):
-                            gui.html(workspace.display_name(user))
-                        if workspace.id == current.id:
-                            gui.html(
-                                '<i class="fa-sharp fa-solid fa-circle-check"></i>'
-                            )
-
-        if current.is_personal:
-            gui.html('<hr class="my-1"/>')
-            with gui.tag(
-                "button",
-                className="bg-transparent border-0 text-start bg-hover-light px-3 my-1",
-                name="--create-workspace",
-                type="submit",
-                value="yes",
-                style=dict(height=row_height),
-                onClick=open_create_workspace_popup_js(),
-            ):
-                with gui.div(className="row align-items-center"):
-                    with gui.div(className="col-2 d-flex justify-content-center"):
-                        gui.html(icons.octopus)
-                    with gui.div(className="col-10"):
-                        gui.html("New Team Workspace")
-        else:
-            gui.html('<hr class="my-1"/>')
-            with gui.link(
-                to=get_route_path(members_route),
-                className="text-decoration-none d-block bg-hover-light px-3 my-1 py-1",
-                style=dict(height=row_height),
-            ):
-                with gui.div(className="row align-items-center"):
-                    with gui.div(className="col-2 d-flex justify-content-center"):
-                        gui.html(icons.octopus)
-                    with gui.div(className="col-10"):
-                        if current.memberships.get(user=user).can_edit_workspace():
-                            gui.html("Manage Workspace")
-                        else:
-                            gui.html("Open Workspace")
-
-        gui.html('<hr class="my-1"/>')
-
-        workspace_selector_link(
-            url=get_route_path(profile_route),
-            icon=icons.profile,
-            label="Profile",
-            caption=(
-                user.email
-                or str(user.phone_number and obscure_phone_number(user.phone_number))
-            ),
-        )
-
-        from routers.root import home_page
-
-        with gui.div(className="d-xl-none d-inline-block"):
-            workspace_selector_link(
-                url=get_route_path(home_page),
-                icon=icons.home,
-                label="Home",
-            )
-            for url, label in settings.HEADER_LINKS:
-                workspace_selector_link(
-                    url=url,
-                    label=label,
-                    icon=settings.HEADER_ICONS.get(url),
-                )
-            workspace_selector_link(
-                url=get_route_path(explore_in_current_workspace),
-                icon=icons.save,
-                label="Saved",
-            )
-
-        workspace_selector_link(
-            url=get_route_path(logout), label="Log out", icon=icons.sign_out
-        )
-
-    return current
 
 
 def handle_workspace_switch(session: dict):
@@ -176,35 +31,6 @@ def handle_workspace_switch(session: dict):
     except KeyError:
         pass
     set_current_workspace(session, int(switch_workspace_id))
-
-
-def workspace_selector_link(
-    url: str,
-    label: str,
-    caption: str | None = None,
-    icon: str | None = None,
-    row_height: str = "2.2rem",
-):
-    with gui.tag(
-        "a",
-        href=url,
-        className="text-decoration-none d-block bg-hover-light align-items-center px-3 my-1 py-1",
-        style=dict(height=row_height),
-    ):
-        with gui.div(className="row align-items-center"):
-            with gui.div(className="col-2 d-flex justify-content-center"):
-                if icon:
-                    gui.html(icon)
-            with gui.div(
-                className="col-10 d-flex justify-content-between align-items-end"
-            ):
-                gui.html(label)
-                if caption:
-                    gui.html(
-                        caption,
-                        className="d-inline-block text-muted small ms-2",
-                        style=dict(marginBottom="0.1rem"),
-                    )
 
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:
