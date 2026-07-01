@@ -92,6 +92,7 @@ def render(
                 logout_href="" if is_anonymous else get_route_path(logout),
                 add_workspace_url=add_workspace_url,
                 login_href=get_login_url(request) if is_anonymous else "/login/",
+                enable_firebase_auth=settings.ENABLE_FIREBASE_AUTH,
             ),
             gooey_builder=_load_gooey_builder_data(request, workspace, page),
         )
