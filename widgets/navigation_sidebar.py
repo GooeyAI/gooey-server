@@ -299,10 +299,9 @@ def _recent_run_ids(
 def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
     from bots.models import SavedRun
     from bots.models.workflow import Workflow
-    from widgets.home import get_workflow_metadata
 
     workflow = Workflow(sr.workflow)
-    metadata = get_workflow_metadata(workflow)
+    metadata = sr.get_workflow_metadata()
     pr = sr.parent_published_run()
 
     href = sr.get_app_url()
@@ -323,10 +322,9 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
 
 def _pr_to_nav_workflow(pr: PublishedRun) -> NavWorkflowItem:
     from bots.models.workflow import Workflow
-    from widgets.home import get_workflow_metadata
 
     workflow = Workflow(pr.workflow)
-    metadata = get_workflow_metadata(workflow)
+    metadata = pr.get_workflow_metadata()
     return NavWorkflowItem(
         title=pr.title or workflow.label,
         href=pr.get_app_url(),
