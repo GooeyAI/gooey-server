@@ -62,10 +62,6 @@ export function GooeyBuilderInlineEmbed(
         onNewConversation: async () => {
           ctx.current.update_session_state({ builderOnNewConversation: true });
         },
-        fetchConversations: () =>
-          fetchServerAPI("/__/gooey-builder/fetch-conversations", {
-            run_url: propsRef.current.builder_run_url,
-          }),
         rerun: async (run_url: string) => {
           let redirectUrl = await fetchServerAPI<string | null>(
             "/__/gooey-builder/send-message",
