@@ -17,6 +17,7 @@ from textwrap import dedent
 from time import sleep
 
 import sentry_sdk
+import yarl
 from django.db.models import Q, Sum
 from django.utils.text import slugify
 from fastapi import HTTPException
@@ -283,15 +284,15 @@ class BasePage:
     ):
         if not tab:
             tab = RecipeTabs.run
-        return str(
-            furl(settings.APP_BASE_URL, query_params=query_params)
-            / tab.url_path(
-                page_slug=cls.canonical_slug(),
-                run_slug=run_slug,
-                example_id=example_id,
-                **(path_params or {}),
-            )
-        )
+        url = yarl.URL(settings.APP_BASE_URL) / tab.url_path(
+            page_slug=cls.canonical_slug(),
+            run_slug=run_slug,
+            example_id=example_id,
+            **(path_params or {}),
+        ).lstrip("/")
+        if query_params:
+            url = url.with_query(query_params)
+        return str(url)
 
     @classmethod
     def api_url(
@@ -687,7 +688,7 @@ class BasePage:
 
             if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
                 if self.current_pr.is_root():
-                    render_help_button(self.workflow)
+                    render_help_button(self.current_sr.get_workflow_metadata())
                 if self.is_logged_in():
                     self._render_options_button_with_dialog()
                 render_share_button(
@@ -1529,12 +1530,8 @@ class BasePage:
 
     @cached_property
     def current_sr_user(self) -> AppUser | None:
-        if not self.current_sr.uid:
-            return None
-        if self.request.user and self.request.user.uid == self.current_sr.uid:
-            return self.request.user
         try:
-            return AppUser.objects.get(uid=self.current_sr.uid)
+            return self.current_sr.created_by
         except AppUser.DoesNotExist:
             return None
 
@@ -1586,12 +1583,17 @@ class BasePage:
         if create:
             return SavedRun.objects.get_or_create(**config, defaults=defaults)[0]
         else:
-            return SavedRun.objects.get(**config)
+            return SavedRun.objects.select_related(
+                "parent_version__published_run__saved_run__workflow_metadata",
+                "parent_version__published_run__workspace",
+                "workflow_metadata",
+                "created_by",
+            ).get(**config)
 
     @classmethod
     def get_pr_from_example_id(cls, example_id: str):
         return (
-            PublishedRun.objects.select_related("saved_run", "workspace")
+            PublishedRun.objects.select_related("saved_run", "workspace", "created_by")
             .prefetch_related("tags")
             .get(workflow=cls.workflow, published_run_id=example_id)
         )
@@ -1602,7 +1604,7 @@ class BasePage:
             PublishedRun,
             workflow=cls.workflow,
             published_run_id="",
-            create=lambda **kwargs: PublishedRun.objects.create_with_version(
+            create=lambda kwargs: PublishedRun.objects.create_with_version(
                 **kwargs,
                 saved_run=SavedRun.objects.get_or_create(
                     example_id="",

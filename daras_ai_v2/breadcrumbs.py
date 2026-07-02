@@ -58,7 +58,7 @@ def get_title_breadcrumbs(
     is_root = pr and pr.saved_run == sr and pr.is_root()
     is_example = not is_root and pr and pr.saved_run == sr
     is_run = not is_root and not is_example
-    metadata = page_cls.workflow.get_or_create_metadata()
+    metadata = sr.get_workflow_metadata()
     root_title = TitleUrl(
         f"{metadata.emoji} {metadata.short_title}", page_cls.app_url()
     )

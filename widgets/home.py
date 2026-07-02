@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
-import threading
 import typing
-from contextlib import contextmanager
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -67,31 +65,18 @@ def render(request: Request):
     else:
         greeting = None
 
-    with get_featured_workflows() as featured_workflows:
-        gui.model_component(
-            HomePageProps(
-                greeting=greeting,
-                workspace_header=workspace_header,
-                workflow_tabs=list(_load_workflow_tabs(featured_workflows)),
-                recent_workflows=_load_recent_workflows(request.user, workspace),
-                saved_workflows=_load_saved_workflows(request.user, workspace),
-                saved_workflows_href=_saved_workflows_href(workspace),
-                industry_tiles=_load_industry_tiles(),
-                news_items=_load_news_items(),
-            ),
-        )
-
-
-@contextmanager
-def get_featured_workflows() -> typing.Iterator[list[Workflow | int]]:
-    qs = WorkflowMetadata.objects.filter(is_featured=True).order_by("-priority")
-    cache = workflow_metadata_cache()
-    try:
-        for metadata in qs:
-            cache[metadata.workflow] = metadata
-        yield [metadata.workflow for metadata in qs]
-    finally:
-        cache.clear()
+    gui.model_component(
+        HomePageProps(
+            greeting=greeting,
+            workspace_header=workspace_header,
+            workflow_tabs=list(_load_workflow_tabs()),
+            recent_workflows=_load_recent_workflows(request.user, workspace),
+            saved_workflows=_load_saved_workflows(request.user, workspace),
+            saved_workflows_href=_saved_workflows_href(workspace),
+            industry_tiles=_load_industry_tiles(),
+            news_items=_load_news_items(),
+        ),
+    )
 
 
 def _get_workspace_header(
@@ -156,7 +141,11 @@ def _load_recent_workflows(
 
     return [
         _history_card(sr, author=author_from_user(user, current_user=user))
-        for sr in SavedRun.objects.filter(id__in=ids).order_by("-updated_at")
+        for sr in SavedRun.objects.select_related(
+            "parent_version__published_run", "workflow_metadata"
+        )
+        .filter(id__in=ids)
+        .order_by("-updated_at")
     ]
 
 
@@ -176,7 +165,7 @@ def _load_saved_workflows(
     )
     prs = list(
         PublishedRun.objects.filter(pr_filter)
-        .select_related("last_edited_by", "saved_run", "workspace")
+        .select_related("last_edited_by", "saved_run", "workspace", "workflow_metadata")
         .annotate(latest_change_notes=Subquery(latest_change_notes))
         .order_by("-updated_at")[:WORKFLOW_LIST_LIMIT]
     )
@@ -189,11 +178,16 @@ def _load_saved_workflows(
     ]
 
 
-def _load_workflow_tabs(
-    featured_workflows: list[Workflow | int],
-) -> typing.Iterable[WorkflowTabData]:
+def _load_workflow_tabs() -> typing.Iterable[WorkflowTabData]:
+    featured_workflows = (
+        WorkflowMetadata.objects.filter(is_featured=True)
+        .order_by("-priority")
+        .values_list("workflow", flat=True)
+    )
     pr_qs = (
-        PublishedRun.objects.select_related("workspace__created_by", "saved_run")
+        PublishedRun.objects.select_related(
+            "workspace__created_by", "saved_run", "workflow_metadata"
+        )
         .filter(is_featured=True, workflow__in=featured_workflows)
         .order_by("-example_priority")
     )
@@ -206,7 +200,7 @@ def _load_workflow_tabs(
     for workflow, pr_group in grouped.items():
         if not pr_group:
             continue
-        metadata = get_workflow_metadata(workflow)
+        metadata = pr_group[0].get_workflow_metadata()
         yield WorkflowTabData(
             id=metadata.workflow,
             title=metadata.short_title,
@@ -270,7 +264,7 @@ def sr_to_card(
 ) -> WorkflowCardData:
     parent_pr = sr.parent_published_run()
     workflow = Workflow(sr.workflow)
-    metadata = get_workflow_metadata(workflow)
+    metadata = sr.get_workflow_metadata()
     return WorkflowCardData(
         title=(parent_pr and parent_pr.title) or workflow.label,
         href=sr.get_app_url(),
@@ -287,7 +281,7 @@ def pr_to_card(
     author: AuthorData | None,
 ) -> WorkflowCardData:
     workflow = Workflow(pr.workflow)
-    metadata = get_workflow_metadata(workflow)
+    metadata = pr.get_workflow_metadata()
     return WorkflowCardData(
         title=pr.title or workflow.label,
         href=pr.get_app_url(),
@@ -295,22 +289,6 @@ def pr_to_card(
         preview=_pr_preview(pr, workflow=workflow, metadata=metadata),
         author=author,
     )
-
-
-def get_workflow_metadata(workflow: Workflow | int) -> WorkflowMetadata:
-    cache = workflow_metadata_cache()
-    try:
-        metadata = cache[workflow]
-    except KeyError:
-        metadata = cache[workflow] = Workflow(workflow).get_or_create_metadata()
-    return metadata
-
-
-def workflow_metadata_cache() -> dict[int, WorkflowMetadata]:
-    return threadlocal.__dict__.setdefault("workflow_metadata_cache", {})
-
-
-threadlocal = threading.local()
 
 
 def _sr_preview(

@@ -248,7 +248,7 @@ class Workflow(models.IntegerChoices):
         return get_or_create_lazy(
             WorkflowMetadata,
             workflow=self,
-            create=lambda **kwargs: WorkflowMetadata.objects.create(
+            create=lambda kwargs: WorkflowMetadata.objects.create(
                 **kwargs,
                 short_title=(self.page_cls.get_root_pr().title or self.page_cls.title),
                 default_image=self.page_cls.explore_image or "",

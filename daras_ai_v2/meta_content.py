@@ -1,5 +1,6 @@
 import typing
 
+from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, WorkflowMetadata
 from daras_ai.text_format import unmarkdown
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
@@ -28,7 +29,7 @@ def build_meta_tags(
     state: dict,
 ) -> list[dict]:
     sr, pr = page.current_sr_pr
-    metadata = page.workflow.get_or_create_metadata()
+    metadata = sr.get_workflow_metadata()
 
     title = meta_title_for_page(
         page=page,
@@ -145,9 +146,13 @@ def meta_title_for_page(
                 # use the short title for non-root examples
                 part = metadata.short_title
                 # add the creator's name
-                user = sr.get_creator()
-                if user and user.display_name:
-                    part += f" by {user.display_name}"
+                try:
+                    user = sr.created_by
+                except AppUser.DoesNotExist:
+                    pass
+                else:
+                    if user.display_name:
+                        part += f" by {user.display_name}"
                 parts.append(part)
 
             ret = SEP.join(parts)

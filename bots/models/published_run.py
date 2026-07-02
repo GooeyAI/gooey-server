@@ -14,7 +14,7 @@ from bots.custom_fields import CustomURLField
 from daras_ai_v2.crypto import get_random_doc_id
 from gooey_gui.types.home_page_props import AccessBadgeData
 from .saved_run import SavedRun
-from .workflow import Workflow, WorkflowAccessLevel
+from .workflow import Workflow, WorkflowAccessLevel, WorkflowMetadata
 
 if typing.TYPE_CHECKING:
     import celery.result
@@ -110,6 +110,15 @@ class PublishedRun(models.Model):
     )
     workflow = models.IntegerField(
         choices=Workflow.choices,
+    )
+    workflow_metadata = models.ForeignObject(
+        "bots.WorkflowMetadata",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        from_fields=["workflow"],
+        to_fields=["workflow"],
+        related_name="+",
     )
     title = models.TextField(blank=True, default="")
     notes = models.TextField(blank=True, default="")
@@ -236,6 +245,11 @@ class PublishedRun(models.Model):
             query_params=query_params,
             example_id=self.published_run_id,
             run_slug=slugify(self.title),
+        )
+
+    def get_workflow_metadata(self) -> WorkflowMetadata:
+        return (
+            self.workflow_metadata or Workflow(self.workflow).get_or_create_metadata()
         )
 
     def add_version(
