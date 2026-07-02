@@ -334,6 +334,9 @@ function WorkspaceIcon({ html }: { html: string }) {
 }
 
 function Avatar({ user }: { user: NavUserData }) {
+  const url = user.photo_url || "";
+  if (!url) return null;
+
   return (
     <img
       src={user.photo_url || ""}
