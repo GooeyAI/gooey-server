@@ -219,21 +219,21 @@ function NavigationHeaderMobile({
   onSwitchWorkspace: (workspaceId: number) => void;
 }) {
   return (
-    <>
+    <div className="nav-mobile-topbar-container d-block d-lg-none">
       <div className="nav-mobile-topbar d-lg-none d-flex align-items-center gap-2 px-2 border-bottom bg-body">
         <button
           type="button"
-          className="btn text-muted p-2 d-flex align-items-center"
+          className="btn p-2 d-flex align-items-center m-0"
           title="Open menu"
           onClick={onDrawerOpen}
         >
-          <i className="fa-regular fa-sidebar"></i>
+          <i className="fa-regular fa-sidebar fs-5"></i>
         </button>
         <a
           href="/"
-          className="d-flex align-items-center gap-2 text-body text-decoration-none"
+          className="d-flex align-items-center gap-2 text-body text-decoration-none bg-hover-light"
         >
-          <GooeyBot size={22} />
+          <GooeyBot size={24} />
           <img
             src={logo_image_url}
             alt="Gooey.AI"
@@ -259,7 +259,7 @@ function NavigationHeaderMobile({
       {isMobile && drawerOpen && (
         <div className="nav-scrim" onClick={onDrawerClose} />
       )}
-    </>
+    </div>
   );
 }
 
@@ -349,7 +349,7 @@ function SignInLink({
         "d-flex align-items-center justify-content-center text-decoration-none rounded p-2 bg-hover-light position-relative",
         !iconOnly && "gap-2",
         block && "w-100",
-        subtle ? "text-muted small" : "text-body"
+        subtle ? "small" : "text-body"
       )}
       title={iconOnly ? "Sign In" : undefined}
     >
@@ -373,7 +373,7 @@ function GooeyBuilderButton({
     <button
       type="button"
       className={clsx(
-        "gooey-builder-btn btn btn-light border d-flex align-items-center position-relative",
+        "gooey-builder-btn btn border b-1 bg-hover-light d-flex align-items-center position-relative",
         compact ? "justify-content-center p-1" : "gap-2 p-2"
       )}
       title={"Gooey Builder"}
@@ -426,11 +426,11 @@ function NavigationHeader({
         (isMobile ? (
           <button
             type="button"
-            className="btn text-body p-1 d-flex align-items-center"
+            className="btn text-body p-1 d-flex align-items-center bg-hover-light"
             title="Close menu"
             onClick={onDrawerClose}
           >
-            <i className="fa-regular fa-xmark fa-lg" />
+            <i className="fa-regular fa-xmark" />
           </button>
         ) : (
           <button
@@ -501,10 +501,14 @@ function GooeyBot({
   size?: number;
   className?: string;
 }) {
+  // The artwork fills its 133×100 viewBox edge-to-edge, so the rendered box must
+  // keep that 133:100 ratio or it letterboxes (empty margin above/below the mark).
+  // `size` is the width; height follows the aspect ratio.
   return (
     <svg
       width={size}
-      height={size}
+      height={(size * 100) / 133}
+      style={{ transform: "translateY(-1px)" }}
       viewBox="0 0 133 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
