@@ -6,6 +6,11 @@ import type { GooeyBuilderData } from "@gooey-types/navigation_sidebar_props";
 // so the rail can read it to stay in sync across page navigations.
 export const BUILDER_SIDEBAR_KEY = "builder-sidebar";
 
+// URL fragment that Builder-run links in the rail carry (see
+// widgets/navigation_sidebar.py). When present on arrival, the rail force-opens
+// the Builder panel regardless of the persisted open/closed state.
+export const OPEN_BUILDER_HASH = "#open-builder";
+
 export function GooeyBuilderButton({
   gooey_builder,
   compact,
