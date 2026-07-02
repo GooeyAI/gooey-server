@@ -73,7 +73,12 @@ function renderGsiButton(container: HTMLElement | null, compact: boolean) {
     container,
     compact
       ? { type: "icon", shape: "square", size: "large" }
-      : { text: "continue_with", shape: "rectangular", size: "large", width: 200 }
+      : {
+          text: "continue_with",
+          shape: "rectangular",
+          size: "large",
+          width: 200,
+        }
   );
   if (!oneTapPrompted) {
     oneTapPrompted = true;
@@ -104,9 +109,10 @@ function loadGsiClient(): Promise<void> {
     const existing = document.getElementById(GSI_SCRIPT_ID);
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () =>
-        reject(new Error("Failed to load Google Identity Services"))
-      );
+      existing.addEventListener("error", () => {
+        gsiClientPromise = null;
+        reject(new Error("Failed to load Google Identity Services"));
+      });
       return;
     }
     const script = document.createElement("script");
@@ -115,8 +121,10 @@ function loadGsiClient(): Promise<void> {
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
-    script.onerror = () =>
+    script.onerror = () => {
+      gsiClientPromise = null;
       reject(new Error("Failed to load Google Identity Services"));
+    };
     document.head.appendChild(script);
   });
   return gsiClientPromise;
