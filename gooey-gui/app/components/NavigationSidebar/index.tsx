@@ -8,7 +8,11 @@ import type {
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
 import { AccountSection } from "./AccountSection";
-import { BUILDER_SIDEBAR_KEY, GooeyBuilderButton } from "./GooeyBuilderButton";
+import {
+  BUILDER_SIDEBAR_KEY,
+  GooeyBuilderButton,
+  OPEN_BUILDER_HASH,
+} from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
 import { PrimaryNavItems } from "./PrimaryNavItems";
 
@@ -81,6 +85,30 @@ export function NavigationSidebar({
     return () => {
       window.removeEventListener(`${BUILDER_SIDEBAR_KEY}:open`, onOpen);
       window.removeEventListener(`${BUILDER_SIDEBAR_KEY}:close`, onClose);
+    };
+  }, []);
+
+  // Opening a Builder run from the rail lands with an `#open-builder` fragment;
+  // force-open the Builder panel (overriding any persisted state), then strip
+  // the fragment so a later refresh doesn't re-open it.
+  useEffect(() => {
+    function handleOpenBuilderHash() {
+      if (window.location.hash !== OPEN_BUILDER_HASH) return;
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search
+      );
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent(`${BUILDER_SIDEBAR_KEY}:open`));
+      }, 500);
+    }
+    // Defer the initial check so Sidebar.tsx registers its open listener first.
+    const timer = window.setTimeout(handleOpenBuilderHash, 0);
+    window.addEventListener("hashchange", handleOpenBuilderHash);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("hashchange", handleOpenBuilderHash);
     };
   }, []);
 

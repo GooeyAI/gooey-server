@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 
 RECENT_WORKFLOW_LIST_LIMIT = 20
 
+# Fragment appended to Builder-run links in the rail so that clicking one
+# force-opens the Builder panel on arrival. Must match OPEN_BUILDER_HASH in
+# gooey-gui/app/components/NavigationSidebar/GooeyBuilderButton.tsx.
+OPEN_BUILDER_HASH = "#open-builder"
+
 
 def render(
     request: Request,
@@ -300,14 +305,17 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
     metadata = get_workflow_metadata(workflow)
     pr = sr.parent_published_run()
 
+    href = sr.get_app_url()
     if sr.surface == SavedRun.Surface.builder_child:
         title = (sr.builder_prompt or "").strip()
+        # Only Builder runs opened from the rail force-open the Builder panel.
+        href += OPEN_BUILDER_HASH
     else:
         title = _history_title(sr, pr, metadata)
 
     return NavWorkflowItem(
         title=title or (pr and pr.title) or workflow.label,
-        href=sr.get_app_url(),
+        href=href,
         icon=_workflow_icon(metadata),
         image_url=(pr and pr.photo_url) or None,
     )
