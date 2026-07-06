@@ -223,6 +223,7 @@ class Workflow(models.IntegerChoices):
     TRANSLATION = (33, "Translation")
     MODEL_TRAINER = (34, "Model Trainer")
     VIDEO_GEN = (35, "Video Generation")
+    FILESYSTEM = (36, "Filesystem")
 
     @property
     def short_slug(self):

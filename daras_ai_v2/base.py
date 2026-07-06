@@ -26,6 +26,7 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
 
 import gooey_gui as gui
+from gooey_gui.core.state import drop_callables
 from ai_models.llm_openapi import patch_ai_model_schema_enums
 from app_users.models import AppUser, AppUserTransaction
 from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
@@ -408,7 +409,7 @@ class BasePage:
         else:
             output = gui.realtime_pull([workflow_channel])[0]
             if output:
-                gui.session_state.update(output)
+                gui.session_state.update(drop_callables(output))
 
     def render_unauthorized(self):
         with gui.div(className="d-flex flex-column align-items-center"):
@@ -825,7 +826,7 @@ class BasePage:
                 notes = pr.notes
             else:
                 title = self._get_default_pr_title()
-                notes = ""
+                notes = self._get_default_pr_notes()
 
             col1, col2 = gui.columns([2, 1])
             with col1:
@@ -1004,6 +1005,9 @@ class BasePage:
 
     def _get_default_pr_title(self):
         return f"{self.request.user.first_name_possesive()} {self.get_run_title(self.current_sr, self.current_pr)}"
+
+    def _get_default_pr_notes(self) -> str:
+        return ""
 
     def _validate_published_run_title(self, title: str):
         if slugify(title) in settings.DISALLOWED_TITLE_SLUGS:

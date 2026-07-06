@@ -13,7 +13,7 @@ from .pubsub import (
     realtime_clear_subs,
 )
 
-from .state import get_session_state, set_session_state, set_query_params, threadlocal
+from .state import get_session_state, set_session_state, set_query_params, threadlocal, drop_callables
 
 Style = dict[str, str | None]
 ReactHTMLProps = dict[str, typing.Any]
@@ -151,7 +151,7 @@ def renderer(
                 jsonable_encoder(
                     dict(
                         children=root.to_dict()["children"],
-                        state=get_session_state(),
+                        state=drop_callables(get_session_state()),
                         channels=get_subscriptions(),
                         **(ret or {}),
                     )

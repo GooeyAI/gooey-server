@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import html
 import threading
@@ -48,6 +49,22 @@ def get_running_saved_run() -> SavedRun | None:
         return None
 
 
+def _response_fields_from_state(
+    state: dict[str, typing.Any], page: typing.Type[BasePage]
+) -> tuple[dict[str, typing.Any], list[str]]:
+    fields: dict[str, typing.Any] = {}
+    dropped: list[str] = []
+    for field_name in page.ResponseModel.model_fields:
+        if field_name not in state:
+            continue
+        value = state[field_name]
+        if callable(value) or asyncio.iscoroutine(value):
+            dropped.append(field_name)
+            continue
+        fields[field_name] = value
+    return fields, dropped
+
+
 @app.task
 def runner_task(
     *,
@@ -65,6 +82,7 @@ def runner_task(
 
     @db_middleware
     def save_on_step(yield_val: str | tuple[str, dict] = None, *, done: bool = False):
+        nonlocal error_msg
         sr.refresh_from_db(fields=["is_cancelled"])
 
         if isinstance(yield_val, tuple):
@@ -78,6 +96,15 @@ def runner_task(
         else:
             run_status = run_status or DEFAULT_RUN_STATUS
 
+        response_fields, dropped_fields = _response_fields_from_state(
+            gui.session_state, page
+        )
+        if dropped_fields and not error_msg:
+            error_msg = (
+                "Failed to serialize run output "
+                f"({', '.join(dropped_fields)}). Please retry the run."
+            )
+
         output = (
             # extract status of the run
             {
@@ -86,11 +113,7 @@ def runner_task(
                 StateKeys.run_status: run_status,
             }
             # extract outputs from local state
-            | {
-                k: v
-                for k, v in gui.session_state.items()
-                if k in page.ResponseModel.model_fields
-            }
+            | response_fields
             # add extra outputs from the run
             | extra_output
         )
@@ -102,6 +125,9 @@ def runner_task(
         if unsaved_state:
             for k in unsaved_state:
                 saved_state.pop(k, None)
+        for field_name in dropped_fields:
+            saved_state.pop(field_name, None)
+            gui.session_state.pop(field_name, None)
         # save to db
         page.dump_state_to_sr(saved_state, sr)
 

@@ -1,8 +1,17 @@
+import asyncio
 import threading
 import typing
 
 
 threadlocal = threading.local()
+
+
+def drop_callables(state: dict[str, typing.Any]) -> dict[str, typing.Any]:
+    return {
+        key: value
+        for key, value in state.items()
+        if not callable(value) and not asyncio.iscoroutine(value)
+    }
 
 
 def get_session_state() -> dict[str, typing.Any]:
@@ -14,7 +23,7 @@ def get_session_state() -> dict[str, typing.Any]:
 
 
 def set_session_state(state: dict[str, typing.Any]):
-    threadlocal.session_state = state
+    threadlocal.session_state = drop_callables(state)
 
 
 def get_query_params() -> dict[str, str]:
