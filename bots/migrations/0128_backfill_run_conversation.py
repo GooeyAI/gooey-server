@@ -133,7 +133,7 @@ def _disable_auto_timestamps(RunConversation):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bots", "0126_runconversation_savedrun_conversation_and_more"),
+        ("bots", "0127_runconversation_savedrun_conversation_and_more"),
     ]
 
     operations = [
