@@ -1,0 +1,8 @@
+name = "gooey-functions"
+main = "executor.js"
+compatibility_date = "2025-06-01"
+
+# Dynamic Worker Loading — runs user code in isolated, dynamically loaded workers
+# https://developers.cloudflare.com/workers/runtime-apis/bindings/worker-loader/
+[[worker_loaders]]
+binding = "LOADER"

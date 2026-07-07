@@ -220,24 +220,24 @@ ulimit -n unlimited  # Increase the number of open files allowed
 ./scripts/run-tests.sh
 ```
 
-### ⚙️ Functions runtime (Deno)
+### ⚙️ Functions runtime (Cloudflare Workers)
 
-The Functions recipe executes user-supplied JavaScript in a sandboxed Deno HTTP server (`functions/executor.js`). By default Gooey.AI runs this on [Deno Deploy](https://deno.com/deploy), but you can self-host it with Docker:
+The Functions recipe executes user-supplied JavaScript on [Cloudflare Workers](https://developers.cloudflare.com/workers/) (`functions/executor.js`). The executor wraps the user code in ES module code and runs it in an isolated worker via [dynamic Worker Loading](https://developers.cloudflare.com/workers/runtime-apis/bindings/worker-loader/), so plain expressions (e.g. an anonymous function) can be evaluated.
+
+Deploy it to your own Cloudflare account:
 
 ```bash
-docker run --rm \
-  -e GOOEY_AUTH_TOKEN=your-secret \
-  -p 8000:8000 \
-  -v "$(pwd)/functions/executor.js:/executor.js" \
-  denoland/deno:latest \
-  run --allow-env --allow-net /executor.js
+npx wrangler deploy -c functions/wrangler.toml
+npx wrangler secret put GOOEY_AUTH_TOKEN -c functions/wrangler.toml
 ```
+
+For local development, run it with `npx wrangler dev -c functions/wrangler.toml`.
 
 Then point Gooey Server at it in `.env`:
 
 ```env
-DENO_FUNCTIONS_URL=http://localhost:8000
-DENO_FUNCTIONS_AUTH_TOKEN=your-secret  # i.e. earlier GOOEY_AUTH_TOKEN
+CLOUDFLARE_FUNCTIONS_URL=https://gooey-functions.<your-subdomain>.workers.dev
+CLOUDFLARE_FUNCTIONS_AUTH_TOKEN=your-secret  # i.e. the GOOEY_AUTH_TOKEN worker secret
 ```
 
 ### 🔌 Other non-essential features

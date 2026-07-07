@@ -217,14 +217,14 @@ All optional. Needed only for workflows using Azure-hosted models or moderation.
 
 ---
 
-## Functions runtime (Deno)
+## Functions runtime (Cloudflare Workers)
 
-See [README.md § Sovereign Deployment](README.md#%EF%B8%8F-functions-runtime-deno) for self-hosting instructions.
+See [README.md § Sovereign Deployment](README.md#%EF%B8%8F-functions-runtime-cloudflare-workers) for self-hosting instructions.
 
-| Variable                    | Description                                       |
-| --------------------------- | ------------------------------------------------- |
-| `DENO_FUNCTIONS_URL`        | URL of the Deno executor service                  |
-| `DENO_FUNCTIONS_AUTH_TOKEN` | Auth token sent as `Authorization: Basic <token>` |
+| Variable                          | Description                                       |
+| --------------------------------- | ------------------------------------------------- |
+| `CLOUDFLARE_FUNCTIONS_URL`        | URL of the Cloudflare Workers executor            |
+| `CLOUDFLARE_FUNCTIONS_AUTH_TOKEN` | Auth token sent as `Authorization: Basic <token>` |
 
 ---
 

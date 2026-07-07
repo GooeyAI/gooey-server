@@ -58,7 +58,7 @@ class FunctionsPage(BasePage):
             CodeLanguages.javascript,
             title="Language",
             description="The programming language to use.\n\n"
-            "Your code is executed in a sandboxed environment via [Deno Deploy](https://deno.com/deploy) for JavaScript and [Modal Sandbox](https://modal.com/docs/guide/sandbox) for Python.",
+            "Your code is executed in a sandboxed environment via [Cloudflare Workers](https://developers.cloudflare.com/workers/) for JavaScript and [Modal Sandbox](https://modal.com/docs/guide/sandbox) for Python.",
         )
         variables: dict[str, typing.Any] = Field(
             {},
@@ -526,10 +526,11 @@ def execute_js(
 ) -> dict[str, typing.Any] | None:
     tag = f"run_id={sr.run_id}&uid={sr.uid}"
 
-    # this will run functions/executor.js in deno deploy
+    # this will run the user code via functions/executor.js on cloudflare workers,
+    # wrapped in module code so as to be able to evaluate expressions
     r = requests.post(
-        settings.DENO_FUNCTIONS_URL,
-        headers={"Authorization": f"Basic {settings.DENO_FUNCTIONS_AUTH_TOKEN}"},
+        settings.CLOUDFLARE_FUNCTIONS_URL,
+        headers={"Authorization": f"Basic {settings.CLOUDFLARE_FUNCTIONS_AUTH_TOKEN}"},
         json=dict(
             code=code,
             variables=variables,
