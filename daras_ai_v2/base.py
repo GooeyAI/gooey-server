@@ -413,7 +413,7 @@ class BasePage:
             if output:
                 gui.session_state.update(output)
 
-    def render_unauthorized(self):
+    def render_unauthorized(self, owner_workspace: Workspace | None = None):
         with gui.div(className="d-flex flex-column align-items-center"):
             gui.write('# <i class="fa-solid fa-lock"></i>', unsafe_allow_html=True)
             gui.caption("Welcome to Gooey.AI")
@@ -421,11 +421,11 @@ class BasePage:
             if not self.request.user or self.request.user.is_anonymous:
                 gui.write(f"[Sign in]({self.get_auth_url()}) to view this resource.")
             else:
-                owner_workspace = (
-                    self.current_pr.workspace
-                    if self.current_pr.saved_run == self.current_sr
-                    else self.current_sr.workspace
-                )
+                if owner_workspace is None:
+                    if self.current_pr.saved_run == self.current_sr:
+                        owner_workspace = self.current_pr.workspace
+                    else:
+                        owner_workspace = self.current_sr.workspace
                 gui.write(
                     dedent(f"""
                 You currently don't have access to this resource. Please request access from the

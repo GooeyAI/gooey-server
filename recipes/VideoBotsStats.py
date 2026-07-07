@@ -85,27 +85,23 @@ class VideoBotsStatsPage(BasePage):
         self.setup_sentry()
 
         if not self.request.user or self.request.user.is_anonymous:
-            gui.write("**Please Login to view stats for your bot Deployments**")
+            self.render_unauthorized()
             return
-        if self.is_current_user_admin():
-            bi_qs = BotIntegration.objects.all().order_by("platform", "-created_at")
-        else:
-            bi_qs = BotIntegration.objects.filter(
-                workspace__memberships__user=self.request.user,
-                workspace__memberships__deleted__isnull=True,
-            ).order_by("platform", "-created_at")
-
-        if not bi_qs.exists():
-            gui.write(
-                "**Please connect a bot to a platform to view stats for your bot deployments or login to an account with connected bot deployments**"
-            )
-            return
-
         bi_id = self.request.query_params.get("bi_id") or gui.session_state.get("bi_id")
         try:
-            self.bi = bi = bi_qs.get(id=bi_id)
+            bi = BotIntegration.objects.get(id=bi_id)
         except BotIntegration.DoesNotExist:
             raise HTTPException(status_code=404, detail="Bot Integration not found")
+        is_authorized = self.is_current_user_admin() or (
+            bi.workspace
+            and bi.workspace.memberships.filter(
+                user=self.request.user, deleted__isnull=True
+            ).exists()
+        )
+        if not is_authorized:
+            self.render_unauthorized(owner_workspace=bi.workspace)
+            return
+        self.bi = bi
 
         # for backwards compatibility with old urls
         if self.request.query_params.get("bi_id"):
