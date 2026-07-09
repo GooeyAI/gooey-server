@@ -1,6 +1,5 @@
 import typing
 
-from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, WorkflowMetadata
 from daras_ai.text_format import unmarkdown
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs

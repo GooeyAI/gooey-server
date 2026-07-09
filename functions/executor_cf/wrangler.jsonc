@@ -1,0 +1,26 @@
+//
+// To deploy this, run:
+//    cd functions/executor_cf && npm install && npx wrangler deploy
+// Auth is handled by Cloudflare Access (service token) in front of the
+// worker URL — see the Zero Trust dashboard.
+//
+{
+  "name": "gooey-functions-esm",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-07-08",
+  // Import executor.js as raw source text (it's bundled into each dynamic
+  // worker, not executed here). Other .js files fall through to the
+  // default ESModule rule.
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/executor.js"],
+      "fallthrough": true
+    }
+  ],
+  "worker_loaders": [
+    {
+      "binding": "LOADER"
+    }
+  ]
+}

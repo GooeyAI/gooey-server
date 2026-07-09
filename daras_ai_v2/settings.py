@@ -518,8 +518,12 @@ MAX_RPM_PAID = config("MAX_RPM_PAID", 10, cast=int)
 MAX_MESSAGES_PER_DAY_WARNING = config("MAX_MESSAGES_PER_DAY_WARN", 50, cast=int)
 MAX_MESSAGES_PER_DAY_BLOCK = config("MAX_MESSAGES_PER_DAY_BLOCK", 100, cast=int)
 
-DENO_FUNCTIONS_AUTH_TOKEN = config("DENO_FUNCTIONS_AUTH_TOKEN", "")
-DENO_FUNCTIONS_URL = config("DENO_FUNCTIONS_URL", "")
+# Cloudflare Worker that executes JavaScript/ESM functions via Dynamic Workers.
+# See functions/executor_cf/ for the worker code and deployment instructions.
+CF_FUNCTIONS_URL = config("CF_FUNCTIONS_URL", "")
+# Cloudflare Access service token, checked at the edge before the worker runs.
+CF_ACCESS_CLIENT_ID = config("CF_ACCESS_CLIENT_ID", "")
+CF_ACCESS_CLIENT_SECRET = config("CF_ACCESS_CLIENT_SECRET", "")
 
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", "")
 TWILIO_API_KEY_SID = config("TWILIO_API_KEY_SID", "")
