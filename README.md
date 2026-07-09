@@ -104,6 +104,7 @@ Specifically, this repo may be for you if:
 The fastest way to run everything locally is Docker Compose. It starts postgres, redis, rabbitmq, vespa, and the app services (API, Django admin, celery, gooey-gui) in one command.
 
 **1. Clone the Gooey Server Repo**
+
 ```bash
 git clone https://github.com/GooeyAI/gooey-server.git
 ```
@@ -111,8 +112,9 @@ git clone https://github.com/GooeyAI/gooey-server.git
 **2. Install Docker**
 
 - **macOS** — install [OrbStack](https://orbstack.dev/download) (recommended on Apple Silicon; native arm64, fast builds)
-> [!NOTE]
-> OrbStack requires you to start it the first time.
+
+  > [!NOTE]
+  > OrbStack requires you to start it the first time.
 
 - **Linux** — install [Docker Engine](https://docs.docker.com/engine/install/) and the [Compose plugin](https://docs.docker.com/compose/install/linux/)
 - **Windows** — install [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
@@ -187,12 +189,14 @@ export MAGICK_HOME=/opt/homebrew
 - Configure Postgres to ensure that password authentication is enabled for the gooey user
   - open the pg_hba.conf file in a text editor. On Linux, by default, it is usually located either at `/etc/postgresql/<version>/main/` or `/var/lib/pgsql/<version>/data/`
   - add/edit the file so that there are lines at the bottom that looks like this:
+
   ```
   local    all        gooey                    md5
   host     all        gooey                    md5
   ```
 
   - restart postgresql using `sudo systemctl restart postgresql`
+
 - Use the manage.py script to set up the Postgres database:
   - To create the user and database for gooey: `./manage.py sqlcreate | sudo -u postgres psql postgres `
   - Test your setup to ensure that `gooey-server` can access the database by running `psql -W -U gooey gooey` and supplying "gooey" as the password
@@ -220,25 +224,23 @@ ulimit -n unlimited  # Increase the number of open files allowed
 ./scripts/run-tests.sh
 ```
 
-### ⚙️ Functions runtime (Deno)
+### ⚙️ Functions runtime (Cloudflare Workers)
 
-The Functions recipe executes user-supplied JavaScript in a sandboxed Deno HTTP server (`functions/executor.js`). By default Gooey.AI runs this on [Deno Deploy](https://deno.com/deploy), but you can self-host it with Docker:
+The Functions recipe executes user-supplied JavaScript/ESM in sandboxed [Cloudflare Dynamic Workers](https://developers.cloudflare.com/dynamic-workers/) via the worker in `functions/executor_cf/`. You can run it locally with wrangler:
 
 ```bash
-docker run --rm \
-  -e GOOEY_AUTH_TOKEN=your-secret \
-  -p 8000:8000 \
-  -v "$(pwd)/functions/executor.js:/executor.js" \
-  denoland/deno:latest \
-  run --allow-env --allow-net /executor.js
+cd functions/executor_cf
+npm install
+npx wrangler dev
 ```
 
 Then point Gooey Server at it in `.env`:
 
 ```env
-DENO_FUNCTIONS_URL=http://localhost:8000
-DENO_FUNCTIONS_AUTH_TOKEN=your-secret  # i.e. earlier GOOEY_AUTH_TOKEN
+CF_FUNCTIONS_URL=http://localhost:8787
 ```
+
+To deploy it to Cloudflare instead, see `functions/executor_cf/wrangler.jsonc`.
 
 ### 🔌 Other non-essential features
 

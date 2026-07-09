@@ -285,7 +285,7 @@ class RealtimeSession:
 T = typing.TypeVar("T")
 
 
-def yield_from(gen: typing.Generator[typing.Any, None, T]) -> T:
+def yield_from(gen: typing.Iterator[T]) -> T:
     """Same as `yield from` but returns the value of the generator."""
     while True:
         try:

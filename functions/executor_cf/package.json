@@ -1,0 +1,14 @@
+{
+  "name": "gooey-functions-esm",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cloudflare/worker-bundler": "^0.2.1",
+    "acorn": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^6.0.3",
+    "wrangler": "latest"
+  }
+}

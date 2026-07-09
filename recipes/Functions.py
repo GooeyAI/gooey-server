@@ -32,7 +32,7 @@ from workspaces.models import Workspace
 
 
 class ConsoleLogs(BaseModel):
-    level: typing.Literal["log", "error"]
+    level: typing.Literal["log", "error", "warn", "info", "debug", "trace"]
     message: str
 
 
@@ -58,7 +58,7 @@ class FunctionsPage(BasePage):
             CodeLanguages.javascript,
             title="Language",
             description="The programming language to use.\n\n"
-            "Your code is executed in a sandboxed environment via [Deno Deploy](https://deno.com/deploy) for JavaScript and [Modal Sandbox](https://modal.com/docs/guide/sandbox) for Python.",
+            "Your code is executed in a sandboxed environment via [Cloudflare Dynamic Workers](https://developers.cloudflare.com/dynamic-workers/) for JavaScript and [Modal Sandbox](https://modal.com/docs/guide/sandbox) for Python.",
         )
         variables: dict[str, typing.Any] = Field(
             {},
@@ -81,6 +81,11 @@ class FunctionsPage(BasePage):
             None,
             title="🐍 `requirements.txt`",
             description="List of python packages to be installed in the sandbox.",
+        )
+        package_json: typing.Any | None = Field(
+            None,
+            title="📦 `package.json`",
+            description="List of javascript packages to be installed in the sandbox.",
         )
         gpu: (
             typing.Literal[
@@ -160,11 +165,11 @@ class FunctionsPage(BasePage):
                 )
             case CodeLanguages.javascript:
                 gooey_memory_after = execute_js(
-                    sr=self.current_sr,
                     code=request.code,
                     variables=variables,
                     env=env,
                     gooey_memory=gooey_memory_before,
+                    package_json=request.package_json,
                     response=response,
                 )
         self._apply_gooey_memory_updates(
@@ -269,13 +274,20 @@ class FunctionsPage(BasePage):
             exclude=self.fields_to_save(),
         )
 
-        if gui.session_state.get("language") == "python":
-            gui.code_editor(
-                label="##### " + field_title(self.RequestModel, "python_requirements"),
-                key="python_requirements",
-                style=dict(maxHeight="50vh"),
-                help=field_desc(self.RequestModel, "python_requirements"),
-            )
+        match gui.session_state.get("language"):
+            case CodeLanguages.python.name:
+                gui.code_editor(
+                    label="##### "
+                    + field_title(self.RequestModel, "python_requirements"),
+                    key="python_requirements",
+                    style=dict(maxHeight="50vh"),
+                    help=field_desc(self.RequestModel, "python_requirements"),
+                )
+            case CodeLanguages.javascript.name:
+                _render_package_json_editor(
+                    label="##### " + field_title(self.RequestModel, "package_json"),
+                    help=field_desc(self.RequestModel, "package_json"),
+                )
 
         options = set(gui.session_state.get("secrets") or [])
         with gui.div(className="d-flex align-items-center gap-3 mb-2"):
@@ -392,6 +404,32 @@ class FunctionsPage(BasePage):
             .filter(function_run=self.current_sr)
             .first()
         )
+
+
+def _render_package_json_editor(*, label: str, help: str) -> None:
+    package_json = gui.session_state.get("package_json")
+    if package_json:
+        try:
+            default_value = json.dumps(package_json, indent=2)
+        except TypeError:
+            default_value = str(package_json)
+    else:
+        default_value = ""
+    json_str = gui.code_editor(
+        label=label,
+        key="package_json:editor",
+        language="json",
+        value=default_value,
+        style=dict(maxHeight="50vh"),
+        help=help,
+    )
+    if not json_str.strip():
+        gui.session_state["package_json"] = None
+        return
+    try:
+        gui.session_state["package_json"] = json.loads(json_str)
+    except json.JSONDecodeError:
+        gui.error("Invalid JSON")
 
 
 def execute_python(
@@ -517,25 +555,26 @@ def extract_gcs_urls(
 
 def execute_js(
     *,
-    sr: SavedRun,
     code: str,
     variables: dict[str, typing.Any],
     env: dict[str, str] | None,
     gooey_memory: dict[str, typing.Any] | None,
+    package_json: typing.Any | None,
     response: "FunctionsPage.ResponseModel",
 ) -> dict[str, typing.Any] | None:
-    tag = f"run_id={sr.run_id}&uid={sr.uid}"
-
-    # this will run functions/executor.js in deno deploy
+    # this will run functions/executor_cf in a cloudflare dynamic worker
     r = requests.post(
-        settings.DENO_FUNCTIONS_URL,
-        headers={"Authorization": f"Basic {settings.DENO_FUNCTIONS_AUTH_TOKEN}"},
+        settings.CF_FUNCTIONS_URL,
+        headers={
+            "CF-Access-Client-Id": settings.CF_ACCESS_CLIENT_ID,
+            "CF-Access-Client-Secret": settings.CF_ACCESS_CLIENT_SECRET,
+        },
         json=dict(
             code=code,
             variables=variables,
-            tag=tag,
             env=env,
             gooey_memory=gooey_memory,
+            package_json=package_json,
         ),
     )
     raise_for_status(r)

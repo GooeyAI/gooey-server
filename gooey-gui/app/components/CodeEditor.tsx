@@ -30,10 +30,18 @@ const codeEditorExtensions: Record<string, () => Promise<Extension[]>> = {
     const { json, jsonParseLinter } = await import("@codemirror/lang-json");
     const { linter, lintGutter } = await import("@codemirror/lint");
 
+    const parseLinter = jsonParseLinter();
     return [
       lintGutter(),
       json(),
-      linter(jsonParseLinter(), { delay: linterDelay }),
+      linter(
+        (view: EditorView) => {
+          // an empty document is valid (e.g. optional package.json)
+          if (!view.state.doc.toString().trim()) return [];
+          return parseLinter(view);
+        },
+        { delay: linterDelay }
+      ),
     ];
   },
   async python() {
