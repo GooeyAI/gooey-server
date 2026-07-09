@@ -8,7 +8,10 @@ from functions.base_llm_tool import (
 from bots.models import SavedRun
 
 from daras_ai_v2.workflow_url_input import url_to_runs
-from functions.gooey_builder_deploy_tool import DeployWorkflowLLMTool
+from functions.gooey_builder_deploy_tool import (
+    DeployWorkflowLLMTool,
+    UpdateDeploymentSettingsLLMTool,
+)
 from functions.gooey_builder_workflow_tools import (
     WORKFLOW_URL_KEY,
     FetchWorkflowStateLLMTool,
@@ -40,5 +43,6 @@ def get_current_builder_tools(builder_sr: SavedRun) -> dict[str, BaseLLMTool]:
         SaveWorkflowLLMTool(page_cls, sr, pr, builder_sr),
         SaveAsNewWorkflowLLMTool(page_cls, sr, pr, builder_sr),
         DeployWorkflowLLMTool(page_cls, sr, pr, builder_sr),
+        UpdateDeploymentSettingsLLMTool(page_cls, sr, pr, builder_sr),
     ]
     return {tool.name: tool for tool in tools}
