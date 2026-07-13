@@ -129,7 +129,19 @@ def init_ws_session(
     from daras_ai_v2.language_model import get_entry_text, msgs_to_prompt_str
 
     if not created:
-        # session already exists, just send back the most recent tool outputs
+        # Keep the persistent session in sync with tools activated since the
+        # previous response, then send back the most recent tool outputs.
+        if tools:
+            send_recv_json(
+                ws,
+                {
+                    "type": "session.update",
+                    "session": {
+                        "type": "realtime",
+                        "tools": [tool.spec_openai_audio for tool in tools],
+                    },
+                },
+            )
         for entry in reversed(messages):
             if entry.get("role") != "tool":
                 break
