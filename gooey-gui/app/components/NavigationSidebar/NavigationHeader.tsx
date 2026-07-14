@@ -22,7 +22,7 @@ export function NavigationHeader({
   onDrawerClose: () => void;
 }) {
   return (
-    <div className="nav-sidebar-header d-flex align-items-center p-2 mb-1 flex-shrink-0">
+    <div className="nav-sidebar-header d-flex align-items-center p-2 flex-shrink-0">
       <NavBrand
         logo_image_url={logo_image_url}
         collapsed={railCollapsed}
@@ -61,8 +61,6 @@ export function NavigationHeaderMobile({
   onDrawerClose,
   gooey_builder,
   builderOpen,
-  account,
-  onSwitchWorkspace,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
   isMobile: boolean;
@@ -71,11 +69,9 @@ export function NavigationHeaderMobile({
   onDrawerClose: () => void;
   gooey_builder: NavigationSidebarProps["gooey_builder"];
   builderOpen: boolean;
-  account: NavAccountData;
-  onSwitchWorkspace: (workspaceId: number) => void;
 }) {
   return (
-    <div className="nav-mobile-topbar-container d-block d-lg-none">
+    <Fragment>
       <div className="nav-mobile-topbar d-lg-none d-flex align-items-center px-2 border-bottom bg-body">
         <button
           type="button"
@@ -87,35 +83,27 @@ export function NavigationHeaderMobile({
         </button>
         <a
           href="/"
-          className="btn d-flex align-items-center gap-2 text-body text-decoration-none bg-hover-light py-2 rounded"
+          className="btn d-flex align-items-center gap-2 text-body text-decoration-none bg-hover-light py-2 px-1 rounded"
         >
-          <GooeyBot size={24} />
           <img
             src={logo_image_url}
             alt="Gooey.AI"
             height={20}
-            width={100}
+            width={94}
             className="img-fluid"
           />
         </a>
         <div className="ms-auto d-flex align-items-center gap-1">
           {gooey_builder && !builderOpen && (
-            <GooeyBuilderButton gooey_builder={gooey_builder} compact />
+            <GooeyBuilderButton gooey_builder={gooey_builder} compact mobile />
           )}
-          <AccountSection
-            account={account}
-            onSwitchWorkspace={onSwitchWorkspace}
-            compact
-            placement="bottom-end"
-            mobile
-          />
         </div>
       </div>
 
       {isMobile && drawerOpen && (
         <div className="nav-scrim" onClick={onDrawerClose} />
       )}
-    </div>
+    </Fragment>
   );
 }
 
@@ -153,14 +141,14 @@ function NavBrand({
   return (
     <a
       href="/"
-      className="nav-brand d-flex align-items-center gap-2 text-body text-decoration-none"
+      className="nav-brand d-flex align-items-center gap-2 text-body text-decoration-none ps-2"
     >
       {mark}
       <img
         src={logo_image_url}
         alt="Gooey.AI"
         height={22}
-        width={120}
+        width={94}
         className="nav-brand__wordmark img-fluid"
       />
     </a>

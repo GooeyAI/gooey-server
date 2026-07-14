@@ -76,9 +76,6 @@ export function NavigationSidebar({
     };
     const onClose = () => {
       setBuilderOpen(false);
-      // Closing the Builder re-expands the rail on desktop, but must not pop
-      // the drawer open on mobile.
-      if (!isMobileViewport()) setCollapsed(false);
     };
     window.addEventListener(`${BUILDER_SIDEBAR_KEY}:open`, onOpen);
     window.addEventListener(`${BUILDER_SIDEBAR_KEY}:close`, onClose);
@@ -138,8 +135,6 @@ export function NavigationSidebar({
         onDrawerClose={() => setCollapsed(true)}
         gooey_builder={gooey_builder}
         builderOpen={builderOpen}
-        account={account}
-        onSwitchWorkspace={switchWorkspace}
       />
 
       <nav
@@ -200,17 +195,14 @@ function NavigationFooter({
           compact={railCollapsed}
         />
       )}
-      {/* On mobile the account menu lives in the top bar, not the drawer. */}
-      {!isMobile && (
-        <div className="border-top pt-2">
-          <AccountSection
-            account={account}
-            onSwitchWorkspace={onSwitchWorkspace}
-            compact={railCollapsed}
-            placement="top-start"
-          />
-        </div>
-      )}
+      <div className="border-top pt-2">
+        <AccountSection
+          account={account}
+          onSwitchWorkspace={onSwitchWorkspace}
+          compact={railCollapsed}
+          placement="top-start"
+        />
+      </div>
     </div>
   );
 }
