@@ -91,6 +91,7 @@ class HomePageProps(pydantic.BaseModel):
     greeting: str | None = None
     workspace_header: WorkspaceHeaderData | None = None
     recent_workflows: list[WorkflowCardData] = []
+    recent_workflows_href: str = ""
     saved_workflows: list[WorkflowCardData] = []
     saved_workflows_href: str = ""
     workflow_tabs: list[WorkflowTabData] = []

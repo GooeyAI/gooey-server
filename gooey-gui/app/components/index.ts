@@ -14,6 +14,7 @@ export * from "./ExploreBuilderPrompt";
 export * from "./ForgotPasswordForm";
 export * from "./GooeyBuilderInlineEmbed";
 export * from "./GooeyPopover";
+export * from "./HistoryPage";
 export * from "./HomePage";
 export * from "./InsufficientCredits";
 export * from "./LoginForm";
