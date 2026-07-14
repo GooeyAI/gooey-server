@@ -236,6 +236,8 @@ class SavedRun(models.Model):
             models.Index(fields=["workflow", "uid", "workspace", "-updated_at"]),
             # used by gooey_builder.py:fetch_builder_conversations
             models.Index(fields=["uid", "workspace", "surface", "-updated_at"]),
+            # used by widgets/history.py for workspace-level history listing
+            models.Index(fields=["workspace", "surface", "-updated_at"]),
         ]
 
     def __str__(self):

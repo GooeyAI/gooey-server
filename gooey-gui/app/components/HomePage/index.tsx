@@ -15,6 +15,7 @@ export function HomePage({
   greeting,
   workspace_header,
   recent_workflows,
+  recent_workflows_href,
   saved_workflows,
   saved_workflows_href,
   workflow_tabs,
@@ -28,7 +29,14 @@ export function HomePage({
 
       {recent_workflows.length > 0 && (
         <section className="mb-5">
-          <h4 className="mb-4">Recent workflows</h4>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <h4>Recent workflows</h4>
+            <a href={recent_workflows_href}>
+              <span className="fw-semibold small">
+                View all <i className="fa-solid fa-arrow-right"></i>
+              </span>
+            </a>
+          </div>
           <div className="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
             {recent_workflows.map((card) => (
               <div key={card.href} className="col">
