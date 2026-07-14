@@ -69,6 +69,7 @@ export interface HomePageProps {
   greeting: string | null;
   workspace_header: WorkspaceHeaderData | null;
   recent_workflows: WorkflowCardData[];
+  recent_workflows_href: string;
   saved_workflows: WorkflowCardData[];
   saved_workflows_href: string;
   workflow_tabs: WorkflowTabData[];
