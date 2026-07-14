@@ -64,6 +64,7 @@ function WorkflowRowItem({
           <span
             aria-hidden="true"
             dangerouslySetInnerHTML={{ __html: item.icon }}
+            className="text-muted"
           />
         ) : null}
       </span>
