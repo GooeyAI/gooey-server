@@ -20,23 +20,11 @@ export function PrimaryNavItems({
   account: NavAccountData;
   railCollapsed: boolean;
 }) {
-  const [recentOpen, setRecentOpen] = useState(true);
-
-  const home = nav_items.filter((item) => item.key === "home")[0];
   return (
-    <div className="px-2 pt-2 nav-primary-items d-flex flex-column">
-      {home && (
-        <NavItem
-          item={home}
-          isActive={home.key === active_key}
-          collapsed={railCollapsed}
-        />
-      )}
-
+    <div className="px-2 nav-primary-items d-flex flex-column">
       {/* scrollable region */}
       <div className="nav-scroll-region d-flex flex-column gap-1 mt-1">
         {nav_items.map((item) => {
-          if (item.key === "home") return null;
           if (item.items.length > 0 && !railCollapsed) {
             return (
               <NavItemChildren
@@ -71,20 +59,12 @@ export function PrimaryNavItems({
 
         {!railCollapsed && recent_workflows.length > 0 && (
           <div className="mt-3 pe-1 nav-section-toggle fs-6">
-            <button
-              type="button"
-              className="nav-item-link d-flex align-items-center fw-semibold gap-1 px-1 py-1 w-100 rounded"
-              onClick={() => setRecentOpen((v) => !v)}
-            >
-              <span className="text-start small text-muted">Recent</span>
-              <i
-                className={clsx(
-                  "fa-regular text-muted nav-chevron-icon",
-                  recentOpen ? "fa-chevron-down" : "fa-chevron-right"
-                )}
-              />
-            </button>
-            {recentOpen && <WorkflowList items={recent_workflows} />}
+            <span className="text-start small ps-1">
+              {" "}
+              <i className="fa-regular fa-clock-rotate-left text-muted small"></i>{" "}
+              Recents
+            </span>
+            <WorkflowList items={recent_workflows} />
           </div>
         )}
       </div>
