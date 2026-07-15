@@ -13,7 +13,7 @@ class NavWorkflowItem(pydantic.BaseModel):
 class NavItemData(pydantic.BaseModel):
     key: str
     label: str
-    icon: str  # FontAwesome class, e.g. "fa-regular fa-house"
+    icon: str  # HTML <i> element (rendered as raw HTML), e.g. icons.home
     href: str
     items: list[NavWorkflowItem] = []  # nested children, e.g. saved workflows
     collapsible: bool = True  # False keeps `items` always expanded (no chevron)

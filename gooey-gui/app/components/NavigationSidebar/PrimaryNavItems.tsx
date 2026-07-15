@@ -88,12 +88,9 @@ function NavItem({
           collapsed && "justify-content-center"
         )}
       >
-        <i
-          className={clsx(
-            item.icon,
-            "nav-item-icon",
-            !isActive && "text-muted"
-          )}
+        <span
+          className={clsx("nav-item-icon", !isActive && "text-muted")}
+          dangerouslySetInnerHTML={{ __html: item.icon }}
         />
         {!collapsed && <span>{item.label}</span>}
       </span>
