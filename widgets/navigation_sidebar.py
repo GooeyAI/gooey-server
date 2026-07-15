@@ -93,7 +93,7 @@ def render(
                     (ws for ws in workspaces if ws.is_current), None
                 ),
                 workspaces=workspaces,
-                menu_links=_load_menu_links(is_anonymous),
+                menu_links=_load_menu_links(is_anonymous, workspace),
                 logout_href="" if is_anonymous else get_route_path(logout),
                 add_workspace_url=add_workspace_url,
                 login_href=get_login_url(request) if is_anonymous else "/login/",
@@ -138,7 +138,10 @@ def _load_nav_items(
     ]
 
 
-def _load_menu_links(is_anonymous: bool) -> list[MenuLinkData]:
+def _load_menu_links(
+    is_anonymous: bool,
+    workspace: Workspace | None,
+) -> list[MenuLinkData]:
     public_links = [
         MenuLinkData(label=label, href=url, icon=settings.HEADER_ICONS.get(url))
         for url, label in settings.HEADER_LINKS
@@ -149,19 +152,26 @@ def _load_menu_links(is_anonymous: bool) -> list[MenuLinkData]:
 
     from routers.account import account_route, profile_route
 
-    return [
-        MenuLinkData(
-            label="Profile",
-            href=get_route_path(profile_route),
-            icon="fa-regular fa-user",
-        ),
+    links = []
+    # Profile settings are per-user, so only surface them in a personal workspace.
+    if workspace is not None and workspace.is_personal:
+        links.append(
+            MenuLinkData(
+                label="Profile",
+                href=get_route_path(profile_route),
+                icon="fa-regular fa-user",
+            )
+        )
+    links.append(
         MenuLinkData(
             label="Billing",
             href=get_route_path(account_route),
             icon="fa-regular fa-credit-card",
-        ),
-        *public_links,
-    ]
+        )
+    )
+    # Pricing targets logged-out visitors; signed-in users manage spend via Billing.
+    links += [link for link in public_links if link.label != "Pricing"]
+    return links
 
 
 def _get_nav_user(user: AppUser | None) -> NavUserData | None:
