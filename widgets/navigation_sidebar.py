@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import gooey_gui as gui
 from starlette.requests import Request
 
-from daras_ai_v2 import settings
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
 from gooey_gui.types.navigation_sidebar_props import (
@@ -126,7 +126,7 @@ def _load_nav_items(
     explore_item = NavItemData(
         key="explore",
         label="Explore",
-        icon="fa-regular fa-magnifying-glass",
+        icon=icons.explore,
         href=explore_path,
     )
     if is_anonymous:
@@ -135,14 +135,14 @@ def _load_nav_items(
         NavItemData(
             key="home",
             label="Home",
-            icon="fa-regular fa-house",
+            icon=icons.home,
             href=home_path,
         ),
         explore_item,
         NavItemData(
             key="saved",
             label="Saved",
-            icon="fa-regular fa-floppy-disk",
+            icon=icons.save,
             href=saved_path,
             items=saved_workflows,
         ),
@@ -152,7 +152,7 @@ def _load_nav_items(
             NavItemData(
                 key="history",
                 label="History",
-                icon="fa-regular fa-clock-rotate-left",
+                icon=icons.history,
                 href=history_path,
                 items=recent_workflows,
                 # History mirrors Saved but stays open — no collapse chevron.
