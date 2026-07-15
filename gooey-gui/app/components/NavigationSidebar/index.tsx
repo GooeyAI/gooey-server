@@ -28,7 +28,6 @@ export function NavigationSidebar({
   nav_items,
   active_key,
   default_collapsed,
-  recent_workflows,
   account,
   gooey_builder,
   onChange,
@@ -153,7 +152,6 @@ export function NavigationSidebar({
         <PrimaryNavItems
           nav_items={nav_items}
           active_key={active_key}
-          recent_workflows={recent_workflows}
           account={account}
           railCollapsed={railCollapsed}
         />

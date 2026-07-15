@@ -12,6 +12,7 @@ export interface NavItemData {
   icon: string;
   href: string;
   items: NavWorkflowItem[];
+  collapsible: boolean;
 }
 export interface WorkspaceData {
   id: number;
@@ -48,7 +49,6 @@ export interface NavigationSidebarProps {
   logo_image_url: string;
   nav_items: NavItemData[];
   active_key: string | null;
-  recent_workflows: NavWorkflowItem[];
   account: NavAccountData;
   gooey_builder: GooeyBuilderData | null;
   default_collapsed: boolean;

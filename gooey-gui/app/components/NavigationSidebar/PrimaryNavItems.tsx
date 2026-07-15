@@ -10,13 +10,11 @@ import { WorkflowList } from "./WorkflowList";
 export function PrimaryNavItems({
   nav_items,
   active_key,
-  recent_workflows,
   account,
   railCollapsed,
 }: {
   nav_items: NavItemData[];
   active_key: NavigationSidebarProps["active_key"];
-  recent_workflows: NavigationSidebarProps["recent_workflows"];
   account: NavAccountData;
   railCollapsed: boolean;
 }) {
@@ -56,17 +54,6 @@ export function PrimaryNavItems({
               <span>{link.label}</span>
             </a>
           ))}
-
-        {!railCollapsed && recent_workflows.length > 0 && (
-          <div className="mt-3 pe-1 nav-section-toggle fs-6">
-            <span className="text-start small ps-1">
-              {" "}
-              <i className="fa-regular fa-clock-rotate-left text-muted small"></i>{" "}
-              Recents
-            </span>
-            <WorkflowList items={recent_workflows} />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -129,26 +116,31 @@ function NavItemChildren({
     return <NavItem item={item} isActive={isActive} collapsed={false} />;
   }
 
+  // Non-collapsible sections (e.g. History) drop the chevron and stay expanded.
+  const showItems = !item.collapsible || open;
+
   return (
     <Fragment>
       <NavItem item={item} isActive={isActive} collapsed={false}>
-        {/* the space after the label toggles the nested items open/closed */}
-        <span
-          className="flex-grow-1 d-flex align-items-center justify-content-end flex-grow-1"
-          onClick={(e) => {
-            e.preventDefault();
-            setOpen((isOpen) => !isOpen);
-          }}
-        >
-          <i
-            className={clsx(
-              "nav-chevron-icon fa-regular",
-              open ? "fa-chevron-down" : "fa-chevron-right"
-            )}
-          />
-        </span>
+        {/* the chevron after the label toggles the nested items open/closed */}
+        {item.collapsible && (
+          <span
+            className="flex-grow-1 d-flex align-items-center justify-content-end flex-grow-1"
+            onClick={(e) => {
+              e.preventDefault();
+              setOpen((isOpen) => !isOpen);
+            }}
+          >
+            <i
+              className={clsx(
+                "nav-chevron-icon fa-regular",
+                open ? "fa-chevron-down" : "fa-chevron-right"
+              )}
+            />
+          </span>
+        )}
       </NavItem>
-      {open && (
+      {showItems && (
         <div className="saved-tree">
           <WorkflowList items={item.items} indent />
         </div>

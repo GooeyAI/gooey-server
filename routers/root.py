@@ -750,7 +750,10 @@ def sidebar_page_wrapper(
                 session=request.session,
                 disabled=not display_gooey_builder,
             )
-            with page_content, gui.div(className="d-flex flex-column min-vh-100 w-100"):
+            with (
+                page_content,
+                gui.div(className="d-flex flex-column min-vh-100 w-100 container-xxl"),
+            ):
                 gui.html(templates.get_template("gtag.html").render(**context))
                 gui.html(copy_to_clipboard_scripts)
 
@@ -769,9 +772,7 @@ def sidebar_page_wrapper(
                 else:
                     current_workspace = None
 
-                # Cap the readable content width while the nav rail stays
-                # full-bleed; the container centers content on wide viewports.
-                with gui.div(className="container-fluid"):
+                with gui.div(className="container-xxl"):
                     with gui.div(id="main-content", className=className):
                         yield current_workspace
 
