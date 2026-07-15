@@ -385,7 +385,7 @@ def _load_gooey_builder_data(
     photo_url = bi.get_web_widget_branding().get(
         "photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL
     )
-    return GooeyBuilderData(photo_url=photo_url)
+    return GooeyBuilderData(photo_url=photo_url, name=bi.name)
 
 
 def _active_nav_key(current_path: str, route_paths: dict[str, str]) -> str | None:
