@@ -28,7 +28,7 @@ export function GooeyBuilderButton({
         compact ? "justify-content-center p-1" : "gap-2 p-2",
         mobile ? "border-0" : "border b-1"
       )}
-      title={"Gooey Builder"}
+      title={gooey_builder.name}
       onClick={(e) => {
         e.stopPropagation();
         window.dispatchEvent(new CustomEvent(`${BUILDER_SIDEBAR_KEY}:open`));
@@ -44,8 +44,8 @@ export function GooeyBuilderButton({
       {mobile && <span className="small ms-1">Ask</span>}
       {!compact && (
         <span className="d-flex flex-column text-start lh-sm small">
-          <span className="text-muted small">Build with AI</span>
-          <span className="fw-semibold">Ask Gooey</span>
+          <span className="text-muted small">Edit with AI</span>
+          <span className="fw-semibold">{gooey_builder.name}</span>
         </span>
       )}
     </button>
