@@ -40,6 +40,7 @@ def render(
 ) -> None:
     from routers.base_auth import get_login_url, logout
     from routers.root import explore_page, home_page
+    from widgets.history import history_page
     from widgets.home import _saved_workflows_href
     from workspaces.widgets import (
         get_create_workspace_popup_url,
@@ -49,6 +50,7 @@ def render(
 
     home_path = get_route_path(home_page)
     explore_path = get_route_path(explore_page)
+    history_path = get_route_path(history_page)
 
     is_anonymous = request.user is None or request.user.is_anonymous
     if is_anonymous:
@@ -61,10 +63,18 @@ def render(
 
     saved_path = _saved_workflows_href(workspace)
     workspaces = _load_workspaces(user, workspace)
+    recent_workflows = _load_recent_workflows(
+        user, workspace, limit=RECENT_WORKFLOW_LIST_LIMIT
+    )
 
     active_key = _active_nav_key(
         request.url.path,
-        {"home": home_path, "explore": explore_path, "saved": saved_path},
+        {
+            "home": home_path,
+            "explore": explore_path,
+            "saved": saved_path,
+            "history": history_path,
+        },
     )
 
     if is_anonymous:
@@ -80,13 +90,12 @@ def render(
                 home_path=home_path,
                 explore_path=explore_path,
                 saved_path=saved_path,
+                history_path=history_path,
                 saved_workflows=_load_saved_workflows(user, workspace),
+                recent_workflows=recent_workflows,
             ),
             active_key=active_key,
             default_collapsed=default_collapsed,
-            recent_workflows=_load_recent_workflows(
-                user, workspace, limit=RECENT_WORKFLOW_LIST_LIMIT
-            ),
             account=NavAccountData(
                 user=_get_nav_user(user),
                 current_workspace=next(
@@ -110,7 +119,9 @@ def _load_nav_items(
     home_path: str,
     explore_path: str,
     saved_path: str,
+    history_path: str,
     saved_workflows: list[NavWorkflowItem],
+    recent_workflows: list[NavWorkflowItem],
 ) -> list[NavItemData]:
     explore_item = NavItemData(
         key="explore",
@@ -120,7 +131,7 @@ def _load_nav_items(
     )
     if is_anonymous:
         return [explore_item]
-    return [
+    items = [
         NavItemData(
             key="home",
             label="Home",
@@ -136,6 +147,19 @@ def _load_nav_items(
             items=saved_workflows,
         ),
     ]
+    if recent_workflows:
+        items.append(
+            NavItemData(
+                key="history",
+                label="History",
+                icon="fa-regular fa-clock-rotate-left",
+                href=history_path,
+                items=recent_workflows,
+                # History mirrors Saved but stays open — no collapse chevron.
+                collapsible=False,
+            )
+        )
+    return items
 
 
 def _load_menu_links(
