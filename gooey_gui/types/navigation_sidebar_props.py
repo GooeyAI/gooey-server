@@ -40,6 +40,7 @@ class NavUserData(pydantic.BaseModel):
 
 class GooeyBuilderData(pydantic.BaseModel):
     photo_url: str
+    name: str
 
 
 class NavAccountData(pydantic.BaseModel):
