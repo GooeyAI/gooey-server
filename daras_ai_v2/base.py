@@ -1786,6 +1786,9 @@ class BasePage:
             render_called_functions(
                 saved_run=self.current_sr, trigger=FunctionTrigger.pre
             )
+            render_called_functions(
+                saved_run=self.current_sr, trigger=FunctionTrigger.parallel
+            )
             self.render_steps()
             render_called_functions(
                 saved_run=self.current_sr, trigger=FunctionTrigger.post
@@ -1842,6 +1845,16 @@ class BasePage:
             response_model=self.ResponseModel,
             state=state,
             trigger=FunctionTrigger.pre,
+        )
+
+        yield from call_recipe_functions(
+            saved_run=sr,
+            workspace=self.current_workspace,
+            current_user=self.request.user,
+            request_model=self.RequestModel,
+            response_model=self.ResponseModel,
+            state=state,
+            trigger=FunctionTrigger.parallel,
         )
 
         yield from self.run(state)

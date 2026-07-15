@@ -292,9 +292,10 @@ def _decode_api_hashid(value: str | None) -> int | None:
 
 
 class FunctionTrigger(_TriggerData, GooeyEnum):
-    prompt = _TriggerData(label="✨ Prompt", db_value=3)
-    pre = _TriggerData(label="⏪ Before", db_value=1)
-    post = _TriggerData(label="⏩ After", db_value=2)
+    prompt = _TriggerData(label=f"{icons.llm_tool} LLM Tool", db_value=3)
+    pre = _TriggerData(label=f"{icons.before} Before", db_value=1)
+    post = _TriggerData(label=f"{icons.after} After", db_value=2)
+    parallel = _TriggerData(label=f"{icons.parallel} Parallel", db_value=4)
 
 
 class RecipeFunction(BaseModel):

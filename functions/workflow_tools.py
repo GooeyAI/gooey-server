@@ -124,8 +124,9 @@ class WorkflowLLMTool(BaseLLMTool):
         )
         self.fn_sr = fn_sr
 
-        # wait for the result if its a pre request function
-        if self.trigger == FunctionTrigger.post:
+        # don't wait for the result of fire-and-forget triggers; parallel functions
+        # keep running concurrently with the main workflow, post ones after it
+        if self.trigger in (FunctionTrigger.post, FunctionTrigger.parallel):
             return
         fn_sr.wait_for_celery_result(result)
 

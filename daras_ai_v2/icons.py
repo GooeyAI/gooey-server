@@ -60,6 +60,10 @@ memory = '<i class="fa-regular fa-brain"></i>'
 platform_user = '<i class="fa-regular fa-user-message"></i>'
 deployment = '<i class="fa-regular fa-robot"></i>'
 conversation = '<i class="fa-regular fa-message"></i>'
+llm_tool = '<i class="fa-regular fa-fw fa-screwdriver-wrench"></i>'
+before = '<i class="fa-regular fa-fw fa-person-to-portal"></i>'
+after = '<i class="fa-regular fa-fw fa-person-from-portal"></i>'
+parallel = '<i class="fa-regular fa-fw fa-split"></i>'
 
 # brands
 github = '<i class="fa-brands fa-github"></i>'

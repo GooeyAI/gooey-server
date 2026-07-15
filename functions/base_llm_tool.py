@@ -24,7 +24,7 @@ if typing.TYPE_CHECKING:
 FUNCTIONS_HELP_TEXT = """\
 Functions give your workflow the ability run Javascript code (with webcalls!) \
 allowing it execute logic, use common JS libraries or make external API calls \
-before or after the workflow runs.
+before, after or in parallel with the workflow run.
 <a href='/functions-help' target='_blank'>Learn more.</a>"""
 
 
