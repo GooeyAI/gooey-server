@@ -16,6 +16,7 @@ class NavItemData(pydantic.BaseModel):
     icon: str  # FontAwesome class, e.g. "fa-regular fa-house"
     href: str
     items: list[NavWorkflowItem] = []  # nested children, e.g. saved workflows
+    collapsible: bool = True  # False keeps `items` always expanded (no chevron)
 
 
 class WorkspaceData(pydantic.BaseModel):
@@ -60,7 +61,6 @@ class NavigationSidebarProps(pydantic.BaseModel):
     logo_image_url: str
     nav_items: list[NavItemData] = []
     active_key: str | None = None
-    recent_workflows: list[NavWorkflowItem] = []
     account: NavAccountData = pydantic.Field(default_factory=NavAccountData)
     gooey_builder: GooeyBuilderData | None = None
     default_collapsed: bool = False
