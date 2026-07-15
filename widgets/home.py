@@ -133,7 +133,7 @@ def _load_recent_workflows(
             break
 
     return [
-        _history_card(sr, author=author_from_user(user, current_user=user))
+        history_card(sr, author=author_from_user(user, current_user=user))
         for sr in SavedRun.objects.select_related(
             "parent_version__published_run", "workflow_metadata"
         )
@@ -147,7 +147,7 @@ def _load_saved_workflows(
     workspace: Workspace | None,
 ) -> list[WorkflowCardData]:
     return [
-        _saved_card(pr, author=author_from_user(pr.last_edited_by, current_user=user))
+        saved_card(pr, author=author_from_user(pr.last_edited_by, current_user=user))
         for pr in saved_published_runs(user, workspace)
     ]
 
