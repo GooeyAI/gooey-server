@@ -196,9 +196,6 @@ a.nav-brand {
   text-decoration: none;
   min-height: 40px;
 }
-.nav-item-link:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
 .nav-item-link--active {
   background-color: rgba(0, 0, 0, 0.08);
 }
@@ -343,7 +340,7 @@ a.nav-brand {
   .nav-sidebar--drawer-open {
     transform: translateX(0);
   }
-  
+
   html:has(.gooey-sidebar-open),
   html:has(.nav-sidebar--drawer-open),
   html:has(.nav-sidebar--drawer-open) body {
@@ -351,4 +348,3 @@ a.nav-brand {
     overscroll-behavior: none;
   }
 }
-    

@@ -11,10 +11,10 @@ class NavWorkflowItem(pydantic.BaseModel):
 
 
 class NavItemData(pydantic.BaseModel):
-    key: str
+    key: str  # stable identity matched against NavigationSidebarProps.active_key
     label: str
     icon: str  # HTML <i> element (rendered as raw HTML), e.g. icons.home
-    href: str
+    href: str | None = None
     items: list[NavWorkflowItem] = []  # nested children, e.g. saved workflows
     collapsible: bool = True  # False keeps `items` always expanded (no chevron)
 
