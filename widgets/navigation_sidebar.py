@@ -42,6 +42,7 @@ def render(
     from routers.root import explore_page, home_page
     from widgets.history import history_page
     from widgets.home import _saved_workflows_href
+    from widgets.workflow_search import get_filter_value_from_workspace
     from workspaces.widgets import (
         get_create_workspace_popup_url,
         get_current_workspace,
@@ -67,14 +68,17 @@ def render(
         user, workspace, limit=RECENT_WORKFLOW_LIST_LIMIT
     )
 
+    if workspace is None:
+        saved_workspace_filter = None
+    else:
+        saved_workspace_filter = get_filter_value_from_workspace(workspace)
+
     active_key = _active_nav_key(
-        request.url.path,
-        {
-            "home": home_path,
-            "explore": explore_path,
-            "saved": saved_path,
-            "history": history_path,
-        },
+        request,
+        home_path=home_path,
+        explore_path=explore_path,
+        history_path=history_path,
+        saved_workspace_filter=saved_workspace_filter,
     )
 
     if is_anonymous:
@@ -153,7 +157,7 @@ def _load_nav_items(
                 key="history",
                 label="History",
                 icon=icons.history,
-                href=history_path,
+                # href=history_path, # no href for history yet
                 items=recent_workflows,
                 # History mirrors Saved but stays open — no collapse chevron.
                 collapsible=False,
@@ -412,11 +416,31 @@ def _load_gooey_builder_data(
     return GooeyBuilderData(photo_url=photo_url, name=bi.name)
 
 
-def _active_nav_key(current_path: str, route_paths: dict[str, str]) -> str | None:
-    normalized_current = _normalize_path(current_path)
-    for key, path in route_paths.items():
-        if normalized_current == _normalize_path(path):
-            return key
+def _active_nav_key(
+    request: Request,
+    *,
+    home_path: str,
+    explore_path: str,
+    history_path: str,
+    saved_workspace_filter: str | None,
+) -> str | None:
+    current = _normalize_path(request.url.path)
+
+    if current == _normalize_path(explore_path):
+        # Saved is Explore scoped to the current workspace: both live at
+        # /explore/ and differ only by the ?workspace= filter, so disambiguate
+        # on that query param (request.url.path drops the query string).
+        if (
+            saved_workspace_filter
+            and request.query_params.get("workspace") == saved_workspace_filter
+        ):
+            return "saved"
+        return "explore"
+
+    if current == _normalize_path(home_path):
+        return "home"
+    if current == _normalize_path(history_path):
+        return "history"
     return None
 
 
