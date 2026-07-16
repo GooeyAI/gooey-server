@@ -145,7 +145,7 @@ def render_title_pills(
                 gui.html(label)
 
         for tag in published_run.tags.all():
-            new_filters = search_filters.model_copy(update={"search": tag.name})
+            new_filters = search_filters.model_copy(update={"tag": tag.name})
             link_to = get_app_route_url(
                 explore_page, query_params=new_filters.get_query_params()
             )

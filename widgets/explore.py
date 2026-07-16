@@ -34,7 +34,7 @@ def build_meta_tags(url: str, search_filters: SearchFilters | None):
     if not search_filters:
         search_filters = SearchFilters()
 
-    match search_filters.search, search_filters.workflow:
+    match search_filters.search or search_filters.tag, search_filters.workflow:
         case "", "":
             title = META_TITLE
         case query, "":
@@ -72,7 +72,7 @@ def render(request: Request, search_filters: SearchFilters | None):
             search_filters=search_filters,
             max_width="600px",
         )
-        if not search_filters.search:
+        if not search_filters.search or search_filters.tag:
             render_search_suggestions(search_filters=search_filters)
         with gui.div(className="mt-3"):
             new_filters = render_search_filters(
