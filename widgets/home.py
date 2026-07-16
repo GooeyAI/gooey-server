@@ -255,7 +255,7 @@ def _saved_workflows_href(workspace: Workspace | None) -> str:
 def _industry_tile_href(tag: Tag) -> str:
     if tag.landing_page:
         return tag.landing_page
-    return str(furl("/explore/", query_params={"search": tag.name}))
+    return str(furl("/explore/", query_params={"tag": tag.name}))
 
 
 def _load_news_items() -> list[NewsItemData]:

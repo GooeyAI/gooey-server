@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 import typing
 
@@ -99,10 +100,13 @@ class SearchFilters(BaseModel):
     search: str = ""
     workspace: str = ""
     workflow: str = ""
+    tag: str = ""
     sort: str = ""
 
     def __bool__(self):
-        return bool(self.search or self.workspace or self.workflow or self.sort)
+        return bool(
+            self.search or self.workspace or self.workflow or self.tag or self.sort
+        )
 
     @field_validator("sort", "workflow", mode="before")
     @classmethod
@@ -122,8 +126,11 @@ def render_search_filters(
         search_filters = SearchFilters()
 
     show_workspace_filter = bool(current_user and not current_user.is_anonymous)
-    show_sort_option = (
-        search_filters.search or search_filters.workflow or search_filters.workspace
+    show_sort_option = bool(
+        search_filters.search
+        or search_filters.workflow
+        or search_filters.workspace
+        or search_filters.tag
     )
     with gui.div(className="row container-margin-reset", style={"fontSize": "0.9rem"}):
         if not show_sort_option:
@@ -316,14 +323,29 @@ def render_search_suggestions(search_filters: SearchFilters):
 
     with gui.div(className="my-2"):
         for tag in Tag.get_options():
+            is_active = search_filters.tag.lower() == tag.name.lower()
+            if is_active:
+                # clicking the active tag clears the filter
+                new_tag = ""
+            else:
+                new_tag = tag.name
             url = get_app_route_url(
                 explore_page,
                 query_params=search_filters.model_copy(
-                    update={"search": tag.name}
+                    update={"tag": new_tag}
                 ).get_query_params(),
             )
             with gui.link(to=url, className="me-2 mb-1"):
-                gui.pill(tag.render())
+                if is_active:
+                    # trailing x hints that clicking the tag removes the filter
+                    gui.pill(
+                        f"{html.escape(tag.render())}"
+                        f' <span class="ms-1 small">{icons.cancel}</span>',
+                        unsafe_allow_html=True,
+                        text_bg="secondary",
+                    )
+                else:
+                    gui.pill(tag.render(), text_bg="light")
 
 
 def get_placeholder_by_search_filters(
@@ -530,6 +552,15 @@ def build_search_filter(
             pass
         else:
             qs = qs.filter(workflow=workflow_page.workflow.value)
+
+    if search_filters.tag:
+        # filter to runs carrying this tag via a subquery to avoid join
+        # duplication / interference with the search-vector tag aggregation below
+        qs = qs.filter(
+            id__in=Tag.objects.filter(name__iexact=search_filters.tag).values(
+                "published_runs"
+            )
+        )
 
     if search_filters.search:
         # add tag_names as a single aggregated field to remove duplicates
