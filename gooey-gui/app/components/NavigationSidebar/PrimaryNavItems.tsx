@@ -20,7 +20,6 @@ export function PrimaryNavItems({
 }) {
   return (
     <div className="px-2 nav-primary-items d-flex flex-column">
-      {/* scrollable region */}
       <div className="nav-scroll-region d-flex flex-column gap-1 mt-1">
         {nav_items.map((item) => {
           if (item.items.length > 0 && !railCollapsed) {
@@ -77,15 +76,17 @@ function NavItem({
         collapsed ? "justify-content-center px-0 py-2" : "px-2 py-2",
         isActive ? "fw-bold nav-item-link--active text-body" : "text-body",
         collapsed && "position-relative",
-        children && "nav-section-toggle"
+        children && "nav-section-toggle",
+        !!item.href && "bg-hover-light"
       )}
-      href={item.href}
+      href={item.href ?? undefined}
       onClick={(e) => e.stopPropagation()} // avoid opening the sidebar
     >
       <span
         className={clsx(
           "d-flex align-items-center gap-2 flex-grow-1",
-          collapsed && "justify-content-center"
+          collapsed && "justify-content-center",
+          collapsed && !item.href && "d-none" // hide when no href and collapsed
         )}
       >
         <span

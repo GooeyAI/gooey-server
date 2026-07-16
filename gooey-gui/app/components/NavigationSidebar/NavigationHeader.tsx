@@ -1,9 +1,5 @@
 import { Fragment } from "react";
-import type {
-  NavAccountData,
-  NavigationSidebarProps,
-} from "@gooey-types/navigation_sidebar_props";
-import { AccountSection } from "./AccountSection";
+import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 
 export function NavigationHeader({

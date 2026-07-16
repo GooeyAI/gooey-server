@@ -10,7 +10,7 @@ export interface NavItemData {
   key: string;
   label: string;
   icon: string;
-  href: string;
+  href: string | null;
   items: NavWorkflowItem[];
   collapsible: boolean;
 }
