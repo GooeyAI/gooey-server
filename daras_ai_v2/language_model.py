@@ -836,8 +836,9 @@ def run_openai_chat(
         avoid_repetition = False
 
     if model.name in ["apertus_70b_instruct", "sea_lion_v4_gemma_3_27b_it"]:
-        # Swiss AI Apertus model doesn't support tool calling
+        # These models don't support tool calling.
         tools = None
+        tool_choice = None
 
     if avoid_repetition:
         kwargs["frequency_penalty"] = 0.1

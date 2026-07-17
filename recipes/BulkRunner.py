@@ -369,15 +369,13 @@ To understand what each field represents, check out our [API docs](https://api.g
                     state["run_time"] = round(sr.run_time.total_seconds(), 2)
                     state["error_msg"] = sr.error_msg
 
-                    if len(request.run_urls) > 1:
-                        workflow_label = _make_unique_workflow_label(
-                            (pr and pr.title) or str(url_ix + 1),
-                            used_workflow_labels,
-                        )
+                    workflow_label = _make_unique_workflow_label(
+                        (pr and pr.title) or str(url_ix + 1),
+                        used_workflow_labels,
+                    )
 
                     for field, col in request.output_columns.items():
-                        if len(request.run_urls) > 1:
-                            col = f"({workflow_label}) {col}"
+                        col = f"({workflow_label}) {col}"
                         out_val = state.get(field)
                         if isinstance(out_val, list):
                             for arr_ix, item in enumerate(out_val):
