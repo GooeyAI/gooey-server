@@ -64,4 +64,6 @@ class NavigationSidebarProps(pydantic.BaseModel):
     active_key: str | None = None
     account: NavAccountData = pydantic.Field(default_factory=NavAccountData)
     gooey_builder: GooeyBuilderData | None = None
+    builder_sidebar_key: str | None = None
+    open_builder_hash: str | None = None
     default_collapsed: bool = False
