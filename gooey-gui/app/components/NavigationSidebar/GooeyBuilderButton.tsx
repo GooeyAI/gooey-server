@@ -1,22 +1,14 @@
 import clsx from "clsx";
 import type { GooeyBuilderData } from "@gooey-types/navigation_sidebar_props";
 
-// Matches the Sidebar `name`/`key` used for the Builder panel (sidebar_layout
-// in widgets/sidebar.py). Sidebar.tsx persists its open state under this key,
-// so the rail can read it to stay in sync across page navigations.
-export const BUILDER_SIDEBAR_KEY = "builder-sidebar";
-
-// URL fragment that Builder-run links in the rail carry (see
-// widgets/navigation_sidebar.py). When present on arrival, the rail force-opens
-// the Builder panel regardless of the persisted open/closed state.
-export const OPEN_BUILDER_HASH = "#open-builder";
-
 export function GooeyBuilderButton({
   gooey_builder,
+  builder_sidebar_key,
   compact,
   mobile = false,
 }: {
   gooey_builder: GooeyBuilderData;
+  builder_sidebar_key: string | null;
   compact: boolean;
   mobile?: boolean;
 }) {
@@ -31,7 +23,8 @@ export function GooeyBuilderButton({
       title={gooey_builder.name}
       onClick={(e) => {
         e.stopPropagation();
-        window.dispatchEvent(new CustomEvent(`${BUILDER_SIDEBAR_KEY}:open`));
+        if (!builder_sidebar_key) return;
+        window.dispatchEvent(new CustomEvent(`${builder_sidebar_key}:open`));
       }}
     >
       <img
