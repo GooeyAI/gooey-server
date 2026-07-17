@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 import re
 import typing
 
@@ -17,7 +16,7 @@ from django.db.models import (
     When,
 )
 from django.utils.translation import ngettext
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Tag, WorkflowAccessLevel
@@ -94,13 +93,14 @@ class SortOptions(SortOption, GooeyEnum):
 
 
 SEARCH_TOKEN_ALLOWED_CHARS = re.compile(r"[\w]+")
+MAX_TAG_FILTERS = 10
 
 
 class SearchFilters(BaseModel):
     search: str = ""
     workspace: str = ""
     workflow: str = ""
-    tag: str = ""
+    tag: list[str] = Field(default_factory=list)
     sort: str = ""
 
     def __bool__(self):
@@ -113,8 +113,21 @@ class SearchFilters(BaseModel):
     def to_lower(cls, v):
         return v.lower() if isinstance(v, str) else v
 
-    def get_query_params(self) -> dict[str, str]:
+    @field_validator("tag")
+    @classmethod
+    def limit_tags(cls, tags: list[str]) -> list[str]:
+        return tags[:MAX_TAG_FILTERS]
+
+    def get_query_params(self) -> dict[str, str | list[str]]:
         return self.model_dump(exclude_defaults=True)
+
+    def toggle_tag(self, tag: str) -> SearchFilters:
+        tags = [
+            selected for selected in self.tag if selected.casefold() != tag.casefold()
+        ]
+        if len(tags) == len(self.tag) and len(tags) < MAX_TAG_FILTERS:
+            tags.append(tag)
+        return self.model_copy(update={"tag": tags})
 
 
 def render_search_filters(
@@ -321,31 +334,52 @@ def render_search_bar(
 def render_search_suggestions(search_filters: SearchFilters):
     from routers.root import explore_page
 
-    with gui.div(className="my-2"):
+    with (
+        gui.styled("""
+        & .tag-filter-chip .badge {
+            transition: background-color 150ms ease, border-color 150ms ease;
+        }
+        & .tag-filter-chip:hover .badge,
+        & .tag-filter-chip:focus-visible .badge {
+            background-color: rgba(var(--bs-secondary-rgb), 0.18) !important;
+            border-color: var(--bs-secondary) !important;
+        }
+        & .tag-filter-chip:hover .tag-filter-chip-selected,
+        & .tag-filter-chip:focus-visible .tag-filter-chip-selected {
+            background-color: rgba(var(--bs-secondary-rgb), 0.85) !important;
+        }
+        """),
+        gui.div(className="my-2 d-flex flex-wrap align-items-center gap-2"),
+    ):
         for tag in Tag.get_options():
-            is_active = search_filters.tag.lower() == tag.name.lower()
+            is_active = any(
+                selected.casefold() == tag.name.casefold()
+                for selected in search_filters.tag
+            )
+            pill_class = "border px-3 py-2"
             if is_active:
-                # clicking the active tag clears the filter
-                new_tag = ""
-            else:
-                new_tag = tag.name
+                pill_class += " tag-filter-chip-selected border-secondary"
             url = get_app_route_url(
                 explore_page,
-                query_params=search_filters.model_copy(
-                    update={"tag": new_tag}
-                ).get_query_params(),
+                query_params=search_filters.toggle_tag(tag.name).get_query_params(),
             )
-            with gui.link(to=url, className="me-2 mb-1"):
-                if is_active:
-                    # trailing x hints that clicking the tag removes the filter
-                    gui.pill(
-                        f"{html.escape(tag.render())}"
-                        f' <span class="ms-1 small">{icons.cancel}</span>',
-                        unsafe_allow_html=True,
-                        text_bg="secondary",
-                    )
-                else:
-                    gui.pill(tag.render(), text_bg="light")
+            with gui.link(
+                to=url,
+                className=(
+                    "tag-filter-chip d-inline-flex align-items-center "
+                    "text-decoration-none"
+                ),
+                style={"minHeight": "48px"},
+                **{
+                    "aria-label": f"{tag.name}, "
+                    f"{'selected' if is_active else 'not selected'}"
+                },
+            ):
+                gui.pill(
+                    tag.render(),
+                    text_bg="secondary" if is_active else "light",
+                    className=pill_class,
+                )
 
 
 def get_placeholder_by_search_filters(
@@ -554,13 +588,10 @@ def build_search_filter(
             qs = qs.filter(workflow=workflow_page.workflow.value)
 
     if search_filters.tag:
-        # filter to runs carrying this tag via a subquery to avoid join
-        # duplication / interference with the search-vector tag aggregation below
-        qs = qs.filter(
-            id__in=Tag.objects.filter(name__iexact=search_filters.tag).values(
-                "published_runs"
+        for tag in search_filters.tag:
+            qs = qs.filter(
+                id__in=Tag.objects.filter(name__iexact=tag).values("published_runs")
             )
-        )
 
     if search_filters.search:
         # add tag_names as a single aggregated field to remove duplicates
