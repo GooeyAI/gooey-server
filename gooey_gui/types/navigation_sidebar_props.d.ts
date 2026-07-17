@@ -13,6 +13,7 @@ export interface NavItemData {
   href: string | null;
   items: NavWorkflowItem[];
   collapsible: boolean;
+  dense: boolean;
 }
 export interface WorkspaceData {
   id: number;

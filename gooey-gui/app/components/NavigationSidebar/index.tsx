@@ -89,15 +89,25 @@ export function NavigationSidebar({
   // the fragment so a later refresh doesn't re-open it.
   useEffect(() => {
     function handleOpenBuilderHash() {
-      if (window.location.hash !== OPEN_BUILDER_HASH) return;
-      window.history.replaceState(
-        null,
-        "",
-        window.location.pathname + window.location.search
-      );
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent(`${BUILDER_SIDEBAR_KEY}:open`));
-      }, 500);
+      if (window.location.hash == OPEN_BUILDER_HASH) {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search
+        );
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent(`${BUILDER_SIDEBAR_KEY}:open`));
+        }, 500);
+      } else {
+        if (builderOpen) {
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent(`${BUILDER_SIDEBAR_KEY}:close`)
+            );
+            setBuilderOpen(false);
+          }, 500);
+        }
+      }
     }
     // Defer the initial check so Sidebar.tsx registers its open listener first.
     const timer = window.setTimeout(handleOpenBuilderHash, 0);
@@ -185,7 +195,7 @@ function NavigationFooter({
   onSwitchWorkspace: (workspaceId: number) => void;
 }) {
   return (
-    <div className="flex-shrink-0 p-2 d-flex flex-column gap-2">
+    <div className="flex-shrink-0 px-2 pb-2 d-flex flex-column gap-2">
       {/* On mobile the Gooey Builder launcher lives in the top bar, not the drawer. */}
       {gooey_builder && !builderOpen && !isMobile && (
         <GooeyBuilderButton
@@ -203,9 +213,4 @@ function NavigationFooter({
       </div>
     </div>
   );
-}
-
-function isMobileViewport() {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia(MOBILE_MEDIA_QUERY).matches;
 }
