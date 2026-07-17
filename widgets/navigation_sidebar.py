@@ -27,9 +27,7 @@ if TYPE_CHECKING:
 
 RECENT_WORKFLOW_LIST_LIMIT = 20
 
-# Fragment appended to Builder-run links in the rail so that clicking one
-# force-opens the Builder panel on arrival. Must match OPEN_BUILDER_HASH in
-# gooey-gui/app/components/NavigationSidebar/GooeyBuilderButton.tsx.
+BUILDER_SIDEBAR_KEY = "builder-sidebar"
 OPEN_BUILDER_HASH = "#open-builder"
 
 
@@ -86,6 +84,13 @@ def render(
     else:
         add_workspace_url, _ = get_create_workspace_popup_url()
 
+    gooey_builder = _load_gooey_builder_data(request, workspace, page)
+    builder_sidebar_key = None
+    open_builder_hash = None
+    if gooey_builder:
+        builder_sidebar_key = BUILDER_SIDEBAR_KEY
+        open_builder_hash = OPEN_BUILDER_HASH
+
     gui.model_component(
         NavigationSidebarProps(
             logo_image_url=settings.GOOEY_LOGO_IMG,
@@ -112,7 +117,9 @@ def render(
                 login_href=get_login_url(request) if is_anonymous else "/login/",
                 enable_firebase_auth=settings.ENABLE_FIREBASE_AUTH,
             ),
-            gooey_builder=_load_gooey_builder_data(request, workspace, page),
+            gooey_builder=gooey_builder,
+            builder_sidebar_key=builder_sidebar_key,
+            open_builder_hash=open_builder_hash,
         )
     )
 
