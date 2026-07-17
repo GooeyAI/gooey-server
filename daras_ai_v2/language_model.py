@@ -1531,7 +1531,7 @@ def _run_mistral_chat(
 
     data = dict(
         model=model,
-        messages=_format_mistral_messages(messages),
+        messages=[chat_completion_msg_to_mistral_msg(msg) for msg in messages],
         max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
@@ -1565,32 +1565,34 @@ def _run_mistral_chat(
     return list(_parse_mistral_output(out))
 
 
-def _format_mistral_messages(
-    messages: list[ConversationEntry],
-) -> list[ConversationEntry]:
-    mistral_messages = []
-    for message in messages:
-        mistral_message = {
-            "role": message.get("role") or CHATML_ROLE_USER,
-            "content": message.get("content"),
-        }
-        if tool_call_id := message.get("tool_call_id"):
-            mistral_message["tool_call_id"] = tool_call_id
-        if tool_calls := message.get("tool_calls"):
-            mistral_message["tool_calls"] = [
+def chat_completion_msg_to_mistral_msg(msg: dict) -> dict:
+    if msg["role"] == "assistant" and "tool_calls" in msg:
+        # function calls
+        return {
+            "role": msg["role"],
+            "content": msg.get("content"),
+            "tool_calls": [
                 {
-                    "id": tool_call.get("id") or "",
-                    "type": tool_call.get("type") or "function",
+                    "id": tool_call.get("id", ""),
+                    "type": tool_call.get("type", "function"),
                     "function": {
-                        "name": (tool_call.get("function") or {}).get("name") or "",
-                        "arguments": (tool_call.get("function") or {}).get("arguments")
-                        or "",
+                        "name": tool_call["function"]["name"],
+                        "arguments": tool_call["function"]["arguments"],
                     },
                 }
-                for tool_call in tool_calls
-            ]
-        mistral_messages.append(mistral_message)
-    return mistral_messages
+                for tool_call in msg["tool_calls"]
+            ],
+        }
+
+    if msg["role"] == "tool":
+        # function call output
+        return {
+            "role": msg["role"],
+            "content": msg["content"],
+            "tool_call_id": msg["tool_call_id"],
+        }
+
+    return {"role": msg["role"], "content": msg["content"]}
 
 
 def _parse_mistral_output(out: dict) -> typing.Iterable[dict]:
