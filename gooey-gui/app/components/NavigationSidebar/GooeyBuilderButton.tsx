@@ -3,12 +3,10 @@ import type { GooeyBuilderData } from "@gooey-types/navigation_sidebar_props";
 
 export function GooeyBuilderButton({
   gooey_builder,
-  builder_sidebar_key,
   compact,
   mobile = false,
 }: {
   gooey_builder: GooeyBuilderData;
-  builder_sidebar_key: string | null;
   compact: boolean;
   mobile?: boolean;
 }) {
@@ -23,8 +21,9 @@ export function GooeyBuilderButton({
       title={gooey_builder.name}
       onClick={(e) => {
         e.stopPropagation();
-        if (!builder_sidebar_key) return;
-        window.dispatchEvent(new CustomEvent(`${builder_sidebar_key}:open`));
+        window.dispatchEvent(
+          new CustomEvent(`${gooey_builder.event_key}:open`)
+        );
       }}
     >
       <img

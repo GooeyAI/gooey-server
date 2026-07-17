@@ -26,19 +26,21 @@ export function NavigationSidebar({
   default_collapsed,
   account,
   gooey_builder,
-  builder_sidebar_key,
-  open_builder_hash,
   onChange,
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
+  const builderEventKey = gooey_builder?.event_key;
+  const builderOpenHash = gooey_builder?.open_hash;
   const builderInitiallyOpen = Boolean(
-    builder_sidebar_key && state[builder_sidebar_key]
+    builderEventKey && state[builderEventKey]
   );
   const [collapsed, setCollapsed] = useState(
     builderInitiallyOpen || default_collapsed
   );
   const [isMobile, setIsMobile] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(builderInitiallyOpen);
+  const builderOpenRef = useRef(builderInitiallyOpen);
+  builderOpenRef.current = builderOpen;
   const mounted = useRef(false);
 
   const railCollapsed = !isMobile && collapsed;
@@ -69,7 +71,7 @@ export function NavigationSidebar({
   }, []);
 
   useEffect(() => {
-    if (!builder_sidebar_key) return;
+    if (!builderEventKey) return;
     const onOpen = () => {
       setBuilderOpen(true);
       setCollapsed(true);
@@ -77,35 +79,33 @@ export function NavigationSidebar({
     const onClose = () => {
       setBuilderOpen(false);
     };
-    window.addEventListener(`${builder_sidebar_key}:open`, onOpen);
-    window.addEventListener(`${builder_sidebar_key}:close`, onClose);
+    window.addEventListener(`${builderEventKey}:open`, onOpen);
+    window.addEventListener(`${builderEventKey}:close`, onClose);
     return () => {
-      window.removeEventListener(`${builder_sidebar_key}:open`, onOpen);
-      window.removeEventListener(`${builder_sidebar_key}:close`, onClose);
+      window.removeEventListener(`${builderEventKey}:open`, onOpen);
+      window.removeEventListener(`${builderEventKey}:close`, onClose);
     };
-  }, [builder_sidebar_key]);
+  }, [builderEventKey]);
 
   // Opening a Builder run from the rail lands with the configured fragment.
   // Force-open the Builder panel (overriding any persisted state), then strip
   // the fragment so a later refresh doesn't re-open it.
   useEffect(() => {
-    if (!builder_sidebar_key || !open_builder_hash) return;
+    if (!builderEventKey || !builderOpenHash) return;
     function handleOpenBuilderHash() {
-      if (window.location.hash == open_builder_hash) {
+      if (window.location.hash == builderOpenHash) {
         window.history.replaceState(
           null,
           "",
           window.location.pathname + window.location.search
         );
         setTimeout(() => {
-          window.dispatchEvent(new CustomEvent(`${builder_sidebar_key}:open`));
+          window.dispatchEvent(new CustomEvent(`${builderEventKey}:open`));
         }, 500);
       } else {
-        if (builderOpen) {
+        if (builderOpenRef.current) {
           setTimeout(() => {
-            window.dispatchEvent(
-              new CustomEvent(`${builder_sidebar_key}:close`)
-            );
+            window.dispatchEvent(new CustomEvent(`${builderEventKey}:close`));
             setBuilderOpen(false);
           }, 500);
         }
@@ -118,7 +118,7 @@ export function NavigationSidebar({
       window.clearTimeout(timer);
       window.removeEventListener("hashchange", handleOpenBuilderHash);
     };
-  }, [builder_sidebar_key, open_builder_hash]);
+  }, [builderEventKey, builderOpenHash]);
 
   const expandRail = (e?: React.MouseEvent) => {
     e?.preventDefault();
@@ -145,7 +145,6 @@ export function NavigationSidebar({
         onDrawerOpen={() => setCollapsed(false)}
         onDrawerClose={() => setCollapsed(true)}
         gooey_builder={gooey_builder}
-        builder_sidebar_key={builder_sidebar_key}
         builderOpen={builderOpen}
       />
 
@@ -171,7 +170,6 @@ export function NavigationSidebar({
 
         <NavigationFooter
           gooey_builder={gooey_builder}
-          builder_sidebar_key={builder_sidebar_key}
           railCollapsed={railCollapsed}
           builderOpen={builderOpen}
           isMobile={isMobile}
@@ -185,7 +183,6 @@ export function NavigationSidebar({
 
 function NavigationFooter({
   gooey_builder,
-  builder_sidebar_key,
   railCollapsed,
   builderOpen,
   isMobile,
@@ -193,7 +190,6 @@ function NavigationFooter({
   onSwitchWorkspace,
 }: {
   gooey_builder: NavigationSidebarProps["gooey_builder"];
-  builder_sidebar_key: NavigationSidebarProps["builder_sidebar_key"];
   railCollapsed: boolean;
   builderOpen: boolean;
   isMobile: boolean;
@@ -206,7 +202,6 @@ function NavigationFooter({
       {gooey_builder && !builderOpen && !isMobile && (
         <GooeyBuilderButton
           gooey_builder={gooey_builder}
-          builder_sidebar_key={builder_sidebar_key}
           compact={railCollapsed}
         />
       )}

@@ -43,6 +43,8 @@ class NavUserData(pydantic.BaseModel):
 class GooeyBuilderData(pydantic.BaseModel):
     photo_url: str
     name: str
+    event_key: str
+    open_hash: str
 
 
 class NavAccountData(pydantic.BaseModel):
@@ -64,6 +66,4 @@ class NavigationSidebarProps(pydantic.BaseModel):
     active_key: str | None = None
     account: NavAccountData = pydantic.Field(default_factory=NavAccountData)
     gooey_builder: GooeyBuilderData | None = None
-    builder_sidebar_key: str | None = None
-    open_builder_hash: str | None = None
     default_collapsed: bool = False
