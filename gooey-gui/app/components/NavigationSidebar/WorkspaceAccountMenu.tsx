@@ -21,6 +21,13 @@ const WORKSPACE_SWITCHER_POPPER_OPTIONS = {
         fallbackPlacements: ["bottom-start", "left-start"],
       },
     },
+    {
+      name: "preventOverflow",
+      options: {
+        altAxis: true,
+        tether: false,
+      },
+    },
   ],
 };
 const MENU_PANEL_CLASS =
