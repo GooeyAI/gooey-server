@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
+import { SignedOutAccount } from "./AccountSection";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 
 export function NavigationHeader({
@@ -57,6 +58,7 @@ export function NavigationHeaderMobile({
   onDrawerClose,
   gooey_builder,
   builderOpen,
+  account,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
   isMobile: boolean;
@@ -65,6 +67,7 @@ export function NavigationHeaderMobile({
   onDrawerClose: () => void;
   gooey_builder: NavigationSidebarProps["gooey_builder"];
   builderOpen: boolean;
+  account: NavigationSidebarProps["account"];
 }) {
   return (
     <Fragment>
@@ -90,6 +93,9 @@ export function NavigationHeaderMobile({
           />
         </a>
         <div className="ms-auto d-flex align-items-center gap-1">
+          {!account.user && (
+            <SignedOutAccount account={account} compact={false} mobile />
+          )}
           {gooey_builder && !builderOpen && (
             <GooeyBuilderButton gooey_builder={gooey_builder} compact mobile />
           )}
