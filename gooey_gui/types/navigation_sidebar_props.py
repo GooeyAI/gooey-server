@@ -51,6 +51,7 @@ class NavAccountData(pydantic.BaseModel):
     user: NavUserData | None = None  # None => anonymous
     current_workspace: WorkspaceData | None = None
     workspaces: list[WorkspaceData] = []
+    switch_workspace_key: str | None = None
     menu_links: list[MenuLinkData] = []
     logout_href: str = ""
     add_workspace_url: str = ""
@@ -64,6 +65,7 @@ class NavigationSidebarProps(pydantic.BaseModel):
     logo_image_url: str
     nav_items: list[NavItemData] = []
     active_key: str | None = None
+    collapsed_state_key: str
     account: NavAccountData = pydantic.Field(default_factory=NavAccountData)
     gooey_builder: GooeyBuilderData | None = None
     default_collapsed: bool = False
