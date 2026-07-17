@@ -56,6 +56,7 @@ export function NavigationHeaderMobile({
   onDrawerOpen,
   onDrawerClose,
   gooey_builder,
+  builder_sidebar_key,
   builderOpen,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
@@ -64,6 +65,7 @@ export function NavigationHeaderMobile({
   onDrawerOpen: () => void;
   onDrawerClose: () => void;
   gooey_builder: NavigationSidebarProps["gooey_builder"];
+  builder_sidebar_key: NavigationSidebarProps["builder_sidebar_key"];
   builderOpen: boolean;
 }) {
   return (
@@ -91,7 +93,12 @@ export function NavigationHeaderMobile({
         </a>
         <div className="ms-auto d-flex align-items-center gap-1">
           {gooey_builder && !builderOpen && (
-            <GooeyBuilderButton gooey_builder={gooey_builder} compact mobile />
+            <GooeyBuilderButton
+              gooey_builder={gooey_builder}
+              builder_sidebar_key={builder_sidebar_key}
+              compact
+              mobile
+            />
           )}
         </div>
       </div>
