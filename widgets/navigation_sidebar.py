@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from workspaces.models import Workspace
 
 RECENT_WORKFLOW_LIST_LIMIT = 20
+NAV_COLLAPSED_STATE_KEY = "nav-sidebar:default-collapsed"
 
 
 def render(
@@ -47,6 +48,7 @@ def render(
         get_create_workspace_popup_url,
         get_current_workspace,
         handle_workspace_switch,
+        SWITCH_WORKSPACE_KEY,
     )
 
     home_path = get_route_path(home_page)
@@ -99,6 +101,7 @@ def render(
                 recent_workflows=recent_workflows,
             ),
             active_key=active_key,
+            collapsed_state_key=NAV_COLLAPSED_STATE_KEY,
             default_collapsed=default_collapsed,
             account=NavAccountData(
                 user=_get_nav_user(user),
@@ -106,6 +109,7 @@ def render(
                     (ws for ws in workspaces if ws.is_current), None
                 ),
                 workspaces=workspaces,
+                switch_workspace_key=SWITCH_WORKSPACE_KEY,
                 menu_links=_load_menu_links(is_anonymous, workspace),
                 logout_href="" if is_anonymous else get_route_path(logout),
                 add_workspace_url=add_workspace_url,
