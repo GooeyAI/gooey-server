@@ -1,13 +1,16 @@
 from django.db import transaction
+from django.db.models import Q
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from loguru import logger
 
-from bots.models import Message, SavedRun
+from bots.models import Message, SavedRun, Workflow
+from bots.models.run_conversation import RunConversation
 from bots.tasks import msg_analysis
 from daras_ai_v2.base import STARTING_STATE
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
+from django.db import IntegrityError
 
 
 @receiver(pre_save, sender=SavedRun)
@@ -45,6 +48,101 @@ def revoke_saved_run_task_on_cancel(instance: SavedRun, **kwargs):
             app.control.revoke(task_id, terminate=True, signal="SIGUSR1")
         except Exception as e:
             logger.warning(f"failed to revoke celery task {task_id}: {e}")
+
+
+@receiver(post_save, sender=SavedRun)
+def create_run_conversation(instance: SavedRun, **kwargs):
+    sr = instance
+    if (
+        sr.workflow != Workflow.VIDEO_BOTS
+        or "messages" not in sr.state
+        or sr.surface == SavedRun.Surface.deployment
+    ):
+        return
+    try:
+        if sr.run_conversation:
+            return
+    except RunConversation.DoesNotExist:
+        pass
+
+    parent = sr.parent
+
+    if (
+        parent
+        and parent.workspace_id == sr.workspace_id
+        and is_continued_conversation(sr, parent)
+    ):
+        try:
+            parent_convo = parent.run_conversation
+            with transaction.atomic():
+                parent_convo.last_msg = sr
+                parent_convo.save(update_fields=["last_msg"])
+                parent_convo.messages.add(sr)
+                return
+        except (RunConversation.DoesNotExist, IntegrityError):
+            pass
+
+    with transaction.atomic():
+        run_convo = RunConversation.objects.create(
+            first_msg=sr,
+            last_msg=sr,
+            title=sr.state.get("input_prompt") or "",
+        )
+        run_convo.messages.add(sr)
+
+
+@receiver(post_save, sender=Message)
+def create_run_conversation_for_deployment(instance: Message, **kwargs):
+    sr = instance.saved_run
+    if instance.role != CHATML_ROLE_ASSISTANT or not sr:
+        return
+    try:
+        if sr.run_conversation:
+            return
+    except RunConversation.DoesNotExist:
+        pass
+    convo = instance.conversation
+    try:
+        run_convo = convo.run_conversation
+    except RunConversation.DoesNotExist:
+        try:
+            first_msg = convo.messages.earliest().saved_run
+        except Message.DoesNotExist:
+            first_msg = sr
+        try:
+            with transaction.atomic():
+                run_convo = RunConversation.objects.create(
+                    first_msg=first_msg,
+                    last_msg=sr,
+                    title=sr.state.get("input_prompt") or "",
+                    bot_conversation=convo,
+                )
+                run_convo.messages.add(
+                    *convo.messages.filter(saved_run__isnull=False).values_list(
+                        "saved_run", flat=True
+                    )
+                )
+                return
+        except IntegrityError:
+            run_convo = RunConversation.objects.get(
+                Q(bot_conversation=convo) | Q(last_msg=sr)
+            )
+    run_convo.last_msg = sr
+    run_convo.save(update_fields=["last_msg"])
+    run_convo.messages.add(sr)
+
+
+def is_continued_conversation(sr: SavedRun, parent: SavedRun) -> bool:
+    messages = sr.state.get("messages")
+    if not messages:
+        return False
+    for msg in reversed(messages):
+        uid = msg.get("uid")
+        run_id = msg.get("run_id")
+        if not (uid and run_id):
+            continue
+        return uid == parent.uid and run_id == parent.run_id
+    return False
 
 
 @receiver(post_save, sender=Message)

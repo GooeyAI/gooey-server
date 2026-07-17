@@ -1,8 +1,8 @@
-from typing import Any
+from __future__ import annotations
 
+import typing
 
 import gooey_gui as gui
-
 from daras_ai_v2 import settings
 from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.language_model import (
@@ -14,6 +14,9 @@ from daras_ai_v2.language_model import (
 )
 from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 
+if typing.TYPE_CHECKING:
+    from bots.models.saved_run import SavedRun
+
 
 def load_chat_widget_lib():
     gui.html(
@@ -21,7 +24,7 @@ def load_chat_widget_lib():
     )
 
 
-def chat_widget_input_to_request_body(state: dict, input_data: dict):
+def chat_widget_input_to_request_body(sr: SavedRun, state: dict, input_data: dict):
     from daras_ai_v2.bots import handle_location_msg
 
     ret = {
@@ -63,8 +66,14 @@ def chat_widget_input_to_request_body(state: dict, input_data: dict):
                 role=CHATML_ROLE_USER,
                 content_text=prev_input,
                 input_images=prev_input_images,
-                # input_audio=prev_input_audio,
-                input_documents=prev_input_documents,
+                extra=dict(
+                    web_url=sr.get_app_url(),
+                    uid=sr.uid,
+                    run_id=sr.run_id,
+                    input_prompt=state.get("input_prompt") or "",
+                    input_audio=prev_input_audio,
+                    input_documents=prev_input_documents,
+                ),
             ),
             format_chat_entry(
                 role=CHATML_ROLE_ASSISTANT,
@@ -75,29 +84,30 @@ def chat_widget_input_to_request_body(state: dict, input_data: dict):
     return ret
 
 
-def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[Any]:
+def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list:
     from daras_ai_v2.bots import parse_bot_html
-    from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 
     messages = []  # chat widget internal mishmash format
-    input_audio = state.get("input_audio") or ""
-    input_images = state.get("input_images") or []
-    input_documents = state.get("input_documents") or []
 
-    if is_realtime_audio_url(input_audio):
+    if is_realtime_audio_url(state.get("input_audio") or ""):
         entries = state.get("final_prompt", []).copy()
-        input_audio = ""  # dont render ws audio url in chat widget
     else:
         entries = state.get("messages", []).copy()
 
     for entry in entries:
         role = entry.get("role")
         if role == CHATML_ROLE_USER:
+            input_prompt = entry.get("input_prompt", get_entry_text(entry)) or ""
+            input_images = get_entry_images(entry) or []
+            input_audio = entry.get("input_audio") or ""
+            input_documents = entry.get("input_documents") or []
             messages.append(
                 dict(
                     role=role,
-                    input_prompt=get_entry_text(entry),
-                    input_images=get_entry_images(entry) or [],
+                    input_prompt=input_prompt,
+                    input_images=input_images,
+                    input_audio=input_audio,
+                    input_documents=input_documents,
                 )
             )
         elif role == CHATML_ROLE_ASSISTANT:
@@ -111,6 +121,23 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
             )
 
     # add last input to history if present
+    messages += get_chat_widget_last_turn(state, web_url)
+
+    return messages
+
+
+def get_chat_widget_last_turn(state: dict, web_url: str | None = None) -> list:
+    from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+    from daras_ai_v2.bots import parse_bot_html
+
+    messages = []
+
+    input_audio = state.get("input_audio") or ""
+    if is_realtime_audio_url(input_audio):
+        input_audio = ""  # dont render ws audio url in chat widget
+    input_images = state.get("input_images") or []
+    input_documents = state.get("input_documents") or []
+
     show_raw_msgs = False
     if show_raw_msgs:
         input_prompt = state.get("raw_input_text") or ""

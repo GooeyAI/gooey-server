@@ -1396,7 +1396,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         )
 
     def on_send(self, input_data: dict):
-        ret = chat_widget_input_to_request_body(gui.session_state, input_data)
+        ret = chat_widget_input_to_request_body(
+            self.current_sr, gui.session_state, input_data
+        )
         gui.session_state.update(ret)
         self.submit_and_redirect()
 

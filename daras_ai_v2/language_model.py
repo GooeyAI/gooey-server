@@ -1750,6 +1750,7 @@ def format_chat_entry(
     input_images: typing.Optional[list[str]] = None,
     input_audio: typing.Optional[str] = None,
     input_documents: typing.Optional[list[str]] = None,
+    extra: dict | None = None,
 ) -> ConversationEntry:
     text_parts = []
     if input_images:
@@ -1762,7 +1763,7 @@ def format_chat_entry(
     text_with_urls = "\n\n".join(filter(None, text_parts))
 
     if not input_images and not input_audio:
-        return {"role": role, "content": text_with_urls}
+        return {"role": role, "content": text_with_urls} | (extra or {})
 
     content = []
     if input_images:
@@ -1779,7 +1780,7 @@ def format_chat_entry(
             }
         )
     content.append({"type": "text", "text": text_with_urls})
-    return {"role": role, "content": content}
+    return {"role": role, "content": content} | (extra or {})
 
 
 @redis_cache_decorator(ex=3600)  # Cache for 1 hour
