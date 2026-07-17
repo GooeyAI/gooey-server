@@ -8,6 +8,11 @@ from starlette.requests import Request
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.gooey_builder import (
+    DEFAULT_GOOEY_BUILDER_PHOTO_URL,
+    GOOEY_BUILDER_EVENT_KEY,
+    GOOEY_BUILDER_OPEN_HASH,
+)
 from gooey_gui.types.navigation_sidebar_props import (
     GooeyBuilderData,
     MenuLinkData,
@@ -26,9 +31,6 @@ if TYPE_CHECKING:
     from workspaces.models import Workspace
 
 RECENT_WORKFLOW_LIST_LIMIT = 20
-
-BUILDER_SIDEBAR_KEY = "builder-sidebar"
-OPEN_BUILDER_HASH = "#open-builder"
 
 
 def render(
@@ -84,13 +86,6 @@ def render(
     else:
         add_workspace_url, _ = get_create_workspace_popup_url()
 
-    gooey_builder = _load_gooey_builder_data(request, workspace, page)
-    builder_sidebar_key = None
-    open_builder_hash = None
-    if gooey_builder:
-        builder_sidebar_key = BUILDER_SIDEBAR_KEY
-        open_builder_hash = OPEN_BUILDER_HASH
-
     gui.model_component(
         NavigationSidebarProps(
             logo_image_url=settings.GOOEY_LOGO_IMG,
@@ -117,9 +112,7 @@ def render(
                 login_href=get_login_url(request) if is_anonymous else "/login/",
                 enable_firebase_auth=settings.ENABLE_FIREBASE_AUTH,
             ),
-            gooey_builder=gooey_builder,
-            builder_sidebar_key=builder_sidebar_key,
-            open_builder_hash=open_builder_hash,
+            gooey_builder=_load_gooey_builder_data(request, workspace, page),
         )
     )
 
@@ -354,7 +347,7 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
     if sr.surface == SavedRun.Surface.builder_child:
         title = (sr.builder_prompt or "").strip()
         # Only Builder runs opened from the rail force-open the Builder panel.
-        href += OPEN_BUILDER_HASH
+        href += GOOEY_BUILDER_OPEN_HASH
     else:
         title = _history_title(sr, pr, metadata)
 
@@ -410,7 +403,6 @@ def _load_gooey_builder_data(
         return None
 
     from bots.models import BotIntegration
-    from daras_ai_v2.gooey_builder import DEFAULT_GOOEY_BUILDER_PHOTO_URL
 
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return None
@@ -421,7 +413,12 @@ def _load_gooey_builder_data(
     photo_url = bi.get_web_widget_branding().get(
         "photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL
     )
-    return GooeyBuilderData(photo_url=photo_url, name=bi.name)
+    return GooeyBuilderData(
+        photo_url=photo_url,
+        name=bi.name,
+        event_key=GOOEY_BUILDER_EVENT_KEY,
+        open_hash=GOOEY_BUILDER_OPEN_HASH,
+    )
 
 
 def _active_nav_key(

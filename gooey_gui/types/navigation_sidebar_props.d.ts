@@ -35,6 +35,8 @@ export interface NavUserData {
 export interface GooeyBuilderData {
   photo_url: string;
   name: string;
+  event_key: string;
+  open_hash: string;
 }
 export interface NavAccountData {
   user: NavUserData | null;
@@ -52,7 +54,5 @@ export interface NavigationSidebarProps {
   active_key: string | null;
   account: NavAccountData;
   gooey_builder: GooeyBuilderData | null;
-  builder_sidebar_key: string | null;
-  open_builder_hash: string | null;
   default_collapsed: boolean;
 }

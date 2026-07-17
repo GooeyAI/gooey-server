@@ -28,7 +28,10 @@ from daras_ai_v2.fastapi_tricks import (
     fastapi_request_json,
     get_route_path,
 )
-from daras_ai_v2.gooey_builder import render_gooey_builder
+from daras_ai_v2.gooey_builder import (
+    GOOEY_BUILDER_EVENT_KEY,
+    render_gooey_builder,
+)
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.profiles import get_meta_tags_for_profile, profile_page
@@ -746,7 +749,7 @@ def sidebar_page_wrapper(
 
         with gui.div(className="d-flex flex-column flex-grow-1 min-w-0"):
             sidebar, page_content = sidebar_layout(
-                key="builder-sidebar",
+                key=GOOEY_BUILDER_EVENT_KEY,
                 session=request.session,
                 disabled=not display_gooey_builder,
             )
@@ -765,7 +768,7 @@ def sidebar_page_wrapper(
                     if display_gooey_builder:
                         with sidebar:
                             render_gooey_builder(
-                                sidebar_key="builder-sidebar",
+                                event_key=GOOEY_BUILDER_EVENT_KEY,
                                 request=request,
                                 page=page,
                             )
