@@ -332,6 +332,7 @@ a.nav-brand {
     width: 70vw;
     max-width: 85vw;
     height: 100vh;
+    height: 100dvh;
     z-index: 9999;
     transform: translateX(-100%);
     transition: transform 200ms ease;
