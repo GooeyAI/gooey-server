@@ -1,6 +1,7 @@
 import json
 import itertools
 import os
+import re
 import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from itertools import zip_longest
@@ -23,6 +24,7 @@ from daras_ai_v2.functional import map_parallel
 from daras_ai_v2.language_model import run_language_model
 from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
 from daras_ai_v2.variables_widget import render_prompt_vars
+from functions.base_llm_tool import BaseLLMTool
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
 
@@ -51,9 +53,89 @@ AggFunctionsList = [
 ]
 
 
+class CandidateEvalSpec(typing_extensions.TypedDict):
+    output_columns: list[str]
+    workflow_title_by_candidate: dict[str, str]
+
+
+class CandidateEvaluationTool(BaseLLMTool):
+    def __init__(self, output_column_names: list[str], candidate_labels: list[str]):
+        super().__init__(
+            name="submit_evaluation",
+            label="Submit Evaluation",
+            description=(
+                "Score only the workflow output columns requested by the evaluation "
+                "prompt. When no columns are named, score evaluation-worthy fields "
+                "such as Output Text or Run Time, not metadata such as Price, Run URL, "
+                "or Error Message. Return one numeric score for every candidate in each "
+                "scored column, using the provided column and candidate names exactly. "
+                "Put rationales, best candidates, and other row-level outputs in "
+                "summaries."
+            ),
+            properties={
+                "scores": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": len(output_column_names),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "column": {
+                                "type": "string",
+                                "enum": output_column_names,
+                            },
+                            "candidates": {
+                                "type": "array",
+                                "minItems": len(candidate_labels),
+                                "maxItems": len(candidate_labels),
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "candidate": {
+                                            "type": "string",
+                                            "enum": candidate_labels,
+                                        },
+                                        "score": {"type": "number"},
+                                    },
+                                    "required": ["candidate", "score"],
+                                    "additionalProperties": False,
+                                },
+                            },
+                        },
+                        "required": ["column", "candidates"],
+                        "additionalProperties": False,
+                    },
+                },
+                "summaries": {
+                    "type": "array",
+                    "description": (
+                        "Additional row-level outputs requested by the prompt, such as "
+                        "a rationale or the best candidate. Return an empty array when "
+                        "none were requested."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "column": {"type": "string"},
+                            "value": {"type": "string"},
+                        },
+                        "required": ["column", "value"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            required=["scores"],
+        )
+
+    @property
+    def spec_parameters(self) -> dict:
+        return super().spec_parameters | {"additionalProperties": False}
+
+
 class EvalPrompt(typing_extensions.TypedDict):
     name: str
     prompt: str
+    candidate_spec: typing_extensions.NotRequired[CandidateEvalSpec]
 
 
 class AggFunction(typing_extensions.TypedDict):
@@ -185,8 +267,9 @@ TIP: Only the left most Sheet of Excel/Google Sheet is used so add ~3 rows of co
             None,
             title="Evaluation Prompts",
             description="""
-Specify custom LLM prompts to calculate metrics that evaluate each row of the input data. The output should be a JSON object mapping the metric names to values.  
-_The `columns` dictionary can be used to reference the spreadsheet columns._            
+Add an LLM judge for each spreadsheet row.
+
+`{{ columns | tojson(indent=2) }}` = row context plus every workflow field grouped under blind candidates.
             """,
         )
 
@@ -214,6 +297,7 @@ Aggregate using one or more operations. Uses [pandas](https://pandas.pydata.org/
     class ResponseModel(BaseModel):
         output_documents: list[str]
         final_prompts: list[list[str]] | None = None
+        evaluation_results: list[list[dict | None]] | None = None
         aggregations: list[list[AggFunctionResult]] | None = None
 
     def render_form_v2(self):
@@ -337,6 +421,7 @@ Here's what you uploaded:
     ) -> typing.Iterator[str | None]:
         response.output_documents = []
         response.final_prompts = []
+        response.evaluation_results = []
         response.aggregations = []
 
         with ThreadPoolExecutor(max_workers=4) as pool:
@@ -356,21 +441,33 @@ Here's what you uploaded:
     def render_steps(self):
         documents = gui.session_state.get("documents") or []
         final_prompts = gui.session_state.get("final_prompts") or []
-        for doc, prompts in zip_longest(documents, final_prompts):
+        evaluation_results = gui.session_state.get("evaluation_results") or []
+        for doc, prompts, results in zip_longest(
+            documents, final_prompts, evaluation_results, fillvalue=[]
+        ):
             if not prompts:
                 continue
             gui.write(f"###### {doc}")
             for i, prompt in enumerate(prompts):
+                gui.write(f"**Evaluation Row {i + 1}**")
                 gui.text_area("", value=prompt, key=f"--final-prompt-{i}")
+                evaluation_result = results[i] if i < len(results) else None
+                if evaluation_result is None:
+                    continue
+
+                gui.write("**Evaluation Result**")
+                gui.json(evaluation_result, expanded=False)
 
 
 class TaskResult(typing.NamedTuple):
-    llm_output: dict
+    evaluation_result: dict
     doc_ix: int
+    prompt_idx: int
     current_rec: dict
     input_cols: set[str]
     out_df_recs: list[dict]
     ep: EvalPrompt
+    evaluation_tool: CandidateEvaluationTool
 
 
 def submit(
@@ -379,39 +476,143 @@ def submit(
     response: BulkEvalPage.ResponseModel,
 ) -> list[Future[TaskResult]]:
     futs = []
+    for ep in request.eval_prompts or []:
+        validate_eval_prompt(ep)
     for doc_ix, doc in enumerate(request.documents):
         response.output_documents.append(doc)
         response.final_prompts.append([])
+        response.evaluation_results.append([])
         response.aggregations.append([])
         df = read_df_any(doc)
+        evaluation_tool = None
         for out_df_recs, current_rec, prompt_columns in iter_eval_groups(
             df, request.array_columns
         ):
-            for ep in request.eval_prompts or []:
+            for request_eval_prompt in request.eval_prompts or []:
+                ep = dict(request_eval_prompt)
+                render_columns, candidate_spec = build_candidate_columns(
+                    prompt_columns,
+                    request_eval_prompt["name"],
+                )
+                ep["candidate_spec"] = candidate_spec
+                if evaluation_tool is None:
+                    evaluation_tool = CandidateEvaluationTool(
+                        output_column_names=candidate_spec["output_columns"],
+                        candidate_labels=list(
+                            candidate_spec["workflow_title_by_candidate"]
+                        ),
+                    )
+
                 prompt = render_prompt_vars(
-                    ep.get("prompt") or "",
-                    gui.session_state | {"columns": prompt_columns},
+                    request_eval_prompt.get("prompt") or "",
+                    gui.session_state | {"columns": render_columns},
                 )
                 if not prompt.strip():
                     raise UserError("Please provide a prompt")
 
+                prompt_idx = len(response.final_prompts[doc_ix])
                 response.final_prompts[doc_ix].append(prompt)
+                response.evaluation_results[doc_ix].append(None)
                 futs.append(
                     pool.submit(
                         _run_language_model,
                         model=request.selected_model,
                         prompt=prompt,
                         result=TaskResult(
-                            llm_output={},
+                            evaluation_result={},
                             doc_ix=doc_ix,
+                            prompt_idx=prompt_idx,
                             current_rec=current_rec,
                             input_cols=set(current_rec.keys()),
                             out_df_recs=out_df_recs,
                             ep=ep,
+                            evaluation_tool=evaluation_tool,
                         ),
                     ),
                 )
     return futs
+
+
+def validate_eval_prompt(ep: EvalPrompt):
+    if not (ep.get("name") or "").strip():
+        raise UserError("Each evaluation prompt needs a name.")
+    if not (ep.get("prompt") or "").strip():
+        raise UserError(f"Eval prompt {ep.get('name')!r} needs a prompt.")
+
+
+def build_candidate_columns(
+    prompt_columns: dict,
+    eval_name: str,
+) -> tuple[dict, CandidateEvalSpec]:
+    shared_input_columns = {}
+    grouped_output_columns: dict[str, dict[str, typing.Any]] = {}
+    candidate_by_workflow_title: dict[str, str] = {}
+
+    for source_column, value in prompt_columns.items():
+        workflow_title, output_column = _parse_workflow_column_parts(source_column)
+        if not workflow_title:
+            shared_input_columns[source_column] = value
+            continue
+
+        candidate = candidate_by_workflow_title.get(workflow_title)
+        if candidate is None:
+            candidate = _candidate_name(len(candidate_by_workflow_title))
+            candidate_by_workflow_title[workflow_title] = candidate
+        output_column = output_column or "Output"
+        grouped_output_columns.setdefault(output_column, {})
+        if candidate in grouped_output_columns[output_column]:
+            raise UserError(
+                f"Eval prompt {eval_name!r}: workflow {workflow_title!r} has more "
+                f"than one spreadsheet column for output {output_column!r}."
+            )
+        grouped_output_columns[output_column][candidate] = value
+
+    if not grouped_output_columns:
+        raise UserError(
+            f"Eval prompt {eval_name!r}: no workflow columns found. "
+            "Expected Bulk Runner headers like `(My Workflow) Output Text`."
+        )
+
+    collisions = shared_input_columns.keys() & grouped_output_columns.keys()
+    if collisions:
+        collision_names = ", ".join(repr(col) for col in sorted(collisions))
+        raise UserError(
+            f"Eval prompt {eval_name!r}: input and workflow output columns use the "
+            f"same name: {collision_names}. Rename the Bulk Runner output column."
+        )
+
+    for output_column, values_by_candidate in grouped_output_columns.items():
+        if len(values_by_candidate) != len(candidate_by_workflow_title):
+            raise UserError(
+                f"Eval prompt {eval_name!r}: output column {output_column!r} is not "
+                "available for every workflow. Bulk Runner workflows must have the "
+                "same output columns."
+            )
+
+    candidate_spec: CandidateEvalSpec = {
+        "output_columns": list(grouped_output_columns),
+        "workflow_title_by_candidate": {
+            candidate: workflow_title
+            for workflow_title, candidate in candidate_by_workflow_title.items()
+        },
+    }
+    return shared_input_columns | grouped_output_columns, candidate_spec
+
+
+def _parse_workflow_column_parts(col: str) -> tuple[str | None, str | None]:
+    if match := re.fullmatch(r"\((.*\S.*)\)(?:\s+(.+))?", col.strip()):
+        return match[1].strip(), match[2].strip() if match[2] else None
+    return None, None
+
+
+def _candidate_name(index: int) -> str:
+    name = ""
+    while True:
+        index, remainder = divmod(index, 26)
+        name = chr(ord("A") + remainder) + name
+        if index == 0:
+            return name
+        index -= 1
 
 
 def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
@@ -448,15 +649,25 @@ def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
 
 
 def _run_language_model(model: str, prompt: str, result: TaskResult):
-    ret = json.loads(
-        run_language_model(
-            model=model,
-            prompt=prompt,
-            response_format_type="json_object",
-        )[0]
-    )
-    assert isinstance(ret, dict)
-    result.llm_output.update(ret)
+    entries = []
+    for entries in run_language_model(
+        model=model,
+        prompt=prompt,
+        tools=[result.evaluation_tool],
+        tool_choice="required",
+        stream=True,
+    ):
+        pass
+    tool_calls = entries[0].get("tool_calls") if entries else None
+    if not tool_calls:
+        raise UserError("The evaluator did not submit an evaluation result.")
+    function_call = tool_calls[0]["function"]
+    if function_call["name"] != result.evaluation_tool.name:
+        raise UserError("The evaluator returned an unexpected tool call.")
+    evaluation_result = json.loads(function_call["arguments"])
+
+    assert isinstance(evaluation_result, dict)
+    result.evaluation_result.update(evaluation_result)
     return result
 
 
@@ -476,10 +687,11 @@ def iterate(
             yield "Uploading Results..."
 
         result = fut.result()
+        response.evaluation_results[result.doc_ix][result.prompt_idx] = (
+            result.evaluation_result
+        )
 
-        for metric_name, metric_value in result.llm_output.items():
-            col = f"{result.ep['name']} - {metric_name}"
-            result.current_rec[col] = metric_value
+        apply_eval_metrics(result.current_rec, result.ep, result.evaluation_result)
 
         out_df = pd.DataFrame.from_records(result.out_df_recs)
         f = upload_file_from_bytes(
@@ -490,11 +702,17 @@ def iterate(
         response.output_documents[result.doc_ix] = f
 
         aggs = []
+        prefix = result.ep["name"] + " - "
+        metric_cols = [
+            col
+            for col in out_df.select_dtypes(include=["number"]).columns
+            if col not in result.input_cols and col.startswith(prefix)
+        ]
         for agg in request.agg_functions or []:
             if agg.get("column"):
                 cols = [agg["column"]]
             else:
-                cols = out_df.select_dtypes(include=["float", "int"]).columns
+                cols = metric_cols
             for col in cols:
                 if col in result.input_cols:
                     continue
@@ -511,6 +729,53 @@ def iterate(
                     }
                 )
         response.aggregations[result.doc_ix] = aggs
+
+
+def apply_eval_metrics(
+    current_rec: dict, ep: EvalPrompt, evaluation_result: dict
+) -> None:
+    eval_name = ep["name"]
+    candidate_spec = ep["candidate_spec"]
+    output_columns = candidate_spec["output_columns"]
+    workflow_title_by_candidate = candidate_spec["workflow_title_by_candidate"]
+    scores = evaluation_result["scores"]
+    if not scores:
+        raise ValueError("scores must contain at least one output column")
+
+    evaluation_columns = {}
+    include_output_column = len(output_columns) > 1
+
+    for score in scores:
+        output_column = score["column"]
+        candidate_scores = score["candidates"]
+        score_by_candidate = {
+            item["candidate"]: item["score"] for item in candidate_scores
+        }
+        if len(candidate_scores) != len(workflow_title_by_candidate) or set(
+            score_by_candidate
+        ) != set(workflow_title_by_candidate):
+            raise ValueError(
+                f"scores for {output_column!r} must contain each candidate exactly once"
+            )
+
+        for candidate, workflow_title in workflow_title_by_candidate.items():
+            if include_output_column:
+                output_col = f"{eval_name} - {output_column} - {workflow_title}"
+            else:
+                output_col = f"{eval_name} - {workflow_title}"
+            evaluation_columns[output_col] = float(score_by_candidate[candidate])
+
+    for summary in evaluation_result.get("summaries", []):
+        column = summary["column"].strip()
+        if not column:
+            raise ValueError("summary column names cannot be blank")
+        value = summary["value"]
+        output_col = f"{eval_name} - {column}"
+        if output_col in evaluation_columns:
+            raise ValueError(f"duplicate evaluation column: {column!r}")
+        evaluation_columns[output_col] = workflow_title_by_candidate.get(value, value)
+
+    current_rec.update(evaluation_columns)
 
 
 @gui.cache_in_session_state
