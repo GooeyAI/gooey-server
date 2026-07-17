@@ -196,6 +196,10 @@ a.nav-brand {
   text-decoration: none;
   min-height: 40px;
 }
+
+.nav-item-link.dense {
+  min-height: 28px;
+}
 .nav-item-link--active {
   background-color: rgba(0, 0, 0, 0.08);
 }

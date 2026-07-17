@@ -17,6 +17,7 @@ class NavItemData(pydantic.BaseModel):
     href: str | None = None
     items: list[NavWorkflowItem] = []  # nested children, e.g. saved workflows
     collapsible: bool = True  # False keeps `items` always expanded (no chevron)
+    dense: bool = False  # True means less spacing and smaller font
 
 
 class WorkspaceData(pydantic.BaseModel):

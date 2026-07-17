@@ -161,6 +161,7 @@ def _load_nav_items(
                 items=recent_workflows,
                 # History mirrors Saved but stays open — no collapse chevron.
                 collapsible=False,
+                dense=True,
             )
         )
     return items

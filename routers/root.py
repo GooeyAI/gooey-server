@@ -752,7 +752,7 @@ def sidebar_page_wrapper(
             )
             with (
                 page_content,
-                gui.div(className="d-flex flex-column min-vh-100 w-100 container-xxl"),
+                gui.div(className="d-flex flex-column min-vh-100 w-100"),
             ):
                 gui.html(templates.get_template("gtag.html").render(**context))
                 gui.html(copy_to_clipboard_scripts)
