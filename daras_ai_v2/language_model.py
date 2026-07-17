@@ -1531,7 +1531,7 @@ def _run_mistral_chat(
 
     data = dict(
         model=model,
-        messages=messages,
+        messages=_format_mistral_messages(messages),
         max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
@@ -1563,6 +1563,34 @@ def _run_mistral_chat(
         quantity=out["usage"]["completion_tokens"],
     )
     return list(_parse_mistral_output(out))
+
+
+def _format_mistral_messages(
+    messages: list[ConversationEntry],
+) -> list[ConversationEntry]:
+    mistral_messages = []
+    for message in messages:
+        mistral_message = {
+            "role": message.get("role") or CHATML_ROLE_USER,
+            "content": message.get("content"),
+        }
+        if tool_call_id := message.get("tool_call_id"):
+            mistral_message["tool_call_id"] = tool_call_id
+        if tool_calls := message.get("tool_calls"):
+            mistral_message["tool_calls"] = [
+                {
+                    "id": tool_call.get("id") or "",
+                    "type": tool_call.get("type") or "function",
+                    "function": {
+                        "name": (tool_call.get("function") or {}).get("name") or "",
+                        "arguments": (tool_call.get("function") or {}).get("arguments")
+                        or "",
+                    },
+                }
+                for tool_call in tool_calls
+            ]
+        mistral_messages.append(mistral_message)
+    return mistral_messages
 
 
 def _parse_mistral_output(out: dict) -> typing.Iterable[dict]:
