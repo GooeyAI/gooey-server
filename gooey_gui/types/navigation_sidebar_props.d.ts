@@ -42,6 +42,7 @@ export interface NavAccountData {
   user: NavUserData | null;
   current_workspace: WorkspaceData | null;
   workspaces: WorkspaceData[];
+  switch_workspace_key: string | null;
   menu_links: MenuLinkData[];
   logout_href: string;
   add_workspace_url: string;
@@ -52,6 +53,7 @@ export interface NavigationSidebarProps {
   logo_image_url: string;
   nav_items: NavItemData[];
   active_key: string | null;
+  collapsed_state_key: string;
   account: NavAccountData;
   gooey_builder: GooeyBuilderData | null;
   default_collapsed: boolean;

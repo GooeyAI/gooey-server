@@ -12,9 +12,6 @@ import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
 import { PrimaryNavItems } from "./PrimaryNavItems";
 
-const NAV_COLLAPSED_KEY = "nav-sidebar:default-collapsed";
-// Keep in sync with SWITCH_WORKSPACE_KEY in workspaces/widgets.py
-const SWITCH_WORKSPACE_KEY = "--switch-workspace";
 // Below this width the rail becomes an off-canvas drawer (matches the CSS
 // breakpoint in NavigationSidebar.css).
 const MOBILE_MEDIA_QUERY = "(max-width: 991.98px)";
@@ -23,6 +20,7 @@ export function NavigationSidebar({
   logo_image_url,
   nav_items,
   active_key,
+  collapsed_state_key,
   default_collapsed,
   account,
   gooey_builder,
@@ -50,12 +48,12 @@ export function NavigationSidebar({
     if (isMobile || builderOpen) return;
     if (!mounted.current) {
       mounted.current = true;
-      if (state[NAV_COLLAPSED_KEY] === collapsed) return;
+      if (state[collapsed_state_key] === collapsed) return;
     }
-    state[NAV_COLLAPSED_KEY] = collapsed;
+    state[collapsed_state_key] = collapsed;
     onChange();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapsed, isMobile, builderOpen]);
+  }, [collapsed, isMobile, builderOpen, collapsed_state_key]);
 
   useEffect(() => {
     const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
@@ -126,7 +124,8 @@ export function NavigationSidebar({
   };
 
   const switchWorkspace = (workspaceId: number) => {
-    state[SWITCH_WORKSPACE_KEY] = String(workspaceId);
+    if (!account.switch_workspace_key) return;
+    state[account.switch_workspace_key] = String(workspaceId);
     onChange();
   };
 

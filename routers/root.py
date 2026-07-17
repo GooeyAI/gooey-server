@@ -737,7 +737,9 @@ def sidebar_page_wrapper(
     display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]
 
     default_collapsed = persist_toggle_state(
-        "nav-sidebar:default-collapsed", session=request.session, default=False
+        navigation_sidebar.NAV_COLLAPSED_STATE_KEY,
+        session=request.session,
+        default=False,
     )
 
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
