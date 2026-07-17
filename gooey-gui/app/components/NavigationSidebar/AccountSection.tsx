@@ -33,7 +33,7 @@ export function AccountSection({
   );
 }
 
-function SignedOutAccount({
+export function SignedOutAccount({
   account,
   compact,
   mobile,
@@ -42,15 +42,9 @@ function SignedOutAccount({
   compact: boolean;
   mobile: boolean;
 }) {
-  // Mobile top bar (horizontal): always keep the "Sign In" text, and show the
-  // Google icon button beside it when Firebase auth is on.
+  // Keep the mobile top bar focused on the regular sign-in action.
   if (mobile) {
-    return (
-      <div className="d-flex align-items-center gap-1">
-        <SignInLink href={account.login_href} />
-        {account.enable_firebase_auth && <GoogleSignInButton compact />}
-      </div>
-    );
+    return <SignInLink href={account.login_href} />;
   }
 
   // Collapsed rail (narrow, vertical): room for a single icon-sized affordance.

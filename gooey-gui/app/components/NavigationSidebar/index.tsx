@@ -145,6 +145,7 @@ export function NavigationSidebar({
         onDrawerClose={() => setCollapsed(true)}
         gooey_builder={gooey_builder}
         builderOpen={builderOpen}
+        account={account}
       />
 
       <nav

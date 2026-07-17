@@ -48,7 +48,7 @@ export function PrimaryNavItems({
             <a
               key={`${link.href}:${link.label}`}
               href={link.href}
-              className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body"
+              className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body bg-hover-light"
             >
               {link.icon && <i className={clsx(link.icon, "nav-item-icon")} />}
               <span>{link.label}</span>
