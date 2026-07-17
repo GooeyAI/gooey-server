@@ -37,6 +37,7 @@ export function PrimaryNavItems({
               item={item}
               isActive={item.key === active_key}
               collapsed={railCollapsed}
+              dense={item.dense}
             />
           );
         })}
@@ -68,29 +69,36 @@ function NavItem({
   isActive: boolean;
   collapsed: boolean;
   children?: ReactNode;
+  dense: boolean;
 }) {
   return (
     <a
       className={clsx(
-        "nav-item-link d-flex align-items-center gap-2 rounded",
-        collapsed ? "justify-content-center px-0 py-2" : "px-2 py-2",
+        "nav-item-link d-flex align-items-center rounded",
+        collapsed && "justify-content-center px-0 py-2",
         isActive ? "fw-bold nav-item-link--active text-body" : "text-body",
         collapsed && "position-relative",
         children && "nav-section-toggle",
-        !!item.href && "bg-hover-light"
+        !!item.href && "bg-hover-light",
+        item.dense ? "dense px-2 py-1 small" : "px-2 py-2"
       )}
       href={item.href ?? undefined}
       onClick={(e) => e.stopPropagation()} // avoid opening the sidebar
     >
       <span
         className={clsx(
-          "d-flex align-items-center gap-2 flex-grow-1",
+          "d-flex align-items-center flex-grow-1",
           collapsed && "justify-content-center",
-          collapsed && !item.href && "d-none" // hide when no href and collapsed
+          collapsed && !item.href && "d-none", // hide when no href and collapsed
+          item.dense ? "gap-1" : "gap-2"
         )}
       >
         <span
-          className={clsx("nav-item-icon", !isActive && "text-muted")}
+          className={clsx(
+            "nav-item-icon",
+            !isActive && "text-muted",
+            item.dense && !collapsed && "small"
+          )}
           dangerouslySetInnerHTML={{ __html: item.icon }}
         />
         {!collapsed && <span>{item.label}</span>}
@@ -111,7 +119,14 @@ function NavItemChildren({
 
   // No children → behaves like a plain nav item (label links to href).
   if (item.items.length === 0) {
-    return <NavItem item={item} isActive={isActive} collapsed={false} />;
+    return (
+      <NavItem
+        item={item}
+        isActive={isActive}
+        collapsed={false}
+        dense={item.dense}
+      />
+    );
   }
 
   // Non-collapsible sections (e.g. History) drop the chevron and stay expanded.
@@ -119,7 +134,12 @@ function NavItemChildren({
 
   return (
     <Fragment>
-      <NavItem item={item} isActive={isActive} collapsed={false}>
+      <NavItem
+        item={item}
+        isActive={isActive}
+        collapsed={false}
+        dense={item.dense}
+      >
         {/* the chevron after the label toggles the nested items open/closed */}
         {item.collapsible && (
           <span
@@ -139,8 +159,8 @@ function NavItemChildren({
         )}
       </NavItem>
       {showItems && (
-        <div className="saved-tree">
-          <WorkflowList items={item.items} indent />
+        <div className={clsx(!item.dense && "saved-tree")}>
+          <WorkflowList items={item.items} indent={!item.dense} />
         </div>
       )}
     </Fragment>
