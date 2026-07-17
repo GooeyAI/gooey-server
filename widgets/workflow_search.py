@@ -122,11 +122,14 @@ class SearchFilters(BaseModel):
         return self.model_dump(exclude_defaults=True)
 
     def toggle_tag(self, tag: str) -> SearchFilters:
-        tags = [
-            selected for selected in self.tag if selected.casefold() != tag.casefold()
-        ]
-        if len(tags) == len(self.tag) and len(tags) < MAX_TAG_FILTERS:
-            tags.append(tag)
+        tags = list(self.tag)
+        for selected in tags:
+            if selected.casefold() == tag.casefold():
+                tags.remove(selected)
+                break
+        else:
+            if len(tags) < MAX_TAG_FILTERS:
+                tags.append(tag)
         return self.model_copy(update={"tag": tags})
 
 
