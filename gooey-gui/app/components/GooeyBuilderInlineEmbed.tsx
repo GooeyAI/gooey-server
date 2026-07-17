@@ -12,7 +12,7 @@ declare global {
 export function GooeyBuilderInlineEmbed(
   props: CustomComponentProps & {
     config: Record<string, any>;
-    sidebar_key: string;
+    event_key: string;
     messages?: Record<string, any> | null;
     builder_run_url: string;
     workflow_state: Record<string, any>;
@@ -39,7 +39,7 @@ export function GooeyBuilderInlineEmbed(
 
       config.onClose = function () {
         window.dispatchEvent(
-          new CustomEvent(`${propsRef.current.sidebar_key}:close`)
+          new CustomEvent(`${propsRef.current.event_key}:close`)
         );
       };
 
