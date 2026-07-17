@@ -321,7 +321,7 @@ def render_search_bar(
 def render_search_suggestions(search_filters: SearchFilters):
     from routers.root import explore_page
 
-    with gui.div(className="my-2"):
+    with gui.div(className="my-2 d-flex flex-wrap gap-2"):
         for tag in Tag.get_options():
             is_active = search_filters.tag.lower() == tag.name.lower()
             if is_active:
@@ -335,7 +335,8 @@ def render_search_suggestions(search_filters: SearchFilters):
                     update={"tag": new_tag}
                 ).get_query_params(),
             )
-            with gui.link(to=url, className="me-2 mb-1"):
+            with gui.link(to=url):
+                pill_classes = "px-2 py-2 border border-hover"
                 if is_active:
                     # trailing x hints that clicking the tag removes the filter
                     gui.pill(
@@ -343,9 +344,10 @@ def render_search_suggestions(search_filters: SearchFilters):
                         f' <span class="ms-1 small">{icons.cancel}</span>',
                         unsafe_allow_html=True,
                         text_bg="secondary",
+                        className=pill_classes,
                     )
                 else:
-                    gui.pill(tag.render(), text_bg="light")
+                    gui.pill(tag.render(), text_bg="light", className=pill_classes)
 
 
 def get_placeholder_by_search_filters(
