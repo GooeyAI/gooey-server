@@ -80,7 +80,9 @@ class SavedRun(models.Model):
         to_fields=["workflow"],
         related_name="saved_runs",
     )
-    run_id = models.CharField(max_length=128, default=None, null=True, blank=True)
+    run_id = models.CharField(
+        max_length=128, default=None, null=True, blank=True, unique=True
+    )
     uid = models.CharField(max_length=128, default=None, null=True, blank=True)
     created_by = models.ForeignObject(
         "app_users.AppUser",
