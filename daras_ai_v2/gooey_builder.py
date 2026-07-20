@@ -196,8 +196,8 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
     workflow_url = workflow_sr.get_app_url()
     builder_run_url = body.builder_run_url or get_default_builder_pr().get_app_url()
     builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
-    request_body = chat_widget_input_to_request_body(
-        builder_sr.state, body.input_data or builder_sr.state
+    request_body, message_thread = chat_widget_input_to_request_body(
+        builder_sr, builder_sr.state, body.input_data or builder_sr.state
     )
     insert_gooey_builder_variables(request_body, workflow_url)
 
@@ -206,6 +206,7 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         workspace=workspace,
         request_body=request_body,
         surface=SavedRun.Surface.builder_prompt,
+        message_thread=message_thread,
     )[1]
     workflow_sr.save(update_fields=["parent_builder_saved_run"])
 
