@@ -73,7 +73,8 @@ def render(request: Request, search_filters: SearchFilters | None):
             search_filters=search_filters,
             max_width="600px",
         )
-        render_search_suggestions(search_filters=search_filters)
+        if not search_filters.search or search_filters.tag:
+            render_search_suggestions(search_filters=search_filters)
         with gui.div(className="mt-3"):
             new_filters = render_search_filters(
                 current_user=request.user,
