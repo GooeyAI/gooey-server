@@ -19,6 +19,7 @@ from bots.models import (
     SavedRun,
     Workflow,
 )
+from bots.models.message_thread import MessageThread
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings, exceptions
 from daras_ai_v2.asr import (
@@ -35,7 +36,7 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
-from daras_ai_v2.base import BasePage, RecipeTabs
+from daras_ai_v2.base import BasePage, RecipeTabs, STARTING_STATE
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
 from daras_ai_v2.fastapi_tricks import get_api_route_url
 from daras_ai_v2.integrations_tab import render_integrations_tab
@@ -1396,9 +1397,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         )
 
     def on_send(self, input_data: dict):
-        ret = chat_widget_input_to_request_body(gui.session_state, input_data)
-        gui.session_state.update(ret)
-        self.submit_and_redirect()
+        request_body, message_thread = chat_widget_input_to_request_body(
+            self.current_sr, gui.session_state, input_data
+        )
+        gui.session_state.update(request_body)
+        self.submit_and_redirect(message_thread=message_thread)
 
     def _render_regenerate_button(self):
         pass
@@ -1539,6 +1542,32 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             )
         else:
             super().render_selected_tab()
+
+    def create_new_run(
+        self,
+        *,
+        enable_rate_limits: bool = False,
+        run_status: str | None = STARTING_STATE,
+        **defaults,
+    ) -> SavedRun:
+        sr = super().create_new_run(
+            enable_rate_limits=enable_rate_limits, run_status=run_status, **defaults
+        )
+
+        if sr.message_thread:
+            if not sr.message_thread.first_run:
+                sr.message_thread.first_run = sr
+            sr.message_thread.last_run = sr
+            sr.message_thread.save(update_fields=["first_run", "last_run"])
+        else:
+            sr.message_thread = MessageThread.objects.create(
+                title=gui.session_state.get("input_prompt") or "",
+                first_run=sr,
+                last_run=sr,
+            )
+            sr.save(update_fields=["message_thread"])
+
+        return sr
 
 
 def messages_as_prompt(query_msgs: list[dict]) -> str:

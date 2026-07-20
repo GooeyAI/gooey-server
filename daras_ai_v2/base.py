@@ -2082,9 +2082,11 @@ class BasePage:
         pass
 
     def submit_and_redirect(
-        self, unsaved_state: dict[str, typing.Any] = None
-    ) -> typing.NoReturn | None:
-        sr = self.on_submit(unsaved_state=unsaved_state)
+        self,
+        unsaved_state: dict[str, typing.Any] | None = None,
+        **defaults,
+    ):
+        sr = self.on_submit(unsaved_state=unsaved_state, **defaults)
         if not sr:
             return
         if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
@@ -2119,8 +2121,12 @@ class BasePage:
         )
         raise gui.RedirectException(pr.get_app_url())
 
-    def on_submit(self, unsaved_state: dict[str, typing.Any] = None):
-        sr = self.create_and_validate_new_run(enable_rate_limits=True)
+    def on_submit(
+        self,
+        unsaved_state: dict[str, typing.Any] | None = None,
+        **defaults,
+    ):
+        sr = self.create_and_validate_new_run(enable_rate_limits=True, **defaults)
         if not sr:
             return
         self.call_runner_task(sr, unsaved_state=unsaved_state)

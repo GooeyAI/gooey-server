@@ -210,6 +210,15 @@ class SavedRun(models.Model):
         help_text="The URL to redirect the user to after the builder run is complete",
     )
 
+    message_thread = models.ForeignKey(
+        "bots.MessageThread",
+        on_delete=models.CASCADE,
+        related_name="saved_runs",
+        null=True,
+        blank=True,
+        default=None,
+    )
+
     objects = SavedRunQuerySet.as_manager()
 
     class Meta:

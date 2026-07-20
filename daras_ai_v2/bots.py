@@ -4,6 +4,7 @@ import traceback
 import typing
 from datetime import datetime
 
+from bots.models.message_thread import MessageThread
 import gooey_gui as gui
 import requests
 from django.db import transaction, IntegrityError
@@ -514,6 +515,10 @@ def _process_and_send_msg(
     if bot.request_overrides:
         body.update(bot.request_overrides)
         body["variables"] = variables | bot.request_overrides.get("variables", {})
+    message_thread = MessageThread.objects.get_or_create(
+        bot_conversation=bot.convo,
+        defaults=dict(title=input_text),
+    )[0]
     result, sr = submit_api_call(
         page_cls=bot.page_cls,
         query_params=bot.query_params,
@@ -521,6 +526,7 @@ def _process_and_send_msg(
         current_user=current_user,
         request_body=body,
         surface=SavedRun.Surface.deployment,
+        message_thread=message_thread,
     )
     bot.on_run_created(sr)
 

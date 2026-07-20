@@ -1,6 +1,7 @@
 from typing import Any
 
-
+from bots.models import SavedRun
+from bots.models.message_thread import MessageThread
 import gooey_gui as gui
 
 from daras_ai_v2 import settings
@@ -21,7 +22,9 @@ def load_chat_widget_lib():
     )
 
 
-def chat_widget_input_to_request_body(state: dict, input_data: dict):
+def chat_widget_input_to_request_body(
+    sr: SavedRun, state: dict, input_data: dict
+) -> tuple[dict, MessageThread | None]:
     from daras_ai_v2.bots import handle_location_msg
 
     ret = {
@@ -71,8 +74,11 @@ def chat_widget_input_to_request_body(state: dict, input_data: dict):
                 content_text=prev_output,
             ),
         ]
+        message_thread = sr.message_thread
+    else:
+        message_thread = None
 
-    return ret
+    return ret, message_thread
 
 
 def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[Any]:
