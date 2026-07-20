@@ -76,7 +76,7 @@ def render_breadcrumbs_with_author(
             return
 
         for tag in pr.tags.all():
-            query_params = SearchFilters(tag=[tag.name]).get_query_params()
+            query_params = SearchFilters(tag=tag.name).get_query_params()
             render_pill_with_link(
                 tag.render(),
                 link_to=get_app_route_url(explore_page, query_params=query_params),

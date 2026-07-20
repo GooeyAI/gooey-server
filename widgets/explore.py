@@ -34,8 +34,7 @@ def build_meta_tags(url: str, search_filters: SearchFilters | None):
     if not search_filters:
         search_filters = SearchFilters()
 
-    tag_query = ", ".join(search_filters.tag)
-    match search_filters.search or tag_query, search_filters.workflow:
+    match search_filters.search or search_filters.tag, search_filters.workflow:
         case "", "":
             title = META_TITLE
         case query, "":
