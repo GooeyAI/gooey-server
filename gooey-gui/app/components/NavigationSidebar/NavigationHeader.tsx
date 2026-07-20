@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
-import { SignedOutAccount } from "./AccountSection";
+import { AccountSection } from "./AccountSection";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 
 export function NavigationHeader({
@@ -59,6 +59,7 @@ export function NavigationHeaderMobile({
   gooey_builder,
   builderOpen,
   account,
+  onSwitchWorkspace,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
   isMobile: boolean;
@@ -68,37 +69,44 @@ export function NavigationHeaderMobile({
   gooey_builder: NavigationSidebarProps["gooey_builder"];
   builderOpen: boolean;
   account: NavigationSidebarProps["account"];
+  onSwitchWorkspace: (workspaceId: number) => void;
 }) {
   return (
     <Fragment>
       <div className="nav-mobile-topbar d-lg-none d-flex align-items-center px-2 border-bottom bg-body">
-        <button
-          type="button"
-          className="btn p-2 d-flex align-items-center m-0"
-          title="Open menu"
-          onClick={onDrawerOpen}
-        >
-          <i className="fa-regular fa-sidebar fs-5"></i>
-        </button>
-        <a
-          href="/"
-          className="btn d-flex align-items-center gap-2 text-body text-decoration-none bg-hover-light py-2 px-1 rounded"
-        >
-          <img
-            src={logo_image_url}
-            alt="Gooey.AI"
-            height={20}
-            width={94}
-            className="img-fluid"
-          />
-        </a>
-        <div className="ms-auto d-flex align-items-center gap-1">
-          {!account.user && (
-            <SignedOutAccount account={account} compact={false} mobile />
-          )}
+        <div className="d-flex align-items-center gap-1">
+          <button
+            type="button"
+            className="btn p-2 d-flex align-items-center m-0"
+            title="Open menu"
+            onClick={onDrawerOpen}
+          >
+            <i className="fa-regular fa-sidebar fs-5"></i>
+          </button>
+          <a
+            href="/"
+            className="btn m-0 d-flex align-items-center gap-2 text-body text-decoration-none bg-hover-light py-2 px-1 rounded"
+          >
+            <img
+              src={logo_image_url}
+              alt="Gooey.AI"
+              height={20}
+              width={94}
+              className="img-fluid"
+            />
+          </a>
           {gooey_builder && !builderOpen && (
             <GooeyBuilderButton gooey_builder={gooey_builder} compact mobile />
           )}
+        </div>
+        <div className="ms-auto">
+          <AccountSection
+            account={account}
+            onSwitchWorkspace={onSwitchWorkspace}
+            compact
+            placement="bottom-end"
+            mobile
+          />
         </div>
       </div>
 

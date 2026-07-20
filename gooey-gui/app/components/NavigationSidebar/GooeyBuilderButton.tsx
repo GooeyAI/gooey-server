@@ -14,8 +14,8 @@ export function GooeyBuilderButton({
     <button
       type="button"
       className={clsx(
-        "gooey-builder-btn btn b-1 bg-hover-light d-flex align-items-center position-relative",
-        compact ? "justify-content-center p-1" : "gap-2 p-2",
+        "gooey-builder-btn btn b-1 bg-hover-light d-flex align-items-center position-relative p-2",
+        compact ? "justify-content-center" : "gap-2",
         mobile ? "border-0" : "border b-1"
       )}
       title={gooey_builder.name}
