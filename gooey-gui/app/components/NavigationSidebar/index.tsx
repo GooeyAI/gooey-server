@@ -146,6 +146,7 @@ export function NavigationSidebar({
         gooey_builder={gooey_builder}
         builderOpen={builderOpen}
         account={account}
+        onSwitchWorkspace={switchWorkspace}
       />
 
       <nav
@@ -198,8 +199,7 @@ function NavigationFooter({
 }) {
   return (
     <div className="flex-shrink-0 px-2 pb-2 d-flex flex-column gap-2">
-      {/* On mobile the Gooey Builder launcher lives in the top bar, not the drawer. */}
-      {gooey_builder && !builderOpen && !isMobile && (
+      {gooey_builder && !builderOpen && (
         <GooeyBuilderButton
           gooey_builder={gooey_builder}
           compact={railCollapsed}
