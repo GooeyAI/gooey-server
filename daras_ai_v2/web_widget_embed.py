@@ -1,6 +1,7 @@
 from typing import Any
 
-
+from bots.models import SavedRun
+from bots.models.message_thread import MessageThread
 import gooey_gui as gui
 
 from daras_ai_v2 import settings
@@ -21,7 +22,9 @@ def load_chat_widget_lib():
     )
 
 
-def chat_widget_input_to_request_body(state: dict, input_data: dict):
+def chat_widget_input_to_request_body(
+    sr: SavedRun, state: dict, input_data: dict
+) -> tuple[dict, MessageThread | None]:
     from daras_ai_v2.bots import handle_location_msg
 
     ret = {
@@ -53,10 +56,11 @@ def chat_widget_input_to_request_body(state: dict, input_data: dict):
     prev_input_images = state.get("input_images")
     prev_input_audio = state.get("input_audio")
     prev_input_documents = state.get("input_documents")
-    prev_output = (state.get("raw_output_text") or [""])[0]
-    if (
+    prev_chat_input = (
         prev_input or prev_input_images or prev_input_audio or prev_input_documents
-    ) and prev_output:
+    )
+    prev_output = (state.get("raw_output_text") or [""])[0]
+    if prev_chat_input and prev_output:
         # append previous input to the history
         ret["messages"] = state.get("messages", []) + [
             format_chat_entry(
@@ -72,7 +76,13 @@ def chat_widget_input_to_request_body(state: dict, input_data: dict):
             ),
         ]
 
-    return ret
+    any_prev_input = prev_chat_input or state.get("input_prompt")
+    if any_prev_input:
+        message_thread = sr.message_thread
+    else:
+        message_thread = None
+
+    return ret, message_thread
 
 
 def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[Any]:

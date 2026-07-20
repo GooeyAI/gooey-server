@@ -34,6 +34,7 @@ from bots.models import (
     Workflow,
     WorkflowMetadata,
 )
+from bots.models.message_thread import MessageThread
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
@@ -1137,3 +1138,38 @@ class TagAdmin(GooeyModelAdmin):
     search_fields = ["name", "category"]
     list_filter = ["category", "is_featured", "hidden"]
     readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(MessageThread)
+class MessageThreadAdmin(GooeyModelAdmin):
+    list_display = [
+        "title",
+        "bot_conversation",
+        "view_first_run",
+        "view_last_run",
+        "view_messages",
+        "get_created_at",
+        "get_updated_at",
+    ]
+    autocomplete_fields = ["bot_conversation", "first_run", "last_run"]
+    readonly_fields = ["view_messages"]
+
+    @admin.display(description="First Message")
+    def view_first_run(self, message_thread: MessageThread):
+        return message_thread.first_run and change_obj_url(message_thread.first_run)
+
+    @admin.display(description="Last Message")
+    def view_last_run(self, message_thread: MessageThread):
+        return message_thread.last_run and change_obj_url(message_thread.last_run)
+
+    @admin.display(description="Messages")
+    def view_messages(self, message_thread: MessageThread):
+        return list_related_html_url(message_thread.saved_runs)
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("first_run", "last_run", "bot_conversation")
+            .order_by("-last_run__updated_at")
+        )
