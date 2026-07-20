@@ -10,7 +10,7 @@ class RedirectException(Exception):
 class QueryParamsRedirectException(RedirectException):
     def __init__(self, query_params: dict, status_code=303):
         query_params = {k: v for k, v in query_params.items() if v is not None}
-        url = "?" + urllib.parse.urlencode(query_params, doseq=True)
+        url = "?" + urllib.parse.urlencode(query_params)
         super().__init__(url, status_code)
 
 
