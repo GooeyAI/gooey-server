@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import typing
 from contextlib import contextmanager
 
@@ -9,10 +10,15 @@ import fastapi
 
 F = typing.TypeVar("F", bound=typing.Callable[..., typing.Any])
 
+# silk's DataCollector is a singleton with per-thread state, so nested
+# collections on the same thread clobber each other and save duplicate
+# Response rows. Track the active collection per-thread to skip nesting.
+_local = threading.local()
+
 
 @contextmanager
 def silk_collect(fn: F, args: tuple, kwargs: dict, request: fastapi.Request | None):
-    if not silk_enabled():
+    if not silk_enabled() or getattr(_local, "collecting", False):
         yield
         return
 
@@ -30,6 +36,7 @@ def silk_collect(fn: F, args: tuple, kwargs: dict, request: fastapi.Request | No
 
     django_request = django_request_for_call(path, query_string, headers, body)
     silk_request = start_silk_collection(django_request)
+    _local.collecting = True
 
     try:
         from silk.profiling.profiler import silk_profile
@@ -37,6 +44,7 @@ def silk_collect(fn: F, args: tuple, kwargs: dict, request: fastapi.Request | No
         with silk_profile(name=path):
             yield
     finally:
+        _local.collecting = False
         finish_silk_collection(silk_request)
 
 
