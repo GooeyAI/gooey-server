@@ -1144,7 +1144,7 @@ class TagAdmin(GooeyModelAdmin):
 class MessageThreadAdmin(GooeyModelAdmin):
     list_display = [
         "title",
-        "bot_conversation",
+        "view_bot_conversation",
         "view_first_run",
         "view_last_run",
         "view_messages",
@@ -1153,6 +1153,12 @@ class MessageThreadAdmin(GooeyModelAdmin):
     ]
     autocomplete_fields = ["bot_conversation", "first_run", "last_run"]
     readonly_fields = ["view_messages"]
+
+    @admin.display(description="Bot Conversation")
+    def view_bot_conversation(self, message_thread: MessageThread):
+        return message_thread.bot_conversation and change_obj_url(
+            message_thread.bot_conversation
+        )
 
     @admin.display(description="First Message")
     def view_first_run(self, message_thread: MessageThread):

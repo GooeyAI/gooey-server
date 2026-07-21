@@ -1589,8 +1589,8 @@ def _can_use_message_thread(
         return False
 
     thread_uid = message_thread.saved_runs.values_list("uid", flat=True).first()
-    if thread_uid:
-        return thread_uid == user.uid
+    if thread_uid and thread_uid != user.uid:
+        return False
 
     return True
 

@@ -77,7 +77,7 @@ def chat_widget_input_to_request_body(
         ]
 
     any_prev_input = prev_chat_input or state.get("input_prompt")
-    if any_prev_input:
+    if any_prev_input and sr.message_thread and sr.message_thread.last_run_id == sr.id:
         message_thread = sr.message_thread
     else:
         message_thread = None
