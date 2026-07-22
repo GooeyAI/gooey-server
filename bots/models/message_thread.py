@@ -29,10 +29,10 @@ class MessageThread(models.Model):
         default=None,
     )
 
-    last_run = models.ForeignKey(
+    last_run = models.OneToOneField(
         "bots.SavedRun",
         on_delete=models.SET_NULL,
-        related_name="threads_as_last_run",
+        related_name="thread_as_last_run",
         null=True,
         blank=True,
         default=None,

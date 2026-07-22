@@ -240,8 +240,11 @@ def fetch_builder_conversations(
             uid=request.user.uid,
             workspace=get_current_workspace(request.user, request.session),
             surface=SavedRun.Surface.builder_child,
+            # group by thread: keep only the run whose builder prompt is the
+            # latest run in its thread
+            parent_builder_saved_run__thread_as_last_run__isnull=False,
         )
-        .annotate(title=F("parent_builder_saved_run__state__input_prompt"))
+        .annotate(title=F("parent_builder_saved_run__thread_as_last_run__title"))
         .order_by("-updated_at")[: body.limit]
     )
     return export_chat_qs(qs)
@@ -264,8 +267,10 @@ def fetch_chat_conversations(
             workflow=Workflow.VIDEO_BOTS,
             workspace=get_current_workspace(request.user, request.session),
             parent_version__published_run=pr,
+            # group by thread: keep only the latest run in each thread
+            thread_as_last_run__isnull=False,
         )
-        .annotate(title=F("state__input_prompt"))
+        .annotate(title=F("thread_as_last_run__title"))
         .order_by("-updated_at")[: body.limit]
     )
     return export_chat_qs(qs)
