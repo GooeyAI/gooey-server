@@ -341,7 +341,7 @@ To understand what each field represents, check out our [API docs](https://api.g
                 rec_ix = len(out_recs)
                 out_recs.extend(in_recs[df_ix : df_ix + arr_len])
 
-                used_col_names = set()
+                used_workflow_labels = set()
                 for url_ix, request_body, page_cls, sr, pr in build_requests_for_df(
                     df, request, df_ix, arr_len, array_columns
                 ):
@@ -369,17 +369,13 @@ To understand what each field represents, check out our [API docs](https://api.g
                     state["run_time"] = round(sr.run_time.total_seconds(), 2)
                     state["error_msg"] = sr.error_msg
 
+                    workflow_label = _make_unique_workflow_label(
+                        (pr and pr.title) or str(url_ix + 1),
+                        used_workflow_labels,
+                    )
+
                     for field, col in request.output_columns.items():
-                        if len(request.run_urls) > 1:
-                            if (
-                                pr
-                                and pr.title
-                                and f"({pr.title}) {col}" not in used_col_names
-                            ):
-                                col = f"({pr.title}) {col}"
-                                used_col_names.add(col)
-                            else:
-                                col = f"({url_ix + 1}) {col}"
+                        col = f"({workflow_label}) {col}"
                         out_val = state.get(field)
                         if isinstance(out_val, list):
                             for arr_ix, item in enumerate(out_val):
@@ -536,6 +532,16 @@ To understand what each field represents, check out our [API docs](https://api.g
             del_key=del_key,
             current_user=self.request.user,
         )
+
+
+def _make_unique_workflow_label(title: str, used_labels: set[str]) -> str:
+    label = title
+    suffix = 2
+    while label in used_labels:
+        label = f"{title} - {suffix}"
+        suffix += 1
+    used_labels.add(label)
+    return label
 
 
 def build_requests_for_df(df, request, df_ix, arr_len, array_columns):

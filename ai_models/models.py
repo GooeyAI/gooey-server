@@ -80,6 +80,7 @@ class AIModelSpec(models.Model):
         video = (1, "🎥 Video")
         audio = (2, "🎵 Audio")
         llm = (3, "💬 LLM")
+        image = (4, "🖼️ Image")
 
     category = models.IntegerField(
         choices=Categories.choices,
