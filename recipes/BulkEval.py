@@ -32,6 +32,8 @@ if typing.TYPE_CHECKING:
     import pandas as pd
 
 NROWS_CACHE_KEY = "__nrows"
+CANDIDATE_TOKEN_PREFIX = "[[candidate:"
+CANDIDATE_TOKEN_RE = re.compile(r"\[\[candidate:([A-Z]+)\]\]")
 
 AggFunctionsList = [
     "mean",
@@ -70,7 +72,10 @@ class CandidateEvaluationTool(BaseLLMTool):
                 "or Error Message. Return one numeric score for every candidate in each "
                 "scored column, using the provided column and candidate names exactly. "
                 "Put rationales, best candidates, and other row-level outputs in "
-                "summaries."
+                "summaries. In summary values, refer to candidates only with the exact "
+                "provided tokens, such as [[candidate:A]]. Use these tokens even when "
+                "embedding candidate references in prose. Never use bare candidate "
+                "letters, workflow titles, or invented candidate tokens."
             ),
             properties={
                 "scores": {
@@ -117,7 +122,13 @@ class CandidateEvaluationTool(BaseLLMTool):
                         "type": "object",
                         "properties": {
                             "column": {"type": "string"},
-                            "value": {"type": "string"},
+                            "value": {
+                                "type": "string",
+                                "description": (
+                                    "Summary text or value. Refer to candidates only "
+                                    "with exact provided tokens such as [[candidate:A]]."
+                                ),
+                            },
                         },
                         "required": ["column", "value"],
                         "additionalProperties": False,
@@ -556,7 +567,7 @@ def build_candidate_columns(
 
         candidate = candidate_by_workflow_title.get(workflow_title)
         if candidate is None:
-            candidate = _candidate_name(len(candidate_by_workflow_title))
+            candidate = _candidate_token(len(candidate_by_workflow_title))
             candidate_by_workflow_title[workflow_title] = candidate
         output_column = output_column or "Output"
         grouped_output_columns.setdefault(output_column, {})
@@ -605,13 +616,13 @@ def _parse_workflow_column_parts(col: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _candidate_name(index: int) -> str:
+def _candidate_token(index: int) -> str:
     name = ""
     while True:
         index, remainder = divmod(index, 26)
         name = chr(ord("A") + remainder) + name
         if index == 0:
-            return name
+            return f"[[candidate:{name}]]"
         index -= 1
 
 
@@ -769,13 +780,26 @@ def apply_eval_metrics(
         column = summary["column"].strip()
         if not column:
             raise ValueError("summary column names cannot be blank")
-        value = summary["value"]
+        value = _restore_workflow_titles(summary["value"], workflow_title_by_candidate)
         output_col = f"{eval_name} - {column}"
         if output_col in evaluation_columns:
             raise ValueError(f"duplicate evaluation column: {column!r}")
-        evaluation_columns[output_col] = workflow_title_by_candidate.get(value, value)
+        evaluation_columns[output_col] = value
 
     current_rec.update(evaluation_columns)
+
+
+def _restore_workflow_titles(
+    value: str, workflow_title_by_candidate: dict[str, str]
+) -> str:
+    if CANDIDATE_TOKEN_PREFIX not in value:
+        return value
+
+    def replace_candidate(match: re.Match) -> str:
+        candidate = match[0]
+        return workflow_title_by_candidate.get(candidate, candidate)
+
+    return CANDIDATE_TOKEN_RE.sub(replace_candidate, value)
 
 
 @gui.cache_in_session_state
