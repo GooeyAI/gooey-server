@@ -72,10 +72,12 @@ class CandidateEvaluationTool(BaseLLMTool):
                 "or Error Message. Return one numeric score for every candidate in each "
                 "scored column, using the provided column and candidate names exactly. "
                 "Put rationales, best candidates, and other row-level outputs in "
-                "summaries. In summary values, refer to candidates only with the exact "
-                "provided tokens, such as [[candidate:A]]. Use these tokens even when "
-                "embedding candidate references in prose. Never use bare candidate "
-                "letters, workflow titles, or invented candidate tokens."
+                "summaries. In summary values, every candidate reference must use the "
+                "complete exact token provided in the input, such as [[candidate:A]], "
+                "including references embedded in prose. Treat candidate tokens as "
+                "opaque identifiers, not an alphabetical sequence. Never abbreviate "
+                "a token to a bare letter, refer to a candidate by ordinal or workflow "
+                "title, or infer or invent another candidate token."
             ),
             properties={
                 "scores": {
@@ -115,8 +117,12 @@ class CandidateEvaluationTool(BaseLLMTool):
                     "type": "array",
                     "description": (
                         "Additional row-level outputs requested by the prompt, such as "
-                        "a rationale or the best candidate. Return an empty array when "
-                        "none were requested."
+                        "a rationale or the best candidate. Every candidate reference "
+                        "must use its complete exact provided token in [[candidate:X]] "
+                        "format, such as [[candidate:A]], including references embedded "
+                        "in prose. When the value is only a selected candidate, return "
+                        "only that token. Return an empty array when no additional outputs "
+                        "were requested."
                     ),
                     "items": {
                         "type": "object",
@@ -125,8 +131,11 @@ class CandidateEvaluationTool(BaseLLMTool):
                             "value": {
                                 "type": "string",
                                 "description": (
-                                    "Summary text or value. Refer to candidates only "
-                                    "with exact provided tokens such as [[candidate:A]]."
+                                    "Summary text or value. Use the complete exact provided "
+                                    "token in [[candidate:X]] format, such as "
+                                    "[[candidate:A]], for every candidate reference, even "
+                                    "in prose. If the value identifies one candidate, "
+                                    "return only that token."
                                 ),
                             },
                         },
