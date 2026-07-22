@@ -154,7 +154,7 @@ def get_entry_text(entry: ConversationEntry) -> str:
 
 
 ResponseFormatType = typing.Literal["text", "json_object"]
-ToolChoice = typing.Literal["auto", "required", "none"] | dict
+ToolChoice = typing.Literal["auto", "required", "none"]
 
 
 def run_language_model(
