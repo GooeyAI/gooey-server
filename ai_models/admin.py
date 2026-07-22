@@ -37,6 +37,7 @@ class AIModelSpecForm(forms.ModelForm):
                     f"--show-on-{AIModelSpec.Categories.llm}": ",".join(llm_fields),
                     f"--show-on-{AIModelSpec.Categories.audio}": ",".join(av_fields),
                     f"--show-on-{AIModelSpec.Categories.video}": ",".join(av_fields),
+                    f"--show-on-{AIModelSpec.Categories.image}": ",".join(av_fields),
                 }
             ),
         }

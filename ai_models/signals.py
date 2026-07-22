@@ -60,6 +60,8 @@ def _model_pricing_category(spec_category: int | None) -> int:
             return ModelCategory.AUDIO_GENERATION
         case AIModelSpec.Categories.llm:
             return ModelCategory.LLM
+        case AIModelSpec.Categories.image:
+            return ModelCategory.IMAGE_GENERATION
         case _:
             return ModelCategory.IMAGE_GENERATION
 
