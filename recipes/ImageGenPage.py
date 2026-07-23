@@ -150,17 +150,17 @@ class ImageGenPage(BasePage):
         self.render_run_preview_output(gui.session_state, preview=False)
 
     def render_run_preview_output(self, state: dict, preview: bool = True):
-        output_images = state.get("output_images") or {}
-        for model_name, image_urls in output_images.items():
-            model = self.available_models.get(model_name)
-            caption = model.label if model else model_name
-            for image_url in image_urls:
-                gui.image(
-                    image_url,
-                    caption=caption,
-                    show_download_button=True,
-                    previewImg=media_preview_img(image_url) if preview else None,
-                )
+        selected_model = state.get("selected_model")
+        image_urls = (state.get("output_images") or {}).get(selected_model, [])
+        model = self.available_models.get(selected_model) if selected_model else None
+        caption = model.label if model else selected_model
+        for image_url in image_urls:
+            gui.image(
+                image_url,
+                caption=caption,
+                show_download_button=True,
+                previewImg=media_preview_img(image_url) if preview else None,
+            )
 
         prompt = get_prompt(state.get("inputs") or {})
         if preview and prompt:
