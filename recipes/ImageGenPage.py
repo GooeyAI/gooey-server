@@ -32,8 +32,8 @@ class ImageGenPage(BasePage):
     price_deferred = True
 
     class RequestModel(BasePage.RequestModel):
-        selected_model: ImageModelMarker
-        inputs: dict[str, typing.Any]
+        selected_model: ImageModelMarker | None = None
+        inputs: dict[str, typing.Any] | None = None
 
     class ResponseModel(BaseModel):
         output_images: dict[str, list[HttpUrlStr]]
@@ -41,16 +41,19 @@ class ImageGenPage(BasePage):
     def run_v2(
         self, request: ImageGenPage.RequestModel, response: ImageGenPage.ResponseModel
     ) -> typing.Iterator[str | None]:
-        yield from self.run_safety_checker(request.inputs)
+        if not request.selected_model:
+            raise UserError("Please select a model")
+        inputs = request.inputs or {}
+        yield from self.run_safety_checker(inputs)
         model = self.get_model(request.selected_model)
-        self.validate_model_inputs(model, request.inputs)
+        self.validate_model_inputs(model, inputs)
         if model.paid_only and not self.current_workspace.is_paying:
             raise PaymentRequired([model.label])
 
         yield f"Running {model.label}"
         result = yield from generate_on_fal(
             model.model_id,
-            request.inputs | dict(enable_safety_checker=False),
+            inputs | dict(enable_safety_checker=False),
         )
         if not isinstance(result, dict):
             raise UserError(f"Invalid image output from {model.label}: {result}")
