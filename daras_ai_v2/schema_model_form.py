@@ -154,25 +154,25 @@ def render_field(*, field: dict, name: str, label: str, value: typing.Any):
     help_text = dedent(description) if description else None
     field = resolve_field_anyof(field)
     match field["type"]:
-        case "array" if "lora" in name or "url" in name or "image" in name:
-            return gui.file_uploader(
-                label=label,
-                value=value,
-                help=help_text,
-                accept_multiple_files=True,
-            )
-        case "string" if "lora" in name or "url" in name or "image" in name:
-            return gui.file_uploader(
-                label=label,
-                value=value,
-                help=help_text,
-            )
         case ("string" | "integer" | "number") as _type if field.get("enum"):
             selected_value = gui.selectbox(
                 label=label, value=value, help=help_text, options=field["enum"]
             )
             pytype = {"string": str, "integer": int, "number": float}[_type]
             return pytype(selected_value)
+        case "array" if "lora" in name or "url" in name:
+            return gui.file_uploader(
+                label=label,
+                value=value,
+                help=help_text,
+                accept_multiple_files=True,
+            )
+        case "string" if "lora" in name or "url" in name:
+            return gui.file_uploader(
+                label=label,
+                value=value,
+                help=help_text,
+            )
         case "string":
             return gui.text_area(label=label, value=value, help=help_text)
         case "integer":
