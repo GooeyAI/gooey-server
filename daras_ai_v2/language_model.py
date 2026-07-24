@@ -1531,7 +1531,7 @@ def _run_mistral_chat(
 
     data = dict(
         model=model,
-        messages=messages,
+        messages=[chat_completion_msg_to_mistral_msg(msg) for msg in messages],
         max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
@@ -1563,6 +1563,36 @@ def _run_mistral_chat(
         quantity=out["usage"]["completion_tokens"],
     )
     return list(_parse_mistral_output(out))
+
+
+def chat_completion_msg_to_mistral_msg(msg: dict) -> dict:
+    if msg["role"] == "assistant" and "tool_calls" in msg:
+        # function calls
+        return {
+            "role": msg["role"],
+            "content": msg.get("content"),
+            "tool_calls": [
+                {
+                    "id": tool_call.get("id", ""),
+                    "type": tool_call.get("type", "function"),
+                    "function": {
+                        "name": tool_call["function"]["name"],
+                        "arguments": tool_call["function"]["arguments"],
+                    },
+                }
+                for tool_call in msg["tool_calls"]
+            ],
+        }
+
+    if msg["role"] == "tool":
+        # function call output
+        return {
+            "role": msg["role"],
+            "content": msg["content"],
+            "tool_call_id": msg["tool_call_id"],
+        }
+
+    return {"role": msg["role"], "content": msg["content"]}
 
 
 def _parse_mistral_output(out: dict) -> typing.Iterable[dict]:
