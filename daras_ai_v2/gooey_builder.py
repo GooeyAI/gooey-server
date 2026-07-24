@@ -245,6 +245,7 @@ def fetch_builder_conversations(
             parent_builder_saved_run__thread_as_last_run__isnull=False,
         )
         .annotate(title=F("parent_builder_saved_run__thread_as_last_run__title"))
+        .only("workflow", "run_id", "uid", "updated_at")
         .order_by("-updated_at")[: body.limit]
     )
     return export_chat_qs(qs)
@@ -271,6 +272,7 @@ def fetch_chat_conversations(
             thread_as_last_run__isnull=False,
         )
         .annotate(title=F("thread_as_last_run__title"))
+        .only("workflow", "run_id", "uid", "updated_at")
         .order_by("-updated_at")[: body.limit]
     )
     return export_chat_qs(qs)
