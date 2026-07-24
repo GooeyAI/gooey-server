@@ -18,7 +18,7 @@ from routers.base_auth import (
     safe_next_url,
 )
 from routers.custom_api_router import CustomAPIRouter
-from routers.root import page_wrapper, get_og_url_path
+from routers.root import sidebar_page_wrapper, get_og_url_path
 
 # mirrors django.contrib.auth
 SESSION_KEY = "_auth_user_id"
@@ -40,7 +40,7 @@ def login(request: fastapi.Request):
         submit_url = str(furl(submit_url, query_params={"next": next_url}))
 
     with (
-        page_wrapper(request),
+        sidebar_page_wrapper(request),
         gui.center(className="flex-grow-1 my-5"),
     ):
         gui.component(
@@ -67,7 +67,7 @@ def forgot_password(request: fastapi.Request):
     to the admin password reset form for that user.
     """
     with (
-        page_wrapper(request),
+        sidebar_page_wrapper(request),
         gui.center(className="flex-grow-1 my-5"),
     ):
         gui.component(

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 
 
@@ -6,6 +8,7 @@ from bots.models import SavedRun, PublishedRun
 if typing.TYPE_CHECKING:
     from routers.root import RecipeTabs
     from daras_ai_v2.base import BasePage
+    from bots.models.workflow import WorkflowMetadata
 
 
 class TitleUrl(typing.NamedTuple):
@@ -52,13 +55,16 @@ def get_title_breadcrumbs(
     sr: SavedRun,
     pr: PublishedRun | None,
     tab: typing.Optional["RecipeTabs"] = None,
+    *,
+    metadata: WorkflowMetadata | None = None,
 ) -> TitleBreadCrumbs:
     from routers.root import RecipeTabs
 
     is_root = pr and pr.saved_run == sr and pr.is_root()
     is_example = not is_root and pr and pr.saved_run == sr
     is_run = not is_root and not is_example
-    metadata = sr.get_workflow_metadata()
+    if metadata is None:
+        metadata = sr.get_workflow_metadata()
     root_title = TitleUrl(
         f"{metadata.emoji} {metadata.short_title}", page_cls.app_url()
     )

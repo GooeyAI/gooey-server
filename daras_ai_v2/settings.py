@@ -283,9 +283,9 @@ else:
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
 
-GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/2a3aacb4-0941-11ee-b236-02420a0001fb/thumbs/logo%20black.png_400x400.png"
+GOOEY_LOGO_IMG = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/62fbdac8-6f0a-11f1-8c7e-02420a000130/gooey-logo-text.png"
 GOOEY_LOGO_IMG_WHITE = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/ea26bc06-7eda-11ef-89fa-02420a0001f6/gooey-white-logo.png"
-GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/d628be8a-9207-11ef-8aee-02420a000186/984x272%20rect%20gooey%20logo.png"
+GOOEY_LOGO_RECT = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/62fbdac8-6f0a-11f1-8c7e-02420a000130/gooey-logo-text.png"
 
 os.environ["REPLICATE_API_TOKEN"] = config("REPLICATE_API_TOKEN", default="")
 
@@ -330,16 +330,21 @@ PRICING_DETAILS_URL = furl(APP_BASE_URL).add(path="pricing").url
 DOCS_URL = config("DOCS_URL", "https://docs.gooey.ai")
 BLOG_URL = config("BLOG_URL", "https://blog.gooey.ai")
 CONTACT_URL = config("CONTACT_URL", "https://gooey.ai/contact")
+API_URL = config("API_URL", "/api/")
 
 HEADER_LINKS = [
     (EXPLORE_URL, "Explore"),
     (DOCS_URL, "Docs"),
-    ("/api/", "API"),
+    (API_URL, "API"),
     (BLOG_URL, "Blog"),
     ("/pricing", "Pricing"),
     (CONTACT_URL, "Contact"),
 ]
-HEADER_ICONS = {}
+
+HEADER_ICONS = {
+    API_URL: "fa-regular fa-code",
+    DOCS_URL: "fa-regular fa-book",
+}
 
 SERPER_API_KEY = config("SERPER_API_KEY", None)
 GOOGLE_GEOCODING_API_KEY = config("GOOGLE_GEOCODING_API_KEY", default="")
