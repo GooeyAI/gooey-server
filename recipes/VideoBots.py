@@ -998,7 +998,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     key="asr_model",
                     language_filter=selected_filter_language,
                     label=f"###### {field_title(self.RequestModel, 'asr_model')}",
-                    format_func=lambda x: (AsrModels[x].value if x else "Auto Select"),
+                    format_func=lambda x: AsrModels[x].value if x else "Auto Select",
                 )
             with col2:
                 if asr_model:
@@ -1365,14 +1365,25 @@ async function loadGooeyEmbed() {
     if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
         return;
     }
+    function sendMessage(payload) {
+        let btn = document.getElementById("onSendMessage");
+        if (!btn) return;
+        btn.value = JSON.stringify(payload);
+        btn.click();
+    }
+    function editQuery(messageId, payload) {
+        const prefix = "simple-msg-id-";
+        if (!messageId.startsWith(prefix)) return;
+        const messageIndex = Number(messageId.slice(prefix.length));
+        if (!Number.isInteger(messageIndex) || messageIndex < 0) return;
+        if (messageIndex >= messages.length) return;
+
+        sendMessage({ ...payload, messages: messages.slice(0, messageIndex) });
+    }
     let controller = {
         messages,
-        onSendMessage: (payload) => {
-            let btn = document.getElementById("onSendMessage");
-            if (!btn) return;
-            btn.value = JSON.stringify(payload);
-            btn.click();
-        },
+        onSendMessage: sendMessage,
+        editQuery,
         onNewConversation() {
           document.getElementById("onNewConversation").click();
         },

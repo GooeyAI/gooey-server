@@ -1,9 +1,10 @@
 from typing import Any
 
+from django.utils import timezone
+
+import gooey_gui as gui
 from bots.models import SavedRun
 from bots.models.message_thread import MessageThread
-import gooey_gui as gui
-
 from daras_ai_v2 import settings
 from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.language_model import (
@@ -27,11 +28,13 @@ def chat_widget_input_to_request_body(
 ) -> tuple[dict, MessageThread | None]:
     from daras_ai_v2.bots import handle_location_msg
 
+    input_messages = input_data.get("messages")
     ret = {
         "input_prompt": input_data.get("input_prompt"),
         "input_audio": input_data.get("input_audio") or None,
         "input_images": input_data.get("input_images") or None,
         "input_documents": input_data.get("input_documents") or None,
+        "created_at": input_data.get("created_at") or timezone.now().isoformat(),
     }
 
     button_pressed: list[str] | None = input_data.get("button_pressed")
@@ -52,37 +55,86 @@ def chat_widget_input_to_request_body(
     if input_location:
         ret["input_prompt"] = handle_location_msg(input_location)
 
-    prev_input = state.get("raw_input_text") or ""
-    prev_input_images = state.get("input_images")
-    prev_input_audio = state.get("input_audio")
-    prev_input_documents = state.get("input_documents")
-    prev_chat_input = (
-        prev_input or prev_input_images or prev_input_audio or prev_input_documents
-    )
-    prev_output = (state.get("raw_output_text") or [""])[0]
-    if prev_chat_input and prev_output:
-        # append previous input to the history
-        ret["messages"] = state.get("messages", []) + [
-            format_chat_entry(
+    if isinstance(input_messages, list):
+        ret["messages"] = chat_widget_messages_to_chatml(input_messages)
+        message_thread = None
+    else:
+        prev_input = state.get("raw_input_text") or ""
+        prev_input_images = state.get("input_images")
+        prev_input_audio = state.get("input_audio")
+        prev_input_documents = state.get("input_documents")
+        prev_chat_input = (
+            prev_input or prev_input_images or prev_input_audio or prev_input_documents
+        )
+        prev_output = (state.get("raw_output_text") or [""])[0]
+        if prev_chat_input and prev_output:
+            # append previous input to the history
+            previous_input = format_chat_entry(
                 role=CHATML_ROLE_USER,
                 content_text=prev_input,
                 input_images=prev_input_images,
                 # input_audio=prev_input_audio,
                 input_documents=prev_input_documents,
-            ),
-            format_chat_entry(
-                role=CHATML_ROLE_ASSISTANT,
-                content_text=prev_output,
-            ),
-        ]
+            )
+            if created_at := state.get("created_at"):
+                previous_input["created_at"] = created_at
 
-    any_prev_input = prev_chat_input or state.get("input_prompt")
-    if any_prev_input and sr.message_thread and sr.message_thread.last_run_id == sr.id:
-        message_thread = sr.message_thread
-    else:
-        message_thread = None
+            ret["messages"] = state.get("messages", []) + [
+                previous_input,
+                format_chat_entry(
+                    role=CHATML_ROLE_ASSISTANT,
+                    content_text=prev_output,
+                ),
+            ]
+
+        any_prev_input = prev_chat_input or state.get("input_prompt")
+        if (
+            any_prev_input
+            and sr.message_thread
+            and sr.message_thread.last_run_id == sr.id
+        ):
+            message_thread = sr.message_thread
+        else:
+            message_thread = None
 
     return ret, message_thread
+
+
+def chat_widget_messages_to_chatml(messages: list[dict]) -> list[dict]:
+    chatml_messages = []
+    for message in messages:
+        chatml_message = chat_widget_message_to_chatml(message)
+        if chatml_message:
+            chatml_messages.append(chatml_message)
+    return chatml_messages
+
+
+def chat_widget_message_to_chatml(message: dict) -> dict | None:
+    role = message.get("role")
+    if role not in {CHATML_ROLE_USER, CHATML_ROLE_ASSISTANT}:
+        return None
+
+    content = message.get("content") or ""
+    if role == CHATML_ROLE_USER:
+        content = message.get("input_prompt") or content
+    else:
+        output = message.get("raw_output_text") or message.get("output_text")
+        if isinstance(output, list):
+            if output:
+                content = output[0]
+        elif output:
+            content = output
+
+    chatml_message = format_chat_entry(
+        role=role,
+        content_text=content,
+        input_images=message.get("input_images"),
+        input_audio=message.get("input_audio"),
+        input_documents=message.get("input_documents"),
+    )
+    if created_at := message.get("created_at"):
+        chatml_message["created_at"] = created_at
+    return chatml_message
 
 
 def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[Any]:
@@ -108,6 +160,7 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                     role=role,
                     input_prompt=get_entry_text(entry),
                     input_images=get_entry_images(entry) or [],
+                    created_at=entry.get("created_at"),
                 )
             )
         elif role == CHATML_ROLE_ASSISTANT:
@@ -135,6 +188,7 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                 input_images=input_images,
                 input_audio=input_audio,
                 input_documents=input_documents,
+                created_at=state.get("created_at"),
             ),
         )
 
