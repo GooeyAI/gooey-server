@@ -14,6 +14,12 @@ from daras_ai_v2.language_filters import (
     filter_models_by_language,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.tts_supported_languages import (
+    BARK_TTS_SUPPORTED_LANGUAGES,
+    ELEVEN_LABS_TTS_SUPPORTED_LANGUAGES,
+    MMS_TTS_SUPPORTED_LANGUAGES,
+    OPENAI_TTS_SUPPORTED_LANGUAGES,
+)
 from managed_secrets.models import ManagedSecret
 from managed_secrets.widgets import edit_secret_button_with_dialog
 from workspaces.models import Workspace
@@ -107,28 +113,6 @@ ELEVEN_LABS_MODELS = {
     "eleven_multilingual_v1": "Multilingual V1",
 }
 
-ELEVEN_LABS_TTS_SUPPORTED_LANGUAGES = [
-    ("English", "en"), ("Japanese", "ja"), ("Chinese", "zh"), ("German", "de"), ("Hindi", "hi"), ("French", "fr"),
-    ("Korean", "ko"), ("Portuguese", "pt"), ("Italian", "it"), ("Spanish", "es"), ("Indonesian", "id"),
-    ("Dutch", "nl"), ("Turkish", "tr"), ("Filipino", "fil"), ("Polish", "pl"), ("Swedish", "sv"),
-    ("Bulgarian", "bg"), ("Romanian", "ro"), ("Arabic", "ar"), ("Czech", "cs"), ("Greek", "el"),
-    ("Finnish", "fi"), ("Croatian", "hr"), ("Malay", "ms"), ("Slovak", "sk"), ("Danish", "da"),
-    ("Tamil", "ta"), ("Ukrainian", "uk"), ("Russian", "ru"),
-]  # fmt: skip
-
-# https://platform.openai.com/docs/guides/text-to-speech
-OPENAI_TTS_SUPPORTED_LANGUAGES: list[str] = [
-    "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",
-    "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
-    "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy",
-]  # fmt: skip
-
-BARK_TTS_SUPPORTED_LANGUAGES = [
-    ("English", "en"), ("German", "de"), ("Spanish", "es"), ("French", "fr"), ("Hindi", "hi"), ("Italian", "it"),
-    ("Japanese", "ja"), ("Korean", "ko"), ("Polish", "pl"), ("Portuguese", "pt"), ("Russian", "ru"), ("Turkish", "tr"),
-    ("Chinese", "zh"),
-]  # fmt: skip
-
 BARK_ALLOWED_PROMPTS = {
     None: "———",
     "announcer": "Announcer",
@@ -141,8 +125,6 @@ BARK_ALLOWED_PROMPTS = {
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def tts_supported_languages_by_provider() -> dict[TextToSpeechProviders, list[str]]:
-    from modal_functions.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
-
     return {
         TextToSpeechProviders.GOOGLE_TTS: google_tts_language_codes(),
         TextToSpeechProviders.AZURE_TTS: azure_tts_language_codes(),
@@ -240,7 +222,6 @@ def mms_tts_selector(*, language_filter: str = ""):
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def mms_tts_language_options():
     import langcodes
-    from modal_functions.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
 
     result = {}
     for lang in MMS_TTS_SUPPORTED_LANGUAGES:
