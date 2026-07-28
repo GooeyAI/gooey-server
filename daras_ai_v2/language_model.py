@@ -17,7 +17,6 @@ from aifail import retry_if, vertex_ai_should_retry, try_all
 from django.conf import settings
 from furl import furl
 from loguru import logger
-from openai import Stream
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionChunk,
@@ -26,9 +25,7 @@ from openai.types.chat import (
 from openai.types.completion_usage import CompletionUsage
 from openai.types.responses import (
     Response,
-    ResponseCompletedEvent,
     ResponseStreamEvent,
-    ResponseUsage,
 )
 
 from ai_models.models import AIModelSpec, ModelProvider
@@ -440,7 +437,7 @@ def _run_chat_model(
                 stop_chunk_size=stop_chunk_size,
                 step_chunk_size=step_chunk_size,
             )
-        case ModelProvider.openai_responses:
+        case ModelProvider.openai_responses | ModelProvider.litellm_responses:
             return run_openai_responses(
                 model=model,
                 max_output_tokens=max_tokens,
@@ -717,6 +714,7 @@ def run_openai_responses(
         response, used_model = try_all(
             *[
                 _get_responses_create(
+                    provider=model.provider,
                     model=model_id,
                     api_key=model.api_key,
                     base_url=model.base_url,
@@ -727,7 +725,7 @@ def run_openai_responses(
                 for model_id in model_ids
             ],
         )
-        if isinstance(response, Stream):
+        if stream:
             return _stream_openai_responses(
                 response,
                 used_model,
@@ -961,18 +959,36 @@ def _format_anthropic_json_response(
 
 
 def _get_responses_create(
-    model: str, api_key: str | None, base_url: str | None, stream: bool, **kwargs
+    provider: ModelProvider,
+    model: str,
+    api_key: str | None,
+    base_url: str | None,
+    stream: bool,
+    **kwargs,
 ):
-    client = get_openai_client(model, api_key, base_url)
+    if provider == ModelProvider.litellm_responses:
+        import litellm
 
-    @wraps(client.responses.create)
+        responses_create = litellm.responses
+        if api_key:
+            kwargs["api_key"] = api_key
+        if base_url:
+            kwargs["api_base"] = base_url
+        if model.startswith(("vertex_ai/", "vertex_ai_beta/")):
+            kwargs["vertex_location"] = "global"
+    else:
+        responses_create = get_openai_client(
+            model, api_key, base_url
+        ).responses.create
+
+    @wraps(responses_create)
     def wrapper():
         # Convert messages format to responses API input format
         messages = kwargs.pop("messages", [])
         input_messages = flatten(
             chat_completion_msg_to_responses_input_msg(msg) for msg in messages
         )
-        response = client.responses.create(
+        response = responses_create(
             model=model, input=input_messages, stream=stream, **kwargs
         )
         return response, model
@@ -1176,7 +1192,7 @@ def _stream_openai_responses(
                 tool_calls.append(new_tc)
             yield ret
 
-        if isinstance(event, ResponseCompletedEvent):
+        if event.type == "response.completed":
             record_openai_llm_usage(used_model, event.response, messages, ret)
 
     # add the leftover chunks
@@ -1238,7 +1254,7 @@ def record_openai_llm_usage(
             completion.usage.completion_tokens_details
             and completion.usage.completion_tokens_details.reasoning_tokens
         )
-    elif isinstance(completion.usage, ResponseUsage):
+    elif hasattr(completion.usage, "input_tokens"):
         prompt_tokens = completion.usage.input_tokens
         completion_tokens = completion.usage.output_tokens
     else:
