@@ -1,3 +1,4 @@
+*.dump
 dump.rdb
 pages/Pad.py
 scratch.py
