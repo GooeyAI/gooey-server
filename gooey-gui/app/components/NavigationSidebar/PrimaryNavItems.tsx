@@ -1,11 +1,16 @@
+import { useLocation } from "@remix-run/react";
+import * as Sentry from "@sentry/remix";
 import clsx from "clsx";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 import type {
   NavAccountData,
   NavItemData,
   NavigationSidebarProps,
+  NavWorkflowItem,
 } from "@gooey-types/navigation_sidebar_props";
-import { WorkflowList } from "./WorkflowList";
+import { fetchServerAPI } from "~/fetchServerAPI";
+import { NavLink } from "./NavLink";
+import { WorkflowList, WorkflowListSkeleton } from "./WorkflowList";
 
 export function PrimaryNavItems({
   nav_items,
@@ -22,7 +27,8 @@ export function PrimaryNavItems({
     <div className="px-2 nav-primary-items d-flex flex-column">
       <div className="nav-scroll-region d-flex flex-column gap-1 mt-1">
         {nav_items.map((item) => {
-          if (item.items.length > 0 && !railCollapsed) {
+          const hasChildren = item.items.length > 0 || !!item.items_url;
+          if (hasChildren && !railCollapsed) {
             return (
               <NavItemChildren
                 key={item.key}
@@ -45,14 +51,14 @@ export function PrimaryNavItems({
         {!account.user &&
           !railCollapsed &&
           account.menu_links.map((link) => (
-            <a
+            <NavLink
               key={`${link.href}:${link.label}`}
               href={link.href}
               className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body bg-hover-light"
             >
               {link.icon && <i className={clsx(link.icon, "nav-item-icon")} />}
               <span>{link.label}</span>
-            </a>
+            </NavLink>
           ))}
       </div>
     </div>
@@ -72,7 +78,7 @@ function NavItem({
   dense: boolean;
 }) {
   return (
-    <a
+    <NavLink
       className={clsx(
         "nav-item-link d-flex align-items-center rounded",
         collapsed && "justify-content-center px-0 py-2",
@@ -82,7 +88,7 @@ function NavItem({
         !!item.href && "bg-hover-light",
         item.dense ? "dense px-2 py-1 small" : "px-2 py-2"
       )}
-      href={item.href ?? undefined}
+      href={item.href}
       onClick={(e) => e.stopPropagation()} // avoid opening the sidebar
     >
       <span
@@ -104,7 +110,7 @@ function NavItem({
         {!collapsed && <span>{item.label}</span>}
       </span>
       {children}
-    </a>
+    </NavLink>
   );
 }
 
@@ -116,9 +122,14 @@ function NavItemChildren({
   isActive: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  const { items, isFetching } = useNavItemChildren(item);
+  const showSkeleton = isFetching && items.length === 0;
 
-  // No children → behaves like a plain nav item (label links to href).
-  if (item.items.length === 0) {
+  if (items.length === 0 && !showSkeleton) {
+    // A fetched section has no href of its own, so an empty result means there's
+    // nothing to link to — drop the whole section instead of a dead label.
+    if (item.items_url) return null;
+    // No children → behaves like a plain nav item (label links to href).
     return (
       <NavItem
         item={item}
@@ -160,9 +171,80 @@ function NavItemChildren({
       </NavItem>
       {showItems && (
         <div className={clsx(!item.dense && "saved-tree")}>
-          <WorkflowList items={item.items} indent={!item.dense} />
+          {showSkeleton ? (
+            <WorkflowListSkeleton rows={3} indent={!item.dense} />
+          ) : (
+            <WorkflowList items={items} indent={!item.dense} />
+          )}
         </div>
       )}
     </Fragment>
   );
+}
+
+// Sections with an `items_url` load their rows after the page has rendered, so a
+// slow query (History) never holds up SSR.
+//
+// The list is refetched on mount and on every url change -- starting a run
+// redirects to that run's url, which is our cue that a new row exists -- and the
+// result is cached per tab. The cache is shown right away and replaced silently
+// once the fetch lands, so only the very first load of a tab shows a skeleton.
+function useNavItemChildren(item: NavItemData) {
+  const itemsUrl = item.items_url;
+  const cacheKey = `${item.key}:${item.items_cache_key || ""}`;
+  const location = useLocation();
+  const locationKey = `${location.pathname}${location.search}`;
+
+  const [items, setItems] = useState<NavWorkflowItem[] | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+
+  useEffect(() => {
+    if (!itemsUrl) return;
+    let cancelled = false;
+    const cached = readCachedItems(cacheKey);
+    if (cached) setItems(cached);
+    setIsFetching(true);
+    fetchServerAPI<{ items: NavWorkflowItem[] }>(itemsUrl)
+      .then((data) => {
+        if (cancelled) return;
+        writeCachedItems(cacheKey, data.items);
+        setItems(data.items);
+      })
+      // keep showing whatever we already have if the refresh fails
+      .catch((error) => Sentry.captureException(error))
+      .finally(() => {
+        if (!cancelled) setIsFetching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemsUrl, cacheKey, locationKey]);
+
+  return { items: items ?? item.items, isFetching };
+}
+
+// sessionStorage (not localStorage): scoped to the tab and dropped when it
+// closes, which is as long as a cached nav list is useful anyway
+const ITEMS_CACHE_PREFIX = "gooey:nav-items:";
+
+function readCachedItems(cacheKey: string): NavWorkflowItem[] | null {
+  try {
+    const cached = sessionStorage.getItem(ITEMS_CACHE_PREFIX + cacheKey);
+    if (!cached) return null;
+    return JSON.parse(cached) as NavWorkflowItem[];
+  } catch {
+    // unavailable (private mode) or unparseable - fall back to fetching
+    return null;
+  }
+}
+
+function writeCachedItems(cacheKey: string, items: NavWorkflowItem[]) {
+  try {
+    sessionStorage.setItem(
+      ITEMS_CACHE_PREFIX + cacheKey,
+      JSON.stringify(items)
+    );
+  } catch {
+    // storage unavailable or full - the list still works, it just won't warm up
+  }
 }

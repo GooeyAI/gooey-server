@@ -40,7 +40,7 @@ def render(
     page: BasePage | None = None,
 ) -> None:
     from routers.base_auth import get_login_url, logout
-    from routers.root import explore_page, home_page
+    from routers.root import explore_page, home_page, navigation_sidebar_history_items
     from widgets.history import history_page
     from widgets.home import _saved_workflows_href
     from widgets.workflow_search import get_filter_value_from_workspace
@@ -66,9 +66,6 @@ def render(
 
     saved_path = _saved_workflows_href(workspace)
     workspaces = _load_workspaces(user, workspace)
-    recent_workflows = _load_recent_workflows(
-        user, workspace, limit=RECENT_WORKFLOW_LIST_LIMIT
-    )
 
     if workspace is None:
         saved_workspace_filter = None
@@ -98,7 +95,8 @@ def render(
                 saved_path=saved_path,
                 history_path=history_path,
                 saved_workflows=_load_saved_workflows(user, workspace),
-                recent_workflows=recent_workflows,
+                history_items_url=get_route_path(navigation_sidebar_history_items),
+                history_cache_key=_history_cache_key(user, workspace),
             ),
             active_key=active_key,
             collapsed_state_key=NAV_COLLAPSED_STATE_KEY,
@@ -129,7 +127,8 @@ def _load_nav_items(
     saved_path: str,
     history_path: str,
     saved_workflows: list[NavWorkflowItem],
-    recent_workflows: list[NavWorkflowItem],
+    history_items_url: str,
+    history_cache_key: str | None,
 ) -> list[NavItemData]:
     explore_item = NavItemData(
         key="explore",
@@ -155,20 +154,29 @@ def _load_nav_items(
             items=saved_workflows,
         ),
     ]
-    if recent_workflows:
-        items.append(
-            NavItemData(
-                key="history",
-                label="History",
-                icon=icons.history,
-                # href=history_path, # no href for history yet
-                items=recent_workflows,
-                # History mirrors Saved but stays open — no collapse chevron.
-                collapsible=False,
-                dense=True,
-            )
+    items.append(
+        NavItemData(
+            key="history",
+            label="History",
+            icon=icons.history,
+            items_url=history_items_url,
+            items_cache_key=history_cache_key,
+            collapsible=False,
+            dense=True,
         )
+    )
     return items
+
+
+def _history_cache_key(
+    user: AppUser | None,
+    workspace: Workspace | None,
+) -> str | None:
+    if user is None or workspace is None:
+        return None
+    # runs are per-user within a workspace, and the uid is already public (it's a
+    # query param on every run url)
+    return f"{user.uid}:{workspace.id}"
 
 
 def _load_menu_links(
@@ -263,11 +271,16 @@ def _load_saved_workflows(
     return [_pr_to_nav_workflow(pr) for pr in saved_published_runs(user, workspace)]
 
 
-def _load_recent_workflows(
+def load_recent_workflow_items(
     user: AppUser | None,
     workspace: Workspace | None,
-    limit: int = 20,
+    limit: int = RECENT_WORKFLOW_LIST_LIMIT,
 ) -> list[NavWorkflowItem]:
+    """Recent runs for the sidebar History section.
+
+    Called from the `navigation_sidebar_history_items` endpoint rather than
+    during render, so these queries stay off the page's critical path.
+    """
     srs = _recent_run_srs(user, workspace, limit)
     return [_sr_to_nav_workflow(sr) for sr in srs]
 
@@ -290,8 +303,14 @@ def _recent_run_srs(
         return []
     return list(
         SavedRun.objects.filter(id__in=ids)
-        .select_related("parent_version__published_run__saved_run")
-        .annotate(builder_prompt=F("parent_builder_saved_run__state__input_prompt"))
+        .select_related("parent_version__published_run__saved_run", "workflow_metadata")
+        .annotate(
+            builder_thread_title=F(
+                "parent_builder_saved_run__thread_as_last_run__title"
+            ),
+            # threads are titled asynchronously, so fall back to the message text
+            builder_prompt=F("parent_builder_saved_run__state__input_prompt"),
+        )
         .order_by("-updated_at")
     )
 
@@ -318,7 +337,10 @@ def _recent_run_ids(
     )
     builder_runs = (
         SavedRun.objects.filter(
-            uid=user.uid, workspace=workspace, surface=SavedRun.Surface.builder_child
+            uid=user.uid,
+            workspace=workspace,
+            surface=SavedRun.Surface.builder_child,
+            parent_builder_saved_run__thread_as_last_run__isnull=False,
         )
         .order_by("-updated_at")
         .values("id", "updated_at")[:limit]
@@ -349,7 +371,7 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
 
     href = sr.get_app_url()
     if sr.surface == SavedRun.Surface.builder_child:
-        title = (sr.builder_prompt or "").strip()
+        title = (sr.builder_thread_title or sr.builder_prompt or "").strip()
         # Only Builder runs opened from the rail force-open the Builder panel.
         href += GOOEY_BUILDER_OPEN_HASH
     else:
@@ -358,8 +380,8 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
     return NavWorkflowItem(
         title=title or (pr and pr.title) or workflow.label,
         href=href,
-        icon=_workflow_icon(metadata),
         image_url=(pr and pr.photo_url) or None,
+        icon=_workflow_icon(metadata),
     )
 
 
@@ -371,8 +393,8 @@ def _pr_to_nav_workflow(pr: PublishedRun) -> NavWorkflowItem:
     return NavWorkflowItem(
         title=pr.title or workflow.label,
         href=pr.get_app_url(),
-        icon=_workflow_icon(metadata),
         image_url=pr.photo_url or None,
+        icon=_workflow_icon(metadata),
     )
 
 

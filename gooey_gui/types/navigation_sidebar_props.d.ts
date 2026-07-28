@@ -12,6 +12,8 @@ export interface NavItemData {
   icon: string;
   href: string | null;
   items: NavWorkflowItem[];
+  items_url: string | null;
+  items_cache_key: string | null;
   collapsible: boolean;
   dense: boolean;
 }

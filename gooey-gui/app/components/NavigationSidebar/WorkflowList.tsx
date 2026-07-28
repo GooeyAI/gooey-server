@@ -1,5 +1,7 @@
 import type { NavWorkflowItem } from "@gooey-types/navigation_sidebar_props";
 import { useLocation } from "@remix-run/react";
+import clsx from "clsx";
+import { NavLink } from "./NavLink";
 
 type WorkflowListProps = {
   items: NavWorkflowItem[];
@@ -41,7 +43,7 @@ function WorkflowRowItem({
   isActive: boolean;
 }) {
   return (
-    <a
+    <NavLink
       href={item.href}
       aria-current={isActive ? "page" : undefined}
       className={
@@ -59,8 +61,8 @@ function WorkflowRowItem({
             className="nav-workflow-thumb rounded-circle flex-shrink-0"
           />
         ) : item.icon ? (
-          // workflow_icon is FontAwesome icon HTML (or a bare emoji); render
-          // both as-is rather than treating it as a class name.
+          // icon is FontAwesome icon HTML (or a bare emoji); render both as-is
+          // rather than treating it as a class name.
           <span
             aria-hidden="true"
             dangerouslySetInnerHTML={{ __html: item.icon }}
@@ -75,7 +77,33 @@ function WorkflowRowItem({
       >
         {item.title}
       </p>
-    </a>
+    </NavLink>
+  );
+}
+
+// Widths cycle so the placeholder rows read as titles of varying length rather
+// than an obvious repeating block.
+const SKELETON_ROW_WIDTHS = ["col-9", "col-6", "col-8", "col-5", "col-7"];
+
+export function WorkflowListSkeleton({
+  rows = 5,
+  indent = false,
+}: {
+  rows?: number;
+  indent?: boolean;
+}) {
+  return (
+    <div className={indent ? "ps-4" : undefined} aria-hidden="true">
+      {SKELETON_ROW_WIDTHS.slice(0, rows).map((width, idx) => (
+        <div
+          key={idx}
+          className="d-flex align-items-center gap-2 py-2 px-2 placeholder-glow"
+        >
+          <span className="placeholder bg-secondary rounded-circle flex-shrink-0 sidebar-recent-item-icon" />
+          <span className={clsx("placeholder bg-secondary rounded", width)} />
+        </div>
+      ))}
+    </div>
   );
 }
 

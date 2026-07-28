@@ -6,8 +6,8 @@ import pydantic
 class NavWorkflowItem(pydantic.BaseModel):
     title: str
     href: str
-    image_url: str | None = None
-    icon: str | None = None  # FA class fallback when no image
+    image_url: str | None = None  # published run photo, preferred over `icon`
+    icon: str | None = None  # FontAwesome icon HTML, or a bare emoji
 
 
 class NavItemData(pydantic.BaseModel):
@@ -16,6 +16,12 @@ class NavItemData(pydantic.BaseModel):
     icon: str  # HTML <i> element (rendered as raw HTML), e.g. icons.home
     href: str | None = None
     items: list[NavWorkflowItem] = []  # nested children, e.g. saved workflows
+    # Endpoint to load `items` from after the page renders, keeping a slow query
+    # off the SSR path. The section hides itself if the response is empty.
+    items_url: str | None = None
+    # Scopes the client-side cache of `items_url` results, so one browser tab
+    # never shows another user's or workspace's rows.
+    items_cache_key: str | None = None
     collapsible: bool = True  # False keeps `items` always expanded (no chevron)
     dense: bool = False  # True means less spacing and smaller font
 
