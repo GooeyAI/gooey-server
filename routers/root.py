@@ -24,7 +24,6 @@ from daras_ai_v2.asr import FFMPEG_WAV_ARGS, check_wav_audio_format
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_scripts
 from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
-    fastapi_login_required,
     fastapi_request_form,
     fastapi_request_json,
     get_route_path,
@@ -237,20 +236,6 @@ def home_page(request: Request):
     return {
         "meta": home.build_meta_tags(url=get_og_url_path(request)),
     }
-
-
-# must stay above the `/{path:path}` catch-all route below, which would
-# otherwise swallow this and 404
-@app.post(
-    "/__/navigation-sidebar/history-items/", dependencies=[fastapi_login_required]
-)
-def navigation_sidebar_history_items(request: Request):
-    # imported here because widgets.navigation_sidebar imports this module
-    from widgets.navigation_sidebar import load_recent_workflow_items
-
-    workspace = get_current_workspace(request.user, request.session)
-    items = load_recent_workflow_items(request.user, workspace)
-    return dict(items=[item.model_dump() for item in items])
 
 
 @app.get("/tools/{toolkit_slug}/{tool_slug}")

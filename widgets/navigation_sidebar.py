@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import gooey_gui as gui
 from starlette.requests import Request
 
+import gooey_gui as gui
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
@@ -17,11 +17,16 @@ from gooey_gui.types.navigation_sidebar_props import (
     GooeyBuilderData,
     MenuLinkData,
     NavAccountData,
+    NavigationSidebarProps,
     NavItemData,
     NavUserData,
     NavWorkflowItem,
-    NavigationSidebarProps,
     WorkspaceData,
+)
+from widgets.workflow_queries import (
+    recent_run_ids,
+    recent_workflow_items,
+    saved_published_runs,
 )
 
 if TYPE_CHECKING:
@@ -40,15 +45,15 @@ def render(
     page: BasePage | None = None,
 ) -> None:
     from routers.base_auth import get_login_url, logout
-    from routers.root import explore_page, home_page, navigation_sidebar_history_items
+    from routers.root import explore_page, home_page
     from widgets.history import history_page
     from widgets.home import _saved_workflows_href
     from widgets.workflow_search import get_filter_value_from_workspace
     from workspaces.widgets import (
+        SWITCH_WORKSPACE_KEY,
         get_create_workspace_popup_url,
         get_current_workspace,
         handle_workspace_switch,
-        SWITCH_WORKSPACE_KEY,
     )
 
     home_path = get_route_path(home_page)
@@ -95,7 +100,7 @@ def render(
                 saved_path=saved_path,
                 history_path=history_path,
                 saved_workflows=_load_saved_workflows(user, workspace),
-                history_items_url=get_route_path(navigation_sidebar_history_items),
+                history_items_url=get_route_path(recent_workflow_items),
                 history_cache_key=_history_cache_key(user, workspace),
             ),
             active_key=active_key,
@@ -249,6 +254,7 @@ def _load_workspaces(
 def _workspace_member_counts(workspaces: list[Workspace]) -> dict[int, int]:
     """Member counts for org workspaces in one query (avoids a COUNT per row)."""
     from django.db.models import Count
+
     from workspaces.models import WorkspaceMembership
 
     org_ids = [ws.id for ws in workspaces if not ws.is_personal]
@@ -266,8 +272,6 @@ def _load_saved_workflows(
     user: AppUser | None,
     workspace: Workspace | None,
 ) -> list[NavWorkflowItem]:
-    from widgets.home import saved_published_runs
-
     return [_pr_to_nav_workflow(pr) for pr in saved_published_runs(user, workspace)]
 
 
@@ -278,7 +282,7 @@ def load_recent_workflow_items(
 ) -> list[NavWorkflowItem]:
     """Recent runs for the sidebar History section.
 
-    Called from the `navigation_sidebar_history_items` endpoint rather than
+    Called from the `recent_workflow_items` endpoint rather than
     during render, so these queries stay off the page's critical path.
     """
     srs = _recent_run_srs(user, workspace, limit)
@@ -296,9 +300,15 @@ def _recent_run_srs(
     rather than the whole scan window.
     """
     from django.db.models import F
+
     from bots.models import SavedRun
 
-    ids = _recent_run_ids(user, workspace, limit)
+    ids = recent_run_ids(
+        user,
+        workspace,
+        limit,
+        include_builder_runs=True,
+    )
     if not ids:
         return []
     return list(
@@ -313,52 +323,6 @@ def _recent_run_srs(
         )
         .order_by("-updated_at")
     )
-
-
-def _recent_run_ids(
-    user: AppUser | None,
-    workspace: Workspace | None,
-    limit: int,
-) -> list[int]:
-    if user is None or workspace is None:
-        return []
-
-    from django.db.models import F
-    from bots.models import SavedRun
-    from widgets.home import RECENT_WORKFLOW_SCAN_LIMIT
-
-    history_runs = (
-        SavedRun.objects.filter(
-            uid=user.uid, workspace=workspace, surface=SavedRun.Surface.run
-        )
-        .annotate(published_run_id=F("parent_version__published_run_id"))
-        .order_by("-updated_at")
-        .values("id", "published_run_id", "updated_at")[:RECENT_WORKFLOW_SCAN_LIMIT]
-    )
-    builder_runs = (
-        SavedRun.objects.filter(
-            uid=user.uid,
-            workspace=workspace,
-            surface=SavedRun.Surface.builder_child,
-            parent_builder_saved_run__thread_as_last_run__isnull=False,
-        )
-        .order_by("-updated_at")
-        .values("id", "updated_at")[:limit]
-    )
-
-    picked: list[tuple] = []  # (updated_at, id)
-    seen_published_runs: set[int | None] = set()
-    for row in history_runs:
-        if row["published_run_id"] in seen_published_runs:
-            continue
-        seen_published_runs.add(row["published_run_id"])
-        picked.append((row["updated_at"], row["id"]))
-        if len(picked) >= limit:
-            break
-    picked.extend((row["updated_at"], row["id"]) for row in builder_runs)
-
-    picked.sort(key=lambda row: row[0], reverse=True)
-    return [id_ for _, id_ in picked[:limit]]
 
 
 def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
