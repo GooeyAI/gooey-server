@@ -5,6 +5,7 @@ export interface NavWorkflowItem {
   href: string;
   image_url: string | null;
   icon: string | null;
+  builder_intent: "open" | null;
 }
 export interface NavItemData {
   key: string;
@@ -38,7 +39,6 @@ export interface GooeyBuilderData {
   photo_url: string;
   name: string;
   event_key: string;
-  open_hash: string;
 }
 export interface NavAccountData {
   user: NavUserData | null;

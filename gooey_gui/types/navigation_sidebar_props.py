@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import typing
+
 import pydantic
+
+# One-shot instruction handed to the client as navigation state (never as a url
+# fragment), so it applies to the navigation it was issued for and is forgotten
+# afterwards. There is deliberately no "close": the Builder panel stays open
+# until the user closes it.
+BuilderIntent = typing.Literal["open"]
 
 
 class NavWorkflowItem(pydantic.BaseModel):
@@ -8,6 +16,7 @@ class NavWorkflowItem(pydantic.BaseModel):
     href: str
     image_url: str | None = None  # published run photo, preferred over `icon`
     icon: str | None = None  # FontAwesome icon HTML, or a bare emoji
+    builder_intent: BuilderIntent | None = None
 
 
 class NavItemData(pydantic.BaseModel):
@@ -50,7 +59,6 @@ class GooeyBuilderData(pydantic.BaseModel):
     photo_url: str
     name: str
     event_key: str
-    open_hash: str
 
 
 class NavAccountData(pydantic.BaseModel):

@@ -1,6 +1,7 @@
 import "./NavigationSidebar.css";
 
 import clsx from "clsx";
+import { useLocation } from "@remix-run/react";
 import type { CustomComponentProps } from "~/components";
 import type {
   NavAccountData,
@@ -8,6 +9,7 @@ import type {
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
 import { AccountSection } from "./AccountSection";
+import { clearBuilderIntent, readBuilderIntent } from "./builderIntent";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
 import { PrimaryNavItems } from "./PrimaryNavItems";
@@ -27,8 +29,8 @@ export function NavigationSidebar({
   onChange,
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
+  const location = useLocation();
   const builderEventKey = gooey_builder?.event_key;
-  const builderOpenHash = gooey_builder?.open_hash;
   const builderInitiallyOpen = Boolean(
     builderEventKey && state[builderEventKey]
   );
@@ -85,38 +87,18 @@ export function NavigationSidebar({
     };
   }, [builderEventKey]);
 
-  // Opening a Builder run from the rail lands with the configured fragment.
-  // Force-open the Builder panel (overriding any persisted state), then strip
-  // the fragment so a later refresh doesn't re-open it.
+  // A Builder-chat row in the rail carries an "open" intent as navigation state.
+  // This effect runs once the navigation has committed, so the panel is already
+  // listening; consuming the intent here also clears it, leaving refreshes and
+  // Back to honour whatever the user last chose. Nothing ever closes the panel
+  // on the user's behalf.
+  const builderIntent = readBuilderIntent(location.state);
   useEffect(() => {
-    if (!builderEventKey || !builderOpenHash) return;
-    function handleOpenBuilderHash() {
-      if (window.location.hash == builderOpenHash) {
-        window.history.replaceState(
-          null,
-          "",
-          window.location.pathname + window.location.search
-        );
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent(`${builderEventKey}:open`));
-        }, 500);
-      } else {
-        if (builderOpenRef.current) {
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent(`${builderEventKey}:close`));
-            setBuilderOpen(false);
-          }, 500);
-        }
-      }
-    }
-    // Defer the initial check so Sidebar.tsx registers its open listener first.
-    const timer = window.setTimeout(handleOpenBuilderHash, 0);
-    window.addEventListener("hashchange", handleOpenBuilderHash);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("hashchange", handleOpenBuilderHash);
-    };
-  }, [builderEventKey, builderOpenHash]);
+    if (!builderEventKey || !builderIntent) return;
+    clearBuilderIntent();
+    if (builderOpenRef.current) return;
+    window.dispatchEvent(new CustomEvent(`${builderEventKey}:open`));
+  }, [builderEventKey, builderIntent, location.key]);
 
   const expandRail = (e?: React.MouseEvent) => {
     e?.preventDefault();

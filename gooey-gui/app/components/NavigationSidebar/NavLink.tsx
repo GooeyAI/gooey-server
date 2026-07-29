@@ -5,23 +5,22 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 // sections, the fetched History list) instead of being torn down and rebuilt on
 // every page change. Plain <a> tags trigger a document load, which is what makes
 // the whole rail flash.
-//
-// Link takes our absolute urls as-is: it strips the origin off same-origin ones
-// and leaves anything external (docs, blog) to navigate normally.
 export function NavLink({
   href,
   children,
+  state,
   ...props
 }: {
   href?: string | null;
   children?: ReactNode;
+  state?: unknown;
 } & Omit<ComponentPropsWithoutRef<"a">, "href" | "children">) {
   // sections without a destination of their own still render as a row
   if (!href) {
     return <a {...props}>{children}</a>;
   }
   return (
-    <Link to={href} {...props}>
+    <Link to={href} state={state} {...props}>
       {children}
     </Link>
   );

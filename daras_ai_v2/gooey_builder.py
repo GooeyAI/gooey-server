@@ -32,7 +32,6 @@ if typing.TYPE_CHECKING:
 
 DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg"
 GOOEY_BUILDER_EVENT_KEY = "builder-sidebar"
-GOOEY_BUILDER_OPEN_HASH = "#open-builder"
 
 
 class GooeyBuilderWorkflow(typing.TypedDict):

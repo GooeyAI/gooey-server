@@ -11,9 +11,9 @@ from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.gooey_builder import (
     DEFAULT_GOOEY_BUILDER_PHOTO_URL,
     GOOEY_BUILDER_EVENT_KEY,
-    GOOEY_BUILDER_OPEN_HASH,
 )
 from gooey_gui.types.navigation_sidebar_props import (
+    BuilderIntent,
     GooeyBuilderData,
     MenuLinkData,
     NavAccountData,
@@ -369,19 +369,20 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
     metadata = sr.get_workflow_metadata()
     pr = sr.parent_published_run()
 
-    href = sr.get_app_url()
+    builder_intent: BuilderIntent | None = None
     if sr.surface == SavedRun.Surface.builder_child:
         title = (sr.builder_thread_title or sr.builder_prompt or "").strip()
         # Only Builder runs opened from the rail force-open the Builder panel.
-        href += GOOEY_BUILDER_OPEN_HASH
+        builder_intent = "open"
     else:
         title = _history_title(sr, pr, metadata)
 
     return NavWorkflowItem(
         title=title or (pr and pr.title) or workflow.label,
-        href=href,
+        href=sr.get_app_url(),
         image_url=(pr and pr.photo_url) or None,
         icon=_workflow_icon(metadata),
+        builder_intent=builder_intent,
     )
 
 
@@ -443,7 +444,6 @@ def _load_gooey_builder_data(
         photo_url=photo_url,
         name=bi.name,
         event_key=GOOEY_BUILDER_EVENT_KEY,
-        open_hash=GOOEY_BUILDER_OPEN_HASH,
     )
 
 

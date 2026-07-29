@@ -1,6 +1,7 @@
 import type { NavWorkflowItem } from "@gooey-types/navigation_sidebar_props";
 import { useLocation } from "@remix-run/react";
 import clsx from "clsx";
+import { builderNavigationState } from "./builderIntent";
 import { NavLink } from "./NavLink";
 
 type WorkflowListProps = {
@@ -45,6 +46,7 @@ function WorkflowRowItem({
   return (
     <NavLink
       href={item.href}
+      state={builderNavigationState(item)}
       aria-current={isActive ? "page" : undefined}
       className={
         "d-flex align-items-center gap-2 py-2 px-2 sidebar-recent-item rounded" +
