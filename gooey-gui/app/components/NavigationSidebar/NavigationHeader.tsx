@@ -1,8 +1,8 @@
+import { Link } from "@remix-run/react";
 import { Fragment } from "react";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
 import { AccountSection } from "./AccountSection";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
-import { NavLink } from "./NavLink";
 
 export function NavigationHeader({
   logo_image_url,
@@ -84,8 +84,8 @@ export function NavigationHeaderMobile({
           >
             <i className="fa-regular fa-sidebar fs-5"></i>
           </button>
-          <NavLink
-            href="/"
+          <Link
+            to="/"
             className="btn m-0 d-flex align-items-center gap-2 text-body text-decoration-none bg-hover-light py-2 px-1 rounded"
           >
             <img
@@ -95,7 +95,7 @@ export function NavigationHeaderMobile({
               width={94}
               className="img-fluid"
             />
-          </NavLink>
+          </Link>
           {gooey_builder && !builderOpen && (
             <GooeyBuilderButton gooey_builder={gooey_builder} compact mobile />
           )}
@@ -150,8 +150,8 @@ function NavBrand({
   }
 
   return (
-    <NavLink
-      href="/"
+    <Link
+      to="/"
       className="nav-brand d-flex align-items-center gap-2 text-body text-decoration-none ps-2"
     >
       {mark}
@@ -162,7 +162,7 @@ function NavBrand({
         width={94}
         className="nav-brand__wordmark img-fluid"
       />
-    </NavLink>
+    </Link>
   );
 }
 

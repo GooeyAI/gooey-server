@@ -1,4 +1,4 @@
-import { useLocation } from "@remix-run/react";
+import { Link, useLocation } from "@remix-run/react";
 import * as Sentry from "@sentry/remix";
 import clsx from "clsx";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
@@ -9,7 +9,6 @@ import type {
   NavWorkflowItem,
 } from "@gooey-types/navigation_sidebar_props";
 import { fetchServerAPI } from "~/fetchServerAPI";
-import { NavLink } from "./NavLink";
 import { WorkflowList, WorkflowListSkeleton } from "./WorkflowList";
 
 export function PrimaryNavItems({
@@ -50,16 +49,31 @@ export function PrimaryNavItems({
 
         {!account.user &&
           !railCollapsed &&
-          account.menu_links.map((link) => (
-            <NavLink
-              key={`${link.href}:${link.label}`}
-              href={link.href}
-              className="nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body bg-hover-light"
-            >
-              {link.icon && <i className={clsx(link.icon, "nav-item-icon")} />}
-              <span>{link.label}</span>
-            </NavLink>
-          ))}
+          account.menu_links.map((link) => {
+            const key = `${link.href}:${link.label}`;
+            const className =
+              "nav-item-link d-flex align-items-center gap-2 rounded text-decoration-none px-2 py-2 text-body bg-hover-light";
+            const content = (
+              <Fragment>
+                {link.icon && (
+                  <i className={clsx(link.icon, "nav-item-icon")} />
+                )}
+                <span>{link.label}</span>
+              </Fragment>
+            );
+            if (isExternalHref(link.href)) {
+              return (
+                <a key={key} href={link.href} className={className}>
+                  {content}
+                </a>
+              );
+            }
+            return (
+              <Link key={key} to={link.href} className={className}>
+                {content}
+              </Link>
+            );
+          })}
       </div>
     </div>
   );
@@ -77,20 +91,17 @@ function NavItem({
   children?: ReactNode;
   dense: boolean;
 }) {
-  return (
-    <NavLink
-      className={clsx(
-        "nav-item-link d-flex align-items-center rounded",
-        collapsed && "justify-content-center px-0 py-2",
-        isActive ? "fw-bold nav-item-link--active text-body" : "text-body",
-        collapsed && "position-relative",
-        children && "nav-section-toggle",
-        !!item.href && "bg-hover-light",
-        item.dense ? "dense px-2 py-1 small" : "px-2 py-2"
-      )}
-      href={item.href}
-      onClick={(e) => e.stopPropagation()} // avoid opening the sidebar
-    >
+  const className = clsx(
+    "nav-item-link d-flex align-items-center rounded",
+    collapsed && "justify-content-center px-0 py-2",
+    isActive ? "fw-bold nav-item-link--active text-body" : "text-body",
+    collapsed && "position-relative",
+    children && "nav-section-toggle",
+    !!item.href && "bg-hover-light",
+    item.dense ? "dense px-2 py-1 small" : "px-2 py-2"
+  );
+  const content = (
+    <Fragment>
       <span
         className={clsx(
           "d-flex align-items-center flex-grow-1",
@@ -110,7 +121,26 @@ function NavItem({
         {!collapsed && <span>{item.label}</span>}
       </span>
       {children}
-    </NavLink>
+    </Fragment>
+  );
+  const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
+
+  if (!item.href) {
+    return (
+      <div className={className} onClick={stopPropagation}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      className={className}
+      to={item.href}
+      onClick={stopPropagation} // avoid opening the sidebar
+    >
+      {content}
+    </Link>
   );
 }
 
@@ -247,4 +277,8 @@ function writeCachedItems(cacheKey: string, items: NavWorkflowItem[]) {
   } catch {
     // storage unavailable or full - the list still works, it just won't warm up
   }
+}
+
+function isExternalHref(href: string): boolean {
+  return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href);
 }

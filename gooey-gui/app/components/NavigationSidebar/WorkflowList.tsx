@@ -1,8 +1,7 @@
 import type { NavWorkflowItem } from "@gooey-types/navigation_sidebar_props";
-import { useLocation } from "@remix-run/react";
+import { Link, useLocation } from "@remix-run/react";
 import clsx from "clsx";
 import { builderNavigationState } from "./builderIntent";
-import { NavLink } from "./NavLink";
 
 type WorkflowListProps = {
   items: NavWorkflowItem[];
@@ -38,8 +37,8 @@ function WorkflowRowItem({
   isActive: boolean;
 }) {
   return (
-    <NavLink
-      href={item.href}
+    <Link
+      to={item.href}
       state={builderNavigationState(item)}
       aria-current={isActive ? "page" : undefined}
       className={
@@ -73,7 +72,7 @@ function WorkflowRowItem({
       >
         {item.title}
       </p>
-    </NavLink>
+    </Link>
   );
 }
 
