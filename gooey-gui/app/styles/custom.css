@@ -13,7 +13,7 @@
 .streamlit-like-btn:hover,
 .streamlit-like-btn:active {
   cursor: pointer;
-  font-family: avenir-lt-w05_85-heavy,"Space Grotesk", sans-serif;
+  font-family: "avenir-lt-w05_85-heavy", "Space Grotesk", sans-serif;
   font-size: 15px;
   text-decoration: none !important;
   color: white !important;
@@ -118,7 +118,7 @@ html {
 }
 
 @font-face {
-  font-family: avenir-lt-w05_85-heavy;
+  font-family: "avenir-lt-w05_85-heavy";
   src: url("https://static.parastorage.com/services/santa-resources/resources/viewer/user-site-fonts/fonts/Avenir_Family_Pack/v1/AvenirLTW05-85Heavy.woff2");
 }
 
@@ -187,7 +187,7 @@ h6,
 strong,
 .bold,
 .semibold {
-  font-family: avenir-lt-w05_85-heavy, "Space Grotesk", sans-serif;
+  font-family: "avenir-lt-w05_85-heavy", "Space Grotesk", sans-serif;
 }
 h1 {
   font-size: 32px;

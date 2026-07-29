@@ -9,31 +9,25 @@ type WorkflowListProps = {
   indent?: boolean;
 };
 
-function normalizePath(path: string): string {
-  return path.replace(/\/+$/, "") || "/";
-}
+export function WorkflowList({ items, indent = false }: WorkflowListProps) {
+  const location = useLocation();
+  if (items.length === 0) return null;
 
-export function hrefMatchesLocation(
-  href: string,
-  pathname: string,
-  search: string
-): boolean {
-  let target: URL;
-  try {
-    target = new URL(href, "http://_"); // href is absolute; base is a no-op
-  } catch {
-    return false;
-  }
-  if (normalizePath(target.pathname) !== normalizePath(pathname)) return false;
-
-  const here = new URLSearchParams(search);
-  const runId = target.searchParams.get("run_id");
-  const uid = target.searchParams.get("uid");
-  if (runId || uid) {
-    return runId === here.get("run_id") && uid === here.get("uid");
-  }
-  // Example link: a path match is enough, as long as we're not on a run of it.
-  return !here.get("run_id");
+  return (
+    <div className={indent ? "ps-4" : undefined}>
+      {items.map((item) => (
+        <WorkflowRowItem
+          key={item.href}
+          item={item}
+          isActive={hrefMatchesLocation(
+            item.href,
+            location.pathname,
+            location.search
+          )}
+        />
+      ))}
+    </div>
+  );
 }
 
 function WorkflowRowItem({
@@ -83,10 +77,6 @@ function WorkflowRowItem({
   );
 }
 
-// Widths cycle so the placeholder rows read as titles of varying length rather
-// than an obvious repeating block.
-const SKELETON_ROW_WIDTHS = ["col-9", "col-6", "col-8", "col-5", "col-7"];
-
 export function WorkflowListSkeleton({
   rows = 5,
   indent = false,
@@ -109,23 +99,33 @@ export function WorkflowListSkeleton({
   );
 }
 
-export function WorkflowList({ items, indent = false }: WorkflowListProps) {
-  const location = useLocation();
-  if (items.length === 0) return null;
+// Widths cycle so the placeholder rows read as titles of varying length rather
+// than an obvious repeating block.
+const SKELETON_ROW_WIDTHS = ["col-9", "col-6", "col-8", "col-5", "col-7"];
 
-  return (
-    <div className={indent ? "ps-4" : undefined}>
-      {items.map((item, idx) => (
-        <WorkflowRowItem
-          key={idx}
-          item={item}
-          isActive={hrefMatchesLocation(
-            item.href,
-            location.pathname,
-            location.search
-          )}
-        />
-      ))}
-    </div>
-  );
+export function hrefMatchesLocation(
+  href: string,
+  pathname: string,
+  search: string
+): boolean {
+  let target: URL;
+  try {
+    target = new URL(href, "http://_"); // href is absolute; base is a no-op
+  } catch {
+    return false;
+  }
+  if (normalizePath(target.pathname) !== normalizePath(pathname)) return false;
+
+  const here = new URLSearchParams(search);
+  const runId = target.searchParams.get("run_id");
+  const uid = target.searchParams.get("uid");
+  if (runId || uid) {
+    return runId === here.get("run_id") && uid === here.get("uid");
+  }
+  // Example link: a path match is enough, as long as we're not on a run of it.
+  return !here.get("run_id");
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\/+$/, "") || "/";
 }

@@ -23,14 +23,16 @@ def handle_workspace_switch(session: dict):
     if not switch_workspace_id:
         return
 
+    try:
+        workspace_id = int(switch_workspace_id)
+    except (TypeError, ValueError):
+        return
+
     from routers.account import members_route
 
-    try:
-        if str(session[SESSION_SELECTED_WORKSPACE]) == switch_workspace_id:
-            raise gui.RedirectException(get_route_path(members_route))
-    except KeyError:
-        pass
-    set_current_workspace(session, int(switch_workspace_id))
+    if session.get(SESSION_SELECTED_WORKSPACE) == workspace_id:
+        raise gui.RedirectException(get_route_path(members_route))
+    set_current_workspace(session, workspace_id)
 
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:

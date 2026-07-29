@@ -205,9 +205,7 @@ def explore_page(
 ):
     from widgets import explore
 
-    with sidebar_page_wrapper(
-        request, search_filters=search_filters, show_search_bar=False
-    ):
+    with sidebar_page_wrapper(request):
         explore.render(request, search_filters)
 
     return {
@@ -221,7 +219,7 @@ def explore_page(
 def explore2_page(request: Request):
     from widgets import explore2
 
-    with sidebar_page_wrapper(request, show_search_bar=False):
+    with sidebar_page_wrapper(request):
         explore2.render(request)
 
     return {
@@ -741,8 +739,6 @@ def get_og_url_path(request) -> str:
 def sidebar_page_wrapper(
     request: Request,
     className="",
-    search_filters: typing.Optional[SearchFilters] = None,
-    show_search_bar: bool = True,
     page: typing.Optional["BasePage"] = None,
 ):
     from widgets import navigation_sidebar
