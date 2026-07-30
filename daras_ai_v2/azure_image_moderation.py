@@ -10,6 +10,8 @@ def get_auth_headers():
 
 
 def is_image_nsfw(image_url: str, cache: bool = False) -> bool:
+    if not settings.AZURE_IMAGE_MODERATION_ENDPOINT:
+        return False
     url = str(
         furl(settings.AZURE_IMAGE_MODERATION_ENDPOINT)
         / "contentmoderator/moderate/v1.0/ProcessImage/Evaluate"
