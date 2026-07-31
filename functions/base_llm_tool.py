@@ -28,6 +28,10 @@ before or after the workflow runs.
 <a href='/functions-help' target='_blank'>Learn more.</a>"""
 
 
+class BaseLLMToolError(Exception):
+    """Expected tool failure that is safe to return to the calling LLM."""
+
+
 class BaseLLMTool:
     icon: str = ""
     url: str = ""
@@ -87,6 +91,8 @@ class BaseLLMTool:
         try:
             kwargs = json.loads(arguments)
             ret = self.call(**kwargs)
+        except BaseLLMToolError as e:
+            ret = dict(error=str(e))
         except (json.JSONDecodeError, TypeError) as e:
             ret = dict(error=repr(e))
         return json.dumps(ret)
