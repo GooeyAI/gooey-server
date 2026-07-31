@@ -11,8 +11,8 @@ from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import ClientConnection
 
 from ai_models.models import AIModelSpec
+from functions.base_llm_tool import BaseLLMTool, get_tool_from_call
 from functions.inbuilt_tools import CallTransferLLMTool
-from functions.base_llm_tool import BaseLLMTool
 from .language_model_openai_ws_tools import send_json, recv_json
 
 # Disable websocket logging
@@ -165,8 +165,6 @@ class RealtimeSession:
             self.total_output_tokens += usage["output_tokens"]
 
     def handle_function_call(self, function_call: dict):
-        from recipes.VideoBots import get_tool_from_call
-
         call_id = function_call["call_id"]
         self.messages.append(
             dict(
