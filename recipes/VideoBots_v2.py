@@ -1529,12 +1529,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
             render_demo_buttons_header(self.current_pr)
 
-    def get_tabs(self):
-        tabs = super().get_tabs()
-        tabs.insert(1, RecipeTabs.preview)
-        tabs.extend([RecipeTabs.integrations])
-        return tabs
-
     def render_selected_tab(self):
         if self.tab == RecipeTabs.integrations:
             user = self.request.user

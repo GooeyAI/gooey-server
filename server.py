@@ -45,6 +45,7 @@ from routers import (
     static_pages,
     onedrive_api,
     workspace,
+    recipe_v2,
 )
 from routers import live_transcribe_api, twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
@@ -105,6 +106,9 @@ app_routers = [
     base_auth.app,
     history.app,
     workflow_queries.router,
+    # layout v2 tab urls (/{page_slug}/config/, ...). must come before root.app, whose
+    # /{path:path} catch-all would match them first
+    recipe_v2.app,
 ]
 
 if settings.ENABLE_FIREBASE_AUTH:

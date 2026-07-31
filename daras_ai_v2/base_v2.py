@@ -56,6 +56,7 @@ from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
+from daras_ai_v2.tab_spec import TabRoute, TabSpec
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
@@ -86,16 +87,8 @@ from payments.auto_recharge import (
 from payments.plans import PricingPlan
 from routers.base_auth import get_login_url
 from routers.root import PREVIEW_ROUTE_WORKFLOWS, RecipeTabs
-from widgets.author import render_author_from_user, render_author_from_workspace
-from widgets.base_header import (
-    render_breadcrumbs_with_author,
-    render_header_title,
-    render_help_button,
-)
-from widgets.history_filer import (
-    render_history_filter_desktop,
-    render_history_filter_mobile,
-)
+from widgets.author import render_author_from_user
+from widgets.base_header import render_header_title, render_help_button
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
@@ -216,9 +209,13 @@ class BasePage:
     def canonical_slug(cls) -> str:
         return cls.slug_versions[-1]
 
+    def current_tab_url(self, tab_slug: str) -> str:
+        """Url of one of this page's v2 tabs, for the run this request is on."""
+        return self.current_app_url(TabRoute(tab_slug))
+
     def current_app_url(
         self,
-        tab: RecipeTabs = RecipeTabs.run,
+        tab: "RecipeTabs | TabRoute" = RecipeTabs.run,
         *,
         query_params: dict[str, str] | None = None,
         path_params: dict | None = None,
@@ -239,7 +236,7 @@ class BasePage:
     def app_url(
         cls,
         *,
-        tab: RecipeTabs | None = None,
+        tab: "RecipeTabs | TabRoute | None" = None,
         example_id: str | None = None,
         run_id: str | None = None,
         uid: str | None = None,
@@ -279,7 +276,7 @@ class BasePage:
         query_params: dict | None = None,
         example_id: str | None = None,
         run_slug: str | None = None,
-        tab: RecipeTabs | None = None,
+        tab: "RecipeTabs | TabRoute | None" = None,
         path_params: dict | None = None,
     ):
         if not tab:
@@ -453,124 +450,77 @@ class BasePage:
             self.render_report_form()
             return
 
-        header_placeholder = gui.div(className="my-3 w-100")
-        with (
-            gui.styled(NAV_TABS_CSS),
-            gui.div(className="position-relative", id="recipe-nav-tabs"),
-            gui.nav_tabs(),
-        ):
-            for tab in self.get_tabs():
-                url = self.current_app_url(tab)
-                if tab == RecipeTabs.run and self.tab == RecipeTabs.preview:
-                    force_active_lg = gui.tag("span", className="active-lg")
-                else:
-                    force_active_lg = gui.dummy()
-                with force_active_lg, gui.nav_item(url, active=tab == self.tab):
-                    gui.html(tab.title)
+        tabs = self.get_tab_spec()
+        assert tabs, f"{type(self).__name__}.get_tab_spec() returned no tabs"
+        active = self._resolve_active_tab(tabs)
 
-            if self.tab in {RecipeTabs.run, RecipeTabs.preview}:
-                self._render_saved_generated_timestamp()
-            elif self.tab == RecipeTabs.history and self.is_logged_in():
-                render_history_filter_desktop(
-                    self.request,
-                    self.current_workspace,
-                    self.current_app_url(tab=RecipeTabs.history),
-                )
+        # the bar's node is reserved here but filled after the body renders:
+        # _has_request_changed() - and so the publish state - is only settled once the inputs
+        # have rendered. v1 renders its header last for the same reason.
+        top_bar_placeholder = gui.div(className="my-3 w-100")
 
-        with gui.nav_tab_content():
-            # Render mobile history filter for history tab
-            if self.tab == RecipeTabs.history and self.is_logged_in():
-                render_history_filter_mobile(
-                    self.request,
-                    self.current_workspace,
-                    self.current_app_url(tab=RecipeTabs.history),
-                )
-            self.render_selected_tab()
-        # rendered at the end to indicate unpublished changes
-        with header_placeholder:
-            self._render_header()
-
-    def _render_header(self):
-        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
-
-        sr, pr = self.current_sr_pr
-        is_example = pr.saved_run == sr
-        tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
-        can_save = self.can_user_save_run(sr, pr)
-        request_changed = self._has_request_changed()
-
-        if self.tab in {RecipeTabs.saved, RecipeTabs.history}:
-            with gui.div(className="mb-2"):
-                render_author_from_workspace(self.current_workspace)
-
-        if self.tab not in {RecipeTabs.run, RecipeTabs.preview}:
-            # tabs: Examples, API, Saved, History, Integrations, ...
-            with gui.div(className="mb-2"):
-                render_header_title(tbreadcrumbs)
-
-            return
-
-        # tabs: Run & Preview
-        img_style = dict(objectFit="cover", marginBottom=0)
-        if self.workflow in CIRCLE_IMAGE_WORKFLOWS:
-            img_style["borderRadius"] = "50%"
+        if active:
+            active.render()
         else:
-            img_style["borderRadius"] = "12px"
+            # a v1 tab url that the v2 strip no longer surfaces: Examples, API, Saved,
+            # History, Deploy. Their routes and deep links keep working, with v2 chrome.
+            self.render_selected_tab()
 
-        pr_photo = pr.photo_url
-        pr_photo_preview = media_preview_img(file_url=pr_photo, size="96x96")
+        with top_bar_placeholder:
+            self._render_top_bar(tabs=tabs, active=active)
 
-        with gui.div(className="d-flex gap-4 w-100 mb-2"):
-            if pr_photo:
-                with gui.div(className="d-none d-md-inline"):
-                    gui.image(
-                        src=pr_photo,
-                        style=img_style | dict(width="96px", height="96px"),
-                        previewImg=pr_photo_preview,
-                    )
+    def _resolve_active_tab(self, tabs: list[TabSpec]) -> TabSpec | None:
+        """The tab this request is for, or None for a v1 tab url with no matching TabSpec."""
+        from routers.recipe_v2 import v1_tab_slugs
 
-            # desktop image and title, social buttons, extra and breadcrumbs
-            with gui.div(className="w-100 d-flex flex-column gap-2"):
-                with gui.div(className="d-flex align-items-start w-100 my-auto"):
-                    if pr_photo:
-                        with gui.div(className="d-inline d-md-none me-2"):
-                            gui.image(
-                                src=pr_photo,
-                                style=img_style | dict(width="56px", height="56px"),
-                                previewImg=pr_photo_preview,
-                            )
+        by_slug = {tab.slug: tab for tab in tabs}
 
-                    with gui.div(
-                        className="d-flex justify-content-between w-100 align-items-start my-auto"
-                    ):
-                        render_header_title(tbreadcrumbs)
+        if v1_slug := v1_tab_slugs().get(self.tab):
+            # a v1 tab route brought us here (/preview/, /api/, /saved/, ...), and it names
+            # the tab directly
+            return by_slug.get(v1_slug)
 
-                        with gui.div(
-                            className="d-flex align-items-end flex-column-reverse gap-2",
-                            style={"whiteSpace": "nowrap"},
-                        ):
-                            if request_changed or (can_save and not is_example):
-                                self._render_unpublished_changes_indicator()
-                            self.render_social_buttons()
+        # RecipeTabs.run: either the entry url or one of the v2-only tab urls
+        return by_slug.get(self._url_tab_slug()) or by_slug.get("") or tabs[0]
 
-                with gui.div(
-                    className="d-flex align-items-center gap-2 w-100 flex-wrap"
+    def _url_tab_slug(self) -> str:
+        """Tab slug of a v2 tab url - `/video-bots/my-agent-abc123/config/` -> "config".
+
+        "" for the entry url, whose last segment is the page slug or the run slug.
+        """
+        if not self.request.url:
+            return ""
+        segments = [seg for seg in self.request.url.path.split("/") if seg]
+        if len(segments) < 2:
+            return ""
+        return segments[-1]
+
+    def _render_top_bar(self, *, tabs: list[TabSpec], active: TabSpec | None):
+        """Unstyled stand-in for the v2 top bar. Slice 6 replaces this markup with the
+        RecipeTopBar react component (avatar, publish, run cost, run button).
+        """
+        sr, pr = self.current_sr_pr
+
+        with gui.div(className="d-flex align-items-center gap-2 w-100"):
+            render_header_title(get_title_breadcrumbs(self, sr, pr, tab=self.tab))
+            if self._has_request_changed() or (
+                self.can_user_save_run(sr, pr) and pr.saved_run != sr
+            ):
+                self._render_unpublished_changes_indicator()
+
+        self._render_tab_strip(tabs=tabs, active=active)
+
+    def _render_tab_strip(self, *, tabs: list[TabSpec], active: TabSpec | None):
+        if len(tabs) < 2:
+            # a single-tab recipe (media gen, bulk/eval) gets no strip at all
+            return
+        with gui.div(className="d-flex gap-3 w-100", id="recipe-tab-strip"):
+            for tab in tabs:
+                with gui.link(
+                    to=self.current_tab_url(tab.slug),
+                    className=("fw-bold" if active and tab.slug == active.slug else ""),
                 ):
-                    self.render_header_extra()
-                    render_breadcrumbs_with_author(
-                        tbreadcrumbs,
-                        user=self.current_sr_user,
-                        pr=self.current_pr,
-                        sr=self.current_sr,
-                        current_workspace=(
-                            self.is_logged_in() and self.current_workspace or None
-                        ),
-                    )
-
-        if self.tab == RecipeTabs.run and is_example:
-            with gui.div(className="container-margin-reset d-flex flex-column gap-2"):
-                if self.current_pr.notes:
-                    gui.write(self.current_pr.notes, line_clamp=3)
+                    gui.html(f"{tab.icon} {tab.label}" if tab.icon else tab.label)
 
     def render_header_extra(self):
         pass
@@ -1245,35 +1195,102 @@ class BasePage:
             gui.error(msg, icon="😵")
             gui.stop()
 
-    def get_tabs(self):
-        tabs = [RecipeTabs.run, RecipeTabs.examples, RecipeTabs.run_as_api]
-        if self.request.user:
-            tabs.extend([RecipeTabs.history])
-        if self.is_logged_in():
-            tabs.extend([RecipeTabs.saved])
-        return tabs
+    @classmethod
+    def all_tab_slugs(cls) -> set[str]:
+        """Every tab slug this recipe can ever show.
+
+        A classmethod, because it drives route registration at import time - there is no
+        request yet, so it must not look at request state. `get_tab_spec()` does the
+        per-request filtering. A slug missing from here has no route, and linking to it
+        raises from `routers.recipe_v2.tab_url_path()`.
+        """
+        return {"about", "config", "preview", "split"}
+
+    def get_tab_spec(self) -> list[TabSpec]:
+        """The tabs for this request, in strip order. The first entry is what the entry url
+        `/{page_slug}/` renders.
+
+        Recipes override this to add, drop or reorder tabs - a spec with a single entry
+        renders no strip at all, which is the media-gen / bulk-eval shape.
+        """
+        return [
+            TabSpec(
+                slug="about",
+                label="About",
+                icon=icons.info,
+                render=self._render_about_tab,
+            ),
+            TabSpec(
+                slug="config",
+                label="Config",
+                icon=icons.edit,
+                render=self._render_config_tab,
+            ),
+            TabSpec(
+                slug="preview",
+                label="Preview",
+                icon=icons.preview,
+                render=self._render_preview_tab,
+            ),
+            TabSpec(
+                slug="split",
+                label="Split",
+                icon=icons.run,
+                render=self._render_split_tab,
+            ),
+        ]
+
+    def _render_about_tab(self):
+        if self.current_pr.notes:
+            with gui.div(className="container-margin-reset"):
+                gui.write(self.current_pr.notes)
+        self._render_help()
+        self.render_related_workflows()
+
+    def _render_config_tab(self):
+        if self._render_deleted_output_if_needed():
+            return
+        if self._render_input_col():
+            # v1 submits from the output col, which this tab doesn't render
+            self.submit_and_redirect()
+
+    def _render_preview_tab(self):
+        if self._render_deleted_output_if_needed():
+            return
+        self._render_output_col()
+
+    def _render_split_tab(self):
+        """Both columns side by side - v1's Run tab, unchanged."""
+        if self._render_deleted_output_if_needed():
+            return
+
+        with gui.styled(INPUT_OUTPUT_COLS_CSS):
+            input_col, output_col = gui.columns([3, 2], gap="medium")
+            with input_col:
+                submitted = self._render_input_col()
+            with output_col:
+                self._render_output_col(submitted=submitted)
+
+        self._render_step_row()
+
+        col1, col2 = gui.columns(2)
+        with col1:
+            self._render_help()
+
+        self.render_related_workflows()
+
+    def _render_deleted_output_if_needed(self) -> bool:
+        """True if this run's data is gone, in which case that is all there is to render."""
+        if self.current_sr.retention_policy != RetentionPolicy.delete:
+            return False
+        self.render_deleted_output()
+        return True
 
     def render_selected_tab(self):
+        """Bodies of the v1 tab urls the v2 strip drops - reached only by deep link."""
         match self.tab:
             case RecipeTabs.run | RecipeTabs.preview:
-                if self.current_sr.retention_policy == RetentionPolicy.delete:
-                    self.render_deleted_output()
-                    return
-
-                with gui.styled(INPUT_OUTPUT_COLS_CSS):
-                    input_col, output_col = gui.columns([3, 2], gap="medium")
-                    with input_col:
-                        submitted = self._render_input_col()
-                    with output_col:
-                        self._render_output_col(submitted=submitted)
-
-                self._render_step_row()
-
-                col1, col2 = gui.columns(2)
-                with col1:
-                    self._render_help()
-
-                self.render_related_workflows()
+                self._render_split_tab()
 
             case RecipeTabs.examples:
                 self._examples_tab()
@@ -2825,60 +2842,6 @@ INPUT_OUTPUT_COLS_CSS = """
     & > div {
         padding-left: calc(var(--bs-gutter-x) * .5);
         padding-right: calc(var(--bs-gutter-x) * .5);
-    }
-}
-"""
-
-NAV_TABS_CSS = """
-@media (max-width: 768px) { 
-    & button {
-        font-size: 0.9rem; 
-        padding: 0.3rem !important 
-    }
-}
-& .nav-item {
-    font-size: smaller;
-}
-
-& .nav-item > .active {
-    font-weight: bold;
-}
-& button {
-    padding: 0.4rem !important;
-}
-
-& a:has(span.mobile-only-recipe-tab) {
-    display: block !important;
-}
-
-& li.nav-item:first-of-type button {
-    margin-left: 0 !important;
-}
-
-& ul.nav-tabs {
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    flex-wrap: nowrap !important;
-    display: flex;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 0.5rem;
-}
-
-@media (min-width: 992px) {
-    & a:has(span.mobile-only-recipe-tab) {
-        display: none !important;
-    }
-
-    /* RUN as active tab in lg view for preview route */
-    & span.active-lg button {
-        color: #000;
-        border-bottom: 2px solid black;
-    }
-
-    & ul.nav-tabs {
-        gap: 0;
     }
 }
 """
