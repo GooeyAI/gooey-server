@@ -31,12 +31,13 @@ def get_wa_auth_header(access_token: str | None = None):
 class WhatsappBot(BotInterface):
     platform = Platform.WHATSAPP
 
-    def __init__(self, message: dict, metadata: dict):
-        self.input_message = message
-        self.user_msg_id = message["id"]
+    def __init__(self, message: dict | list[dict], metadata: dict):
+        self.input_messages = message if isinstance(message, list) else [message]
+        self.input_message = self.input_messages[-1]
+        self.user_msg_id = self.input_message["id"]
         self.bot_id = metadata["phone_number_id"]  # this is NOT the phone number
-        self.user_id = message["from"]  # this is a phone number
-        self.input_type = message["type"]
+        self.user_id = self.input_message["from"]  # this is a phone number
+        self.input_type = self.input_message["type"]
 
         user_phone_number = "+" + self.user_id
         try:
@@ -57,14 +58,15 @@ class WhatsappBot(BotInterface):
         super().__init__()
 
     def get_input_text(self) -> str | None:
-        try:
-            return self.input_message["text"]["body"]
-        except KeyError:
-            pass
-        try:
-            return self.input_message[self.input_type]["caption"]
-        except KeyError:
-            pass
+        for message in self.input_messages:
+            try:
+                return message["text"]["body"]
+            except KeyError:
+                pass
+            try:
+                return message[message["type"]]["caption"]
+            except KeyError:
+                pass
 
     def get_input_audio(self) -> str | None:
         try:
@@ -86,11 +88,12 @@ class WhatsappBot(BotInterface):
         )
 
     def get_input_images(self) -> list[str] | None:
-        try:
-            media_id = self.input_message["image"]["id"]
-        except KeyError:
-            return None
-        return [self._download_wa_media(media_id)]
+        media_ids = [
+            message["image"]["id"]
+            for message in self.input_messages
+            if message["type"] == "image"
+        ]
+        return [self._download_wa_media(media_id) for media_id in media_ids] or None
 
     def get_input_documents(self) -> list[str] | None:
         try:
@@ -146,7 +149,7 @@ class WhatsappBot(BotInterface):
     def mark_read(self):
         wa_mark_read(
             bot_number=self.bot_id,
-            message_id=self.input_message["id"],
+            message_ids=[message["id"] for message in self.input_messages],
             user_msg_id=self.user_msg_id,
             access_token=self.access_token,
         )
@@ -418,19 +421,23 @@ def send_wa_msgs_raw(
 
 
 def wa_mark_read(
-    bot_number: str, message_id: str, user_msg_id: str, access_token: str | None = None
+    bot_number: str,
+    message_ids: list[str],
+    user_msg_id: str,
+    access_token: str | None = None,
 ):
-    # send read receipt
-    r = requests.post(
-        f"https://graph.facebook.com/v16.0/{bot_number}/messages",
-        headers=get_wa_auth_header(access_token),
-        json={
-            "messaging_product": "whatsapp",
-            "status": "read",
-            "message_id": message_id,
-        },
-    )
-    print("wa_mark_read:", r.status_code, r.json())
+    for message_id in message_ids:
+        # send read receipt
+        r = requests.post(
+            f"https://graph.facebook.com/v16.0/{bot_number}/messages",
+            headers=get_wa_auth_header(access_token),
+            json={
+                "messaging_product": "whatsapp",
+                "status": "read",
+                "message_id": message_id,
+            },
+        )
+        print("wa_mark_read:", r.status_code, r.json())
 
     # send typing indicator
     r = requests.post(

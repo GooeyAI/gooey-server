@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response
 
 from bots.models import BotIntegration, Platform
+from bots.tasks import enqueue_whatsapp_media
 from daras_ai_v2 import settings, db
 from daras_ai_v2.bot_integration_connect import (
     connect_bot_to_published_run,
@@ -218,6 +219,9 @@ def fb_webhook(
             case "whatsapp_business_account":
                 value = glom.glom(entry, "changes.0.value", default={})
                 for message in value.get("messages", []):
+                    if message.get("type") in {"image", "unknown", "unsupported"}:
+                        enqueue_whatsapp_media(message, value["metadata"])
+                        continue
                     try:
                         bot = WhatsappBot(message, value["metadata"])
                     except BotIntegrationLookupFailed:

@@ -1,4 +1,6 @@
+import hashlib
 import json
+import uuid
 from datetime import timedelta
 from json import JSONDecodeError
 import random
@@ -18,10 +20,15 @@ from bots.models import (
     Platform,
     SavedRun,
 )
-from daras_ai_v2.bots import save_msg_pair_to_db
+from daras_ai_v2.bots import (
+    BotIntegrationLookupFailed,
+    msg_handler,
+    save_msg_pair_to_db,
+)
 from daras_ai_v2.facebook_bots import WhatsappBot
 from daras_ai_v2.functional import flatten, map_parallel
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
+from daras_ai_v2.redis_cache import get_redis_cache, redis_lock
 from daras_ai_v2.slack_bot import (
     SlackBot,
     create_personal_channel,
@@ -35,6 +42,79 @@ from recipes.VideoBotsStats import (
 )
 
 MAX_PROMPT_LEN = 100_000
+WHATSAPP_MEDIA_BATCH_WAIT_SEC = 3
+WHATSAPP_MEDIA_BATCH_TTL_SEC = 60
+
+
+def enqueue_whatsapp_media(message: dict, metadata: dict):
+    cache_key = _whatsapp_media_batch_cache_key(message, metadata)
+    entry_id = uuid.uuid4().hex
+    entry = json.dumps(
+        {
+            "id": entry_id,
+            "message": message,
+            "metadata": metadata,
+        }
+    )
+    with redis_lock(cache_key):
+        redis_cache = get_redis_cache()
+        redis_cache.rpush(cache_key, entry)
+        redis_cache.expire(cache_key, WHATSAPP_MEDIA_BATCH_TTL_SEC)
+
+    process_whatsapp_media_batch.apply_async(
+        kwargs={
+            "cache_key": cache_key,
+            "last_entry_id": entry_id,
+        },
+        countdown=WHATSAPP_MEDIA_BATCH_WAIT_SEC,
+    )
+
+
+@shared_task
+def process_whatsapp_media_batch(*, cache_key: str, last_entry_id: str):
+    entries = _pop_whatsapp_media_batch(cache_key, last_entry_id)
+    if not entries:
+        return
+
+    image_messages = [
+        entry["message"] for entry in entries if entry["message"]["type"] == "image"
+    ]
+    input_message = image_messages or entries[-1]["message"]
+    try:
+        bot = WhatsappBot(input_message, entries[-1]["metadata"])
+    except BotIntegrationLookupFailed:
+        return
+    msg_handler(bot)
+
+
+def _whatsapp_media_batch_cache_key(message: dict, metadata: dict) -> str:
+    participant_key = f"{metadata['phone_number_id']}:{message['from']}"
+    participant_hash = hashlib.sha256(participant_key.encode()).hexdigest()
+    return f"gooey/whatsapp-media-batch/v1/{participant_hash}"
+
+
+def _pop_whatsapp_media_batch(cache_key: str, last_entry_id: str) -> list[dict] | None:
+    with redis_lock(cache_key):
+        redis_cache = get_redis_cache()
+        raw_entries = redis_cache.lrange(cache_key, 0, -1)
+        if not raw_entries:
+            return None
+
+        entries = [json.loads(entry) for entry in raw_entries]
+        if entries[-1]["id"] != last_entry_id:
+            return None
+
+        redis_cache.delete(cache_key)
+
+    seen_message_ids = set()
+    unique_entries = []
+    for entry in entries:
+        message_id = entry["message"]["id"]
+        if message_id in seen_message_ids:
+            continue
+        seen_message_ids.add(message_id)
+        unique_entries.append(entry)
+    return unique_entries
 
 
 @shared_task
