@@ -697,10 +697,23 @@ def render_recipe_page(
     from daras_ai_v2.all_pages import normalize_slug, page_slug_map
 
     # lookup the page class
+    normalized_slug = normalize_slug(page_slug)
     try:
-        page_cls = page_slug_map[normalize_slug(page_slug)]
+        page_cls = page_slug_map[normalized_slug]
     except KeyError:
         raise RecipePageNotFound
+
+    # layout v2 fork switch: gate closed (default) -> v1 page_cls above is used as-is.
+    # gate open -> swap in the v2 fork of the same recipe, if one exists yet.
+    # settings.ENABLE_LAYOUT_V2 is checked here first so the kill switch being off
+    # costs nothing beyond this one settings read.
+    if settings.ENABLE_LAYOUT_V2:
+        from daras_ai_v2.layout_v2 import can_use_layout_v2
+
+        if can_use_layout_v2(request):
+            from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+
+            page_cls = page_slug_map_v2.get(normalized_slug, page_cls)
 
     # ensure the latest slug is used
     latest_slug = page_cls.canonical_slug()
