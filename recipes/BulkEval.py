@@ -1,4 +1,3 @@
-import json
 import itertools
 import os
 import re
@@ -21,10 +20,12 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.field_render import field_title, field_desc
 from daras_ai_v2.functional import map_parallel
-from daras_ai_v2.language_model import run_language_model
+from daras_ai_v2.harness import llm_loop
+from daras_ai_v2.language_model import CHATML_ROLE_USER
+from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
 from daras_ai_v2.variables_widget import render_prompt_vars
-from functions.base_llm_tool import BaseLLMTool
+from functions.base_llm_tool import BaseLLMTool, BaseLLMToolError
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
 
@@ -60,8 +61,16 @@ class CandidateEvalSpec(typing_extensions.TypedDict):
     workflow_title_by_candidate: dict[str, str]
 
 
+class CandidateEvaluationValidationError(BaseLLMToolError):
+    """The evaluator submitted invalid scoring arguments."""
+
+
 class CandidateEvaluationTool(BaseLLMTool):
-    def __init__(self, output_column_names: list[str], candidate_labels: list[str]):
+    def __init__(self, candidate_spec: CandidateEvalSpec):
+        self.candidate_spec = candidate_spec
+        self.output: dict | None = None
+        output_column_names = candidate_spec["output_columns"]
+        candidate_labels = list(candidate_spec["workflow_title_by_candidate"])
         super().__init__(
             name="submit_evaluation",
             label="Submit Evaluation",
@@ -151,11 +160,16 @@ class CandidateEvaluationTool(BaseLLMTool):
     def spec_parameters(self) -> dict:
         return super().spec_parameters | {"additionalProperties": False}
 
+    def call(self, scores: list[dict], summaries: list[dict] | None = None) -> dict:
+        output = {"scores": scores, "summaries": summaries or []}
+        _validate_evaluation_result(output, self.candidate_spec)
+        self.output = output
+        return output
+
 
 class EvalPrompt(typing_extensions.TypedDict):
     name: str
     prompt: str
-    candidate_spec: typing_extensions.NotRequired[CandidateEvalSpec]
 
 
 class AggFunction(typing_extensions.TypedDict):
@@ -487,6 +501,7 @@ class TaskResult(typing.NamedTuple):
     input_cols: set[str]
     out_df_recs: list[dict]
     ep: EvalPrompt
+    candidate_spec: CandidateEvalSpec
     evaluation_tool: CandidateEvaluationTool
 
 
@@ -504,24 +519,15 @@ def submit(
         response.evaluation_results.append([])
         response.aggregations.append([])
         df = read_df_any(doc)
-        evaluation_tool = None
         for out_df_recs, current_rec, prompt_columns in iter_eval_groups(
             df, request.array_columns
         ):
             for request_eval_prompt in request.eval_prompts or []:
-                ep = dict(request_eval_prompt)
                 render_columns, candidate_spec = build_candidate_columns(
                     prompt_columns,
                     request_eval_prompt["name"],
                 )
-                ep["candidate_spec"] = candidate_spec
-                if evaluation_tool is None:
-                    evaluation_tool = CandidateEvaluationTool(
-                        output_column_names=candidate_spec["output_columns"],
-                        candidate_labels=list(
-                            candidate_spec["workflow_title_by_candidate"]
-                        ),
-                    )
+                evaluation_tool = CandidateEvaluationTool(candidate_spec)
 
                 prompt = render_prompt_vars(
                     request_eval_prompt.get("prompt") or "",
@@ -535,7 +541,7 @@ def submit(
                 response.evaluation_results[doc_ix].append(None)
                 futs.append(
                     pool.submit(
-                        _run_language_model,
+                        _run_evaluation_job,
                         model=request.selected_model,
                         prompt=prompt,
                         result=TaskResult(
@@ -545,7 +551,8 @@ def submit(
                             current_rec=current_rec,
                             input_cols=set(current_rec.keys()),
                             out_df_recs=out_df_recs,
-                            ep=ep,
+                            ep=request_eval_prompt,
+                            candidate_spec=candidate_spec,
                             evaluation_tool=evaluation_tool,
                         ),
                     ),
@@ -668,26 +675,53 @@ def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
         yield out_df_recs, out_df_recs[prev_group_ix], prompt_columns
 
 
-def _run_language_model(model: str, prompt: str, result: TaskResult):
-    entries = []
-    for entries in run_language_model(
-        model=model,
-        prompt=prompt,
-        tools=[result.evaluation_tool],
-        tool_choice="required",
-        stream=True,
-    ):
-        pass
-    tool_calls = entries[0].get("tool_calls") if entries else None
-    if not tool_calls:
-        raise UserError("The evaluator did not submit an evaluation result.")
-    function_call = tool_calls[0]["function"]
-    if function_call["name"] != result.evaluation_tool.name:
-        raise UserError("The evaluator returned an unexpected tool call.")
-    evaluation_result = json.loads(function_call["arguments"])
+def _run_evaluation_job(model: str, prompt: str, result: TaskResult):
+    from recipes.VideoBots import VideoBotsPage
 
-    assert isinstance(evaluation_result, dict)
-    result.evaluation_result.update(evaluation_result)
+    model_spec = AIModelSpec.objects.get(name=model)
+    request = VideoBotsPage.RequestModel(
+        selected_model=model,
+        max_tokens=model_spec.llm_max_output_tokens,
+        num_outputs=1,
+        sampling_temperature=0,
+    )
+    response = VideoBotsPage.ResponseModel(
+        final_prompt=[{"role": CHATML_ROLE_USER, "content": prompt}]
+    )
+    tools_by_name = {
+        result.evaluation_tool.name: result.evaluation_tool,
+    }
+
+    yield_from(
+        llm_loop(
+            request=request,
+            response=response,
+            model=model_spec,
+            tools_by_name=tools_by_name,
+        )
+    )
+    if result.evaluation_tool.output is None:
+        response.final_prompt.append(
+            {
+                "role": CHATML_ROLE_USER,
+                "content": (
+                    "You must call submit_evaluation with the requested scores "
+                    "and summaries."
+                ),
+            }
+        )
+        yield_from(
+            llm_loop(
+                request=request,
+                response=response,
+                model=model_spec,
+                tools_by_name=tools_by_name,
+            )
+        )
+    if result.evaluation_tool.output is None:
+        raise UserError("The evaluator did not submit an evaluation result.")
+
+    result.evaluation_result.update(result.evaluation_tool.output)
     return result
 
 
@@ -711,7 +745,12 @@ def iterate(
             result.evaluation_result
         )
 
-        apply_eval_metrics(result.current_rec, result.ep, result.evaluation_result)
+        apply_eval_metrics(
+            current_rec=result.current_rec,
+            ep=result.ep,
+            candidate_spec=result.candidate_spec,
+            evaluation_result=result.evaluation_result,
+        )
 
         out_df = pd.DataFrame.from_records(result.out_df_recs)
         f = upload_file_from_bytes(
@@ -752,15 +791,15 @@ def iterate(
 
 
 def apply_eval_metrics(
-    current_rec: dict, ep: EvalPrompt, evaluation_result: dict
+    current_rec: dict,
+    ep: EvalPrompt,
+    candidate_spec: CandidateEvalSpec,
+    evaluation_result: dict,
 ) -> None:
     eval_name = ep["name"]
-    candidate_spec = ep["candidate_spec"]
     output_columns = candidate_spec["output_columns"]
     workflow_title_by_candidate = candidate_spec["workflow_title_by_candidate"]
     scores = evaluation_result["scores"]
-    if not scores:
-        raise ValueError("scores must contain at least one output column")
 
     evaluation_columns = {}
     include_output_column = len(output_columns) > 1
@@ -771,13 +810,6 @@ def apply_eval_metrics(
         score_by_candidate = {
             item["candidate"]: item["score"] for item in candidate_scores
         }
-        if len(candidate_scores) != len(workflow_title_by_candidate) or set(
-            score_by_candidate
-        ) != set(workflow_title_by_candidate):
-            raise ValueError(
-                f"scores for {output_column!r} must contain each candidate exactly once"
-            )
-
         for candidate, workflow_title in workflow_title_by_candidate.items():
             if include_output_column:
                 output_col = f"{eval_name} - {output_column} - {workflow_title}"
@@ -796,6 +828,43 @@ def apply_eval_metrics(
         evaluation_columns[output_col] = value
 
     current_rec.update(evaluation_columns)
+
+
+def _validate_evaluation_result(
+    evaluation_result: dict,
+    candidate_spec: CandidateEvalSpec,
+) -> None:
+    scores = evaluation_result["scores"]
+    if not scores:
+        raise CandidateEvaluationValidationError(
+            "Submit scores for at least one output column."
+        )
+
+    score_columns = [score["column"] for score in scores]
+    unknown_columns = set(score_columns) - set(candidate_spec["output_columns"])
+    if unknown_columns:
+        raise CandidateEvaluationValidationError(
+            f"Unknown output columns: {sorted(unknown_columns)}. "
+            f"Allowed columns: {candidate_spec['output_columns']}."
+        )
+    if len(score_columns) != len(set(score_columns)):
+        raise CandidateEvaluationValidationError(
+            "Submit each output column at most once."
+        )
+
+    expected_candidates = set(candidate_spec["workflow_title_by_candidate"])
+    for score in scores:
+        output_column = score["column"]
+        candidate_scores = score["candidates"]
+        score_candidates = [item["candidate"] for item in candidate_scores]
+        if (
+            len(score_candidates) != len(expected_candidates)
+            or set(score_candidates) != expected_candidates
+        ):
+            raise CandidateEvaluationValidationError(
+                f"Scores for {output_column!r} must contain every candidate exactly "
+                f"once. Expected candidates: {sorted(expected_candidates)}."
+            )
 
 
 def _restore_workflow_titles(

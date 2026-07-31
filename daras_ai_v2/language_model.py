@@ -154,7 +154,6 @@ def get_entry_text(entry: ConversationEntry) -> str:
 
 
 ResponseFormatType = typing.Literal["text", "json_object"]
-ToolChoice = typing.Literal["auto", "required", "none"]
 
 
 def run_language_model(
@@ -169,7 +168,6 @@ def run_language_model(
     stop: list[str] = None,
     avoid_repetition: bool = False,
     tools: list[BaseLLMTool] = None,
-    tool_choice: ToolChoice | None = None,
     stream: bool = False,
     response_format_type: ResponseFormatType = None,
     reasoning_effort: ReasoningEffort.api_choices | None = None,
@@ -254,7 +252,6 @@ def run_language_model(
             stop=stop,
             avoid_repetition=avoid_repetition,
             tools=tools,
-            tool_choice=tool_choice,
             response_format_type=response_format_type,
             reasoning_effort=reasoning_effort,
             # we can't stream with tools or json yet
@@ -381,7 +378,6 @@ def _run_chat_model(
     stop: list[str] | None,
     avoid_repetition: bool,
     tools: list[BaseLLMTool] | None,
-    tool_choice: ToolChoice | None,
     response_format_type: ResponseFormatType | None,
     reasoning_effort: ReasoningEffort.api_choices | None,
     stream: bool = False,
@@ -405,7 +401,6 @@ def _run_chat_model(
                 stop=stop,
                 temperature=temperature,
                 tools=tools,
-                tool_choice=tool_choice,
                 response_format_type=response_format_type,
             )
         case ModelProvider.fireworks:
@@ -418,7 +413,6 @@ def _run_chat_model(
                 stop=stop,
                 temperature=temperature,
                 tools=tools,
-                tool_choice=tool_choice,
                 response_format_type=response_format_type,
             )
         case ModelProvider.openai_audio:
@@ -439,7 +433,6 @@ def _run_chat_model(
                 stop=stop,
                 temperature=temperature,
                 tools=tools,
-                tool_choice=tool_choice,
                 response_format_type=response_format_type,
                 reasoning_effort=reasoning_effort,
                 stream=stream,
@@ -454,7 +447,6 @@ def _run_chat_model(
                 messages=messages,
                 temperature=temperature,
                 tools=tools,
-                tool_choice=tool_choice,
                 response_format_type=response_format_type,
                 reasoning_effort=reasoning_effort,
                 stream=stream,
@@ -478,7 +470,6 @@ def _run_chat_model(
                 messages=messages,
                 max_tokens=max_tokens,
                 tools=tools,
-                tool_choice=tool_choice,
                 temperature=temperature,
                 avoid_repetition=avoid_repetition,
                 response_format_type=response_format_type,
@@ -681,7 +672,6 @@ def run_openai_responses(
     max_output_tokens: int,
     temperature: float | None = None,
     tools: list[BaseLLMTool] | None = None,
-    tool_choice: ToolChoice | None = None,
     response_format_type: ResponseFormatType | None = None,
     reasoning_effort: ReasoningEffort.api_choices | None = None,
     stream: bool = False,
@@ -712,8 +702,6 @@ def run_openai_responses(
 
     if tools:
         kwargs["tools"] = [tool.spec_openai_responses for tool in tools]
-    if tool_choice:
-        kwargs["tool_choice"] = tool_choice
 
     if response_format_type:
         kwargs["text"] = {"format": {"type": response_format_type}}
@@ -773,7 +761,6 @@ def run_openai_chat(
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
     tools: list[BaseLLMTool] | None = None,
-    tool_choice: ToolChoice | None = None,
     response_format_type: ResponseFormatType | None = None,
     reasoning_effort: ReasoningEffort.api_choices | None = None,
     stream: bool = False,
@@ -836,9 +823,8 @@ def run_openai_chat(
         avoid_repetition = False
 
     if model.name in ["apertus_70b_instruct", "sea_lion_v4_gemma_3_27b_it"]:
-        # These models don't support tool calling.
+        # Swiss AI Apertus model doesn't support tool calling
         tools = None
-        tool_choice = None
 
     if avoid_repetition:
         kwargs["frequency_penalty"] = 0.1
@@ -846,8 +832,6 @@ def run_openai_chat(
 
     if tools:
         kwargs["tools"] = [tool.spec_openai for tool in tools]
-    if tool_choice:
-        kwargs["tool_choice"] = tool_choice
 
     anthropic_json_workaround = False
     if model.is_anthropic_model():
@@ -1408,7 +1392,6 @@ def _run_groq_chat(
     messages: list[ConversationEntry],
     max_tokens: int,
     tools: list[BaseLLMTool] | None,
-    tool_choice: ToolChoice | None,
     temperature: float,
     stop: list[str] | None,
     response_format_type: ResponseFormatType | None,
@@ -1425,8 +1408,6 @@ def _run_groq_chat(
     )
     if tools:
         data["tools"] = [tool.spec_openai for tool in tools]
-    if tool_choice:
-        data["tool_choice"] = tool_choice
     if stop:
         data["stop"] = stop
     if response_format_type:
@@ -1464,7 +1445,6 @@ def _run_fireworks_chat(
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
     tools: list[BaseLLMTool] | None = None,
-    tool_choice: ToolChoice | None = None,
     response_format_type: ResponseFormatType | None = None,
 ):
     from usage_costs.cost_utils import record_cost_auto
@@ -1505,8 +1485,6 @@ def _run_fireworks_chat(
     )
     if tools:
         data["tools"] = [tool.spec_openai for tool in tools]
-    if tool_choice:
-        data["tool_choice"] = tool_choice
     if avoid_repetition:
         data["frequency_penalty"] = 0.1
         data["presence_penalty"] = 0.25
@@ -1546,7 +1524,6 @@ def _run_mistral_chat(
     stop: list[str] | None = None,
     avoid_repetition: bool = False,
     tools: list[BaseLLMTool] | None = None,
-    tool_choice: ToolChoice | None = None,
     response_format_type: ResponseFormatType | None = None,
 ):
     from usage_costs.cost_utils import record_cost_auto
@@ -1561,8 +1538,6 @@ def _run_mistral_chat(
     )
     if tools:
         data["tools"] = [tool.spec_openai for tool in tools]
-    if tool_choice:
-        data["tool_choice"] = "any" if tool_choice == "required" else tool_choice
     if avoid_repetition:
         data["frequency_penalty"] = 0.1
         data["presence_penalty"] = 0.25
