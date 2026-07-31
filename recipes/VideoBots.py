@@ -1335,6 +1335,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
             bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
 
+        has_whatsapp_integration = BotIntegration.objects.filter(
+            published_run=self.current_pr,
+            platform=Platform.WHATSAPP,
+        ).exists()
         config = dict(
             integration_id="magic",
             target="#gooey-embed",
@@ -1348,13 +1352,16 @@ Translation Glossary for LLM Language (English) -> User Langauge
             enableSourcePreview=False,
             secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
         )
+        if has_whatsapp_integration:
+            config["theme"] = "whatsapp"
+            config["showHeader"] = False
         if settings.DEBUG:
             from routers.bots_api import stream_create
 
             config["apiUrl"] = get_api_route_url(stream_create)
 
         gui.div(
-            className="border rounded py-1 mb-3 bg-white",
+            className="mb-3",
             style=dict(height="calc(100vh - 1rem)"),
             id="gooey-embed",
         )
@@ -1391,7 +1398,11 @@ window.addEventListener("hydrated", loadGooeyEmbed);
 // once the widget is already mounted, update the messages and branding to latest
 if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
     GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
-    GooeyEmbed.copilotPreviewControl.updateConfig?.({ branding: config.branding });
+    GooeyEmbed.copilotPreviewControl.updateConfig?.({
+        theme: config.theme,
+        branding: config.branding,
+        showHeader: config.showHeader,
+    });
 }
             """,
             config=config,
