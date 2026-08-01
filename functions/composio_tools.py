@@ -1,23 +1,22 @@
 from __future__ import annotations
 
+import json
 import typing
 from textwrap import dedent
+
+import requests
 from requests import Response
 
 import gooey_gui as gui
-
 from daras_ai_v2 import settings
-from daras_ai_v2.exceptions import ComposioAuthRequired
+from daras_ai_v2.exceptions import ComposioAuthRequired, raise_for_status
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from functions.base_llm_tool import BaseLLMTool
-import requests
-import json
-from daras_ai_v2.exceptions import raise_for_status
 
 if typing.TYPE_CHECKING:
-    from composio.types import Tool
     from composio import Composio
     from composio.client.types import AuthConfig
+    from composio.types import Tool
     from composio_client.types.connected_account_list_response import (
         Item as ComposioConnectedAccount,
     )
@@ -166,7 +165,7 @@ def render_tool_search_dialog(function_urls: set[str]) -> None:
         toolkits = [
             dict(
                 name="Gooey.AI Memory",
-                slug=GooeyToolkit.gooey_ai_memory.name,
+                slug=GooeyToolkit.GOOEY_AI_MEMORY.name,
                 logo="https://gooey.ai/favicon.ico",
                 description="Securely store key user data such as their consent, location or other other info you want your AI agent to remember across sessions and conversations.",
                 search_terms="gooey.ai gooeyai storage data user consent location remember conversation session",
@@ -189,8 +188,8 @@ def render_tool_search_dialog(function_urls: set[str]) -> None:
 
 def render_toolkit_tools(toolkit: dict[str, str], function_urls: set[str]) -> None:
     from daras_ai_v2.fastapi_tricks import get_app_route_url
-    from routers.root import tool_page
     from functions.inbuilt_tools import GooeyToolkit
+    from routers.root import tool_page
 
     expander_key = f"inbuilt_toolkit:{toolkit['slug']}"
     with (
@@ -207,7 +206,7 @@ def render_toolkit_tools(toolkit: dict[str, str], function_urls: set[str]) -> No
             return
 
         toolkit_slug = toolkit["slug"]
-        if toolkit_slug.lower() == GooeyToolkit.gooey_ai_memory.name:
+        if toolkit_slug == GooeyToolkit.GOOEY_AI_MEMORY.name:
             tools = {
                 "GOOEY_MEMORY_READ_VALUE": dict(
                     name="Read Value",

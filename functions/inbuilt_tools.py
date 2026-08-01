@@ -25,7 +25,7 @@ from functions.memory_tools import (
 from functions.models import FunctionScopes
 
 if typing.TYPE_CHECKING:
-    pass
+    from app_users.models import AppUser
 
 
 def get_inbuilt_tools(state: dict) -> typing.Iterable[BaseLLMTool]:
@@ -354,6 +354,7 @@ class UpdateConversationTitleLLMTool(BaseLLMTool):
 
     def __init__(self, scope: FunctionScopes | None, variables: dict):
         self.web_url = variables.get("web_url") or ""
+        self.current_user = None
         super().__init__(
             name=self.name,
             label=self.label,
@@ -367,6 +368,10 @@ class UpdateConversationTitleLLMTool(BaseLLMTool):
             required=["title"],
         )
 
+    def bind(self, *, current_user: AppUser | None):
+        self.current_user = current_user
+        return self
+
     def call(self, title: str) -> dict:
         from daras_ai_v2.workflow_url_input import url_to_runs
 
@@ -378,6 +383,12 @@ class UpdateConversationTitleLLMTool(BaseLLMTool):
         if not message_thread:
             return {"success": False, "error": "Unknown message thread"}
 
+        if self.current_user and sr.uid != self.current_user.uid:
+            return {
+                "success": False,
+                "error": "You don't have permission to update this conversation",
+            }
+
         message_thread.title = title
         message_thread.save(update_fields=["title"])
 
@@ -386,7 +397,7 @@ class UpdateConversationTitleLLMTool(BaseLLMTool):
 
 class GooeyToolkit(GooeyEnum):
     inbuilt = "Gooey.AI Inbuilt"
-    gooey_ai_memory = "Gooey.AI Memory"
+    GOOEY_AI_MEMORY = "Gooey.AI Memory"
 
 
 MEMORY_TOOLS = (
