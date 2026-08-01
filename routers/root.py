@@ -5,16 +5,16 @@ import typing
 from contextlib import contextmanager
 from enum import Enum
 
-import gooey_gui as gui
 from fastapi import HTTPException, Query
 from fastapi.openapi.docs import get_redoc_html
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from furl import furl
 from loguru import logger
 from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import FileResponse, Response
 
+import gooey_gui as gui
 from bots.models import BotIntegration, PublishedRun, Workflow
 from bots.models.convo_msg import Conversation, db_msgs_to_api_json
 from daras_ai.image_input import safe_filename, upload_file_from_bytes
@@ -36,6 +36,7 @@ from daras_ai_v2.manage_api_keys_widget import manage_api_keys
 from daras_ai_v2.meta_content import build_meta_tags, raw_build_meta_tags
 from daras_ai_v2.profiles import get_meta_tags_for_profile, profile_page
 from daras_ai_v2.settings import templates
+from functions.inbuilt_tools import GooeyToolkit
 from handles.models import Handle
 from routers.custom_api_router import CustomAPIRouter
 from routers.static_pages import serve_static_file
@@ -117,6 +118,7 @@ async def file_upload_meta(body_json: dict = fastapi_request_json):
 @app.post("/__/file-upload/")
 def file_upload(request: Request, form_data: FormData = fastapi_request_form):
     from wand.image import Image
+
     from routers.firebase_auth import init_firebase_anonymous_user
 
     file = form_data["file"]
@@ -242,16 +244,52 @@ def home_page(request: Request):
     }
 
 
-@app.get("/tools/{toolkit_slug}/{tool_slug}")
+@gui.route(app, "/tools/{toolkit_slug}/{tool_slug}")
 def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
-    import composio_client
-    from composio import Composio
+    tool = load_tool_spec(toolkit_slug, tool_slug)
+    with page_wrapper(request):
+        gui.component("ToolPage", tool=tool)
+    return {
+        "meta": raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title=f"{tool.get('name') or tool_slug} | Gooey.AI Tools",
+            description=tool.get("description") or "",
+        ),
+    }
+
+
+def load_tool_spec(toolkit_slug: str, tool_slug: str) -> dict:
+    from functions.inbuilt_tools import INBUILT_TOOL_MAP
 
     try:
-        tool = Composio().tools.get_raw_composio_tool_by_slug(slug=tool_slug)
-    except composio_client.NotFoundError:
-        raise HTTPException(status_code=404)
-    return JSONResponse(content=tool.to_dict())
+        tool = INBUILT_TOOL_MAP[tool_slug](None, {})
+    except KeyError:
+        import composio_client
+        from composio import Composio
+
+        try:
+            tool = Composio().tools.get_raw_composio_tool_by_slug(slug=tool_slug)
+        except composio_client.NotFoundError:
+            raise HTTPException(status_code=404)
+        else:
+            return tool.to_dict()
+    else:
+        toolkit = GooeyToolkit.get(toolkit_slug)
+        if toolkit:
+            toolkit_name = toolkit.value
+        else:
+            toolkit_name = "Gooey.AI"
+        return {
+            "slug": tool.name,
+            "name": tool.label,
+            "description": tool.description,
+            "input_parameters": tool.spec_parameters,
+            "toolkit": {
+                "slug": toolkit_slug,
+                "name": toolkit_name,
+                "logo": str(furl(settings.APP_BASE_URL) / "favicon.ico"),
+            },
+        }
 
 
 @gui.route(app, "/api/")

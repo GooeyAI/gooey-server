@@ -5,11 +5,10 @@ import typing
 from itertools import zip_longest
 
 import sentry_sdk
-
-import gooey_gui as gui
 import typing_extensions
 from pydantic import BaseModel, Field
 
+import gooey_gui as gui
 from ai_models.llm_openapi import LLMMarker
 from ai_models.models import AIModelSpec
 from app_users.models import AppUser
@@ -22,7 +21,7 @@ from bots.models import (
 )
 from bots.models.message_thread import MessageThread
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2 import settings, exceptions
+from daras_ai_v2 import exceptions, settings
 from daras_ai_v2.asr import (
     AsrModels,
     TranslationModels,
@@ -37,10 +36,8 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
-from daras_ai_v2.base import BasePage, RecipeTabs, STARTING_STATE
+from daras_ai_v2.base import STARTING_STATE, BasePage, RecipeTabs
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
-from daras_ai_v2.fastapi_tricks import get_api_route_url
-from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.doc_search_settings_widgets import (
     SUPPORTED_SPREADSHEET_TYPES,
     bulk_documents_uploader,
@@ -54,9 +51,11 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.fastapi_tricks import get_api_route_url, get_app_route_url
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
+from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_filters import (
     asr_languages_without_dialects,
     language_filter_selector,
@@ -82,18 +81,13 @@ from daras_ai_v2.language_model_settings_widgets import (
 from daras_ai_v2.lipsync_api import LipsyncModel, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr, HttpUrlStr
+from daras_ai_v2.pydantic_validation import HttpUrlStr, OptionalHttpUrlStr
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     CitationStyles,
     apply_response_formattings_prefix,
     apply_response_formattings_suffix,
     parse_refs,
-)
-from daras_ai_v2.web_widget_embed import (
-    load_chat_widget_lib,
-    chat_widget_input_to_request_body,
-    get_chat_widget_messages,
 )
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
@@ -108,20 +102,28 @@ from daras_ai_v2.vector_search import (
     doc_or_yt_url_to_file_metas,
     doc_url_to_text_pages,
 )
-from functions.base_llm_tool import BaseLLMTool
+from daras_ai_v2.web_widget_embed import (
+    chat_widget_input_to_request_body,
+    get_chat_widget_messages,
+    load_chat_widget_lib,
+)
 from functions.base_llm_tool import (
+    BaseLLMTool,
     get_tool_from_call,
 )
+from functions.inbuilt_tools import GooeyToolkit, UpdateConversationTitleLLMTool
+from functions.models import FunctionTrigger
 from functions.workflow_tools import DynamicLLMToolLoader
 from recipes.DocExtract import document_intelligence_settings
 from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
+from routers.root import tool_page
 from url_shortener.models import ShortenedURL
 from usage_costs.twilio_usage_cost import (
-    get_non_ivr_price_credits,
     get_ivr_price_credits_and_seconds,
+    get_non_ivr_price_credits,
 )
 from widgets.demo_button import render_demo_buttons_header
 from widgets.switch_with_section import switch_with_section
@@ -1567,7 +1569,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 message_thread.first_run = sr
             message_thread.last_run = sr
             message_thread.save(update_fields=["first_run", "last_run"])
-        else:
+        elif should_create_thread_for_run(sr):
             message_thread = MessageThread.objects.create(
                 title=gui.session_state.get("input_prompt") or "",
                 first_run=sr,
@@ -1576,7 +1578,65 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             sr.message_thread = message_thread
             sr.save(update_fields=["message_thread"])
 
+        if message_thread:
+            run_conversation_title_generator(sr, self.request.user)
+
         return sr
+
+
+def should_create_thread_for_run(sr: SavedRun) -> bool:
+    return sr.surface in {
+        SavedRun.Surface.run,
+        SavedRun.Surface.api,
+        SavedRun.Surface.deployment,
+        SavedRun.Surface.builder_prompt,
+        SavedRun.Surface.builder_child,
+    }
+
+
+def run_conversation_title_generator(sr: SavedRun, user: AppUser):
+    if not settings.CONVERSATION_TITLE_EXAMPLE_ID:
+        return
+
+    variables = dict(
+        current_title=sr.message_thread.title,
+        request=sr.state,
+        web_url=sr.get_app_url(),
+    )
+    variables_schema = {var: {"role": "system"} for var in variables}
+
+    tool_url = get_app_route_url(
+        tool_page,
+        path_params=dict(
+            toolkit_slug=GooeyToolkit.inbuilt.name,
+            tool_slug=UpdateConversationTitleLLMTool.name,
+        ),
+    )
+    func = dict(
+        trigger=FunctionTrigger.prompt.name,
+        url=tool_url,
+        label=UpdateConversationTitleLLMTool.label,
+    )
+
+    body = dict(
+        variables=variables,
+        variables_schema=variables_schema,
+        functions=[func],
+    )
+
+    try:
+        title_generator = VideoBotsPage.get_pr_from_example_id(
+            example_id=settings.CONVERSATION_TITLE_EXAMPLE_ID
+        )
+    except PublishedRun.DoesNotExist:
+        return
+    title_generator.submit_api_call(
+        workspace=title_generator.workspace,
+        current_user=user,
+        request_body=body,
+        deduct_credits=False,
+        surface=SavedRun.Surface.internal,
+    )
 
 
 def _can_use_message_thread(
