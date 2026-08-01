@@ -778,14 +778,30 @@ def sidebar_page_wrapper(
         default=False,
     )
 
+    # Layout v2 is an app shell: the viewport is the frame, the page never scrolls as a
+    # whole, and scrolling happens inside the tab body. That needs a *definite* height on
+    # every ancestor down to the body - `min-vh-100` only sets a floor, so content taller
+    # than the viewport grows the page and scrolls the whole thing, header included.
+    is_v2 = _is_layout_v2_page(page)
+    # splatted so v1 keeps exactly the props it had - an empty style dict would still
+    # be emitted into the render tree
+    fill = dict(style=dict(minHeight=0)) if is_v2 else {}
+
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
     # row on desktop (rail beside content).
-    with gui.div(className="d-flex flex-column flex-lg-row min-vh-100 w-100"):
+    with gui.div(
+        className=(
+            "d-flex flex-column flex-lg-row w-100 "
+            + ("vh-100 overflow-hidden" if is_v2 else "min-vh-100")
+        )
+    ):
         navigation_sidebar.render(
             request, default_collapsed=default_collapsed, page=page
         )
 
-        with gui.div(className="d-flex flex-column flex-grow-1 min-w-0"):
+        with gui.div(
+            className="d-flex flex-column flex-grow-1 min-w-0", **fill
+        ):
             sidebar, page_content = sidebar_layout(
                 key=GOOEY_BUILDER_EVENT_KEY,
                 session=request.session,
@@ -793,7 +809,13 @@ def sidebar_page_wrapper(
             )
             with (
                 page_content,
-                gui.div(className="d-flex flex-column min-vh-100 w-100"),
+                gui.div(
+                    className=(
+                        "d-flex flex-column w-100 "
+                        + ("h-100 overflow-hidden" if is_v2 else "min-vh-100")
+                    ),
+                    **fill,
+                ),
             ):
                 gui.html(templates.get_template("gtag.html").render(**context))
                 gui.html(copy_to_clipboard_scripts)
@@ -822,6 +844,19 @@ def sidebar_page_wrapper(
                     gui.html(
                         templates.get_template("login_scripts.html").render(**context)
                     )
+
+
+def _is_layout_v2_page(page: typing.Optional["BasePage"]) -> bool:
+    """Layout v2 renders an app shell, which has no marketing footer.
+
+    v1 pages and every non-recipe page (account, explore, history, ...) keep theirs.
+    """
+    if page is None:
+        return False
+    # imported lazily: daras_ai_v2.base_v2 imports this module at module level
+    from daras_ai_v2.base_v2 import BasePage as BasePageV2
+
+    return isinstance(page, BasePageV2)
 
 
 class TabData(typing.NamedTuple):

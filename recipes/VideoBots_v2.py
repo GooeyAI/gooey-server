@@ -22,7 +22,7 @@ from bots.models import (
 )
 from bots.models.message_thread import MessageThread
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2 import settings, exceptions
+from daras_ai_v2 import settings, exceptions, icons
 from daras_ai_v2.asr import (
     AsrModels,
     TranslationModels,
@@ -38,6 +38,7 @@ from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
 from daras_ai_v2.base_v2 import BasePage, RecipeTabs, STARTING_STATE
+from daras_ai_v2.tab_spec import TabSpec
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
 from daras_ai_v2.fastapi_tricks import get_api_route_url
 from daras_ai_v2.integrations_tab import render_integrations_tab
@@ -1359,8 +1360,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             config["apiUrl"] = get_api_route_url(stream_create)
 
         gui.div(
-            className="mb-3",
-            style=dict(height="calc(100vh - 1rem)"),
+            # fill the scrolling body area, not the viewport: the top bar sits above this,
+            # so `100vh` would overflow by exactly the bar's height
+            style=dict(height="100%", minHeight=0),
             id="gooey-embed",
         )
         load_chat_widget_lib()
@@ -1528,6 +1530,47 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
     def render_header_extra(self):
         if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
             render_demo_buttons_header(self.current_pr)
+
+    @classmethod
+    def all_tab_slugs(cls) -> set[str]:
+        # "" and "preview" are urls v1 already routes - listing them keeps this an honest
+        # description of the strip; recipe_v2 skips registering a route for them.
+        return {"about", "config", "preview", ""}
+
+    def get_tab_spec(self) -> list[TabSpec]:
+        """The agent tab set.
+
+        Split sits at the entry url because it *is* v1's Run tab, so `/video-bots/` keeps
+        behaving as it always has. Deploy is deliberately absent: it becomes a sub-tab of
+        Config in a later slice, and until then its body stays reachable through v1's
+        `/integrations/` url via `render_selected_tab()`.
+        """
+        return [
+            TabSpec(
+                slug="about",
+                label="About",
+                icon=icons.info,
+                render=self._render_about_tab,
+            ),
+            TabSpec(
+                slug="config",
+                label="Config",
+                icon=icons.edit,
+                render=self._render_config_tab,
+            ),
+            TabSpec(
+                slug="preview",
+                label="Preview",
+                icon=icons.preview,
+                render=self._render_preview_tab,
+            ),
+            TabSpec(
+                slug="",
+                label="Split",
+                icon=icons.run,
+                render=self._render_split_tab,
+            ),
+        ]
 
     def render_selected_tab(self):
         if self.tab == RecipeTabs.integrations:

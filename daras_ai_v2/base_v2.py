@@ -454,17 +454,27 @@ class BasePage:
         assert tabs, f"{type(self).__name__}.get_tab_spec() returned no tabs"
         active = self._resolve_active_tab(tabs)
 
-        # the bar's node is reserved here but filled after the body renders:
+        # App shell: the bar is a fixed-height row at the top and the body takes the rest of
+        # the viewport, scrolling inside itself. The page as a whole never scrolls, so the
+        # bar cannot slide out of view.
+        #
+        # The bar's node is reserved first (so it comes first in the DOM) but filled last:
         # _has_request_changed() - and so the publish state - is only settled once the inputs
         # have rendered. v1 renders its header last for the same reason.
-        top_bar_placeholder = gui.div(className="my-3 w-100")
+        top_bar_placeholder = gui.div(className="flex-shrink-0 w-100 px-3 pt-3")
 
-        if active:
-            active.render()
-        else:
-            # a v1 tab url that the v2 strip no longer surfaces: Examples, API, Saved,
-            # History, Deploy. Their routes and deep links keep working, with v2 chrome.
-            self.render_selected_tab()
+        with gui.div(
+            className="flex-grow-1 w-100 overflow-auto px-3",
+            # without this a flex child refuses to shrink below its content, and the
+            # overflow lands on the page instead of here
+            style=dict(minHeight=0),
+        ):
+            if active:
+                active.render()
+            else:
+                # a v1 tab url that the v2 strip no longer surfaces: Examples, API, Saved,
+                # History, Deploy. Their routes and deep links keep working, with v2 chrome.
+                self.render_selected_tab()
 
         with top_bar_placeholder:
             self._render_top_bar(tabs=tabs, active=active)
@@ -486,12 +496,18 @@ class BasePage:
     def _url_tab_slug(self) -> str:
         """Tab slug of a v2 tab url - `/video-bots/my-agent-abc123/config/` -> "config".
 
-        "" for the entry url, whose last segment is the page slug or the run slug.
+        A trailing segment counts as a tab slug only if `routers.recipe_v2` actually
+        registered a route for it. Matching against the route registry rather than trusting
+        the last segment is what stops a run identifier being read as a tab: the entry url
+        `/video-bots/my-agent-abc123/` ends in the run id, which is not a registered slug,
+        so it correctly resolves to "" - the entry tab.
         """
+        from routers.recipe_v2 import tab_routes
+
         if not self.request.url:
             return ""
         segments = [seg for seg in self.request.url.path.split("/") if seg]
-        if len(segments) < 2:
+        if len(segments) < 2 or segments[-1] not in tab_routes:
             return ""
         return segments[-1]
 
@@ -1241,6 +1257,25 @@ class BasePage:
         ]
 
     def _render_about_tab(self):
+        """What this workflow is, beside a live preview of it.
+
+        Same column split as Split/Config/Preview so the preview keeps its position as you
+        move between tabs, instead of jumping around the page.
+        """
+        with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
+            about_col, preview_col = gui.columns([3, 2], gap="medium")
+            with about_col:
+                self._render_about_content()
+            with preview_col:
+                if self.current_sr.retention_policy == RetentionPolicy.delete:
+                    # the description is still worth reading even when the run's data is gone
+                    gui.caption(
+                        "This run's output has been deleted as per the retention policy."
+                    )
+                else:
+                    self._render_output_col()
+
+    def _render_about_content(self):
         if self.current_pr.notes:
             with gui.div(className="container-margin-reset"):
                 gui.write(self.current_pr.notes)
@@ -1260,24 +1295,22 @@ class BasePage:
         self._render_output_col()
 
     def _render_split_tab(self):
-        """Both columns side by side - v1's Run tab, unchanged."""
+        """Both columns side by side - v1's Run tab.
+
+        Unlike v1 this is *only* the two columns. v1 trailed the Debug expander, the usage
+        guide and Related Workflows below the fold; in an app shell there is no page scroll
+        to put them below, so the guide and Related Workflows live on About, and Debug
+        becomes a Config sub-tab.
+        """
         if self._render_deleted_output_if_needed():
             return
 
-        with gui.styled(INPUT_OUTPUT_COLS_CSS):
+        with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
             input_col, output_col = gui.columns([3, 2], gap="medium")
             with input_col:
                 submitted = self._render_input_col()
             with output_col:
                 self._render_output_col(submitted=submitted)
-
-        self._render_step_row()
-
-        col1, col2 = gui.columns(2)
-        with col1:
-            self._render_help()
-
-        self.render_related_workflows()
 
     def _render_deleted_output_if_needed(self) -> bool:
         """True if this run's data is gone, in which case that is all there is to render."""
@@ -2011,8 +2044,11 @@ class BasePage:
             hide_on_mobile = "d-none d-lg-block pb-2"
         else:
             hide_on_mobile = ""
+        # h-100 so a percentage-height child (the chat widget) resolves against the
+        # scrolling body area rather than the viewport
         with gui.div(
-            style=dict(position="sticky", top="0.5rem"), className=hide_on_mobile
+            style=dict(height="100%", minHeight=0),
+            className=hide_on_mobile,
         ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
@@ -2822,6 +2858,36 @@ def extract_nested_str(obj) -> str:
 class TitleValidationError(Exception):
     pass
 
+
+SPLIT_PANES_CSS = """
+/* App-shell panes, desktop only. The row fills the body exactly, so the body never
+   overflows and therefore never scrolls; the left pane scrolls inside itself and the right
+   pane (the preview) stays put.
+
+   Below lg the columns stack (col-12), so this is deliberately not applied - there the row
+   grows and the body scrolls normally, which is the right behaviour on a phone. */
+& {
+    margin: 0;
+    padding-top: 0;
+}
+
+@media (min-width: 992px) {
+    & {
+        height: 100%;
+        min-height: 0;
+    }
+    & > div {
+        height: 100%;
+        min-height: 0;
+    }
+    & > div:first-child {
+        overflow-y: auto;
+    }
+    & > div:last-child {
+        overflow: hidden;
+    }
+}
+"""
 
 INPUT_OUTPUT_COLS_CSS = """
 & {
