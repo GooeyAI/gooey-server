@@ -461,10 +461,10 @@ class BasePage:
         # The bar's node is reserved first (so it comes first in the DOM) but filled last:
         # _has_request_changed() - and so the publish state - is only settled once the inputs
         # have rendered. v1 renders its header last for the same reason.
-        top_bar_placeholder = gui.div(className="flex-shrink-0 w-100 px-3 pt-3")
+        top_bar_placeholder = gui.div(className="flex-shrink-0 w-100 px-4 pt-3")
 
         with gui.div(
-            className="flex-grow-1 w-100 overflow-auto px-3",
+            className="flex-grow-1 w-100 overflow-auto px-4 pb-2",
             # without this a flex child refuses to shrink below its content, and the
             # overflow lands on the page instead of here
             style=dict(minHeight=0),
@@ -537,6 +537,37 @@ class BasePage:
                     className=("fw-bold" if active and tab.slug == active.slug else ""),
                 ):
                     gui.html(f"{tab.icon} {tab.label}" if tab.icon else tab.label)
+
+    def _render_pane_strip(
+        self, panes: dict[str, typing.Callable[[], None]], *, key: str
+    ) -> typing.Callable[[], None]:
+        """Render an in-page strip of panes and return the one to draw.
+
+        Panes are panels inside a single tab, so - unlike tabs - they have no url and no
+        spec: just an ordered label -> renderer map and a session-state key.
+
+        Only the active pane renders. That is safe because the server round-trips the whole
+        `session_state` regardless of what was drawn, so widgets on the panes that did not
+        render keep their values (see `gooey_gui/core/renderer.py`). The corollary is that a
+        pane must never depend on another pane's *return value* - read `gui.session_state`.
+        """
+        labels = list(panes)
+        if gui.session_state.get(key) not in panes:
+            gui.session_state[key] = labels[0]
+
+        with gui.styled(PANE_STRIP_CSS), gui.div(className="mb-3"):
+            for label in labels:
+                is_active = label == gui.session_state[key]
+                if gui.button(
+                    label,
+                    key=f"{key}:{label}",
+                    type="tertiary",
+                    className="pane-active" if is_active else "",
+                ):
+                    gui.session_state[key] = label
+                    gui.rerun()
+
+        return panes[gui.session_state[key]]
 
     def render_header_extra(self):
         pass
@@ -2859,6 +2890,89 @@ class TitleValidationError(Exception):
     pass
 
 
+FILL_HEIGHT_EDITOR_CSS = """
+/* A code editor that fills its flex parent instead of a fixed/capped height. The label
+   stays its natural size and the editor takes the rest. */
+& {
+    min-height: 0;
+}
+
+& > div:last-child {
+    flex: 1 1 auto;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+}
+
+& .ace_editor,
+& .ace-editor,
+& textarea {
+    height: 100% !important;
+    max-height: none !important;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+"""
+
+PANE_STRIP_CSS = """
+/* The strip spans the column and scrolls sideways when the pills do not fit, rather than
+   wrapping onto a second row - a two-row strip pushes the pane down and reflows the whole
+   column every time the window changes width.
+
+   `!important` throughout: these compete with the app's own button styling, which is more
+   specific than a scoped `& button` rule and otherwise wins (tertiary buttons come with
+   their own padding and a pink hover). */
+& {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+    flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+
+& button {
+    flex: 0 0 auto;
+    /* inline-flex keeps the active dot on the same line as the label; with inline-block it
+       becomes a block-level box and the label drops to a second line */
+    display: inline-flex !important;
+    align-items: center;
+    white-space: nowrap !important;
+    margin: 0 !important;
+    padding: 6px 14px !important;
+    border: 1px solid #e6e6e6 !important;
+    border-radius: 10px !important;
+    background: #fff !important;
+    color: #6b6b6b !important;
+    font-weight: 500 !important;
+    line-height: 1.4 !important;
+}
+
+& button:hover {
+    background: #fff !important;
+    border-color: #d0d0d0 !important;
+    color: #1a1a1a !important;
+}
+
+& button.pane-active {
+    border-color: #c9c9c9 !important;
+    color: #111 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+& button.pane-active::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #111;
+}
+"""
+
 SPLIT_PANES_CSS = """
 /* App-shell panes, desktop only. The row fills the body exactly, so the body never
    overflows and therefore never scrolls; the left pane scrolls inside itself and the right
@@ -2880,10 +2994,10 @@ SPLIT_PANES_CSS = """
         height: 100%;
         min-height: 0;
     }
-    & > div:first-child {
-        overflow-y: auto;
-    }
-    & > div:last-child {
+    /* Neither column scrolls as a whole. The left column is a flex stack whose *pane*
+       scrolls, so its strip and submit row stay put; the right column is the preview,
+       which manages its own scrolling. */
+    & > div {
         overflow: hidden;
     }
 }

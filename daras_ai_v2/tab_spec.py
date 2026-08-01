@@ -6,15 +6,6 @@ import pydantic
 # must not import either of them at module level.
 
 
-class SubTabSpec(pydantic.BaseModel):
-    """A panel inside a tab, selected in-page (no url of its own)."""
-
-    slug: str
-    label: str
-    # server-only: the tab strip renders links and labels, never behaviour
-    render: typing.Callable[[], None] = pydantic.Field(exclude=True)
-
-
 class TabSpec(pydantic.BaseModel):
     """One tab of a layout-v2 recipe page, as declared by `BasePage.get_tab_spec()`.
 
@@ -29,8 +20,7 @@ class TabSpec(pydantic.BaseModel):
     icon: str = ""
     """Raw FontAwesome html, like `NavItemData.icon`."""
 
-    sub_tabs: list[SubTabSpec] = []
-    # server-only: see SubTabSpec.render
+    # server-only: the top bar renders links and labels, never behaviour
     render: typing.Callable[[], None] = pydantic.Field(exclude=True)
 
 

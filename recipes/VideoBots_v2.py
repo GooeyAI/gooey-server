@@ -37,7 +37,12 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
-from daras_ai_v2.base_v2 import BasePage, RecipeTabs, STARTING_STATE
+from daras_ai_v2.base_v2 import (
+    FILL_HEIGHT_EDITOR_CSS,
+    BasePage,
+    RecipeTabs,
+    STARTING_STATE,
+)
 from daras_ai_v2.tab_spec import TabSpec
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
 from daras_ai_v2.fastapi_tricks import get_api_route_url
@@ -112,7 +117,9 @@ from daras_ai_v2.vector_search import (
 from functions.base_llm_tool import BaseLLMTool
 from functions.base_llm_tool import (
     get_tool_from_call,
+    render_called_functions,
 )
+from functions.models import FunctionTrigger
 from functions.workflow_tools import DynamicLLMToolLoader
 from recipes.DocExtract import document_intelligence_settings
 from recipes.DocSearch import get_top_k_references, references_as_prompt
@@ -909,80 +916,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         # don't show the input prompt in the run titles, instead show get_run_title()
         return None
 
-    def render_form_v2(self):
-        gui.code_editor(
-            label=(
-                '#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> '
-                + field_title(self.RequestModel, "bot_script")
-            ),
-            key="bot_script",
-            language="jinja",
-            style=dict(maxHeight="50vh"),
-            help=field_desc(self.RequestModel, "bot_script"),
-        )
-
-        language_model = language_model_selector(
-            label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
-        )
-
-        if not AIModelSpec.objects.filter(
-            name=language_model, llm_is_audio_model=True
-        ).exists():
-            bulk_documents_uploader(
-                label=(
-                    "#### <i class='fa-light fa-books' style='fontSize:20px'></i> "
-                    + field_title(self.RequestModel, "documents")
-                ),
-                accept=["audio/*", "application/*", "video/*", "text/*"],
-                help=field_desc(self.RequestModel, "documents"),
-            )
-
-        gui.markdown("#### 💪 Capabilities")
-
-        speech_recognition_enabled = switch_with_section(
-            label="##### 🦻 Speech Recognition & Translation",
-            key="_speech_recognition_enabled",
-            control_keys=["user_language", "asr_model"],
-            render_section=self.speech_recognition_settings,
-        )
-        if not speech_recognition_enabled:
-            gui.session_state["asr_model"] = None
-            gui.session_state["asr_language"] = None
-            gui.session_state["asr_prompt"] = None
-
-            gui.session_state["asr_task"] = None
-            gui.session_state["translation_model"] = None
-            gui.session_state["user_language"] = None
-
-        text_to_speech_enabled = switch_with_section(
-            label="##### 🗣️ Text to Speech & Lipsync",
-            key="_text_to_speech_enabled",
-            control_keys=["tts_provider"],
-            render_section=self.text_to_speech_settings,
-        )
-        if not text_to_speech_enabled:
-            gui.session_state["tts_provider"] = None
-
-        document_intelligence_enabled = switch_with_section(
-            label="##### 🩻 Photo & Document Intelligence",
-            key="_document_intelligence_enabled",
-            control_keys=["document_model"],
-            render_section=self.document_intelligence_settings,
-        )
-        if not document_intelligence_enabled:
-            gui.session_state["document_model"] = None
-
-        switch_with_section(
-            label="##### 📊 Analytics & Evaluation",
-            control_keys=["bulk_runs"],
-            render_section=lambda: render_workflow_bulk_runs_list(
-                user=self.request.user,
-                workspace=self.request.user and self.current_workspace,
-                sr=self.current_sr,
-                pr=self.current_pr,
-            ),
-        )
-
     def speech_recognition_settings(self):
         with gui.div(className="pt-2 ps-1"):
             gui.caption(field_desc(self.RequestModel, "user_language"))
@@ -1351,9 +1284,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
             enableSourcePreview=False,
             secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
         )
+        # the page's own top bar already names the agent, so the widget never needs its own
+        config["showHeader"] = False
         if has_whatsapp_integration:
             config["theme"] = "whatsapp"
-            config["showHeader"] = False
         if settings.DEBUG:
             from routers.bots_api import stream_create
 
@@ -1572,23 +1506,197 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             ),
         ]
 
+    CONFIG_PANE_KEY = "--config-subtab"
+
+    def _config_panes(self) -> dict[str, typing.Callable[[], None]]:
+        """The working column's panes, in strip order.
+
+        These regroup what v1 spread across `render_form_v2` and the Settings expander -
+        every pane composes existing widgets, none of them reimplement anything.
+        """
+        return {
+            "LLM Instructions": self._render_llm_instructions_pane,
+            "Knowledge": self._render_knowledge_pane,
+            # functions_in_settings is False, so render_variables() gives us both the
+            # function/tool inputs and the variables editor
+            "Tools": self.render_variables,
+            "Settings": self._render_settings_pane,
+            "Deploy": self._render_deploy_panel,
+            "Debug": self._render_debug_pane,
+        }
+
+    def _render_input_col(self):
+        """The working column, shared by Config (alone) and Split (beside the preview).
+
+        Overriding this - rather than the tabs - is what gives both of them the pane strip
+        without duplicating the layout.
+        """
+        with gui.div(
+            className="d-flex flex-column h-100", style=dict(minHeight=0)
+        ):
+            # strip and submit row are fixed; only the pane between them scrolls, and only
+            # when its content actually overflows
+            render_pane = self._render_pane_strip(
+                self._config_panes(), key=self.CONFIG_PANE_KEY
+            )
+            with gui.div(
+                # pe-3 keeps the scrollbar off the content when the pane overflows
+                className="flex-grow-1 overflow-auto pt-2 pe-3",
+                style=dict(minHeight=0),
+            ):
+                render_pane()
+
+            with gui.div(className="flex-shrink-0"):
+                submitted = self.render_submit_row()
+                with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
+                    gui.caption(f"_{self.get_terms_caption()}_")
+        return submitted
+
+    def _render_llm_instructions_pane(self):
+        """Model selector pinned on top, editor filling whatever height is left.
+
+        v1 capped the editor at `maxHeight: 50vh`, which in an app shell leaves dead space
+        below it on tall screens and still overflows on short ones.
+        """
+        with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
+            # model above the editor, unlike v1's form
+            language_model_selector(
+                label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
+            )
+            with gui.styled(FILL_HEIGHT_EDITOR_CSS), gui.div(
+                className="flex-grow-1 d-flex flex-column", style=dict(minHeight=0)
+            ):
+                gui.code_editor(
+                    label=(
+                        '#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> '
+                        + field_title(self.RequestModel, "bot_script")
+                    ),
+                    key="bot_script",
+                    language="jinja",
+                    help=field_desc(self.RequestModel, "bot_script"),
+                )
+
+    def _render_knowledge_pane(self):
+        # v1 gated this on language_model_selector's RETURN VALUE, which only exists while
+        # that widget renders. It lives on another pane now, so read the state key instead -
+        # otherwise the uploader silently disappears unless LLM Instructions rendered first.
+        if not AIModelSpec.objects.filter(
+            name=gui.session_state.get("selected_model"), llm_is_audio_model=True
+        ).exists():
+            bulk_documents_uploader(
+                label=(
+                    "#### <i class='fa-light fa-books' style='fontSize:20px'></i> "
+                    + field_title(self.RequestModel, "documents")
+                ),
+                accept=["audio/*", "application/*", "video/*", "text/*"],
+                help=field_desc(self.RequestModel, "documents"),
+            )
+
+        if not gui.session_state.get("documents"):
+            return
+
+        gui.write("#### 📄 Knowledge Base")
+        gui.text_area(
+            "###### 👩‍🏫 " + field_title(self.RequestModel, "task_instructions"),
+            help=field_desc(self.RequestModel, "task_instructions"),
+            key="task_instructions",
+            height=300,
+        )
+        citation_style_selector()
+        gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
+        cache_knowledge_widget(self)
+        doc_extract_selector(self.request.user)
+
+        gui.write("---")
+        query_instructions_widget()
+        keyword_instructions_widget()
+        gui.write("---")
+        doc_search_advanced_settings()
+
+    def _render_settings_pane(self):
+        gui.markdown("#### 💪 Capabilities")
+
+        speech_recognition_enabled = switch_with_section(
+            label="##### 🦻 Speech Recognition & Translation",
+            key="_speech_recognition_enabled",
+            control_keys=["user_language", "asr_model"],
+            render_section=self.speech_recognition_settings,
+        )
+        if not speech_recognition_enabled:
+            gui.session_state["asr_model"] = None
+            gui.session_state["asr_language"] = None
+            gui.session_state["asr_prompt"] = None
+            gui.session_state["asr_task"] = None
+            gui.session_state["translation_model"] = None
+            gui.session_state["user_language"] = None
+
+        text_to_speech_enabled = switch_with_section(
+            label="##### 🗣️ Text to Speech & Lipsync",
+            key="_text_to_speech_enabled",
+            control_keys=["tts_provider"],
+            render_section=self.text_to_speech_settings,
+        )
+        if not text_to_speech_enabled:
+            gui.session_state["tts_provider"] = None
+
+        document_intelligence_enabled = switch_with_section(
+            label="##### 🩻 Photo & Document Intelligence",
+            key="_document_intelligence_enabled",
+            control_keys=["document_model"],
+            render_section=self.document_intelligence_settings,
+        )
+        if not document_intelligence_enabled:
+            gui.session_state["document_model"] = None
+
+        switch_with_section(
+            label="##### 📊 Analytics & Evaluation",
+            control_keys=["bulk_runs"],
+            render_section=lambda: render_workflow_bulk_runs_list(
+                user=self.request.user,
+                workspace=self.request.user and self.current_workspace,
+                sr=self.current_sr,
+                pr=self.current_pr,
+            ),
+        )
+
+        gui.write("---")
+        self.render_settings()
+
+    def _render_debug_pane(self):
+        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.pre)
+        self.render_steps()
+        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
+        gui.caption(
+            f"""
+            Run Time: {self.current_sr.run_time.total_seconds():.2f}s\n\n
+            [Parent Run]({self.current_sr.parent and self.current_sr.parent.get_app_url()})
+            """,
+            unsafe_allow_html=True,
+        )
+
+    def _render_deploy_panel(self):
+        """Deploy's body. Reached two ways - the Config sub-tab, and v1's `/integrations/`
+        deep link via `render_selected_tab()` - so it lives in exactly one place.
+        """
+        user = self.request.user
+        # not signed in case
+        if not user or user.is_anonymous:
+            integrations_welcome_screen(title="Connect your Agent")
+            gui.newline()
+            with gui.center():
+                gui.anchor("Get Started", href=self.get_auth_url(), type="primary")
+            return
+        sr, pr = self.current_sr_pr
+        render_integrations_tab(
+            user=self.request.user,
+            workspace=self.current_workspace,
+            saved_run=sr,
+            published_run=pr,
+        )
+
     def render_selected_tab(self):
         if self.tab == RecipeTabs.integrations:
-            user = self.request.user
-            # not signed in case
-            if not user or user.is_anonymous:
-                integrations_welcome_screen(title="Connect your Agent")
-                gui.newline()
-                with gui.center():
-                    gui.anchor("Get Started", href=self.get_auth_url(), type="primary")
-                return
-            sr, pr = self.current_sr_pr
-            render_integrations_tab(
-                user=self.request.user,
-                workspace=self.current_workspace,
-                saved_run=sr,
-                published_run=pr,
-            )
+            self._render_deploy_panel()
         else:
             super().render_selected_tab()
 
