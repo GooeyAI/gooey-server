@@ -5,10 +5,11 @@ import typing
 from contextlib import contextmanager
 from enum import Enum
 
+from functions.inbuilt_tools import GooeyToolkit
 import gooey_gui as gui
 from fastapi import HTTPException, Query
 from fastapi.openapi.docs import get_redoc_html
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from furl import furl
 from loguru import logger
 from starlette.datastructures import FormData
@@ -242,16 +243,52 @@ def home_page(request: Request):
     }
 
 
-@app.get("/tools/{toolkit_slug}/{tool_slug}")
+@gui.route(app, "/tools/{toolkit_slug}/{tool_slug}")
 def tool_page(request: Request, toolkit_slug: str, tool_slug: str):
-    import composio_client
-    from composio import Composio
+    tool = load_tool_spec(toolkit_slug, tool_slug)
+    with page_wrapper(request):
+        gui.component("ToolPage", tool=tool)
+    return {
+        "meta": raw_build_meta_tags(
+            url=get_og_url_path(request),
+            title=f"{tool.get('name') or tool_slug} | Gooey.AI Tools",
+            description=tool.get("description") or "",
+        ),
+    }
+
+
+def load_tool_spec(toolkit_slug: str, tool_slug: str) -> dict:
+    from functions.inbuilt_tools import INBUILT_TOOL_MAP
 
     try:
-        tool = Composio().tools.get_raw_composio_tool_by_slug(slug=tool_slug)
-    except composio_client.NotFoundError:
-        raise HTTPException(status_code=404)
-    return JSONResponse(content=tool.to_dict())
+        tool = INBUILT_TOOL_MAP[tool_slug](None, {})
+    except KeyError:
+        import composio_client
+        from composio import Composio
+
+        try:
+            tool = Composio().tools.get_raw_composio_tool_by_slug(slug=tool_slug)
+        except composio_client.NotFoundError:
+            raise HTTPException(status_code=404)
+        else:
+            return tool.to_dict()
+    else:
+        toolkit = GooeyToolkit.get(toolkit_slug.lower())
+        if toolkit:
+            toolkit_name = toolkit.value
+        else:
+            toolkit_name = "Gooey.AI"
+        return {
+            "slug": tool.name,
+            "name": tool.label,
+            "description": tool.description,
+            "input_parameters": tool.spec_parameters,
+            "toolkit": {
+                "slug": toolkit_slug,
+                "name": toolkit_name,
+                "logo": str(furl(settings.APP_BASE_URL) / "favicon.ico"),
+            },
+        }
 
 
 @gui.route(app, "/api/")

@@ -152,6 +152,8 @@ def render_inbuilt_tools_selector(key: str = "inbuilt_tools_selector") -> None:
 
 
 def render_tool_search_dialog(function_urls: set[str]) -> None:
+    from functions.inbuilt_tools import GooeyToolkit
+
     query = gui.text_input(label="", placeholder="Search integrations...")
 
     with (
@@ -164,7 +166,7 @@ def render_tool_search_dialog(function_urls: set[str]) -> None:
         toolkits = [
             dict(
                 name="Gooey.AI Memory",
-                slug="GOOEY_AI_MEMORY",
+                slug=GooeyToolkit.gooey_ai_memory.name,
                 logo="https://gooey.ai/favicon.ico",
                 description="Securely store key user data such as their consent, location or other other info you want your AI agent to remember across sessions and conversations.",
                 search_terms="gooey.ai gooeyai storage data user consent location remember conversation session",
@@ -188,6 +190,7 @@ def render_tool_search_dialog(function_urls: set[str]) -> None:
 def render_toolkit_tools(toolkit: dict[str, str], function_urls: set[str]) -> None:
     from daras_ai_v2.fastapi_tricks import get_app_route_url
     from routers.root import tool_page
+    from functions.inbuilt_tools import GooeyToolkit
 
     expander_key = f"inbuilt_toolkit:{toolkit['slug']}"
     with (
@@ -204,7 +207,7 @@ def render_toolkit_tools(toolkit: dict[str, str], function_urls: set[str]) -> No
             return
 
         toolkit_slug = toolkit["slug"]
-        if toolkit_slug == "GOOEY_AI_MEMORY":
+        if toolkit_slug.lower() == GooeyToolkit.gooey_ai_memory.name:
             tools = {
                 "GOOEY_MEMORY_READ_VALUE": dict(
                     name="Read Value",
