@@ -1547,6 +1547,33 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
     CONFIG_PANE_KEY = "--config-subtab"
     DEPLOY_PANE = "Deploy"
 
+    def _render_config_tab(self):
+        """Config, plus the preview kept mounted but hidden.
+
+        The chat widget is created imperatively by GooeyEmbed against a `#gooey-embed`
+        target. Tab links are client-side navigations, so when a tab without that target
+        renders, React drops the container while GooeyEmbed's own DOM lives on - the widget
+        ends up stranded below the Config content.
+
+        `GooeyEmbed.unmount()` cannot fix it: it takes no target (see
+        `bot_integration_widgets.py`, which pairs it with a mount), so calling it here tears
+        down the Builder as well - both share the one global instance.
+
+        So keep the container instead of removing it, which is exactly why the Builder never
+        leaks: `#gooey-builder-embed` is always mounted. Hidden, not absent.
+        """
+        if self._render_deleted_output_if_needed():
+            return
+
+        if self._render_input_col():
+            self.submit_and_redirect()
+
+        # Deploy's own web preview already renders a `#gooey-embed`; adding ours would put
+        # the id in the document twice and getElementById would find the wrong one.
+        if gui.session_state.get(self.CONFIG_PANE_KEY) != self.DEPLOY_PANE:
+            with gui.div(className="d-none"):
+                self._render_output_col()
+
     def _render_split_tab(self):
         """Split is two columns, except on Deploy.
 
