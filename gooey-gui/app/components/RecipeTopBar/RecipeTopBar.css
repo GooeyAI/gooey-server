@@ -89,8 +89,8 @@ a.gooey-topbar-author:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 0;
   border-radius: 8px;
   background: none;
@@ -99,7 +99,7 @@ a.gooey-topbar-author:hover {
 }
 
 .gooey-topbar-iconbtn:hover {
-  background: #f2f2f2;
+  background: #FBFAF8;
   color: #111;
 }
 
@@ -115,7 +115,7 @@ a.gooey-topbar-author:hover {
   padding: 3px;
   border: 1px solid #ececec;
   border-radius: 12px;
-  background: #fafafa;
+  background: #FBFAF8;
   justify-self: center;
   min-width: 0;
   overflow-x: auto;
@@ -130,13 +130,13 @@ a.gooey-topbar-author:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 5px 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: none;
   color: #5f5f5f;
   font-weight: 500;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   line-height: 1.4;
   text-decoration: none;
   white-space: nowrap;
@@ -172,12 +172,12 @@ a.gooey-topbar-author:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #f2f2f2;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #FBFAF8;
   color: #fff;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   text-decoration: none;
 }
 
@@ -188,16 +188,29 @@ a.gooey-topbar-author:hover {
 
 .gooey-topbar-publish {
   position: relative;
-  padding: 6px 4px;
-  border: 0;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid #e0ddd7;
+  border-radius: 9px;
+  font-size: 0.875rem;
+  background: #fff;
   color: #111;
   font-weight: 500;
   white-space: nowrap;
 }
 
 .gooey-topbar-publish:hover {
-  text-decoration: underline;
+  background: #FBFAF8;
+  border-color: #cfcbc3;
+  color: #111;
+}
+
+/* the "/" between the cost and Run */
+.gooey-topbar-sep {
+  color: #b5b0a6;
+  font-weight: 400;
+  user-select: none;
 }
 
 .gooey-topbar-dot {
@@ -213,7 +226,7 @@ a.gooey-topbar-author:hover {
 .gooey-topbar-cost {
   color: #111;
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -226,10 +239,11 @@ a.gooey-topbar-cost:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
+  padding: 6px 14px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #111;
+  font-size: 0.875rem;
   color: #fff;
   font-weight: 600;
   white-space: nowrap;
@@ -284,7 +298,7 @@ a.gooey-topbar-cost:hover {
 }
 
 .gooey-topbar-menu-item:hover {
-  background: #f5f5f5;
+  background: #FBFAF8;
 }
 
 .gooey-topbar-menu-icon {

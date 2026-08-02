@@ -3145,7 +3145,7 @@ INPUT_OUTPUT_COLS_CSS = """
 
 @media (min-width: 768px) {
     & {
-        background-color: #f9f9f9;
+        background-color: #FBFAF8;
     }
     /* set col padding in mobile */
     & > div {

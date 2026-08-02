@@ -248,6 +248,12 @@ export function RecipeTopBar({
             </span>
           ))}
 
+        {!!cost_label && !!run_key && (
+          <span className="gooey-topbar-sep" aria-hidden="true">
+            /
+          </span>
+        )}
+
         {!!run_key && (
           <button
             type="button"
@@ -261,7 +267,7 @@ export function RecipeTopBar({
             {is_running ? (
               <i className="fa-regular fa-xmark-large" />
             ) : (
-              <i className="fa-regular fa-person-running" />
+              <i className="fa-solid fa-play" />
             )}
             <span className="gooey-topbar-run-label">
               {is_running ? "Stop" : run_label}

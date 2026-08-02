@@ -1501,7 +1501,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             TabSpec(
                 slug="",
                 label="Split",
-                icon=icons.run,
+                icon=icons.split,
                 render=self._render_split_tab,
             ),
         ]

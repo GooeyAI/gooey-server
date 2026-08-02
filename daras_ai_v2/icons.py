@@ -84,3 +84,5 @@ card_icons = {
 integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bfced380-bb60-11f0-80c3-02420a0001e9/d1487c30-12b0-4cc2-bd07-6f22a6f3806b.png"
 
 help_guide = '<i class="fa-duotone fa-solid fa-life-ring"></i>'
+
+split = '<i class="fa-regular fa-table-columns"></i>'

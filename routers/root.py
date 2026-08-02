@@ -791,6 +791,8 @@ def sidebar_page_wrapper(
     # splatted so v1 keeps exactly the props it had - an empty style dict would still
     # be emitted into the render tree
     fill = dict(style=dict(minHeight=0)) if is_v2 else {}
+    # v2's app-shell surface colour
+    shell_bg = dict(style=dict(minHeight=0, backgroundColor="#FBFAF8")) if is_v2 else {}
 
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
     # row on desktop (rail beside content).
@@ -804,9 +806,10 @@ def sidebar_page_wrapper(
             request, default_collapsed=default_collapsed, page=page
         )
 
-        with gui.div(
-            className="d-flex flex-column flex-grow-1 min-w-0", **fill
-        ):
+        # the surface colour belongs here, above `sidebar_layout`: that component separates
+        # the Builder panel from the page with a `gap-2`, and the gap paints whatever is
+        # behind it. Setting it on `page_content` (inside the Sidebar) leaves the gap white.
+        with gui.div(className="d-flex flex-column flex-grow-1 min-w-0", **shell_bg):
             sidebar, page_content = sidebar_layout(
                 key=GOOEY_BUILDER_EVENT_KEY,
                 session=request.session,
