@@ -131,7 +131,6 @@ from usage_costs.twilio_usage_cost import (
     get_non_ivr_price_credits,
     get_ivr_price_credits_and_seconds,
 )
-from widgets.demo_button import render_demo_buttons_header
 from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
 
@@ -1461,9 +1460,48 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
 
         return notes
 
+    DEMO_ACTION_PREFIX = "demo:"
+
+    def _top_bar_integrations(self) -> list:
+        """v1's demo buttons, as chips in the top bar.
+
+        They open a dialog rather than navigating, so each carries an action key instead of
+        an href and comes back through the bar's menu key.
+        """
+        from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
+        from widgets.demo_button import get_demo_bots
+
+        integrations = []
+        for bi_id, platform_id in get_demo_bots(self.current_pr):
+            platform = Platform(platform_id)
+            integrations.append(
+                TopBarIntegration(
+                    label=platform.get_title(),
+                    icon=platform.get_icon(),
+                    color=platform.get_demo_button_color() or None,
+                    key=f"{self.DEMO_ACTION_PREFIX}{bi_id}",
+                )
+            )
+        return integrations
+
+    def _handle_top_bar_actions(self):
+        super()._handle_top_bar_actions()
+
+        from widgets.demo_button import get_demo_bots, render_demo_dialog
+
+        picked = gui.session_state.pop(self.TOP_BAR_MENU_KEY, None)
+        for bi_id, _ in get_demo_bots(self.current_pr):
+            # the dialog has to be re-entered on every pass while it is open, so this runs
+            # for each demo bot rather than only the one just clicked
+            ref = gui.use_alert_dialog(key=f"demo-modal-{bi_id}")
+            if picked == f"{self.DEMO_ACTION_PREFIX}{bi_id}":
+                ref.set_open(True)
+            if ref.is_open:
+                render_demo_dialog(ref, bi_id)
+
     def render_header_extra(self):
-        if self.tab == RecipeTabs.run or self.tab == RecipeTabs.preview:
-            render_demo_buttons_header(self.current_pr)
+        # v2 surfaces the demo buttons as chips in the top bar instead
+        pass
 
     @classmethod
     def all_tab_slugs(cls) -> set[str]:

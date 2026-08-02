@@ -206,19 +206,38 @@ export function RecipeTopBar({
       )}
 
       <div className="gooey-topbar-right">
-        {integrations.map((integration) => (
-          <a
-            key={integration.href}
-            href={integration.href}
-            className="gooey-topbar-integration"
-            style={
-              integration.color ? { backgroundColor: integration.color } : undefined
-            }
-            title={integration.label}
-          >
-            <Icon html={integration.icon} />
-          </a>
-        ))}
+        {integrations.map((integration, i) =>
+          integration.href ? (
+            <a
+              key={integration.href}
+              href={integration.href}
+              className="gooey-topbar-integration"
+              style={
+                integration.color
+                  ? { backgroundColor: integration.color }
+                  : undefined
+              }
+              title={integration.label}
+            >
+              <Icon html={integration.icon} />
+            </a>
+          ) : (
+            <button
+              key={integration.key || i}
+              type="button"
+              className="gooey-topbar-integration"
+              style={
+                integration.color
+                  ? { backgroundColor: integration.color }
+                  : undefined
+              }
+              title={integration.label}
+              onClick={() => fire(menu_key, integration.key)}
+            >
+              <Icon html={integration.icon} />
+            </button>
+          ),
+        )}
 
         {!!publish_label && (
           <button

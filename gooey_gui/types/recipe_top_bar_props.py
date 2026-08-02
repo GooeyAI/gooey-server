@@ -24,12 +24,17 @@ class TopBarAuthor(pydantic.BaseModel):
 
 
 class TopBarIntegration(pydantic.BaseModel):
-    """A connected channel, surfaced as a shortcut pill next to Publish."""
+    """A connected channel, surfaced as a shortcut chip next to Publish.
+
+    Either a link (`href`) or a server action (`key`, echoed back through `menu_key`) -
+    VideoBots' demo buttons open a dialog rather than navigating.
+    """
 
     label: str
     icon: str  # raw FontAwesome html, e.g. icons.whatsapp
-    href: str
-    color: str | None = None  # brand colour for the pill, e.g. WhatsApp green
+    href: str | None = None
+    key: str = ""
+    color: str | None = None  # brand colour for the chip, e.g. WhatsApp green
 
 
 class TopBarMenuItem(pydantic.BaseModel):

@@ -20,12 +20,16 @@ export interface TopBarAuthor {
   photo_url: string | null;
 }
 /**
- * A connected channel, surfaced as a shortcut pill next to Publish.
+ * A connected channel, surfaced as a shortcut chip next to Publish.
+ *
+ * Either a link (`href`) or a server action (`key`, echoed back through `menu_key`) -
+ * VideoBots' demo buttons open a dialog rather than navigating.
  */
 export interface TopBarIntegration {
   label: string;
   icon: string;
-  href: string;
+  href: string | null;
+  key: string;
   color: string | null;
 }
 /**

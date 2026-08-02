@@ -576,6 +576,11 @@ class BasePage:
         notes = [n for n in (self.get_cost_note(), self.additional_notes()) if n]
         return label, " ".join(n.strip() for n in notes)
 
+    def _top_bar_integrations(self) -> list:
+        """Channel shortcuts for the bar's right cluster. Recipes with public deployments
+        override this; most have none."""
+        return []
+
     def _is_run_in_progress(self) -> bool:
         return bool(
             gui.session_state.get(StateKeys.run_status)
@@ -615,6 +620,7 @@ class BasePage:
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 menu_key=self.TOP_BAR_MENU_KEY,
                 builder_toggle_key=GOOEY_BUILDER_EVENT_KEY,
+                integrations=self._top_bar_integrations(),
                 run_key=self.TOP_BAR_RUN_KEY,
                 is_running=self._is_run_in_progress(),
                 cost_label=cost_label,
