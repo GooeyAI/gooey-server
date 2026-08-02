@@ -175,14 +175,29 @@ a.gooey-topbar-author:hover {
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: #FBFAF8;
-  color: #fff;
+  /* default: a neutral chip. Only platforms with a brand colour get white-on-colour -
+     otherwise the icon is white on a near-white surface and disappears. */
+  border: 1px solid #e0ddd7;
+  background: #fff;
+  color: #111;
   font-size: 0.95rem;
   text-decoration: none;
 }
 
 .gooey-topbar-integration:hover {
+  background: #FBFAF8;
+  border-color: #cfcbc3;
+  color: #111;
+}
+
+.gooey-topbar-integration-brand {
+  border-color: transparent;
+  color: #fff;
+}
+
+.gooey-topbar-integration-brand:hover {
   filter: brightness(0.95);
+  border-color: transparent;
   color: #fff;
 }
 
