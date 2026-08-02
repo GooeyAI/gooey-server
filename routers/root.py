@@ -810,11 +810,16 @@ def sidebar_page_wrapper(
         # the Builder panel from the page with a `gap-2`, and the gap paints whatever is
         # behind it. Setting it on `page_content` (inside the Sidebar) leaves the gap white.
         with gui.div(className="d-flex flex-column flex-grow-1 min-w-0", **shell_bg):
-            sidebar, page_content = sidebar_layout(
-                key=GOOEY_BUILDER_EVENT_KEY,
-                session=request.session,
-                disabled=not display_gooey_builder,
-            )
+            if is_v2:
+                # v2 puts the Builder beside the tab body, from inside base_v2, so the top
+                # bar can span the full width above both instead of starting after it.
+                sidebar, page_content = None, gui.dummy()
+            else:
+                sidebar, page_content = sidebar_layout(
+                    key=GOOEY_BUILDER_EVENT_KEY,
+                    session=request.session,
+                    disabled=not display_gooey_builder,
+                )
             with (
                 page_content,
                 gui.div(
@@ -833,7 +838,8 @@ def sidebar_page_wrapper(
                         request.user, request.session
                     )
 
-                    if display_gooey_builder:
+                    # v2 renders the Builder itself, beside the tab body
+                    if display_gooey_builder and sidebar is not None:
                         with sidebar:
                             render_gooey_builder(
                                 event_key=GOOEY_BUILDER_EVENT_KEY,

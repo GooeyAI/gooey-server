@@ -469,16 +469,24 @@ class BasePage:
             )
         )
 
-        with gui.div(
-            className=(
-                "flex-grow-1 w-100 overflow-auto px-2 px-lg-4 pb-1 pb-lg-2"
-                # below lg an immersive tab fills everything under the app header, so the
-                # page's own padding gets out of its way
-                + (" v2-immersive-mobile" if immersive else "")
+        # The Builder sits *beside* the tab body rather than wrapping the whole page, which
+        # is what lets the bar above run the full width. v1 wraps the page instead, so the
+        # shell skips its own sidebar_layout for v2 pages.
+        builder_pane, body_pane = self._builder_layout()
+
+        with (
+            body_pane,
+            gui.div(
+                className=(
+                    "d-flex flex-column flex-grow-1 w-100 overflow-auto px-2 px-lg-4 pb-1 pb-lg-2"
+                    # below lg an immersive tab fills everything under the app header, so
+                    # the page's own padding gets out of its way
+                    + (" v2-immersive-mobile" if immersive else "")
+                ),
+                # without this a flex child refuses to shrink below its content, and the
+                # overflow lands on the page instead of here
+                style=dict(minHeight=0),
             ),
-            # without this a flex child refuses to shrink below its content, and the
-            # overflow lands on the page instead of here
-            style=dict(minHeight=0),
         ):
             if active:
                 active.render()
@@ -487,10 +495,51 @@ class BasePage:
                 # History, Deploy. Their routes and deep links keep working, with v2 chrome.
                 self.render_selected_tab()
 
+        if builder_pane is not None:
+            with builder_pane:
+                self._render_gooey_builder()
+
         with top_bar_placeholder:
             self._render_top_bar(tabs=tabs, active=active)
 
         self._handle_top_bar_actions()
+
+    def _can_show_builder(self) -> bool:
+        from daras_ai_v2.gooey_builder import can_launch_gooey_builder
+
+        try:
+            workspace = self.current_workspace
+        except Workspace.DoesNotExist:
+            return False
+        return can_launch_gooey_builder(self.request, workspace)
+
+    def _builder_layout(self):
+        """(builder pane, body pane) - the Builder beside the tab body, not around it.
+
+        Returns `(None, dummy)` when the Builder is unavailable, so the body renders with
+        no extra wrapper at all rather than an empty sidebar.
+        """
+        from daras_ai_v2.gooey_builder import GOOEY_BUILDER_EVENT_KEY
+        from widgets.sidebar import sidebar_layout
+
+        if not self._can_show_builder():
+            return None, gui.dummy()
+
+        return sidebar_layout(
+            key=GOOEY_BUILDER_EVENT_KEY,
+            session=self.request.session,
+            disabled=False,
+        )
+
+    def _render_gooey_builder(self):
+        from daras_ai_v2.gooey_builder import (
+            GOOEY_BUILDER_EVENT_KEY,
+            render_gooey_builder,
+        )
+
+        render_gooey_builder(
+            event_key=GOOEY_BUILDER_EVENT_KEY, request=self.request, page=self
+        )
 
     def _handle_top_bar_actions(self):
         """Pop the keys RecipeTopBar wrote and act on them.

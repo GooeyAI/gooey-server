@@ -133,6 +133,8 @@ def render_gooey_builder_embed(
     # conversations live in the navigation sidebar, not the builder widget
     config["enableConversations"] = False
     config["theme"] = "builder"
+    # the panel has its own "Ask Gooey" header, so the widget does not need one too
+    config["showHeader"] = False
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 
