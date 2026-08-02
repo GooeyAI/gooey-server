@@ -92,6 +92,7 @@ export function RecipeTopBar({
   is_running,
   cost_label,
   cost_href,
+  cost_title,
   builder_toggle_key,
   onChange,
   state,
