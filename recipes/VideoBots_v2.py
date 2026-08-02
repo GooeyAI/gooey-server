@@ -1599,16 +1599,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             ):
                 render_pane()
 
-            # Run and the cost readout live in the top bar now, so the column keeps only
-            # the terms notice - a legal line, not decoration. Deploy configures channels
-            # rather than producing a run, so it gets neither.
-            if gui.session_state.get(self.CONFIG_PANE_KEY) != self.DEPLOY_PANE:
-                with gui.div(
-                    className="flex-shrink-0 pt-2",
-                    style={"textAlign": "right", "fontSize": "smaller"},
-                ):
-                    gui.caption(f"_{self.get_terms_caption()}_")
-
         # nothing in this column submits any more; the top bar owns Run
         return False
 
@@ -1619,18 +1609,20 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         below it on tall screens and still overflows on short ones.
         """
         with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
-            # model above the editor, unlike v1's form
-            language_model_selector(
-                label=""" #### <i class="fa-sharp fa-regular fa-brain-circuit" style="fontSize:20px"></i> Language Model """
-            )
+            # a compact row - small label left, selector right - rather than v1's full-width
+            # heading and field, so the editor gets the height instead
+            with gui.div(
+                className="d-flex align-items-center gap-3 mb-2 flex-shrink-0"
+            ):
+                gui.html('<span class="text-muted">Model</span>')
+                with gui.div(className="ms-auto", style=dict(minWidth="280px")):
+                    language_model_selector(label="")
+
             with gui.styled(FILL_HEIGHT_EDITOR_CSS), gui.div(
                 className="flex-grow-1 d-flex flex-column", style=dict(minHeight=0)
             ):
                 gui.code_editor(
-                    label=(
-                        '#### <i class="fa-regular fa-lightbulb" style="fontSize:20px"></i> '
-                        + field_title(self.RequestModel, "bot_script")
-                    ),
+                    label="",
                     key="bot_script",
                     language="jinja",
                     help=field_desc(self.RequestModel, "bot_script"),
