@@ -20,6 +20,15 @@ class TabSpec(pydantic.BaseModel):
     icon: str = ""
     """Raw FontAwesome html, like `NavItemData.icon`."""
 
+    desktop_only: bool = False
+    """Hidden from the strip below `lg`. For tabs whose layout needs the width - Split is
+    two columns side by side, which a phone cannot show."""
+
+    immersive_on_mobile: bool = False
+    """Below `lg` this tab fills everything under the app header: no page padding, no tab
+    strip, and a floating back link instead. For a tab that is one full-bleed surface, like
+    the chat preview."""
+
     # server-only: the top bar renders links and labels, never behaviour
     render: typing.Callable[[], None] = pydantic.Field(exclude=True)
 

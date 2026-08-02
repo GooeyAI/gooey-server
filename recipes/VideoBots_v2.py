@@ -1537,12 +1537,16 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 label="Preview",
                 icon=icons.preview,
                 render=self._render_preview_tab,
+                # one full-bleed surface; on a phone it takes the whole screen
+                immersive_on_mobile=True,
             ),
             TabSpec(
                 slug="",
                 label="Split",
                 icon=icons.split,
                 render=self._render_split_tab,
+                # two columns side by side - there is no room for it on a phone
+                desktop_only=True,
             ),
         ]
 
@@ -1594,7 +1598,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             )
             with gui.div(
                 # pe-3 keeps the scrollbar off the content when the pane overflows
-                className="flex-grow-1 overflow-auto pt-2 pe-3",
+                className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3",
                 style=dict(minHeight=0),
             ):
                 render_pane()
@@ -1615,7 +1619,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 className="d-flex align-items-center gap-3 mb-2 flex-shrink-0"
             ):
                 gui.html('<span class="text-muted">Model</span>')
-                with gui.div(className="ms-auto", style=dict(minWidth="280px")):
+                with gui.div(className="ms-auto", style=dict(minWidth="40%")):
                     language_model_selector(label="")
 
             with gui.styled(FILL_HEIGHT_EDITOR_CSS), gui.div(

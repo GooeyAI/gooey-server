@@ -13,6 +13,7 @@ class TopBarTab(pydantic.BaseModel):
     icon: str = ""  # raw FontAwesome html, like NavItemData.icon
     href: str
     is_active: bool = False
+    desktop_only: bool = False  # hidden below lg; see TabSpec.desktop_only
 
 
 class TopBarAuthor(pydantic.BaseModel):
@@ -56,6 +57,9 @@ class RecipeTopBarProps(pydantic.BaseModel):
     author: TopBarAuthor | None = None
 
     tabs: list[TopBarTab] = []
+    # the active tab owns the screen below lg, so the strip and the run cluster
+    # step out of the way and the tab supplies its own way back
+    immersive_on_mobile: bool = False
     overflow_items: list[TopBarMenuItem] = []  # the "..." beside the pill group
     title_menu_items: list[TopBarMenuItem] = []  # the chevron beside the title
 
@@ -78,6 +82,3 @@ class RecipeTopBarProps(pydantic.BaseModel):
     # per-recipe cost notes (e.g. "+1 (lipsync)"), shown on hover rather than inline so a
     # long note cannot push the Run button around
     cost_title: str = ""
-
-    # toggles the Gooey Builder panel; reuses the builder's own event key
-    builder_toggle_key: str = ""

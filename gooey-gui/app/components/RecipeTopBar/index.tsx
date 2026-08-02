@@ -29,12 +29,14 @@ function useDismissOnOutsideClick(onDismiss: () => void) {
   return ref;
 }
 
+type MenuEntry = TopBarMenuItem & { mobileOnly?: boolean };
+
 function Menu({
   items,
   open,
   onPick,
 }: {
-  items: TopBarMenuItem[];
+  items: MenuEntry[];
   open: boolean;
   onPick: (item: TopBarMenuItem) => void;
 }) {
@@ -49,6 +51,7 @@ function Menu({
             className={clsx(
               "gooey-topbar-menu-item",
               item.is_danger && "text-danger",
+              item.mobileOnly && "d-lg-none",
             )}
           >
             <Icon html={item.icon} className="gooey-topbar-menu-icon" />
@@ -61,6 +64,7 @@ function Menu({
             className={clsx(
               "gooey-topbar-menu-item",
               item.is_danger && "text-danger",
+              item.mobileOnly && "d-lg-none",
             )}
             onClick={() => onPick(item)}
           >
@@ -79,6 +83,7 @@ export function RecipeTopBar({
   circle_photo,
   author,
   tabs,
+  immersive_on_mobile,
   overflow_items,
   title_menu_items,
   integrations,
@@ -93,7 +98,6 @@ export function RecipeTopBar({
   cost_label,
   cost_href,
   cost_title,
-  builder_toggle_key,
   onChange,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
@@ -110,6 +114,23 @@ export function RecipeTopBar({
     onChange();
   };
 
+  // Below lg the chips and the title compete for one row and the title always loses, so
+  // the chips move into the overflow menu. Both lists are rendered and CSS picks one - no
+  // media-query JS, and the chip count stops mattering.
+  const overflowEntries: MenuEntry[] = [
+    ...overflow_items,
+    ...integrations.map((it, i) => ({
+      key: it.key || it.href || `integration-${i}`,
+      label: it.label,
+      icon: it.icon,
+      href: it.href ?? null,
+      is_danger: false,
+      mobileOnly: true,
+    })),
+  ];
+  // with nothing but mobile-only entries the button itself has no desktop purpose
+  const overflowDesktopOnly = overflow_items.length === 0;
+
   const pickMenuItem = (item: TopBarMenuItem) => {
     setTitleMenuOpen(false);
     setOverflowOpen(false);
@@ -117,7 +138,12 @@ export function RecipeTopBar({
   };
 
   return (
-    <div className="gooey-topbar">
+    <div
+      className={clsx(
+        "gooey-topbar",
+        immersive_on_mobile && "gooey-topbar-immersive",
+      )}
+    >
       <div className="gooey-topbar-left">
         {photo_url && (
           <img
@@ -157,21 +183,11 @@ export function RecipeTopBar({
           />
         </div>
 
-        {!!builder_toggle_key && (
-          <button
-            type="button"
-            className="gooey-topbar-iconbtn"
-            title="Toggle the Gooey Builder panel"
-            onClick={() => fire(builder_toggle_key, !state[builder_toggle_key])}
-          >
-            <i className="fa-regular fa-sidebar" />
-          </button>
-        )}
       </div>
 
       {/* A single-tab recipe (media gen, bulk/eval) renders no pill group at all. */}
       {tabs.length > 1 && (
-        <div className="gooey-topbar-tabs" ref={overflowRef}>
+        <div className="gooey-topbar-tabs">
           {tabs.map((tab) => (
             <Link
               key={tab.slug}
@@ -179,40 +195,45 @@ export function RecipeTopBar({
               className={clsx(
                 "gooey-topbar-tab",
                 tab.is_active && "gooey-topbar-tab-active",
+                tab.desktop_only && "gooey-topbar-tab-desktop-only",
               )}
             >
               <Icon html={tab.icon} className="gooey-topbar-tab-icon" />
               {tab.label}
             </Link>
           ))}
-          {!!overflow_items.length && (
-            <>
-              <button
-                type="button"
-                className="gooey-topbar-tab gooey-topbar-overflow"
-                onClick={() => setOverflowOpen((v) => !v)}
-                aria-label="More"
-              >
-                <i className="fa-solid fa-ellipsis" />
-              </button>
-              <Menu
-                items={overflow_items}
-                open={overflowOpen}
-                onPick={pickMenuItem}
-              />
-            </>
-          )}
         </div>
       )}
 
       <div className="gooey-topbar-right">
+        {!!overflowEntries.length && (
+          <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
+            <button
+              type="button"
+              className={clsx(
+                "gooey-topbar-overflow-btn",
+                overflowDesktopOnly && "d-lg-none",
+              )}
+              onClick={() => setOverflowOpen((v) => !v)}
+              aria-label="More"
+            >
+              <i className="fa-solid fa-ellipsis" />
+            </button>
+            <Menu
+              items={overflowEntries}
+              open={overflowOpen}
+              onPick={pickMenuItem}
+            />
+          </div>
+        )}
+
         {integrations.map((integration, i) =>
           integration.href ? (
             <a
               key={integration.href}
               href={integration.href}
               className={clsx(
-                "gooey-topbar-integration",
+                "gooey-topbar-integration d-none d-lg-inline-flex",
                 integration.color && "gooey-topbar-integration-brand",
               )}
               style={
@@ -229,7 +250,7 @@ export function RecipeTopBar({
               key={integration.key || i}
               type="button"
               className={clsx(
-                "gooey-topbar-integration",
+                "gooey-topbar-integration d-none d-lg-inline-flex",
                 integration.color && "gooey-topbar-integration-brand",
               )}
               style={
@@ -250,8 +271,10 @@ export function RecipeTopBar({
             type="button"
             className="gooey-topbar-publish"
             onClick={() => fire(publish_key)}
+            title={publish_label}
           >
-            {publish_label}
+            <i className="fa-regular fa-floppy-disk" />
+            <span className="gooey-topbar-btn-label">{publish_label}</span>
             {has_unpublished_changes && (
               <span className="gooey-topbar-dot" title="Unpublished changes" />
             )}
@@ -294,7 +317,7 @@ export function RecipeTopBar({
             ) : (
               <i className="fa-solid fa-play" />
             )}
-            <span className="gooey-topbar-run-label">
+            <span className="gooey-topbar-btn-label">
               {is_running ? "Stop" : run_label}
             </span>
           </button>

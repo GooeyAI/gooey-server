@@ -10,6 +10,7 @@ export interface TopBarTab {
   icon: string;
   href: string;
   is_active: boolean;
+  desktop_only: boolean;
 }
 /**
  * The "by <someone>" line under the title.
@@ -48,6 +49,7 @@ export interface RecipeTopBarProps {
   circle_photo: boolean;
   author: TopBarAuthor | null;
   tabs: TopBarTab[];
+  immersive_on_mobile: boolean;
   overflow_items: TopBarMenuItem[];
   title_menu_items: TopBarMenuItem[];
   integrations: TopBarIntegration[];
@@ -62,5 +64,4 @@ export interface RecipeTopBarProps {
   cost_label: string;
   cost_href: string;
   cost_title: string;
-  builder_toggle_key: string;
 }

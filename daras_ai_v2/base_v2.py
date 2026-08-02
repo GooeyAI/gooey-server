@@ -461,10 +461,21 @@ class BasePage:
         # The bar's node is reserved first (so it comes first in the DOM) but filled last:
         # _has_request_changed() - and so the publish state - is only settled once the inputs
         # have rendered. v1 renders its header last for the same reason.
-        top_bar_placeholder = gui.div(className="flex-shrink-0 w-100 px-4 py-2")
+        immersive = bool(active and active.immersive_on_mobile)
+        top_bar_placeholder = gui.div(
+            className=(
+                "flex-shrink-0 w-100 px-2 px-lg-4 py-2"
+                + (" v2-immersive-topbar" if immersive else "")
+            )
+        )
 
         with gui.div(
-            className="flex-grow-1 w-100 overflow-auto px-4 pb-2",
+            className=(
+                "flex-grow-1 w-100 overflow-auto px-2 px-lg-4 pb-1 pb-lg-2"
+                # below lg an immersive tab fills everything under the app header, so the
+                # page's own padding gets out of its way
+                + (" v2-immersive-mobile" if immersive else "")
+            ),
             # without this a flex child refuses to shrink below its content, and the
             # overflow lands on the page instead of here
             style=dict(minHeight=0),
@@ -589,7 +600,6 @@ class BasePage:
         )
 
     def _render_top_bar(self, *, tabs: list[TabSpec], active: TabSpec | None):
-        from daras_ai_v2.gooey_builder import GOOEY_BUILDER_EVENT_KEY
         from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps, TopBarTab
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
@@ -604,6 +614,7 @@ class BasePage:
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._top_bar_author(),
                 # a single-tab recipe renders no pill group - the component checks length
+                immersive_on_mobile=bool(active and active.immersive_on_mobile),
                 tabs=[
                     TopBarTab(
                         slug=tab.slug,
@@ -611,6 +622,7 @@ class BasePage:
                         icon=tab.icon,
                         href=self.current_tab_url(tab.slug),
                         is_active=bool(active and tab.slug == active.slug),
+                        desktop_only=tab.desktop_only,
                     )
                     for tab in tabs
                 ],
@@ -619,7 +631,6 @@ class BasePage:
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 menu_key=self.TOP_BAR_MENU_KEY,
-                builder_toggle_key=GOOEY_BUILDER_EVENT_KEY,
                 integrations=self._top_bar_integrations(),
                 run_key=self.TOP_BAR_RUN_KEY,
                 is_running=self._is_run_in_progress(),
@@ -1445,9 +1456,20 @@ class BasePage:
             # v1 submits from the output col, which this tab doesn't render
             self.submit_and_redirect()
 
+    def _render_mobile_back_link(self, to_slug: str = "config"):
+        """Floating way out of an immersive tab, since it hides the tab strip below lg."""
+        with gui.link(
+            to=self.current_tab_url(to_slug),
+            className="v2-back-link d-lg-none",
+        ):
+            gui.html('<i class="fa-regular fa-arrow-left"></i> Back')
+
     def _render_preview_tab(self):
         if self._render_deleted_output_if_needed():
             return
+        # this tab is immersive on mobile: it hides the tab strip, so it owes the user a
+        # way back out
+        self._render_mobile_back_link()
         self._render_output_col()
 
     def _preview_frame(self):
@@ -3043,15 +3065,21 @@ class TitleValidationError(Exception):
 FILL_HEIGHT_EDITOR_CSS = """
 /* A code editor that fills its flex parent instead of sizing to its content.
 
-   The widget is CodeMirror, not Ace: the DOM is
-     .code-editor-wrapper > (label, hidden textarea, .cm-editor > .cm-scroller)
-   and `CodeEditor` destructures `height` out of its props without forwarding it, so CSS is
-   the only way to size it. */
+   Every element in this chain has to be told to grow, or the height stops there. The
+   widget is CodeMirror, not Ace, and react-codemirror inserts a `.cm-theme` wrapper that
+   is easy to miss:
+
+     &  ->  .code-editor-wrapper  ->  .cm-theme  ->  .cm-editor  ->  .cm-scroller
+
+   `gui.styled` does not add a node - it merges its class onto its children - so `&` is the
+   flex column this is used inside. `CodeEditor` also destructures `height` out of its props
+   without forwarding it, so CSS is the only way to size this. */
 & {
     min-height: 0;
 }
 
-& .code-editor-wrapper {
+& .code-editor-wrapper,
+& .cm-theme {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
@@ -3061,11 +3089,19 @@ FILL_HEIGHT_EDITOR_CSS = """
 & .cm-editor {
     flex: 1 1 auto;
     min-height: 0;
-    height: 100%;
 }
 
+/* the editor's own scroller owns the overflow, so the panes above it do not */
 & .cm-scroller {
     overflow: auto;
+}
+
+/* Below lg the columns stack, so there is no fixed-height chain to grow into and the
+   editor would collapse to its content. Give it a viewport-relative floor instead. */
+@media (max-width: 991.98px) {
+    & .cm-editor {
+        min-height: 55vh;
+    }
 }
 """
 

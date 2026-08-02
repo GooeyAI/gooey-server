@@ -333,19 +333,6 @@ button .gui-html-container,
   height: 100dvh;
 }
 
-.gooey-sidebar::after {
-  /* Right Sidebar Gradient Shadow */
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 16px;
-  height: 100%;
-  background: linear-gradient(to left, rgba(15, 23, 42, 0.07) 0%, transparent 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
 .gooey-sidebar-bordered {
   border-right: 1px solid #e0e0e0;
 }
@@ -401,16 +388,30 @@ button .gui-html-container,
   top: 0;
   right: 0;
   bottom: 0;
-  width: 4px;
+  width: 10px;
   cursor: col-resize;
   z-index: 2;
   background: transparent;
-  transition: background-color 150ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.gooey-sidebar-resizer:hover,
-body.gooey-sidebar-resizing .gooey-sidebar-resizer {
-  background: rgba(15, 23, 42, 0.12);
+/* A vertical run of dots, so the edge reads as a grab handle rather than relying on the
+   cursor changing once you are already on it. */
+.gooey-sidebar-resizer::before {
+  content: "";
+  width: 3px;
+  height: 22px;
+  background-image: radial-gradient(circle at center, #c2c2c2 1.5px, transparent 1.6px);
+  background-size: 3px 7px;
+  background-repeat: repeat-y;
+  transition: background-image 150ms ease;
+}
+
+.gooey-sidebar-resizer:hover::before,
+body.gooey-sidebar-resizing .gooey-sidebar-resizer::before {
+  background-image: radial-gradient(circle at center, #8a8a8a 1.5px, transparent 1.6px);
 }
 
 body.gooey-sidebar-resizing,
