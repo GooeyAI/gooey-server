@@ -1428,7 +1428,8 @@ class BasePage:
                         "This run's output has been deleted as per the retention policy."
                     )
                 else:
-                    self._render_output_col()
+                    with self._preview_frame():
+                        self._render_output_col()
 
     def _render_about_content(self):
         if self.current_pr.notes:
@@ -1449,6 +1450,23 @@ class BasePage:
             return
         self._render_output_col()
 
+    def _preview_frame(self):
+        """Frames the preview when it shares the view with something else.
+
+        Split and About put it next to a column of content, where a border separates the
+        two. Preview is the whole view, so it needs no frame - a border there would just
+        outline the viewport.
+        """
+        return gui.div(
+            className="h-100",
+            style=dict(
+                border="1px solid #e0ddd7",
+                borderRadius="12px",
+                overflow="hidden",
+                minHeight=0,
+            ),
+        )
+
     def _render_split_tab(self):
         """Both columns side by side - v1's Run tab.
 
@@ -1464,7 +1482,7 @@ class BasePage:
             input_col, output_col = gui.columns([3, 2], gap="medium")
             with input_col:
                 submitted = self._render_input_col()
-            with output_col:
+            with output_col, self._preview_frame():
                 self._render_output_col(submitted=submitted)
 
     def _render_deleted_output_if_needed(self) -> bool:
