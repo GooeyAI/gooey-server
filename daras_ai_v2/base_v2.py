@@ -3041,26 +3041,31 @@ class TitleValidationError(Exception):
 
 
 FILL_HEIGHT_EDITOR_CSS = """
-/* A code editor that fills its flex parent instead of a fixed/capped height. The label
-   stays its natural size and the editor takes the rest. */
+/* A code editor that fills its flex parent instead of sizing to its content.
+
+   The widget is CodeMirror, not Ace: the DOM is
+     .code-editor-wrapper > (label, hidden textarea, .cm-editor > .cm-scroller)
+   and `CodeEditor` destructures `height` out of its props without forwarding it, so CSS is
+   the only way to size it. */
 & {
     min-height: 0;
 }
 
-& > div:last-child {
-    flex: 1 1 auto;
-    min-height: 200px;
+& .code-editor-wrapper {
     display: flex;
     flex-direction: column;
-}
-
-& .ace_editor,
-& .ace-editor,
-& textarea {
-    height: 100% !important;
-    max-height: none !important;
     flex: 1 1 auto;
     min-height: 0;
+}
+
+& .cm-editor {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+}
+
+& .cm-scroller {
+    overflow: auto;
 }
 """
 
