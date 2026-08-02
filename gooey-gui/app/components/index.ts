@@ -13,6 +13,7 @@ export * from "./ComposioAuthRequired";
 export * from "./AskGooeyNew";
 export * from "./ForgotPasswordForm";
 export * from "./GooeyBuilderInlineEmbed";
+export * from "./GooeyEmbedTeardown";
 export * from "./GooeyPopover";
 export * from "./HistoryPage";
 export * from "./HomePage";

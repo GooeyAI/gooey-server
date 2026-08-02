@@ -1298,6 +1298,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
             style=dict(height="100%", minHeight=0),
             id="gooey-embed",
         )
+        # owns the widget's teardown when this tab is navigated away from client-side
+        gui.component("GooeyEmbedTeardown")
         load_chat_widget_lib()
         gui.js(
             """

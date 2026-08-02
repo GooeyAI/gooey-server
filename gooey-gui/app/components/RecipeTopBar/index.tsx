@@ -173,14 +173,9 @@ export function RecipeTopBar({
       {tabs.length > 1 && (
         <div className="gooey-topbar-tabs" ref={overflowRef}>
           {tabs.map((tab) => (
-            // A real navigation, not a client-side <Link>: GooeyEmbed builds the chat
-            // preview imperatively and its DOM is not a child of #gooey-embed, so a
-            // client-side tab change leaves it stranded on tabs that never render it.
-            // GooeyEmbed.unmount() cannot be used to clean up - it takes no target and
-            // would tear down the Builder too. A document load rebuilds everything.
-            <a
+            <Link
               key={tab.slug}
-              href={tab.href}
+              to={tab.href}
               className={clsx(
                 "gooey-topbar-tab",
                 tab.is_active && "gooey-topbar-tab-active",
@@ -188,7 +183,7 @@ export function RecipeTopBar({
             >
               <Icon html={tab.icon} className="gooey-topbar-tab-icon" />
               {tab.label}
-            </a>
+            </Link>
           ))}
           {!!overflow_items.length && (
             <>
