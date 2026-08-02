@@ -499,6 +499,29 @@ class BasePage:
         if publish_ref.is_open:
             self._render_publish_dialog(ref=publish_ref)
 
+        if gui.session_state.pop(self.TOP_BAR_RUN_KEY, None):
+            self._handle_top_bar_run()
+
+    def _handle_top_bar_run(self):
+        """Run (or Stop) pressed in the top bar.
+
+        Same behaviour v1's submit button has, minus the button: validate first, surface the
+        message and start nothing if validation fails, and let anonymous users through the
+        login redirect that `submit_and_redirect` already handles.
+        """
+        if self._is_run_in_progress():
+            self.current_sr.is_cancelled = True
+            self.current_sr.save(update_fields=["is_cancelled", "updated_at"])
+            raise gui.RerunException()
+
+        try:
+            self.validate_form_v2()
+        except AssertionError as e:
+            gui.error(str(e))
+            return
+
+        self.submit_and_redirect()
+
     def _resolve_active_tab(self, tabs: list[TabSpec]) -> TabSpec | None:
         """The tab this request is for, or None for a v1 tab url with no matching TabSpec."""
         from routers.recipe_v2 import v1_tab_slugs
@@ -534,6 +557,31 @@ class BasePage:
     # keys the RecipeTopBar writes into session state; popped by _handle_top_bar_actions
     TOP_BAR_MENU_KEY = "--topbar-menu"
     TOP_BAR_PUBLISH_KEY = "--topbar-publish"
+    TOP_BAR_RUN_KEY = "--topbar-run"
+
+    def _top_bar_cost(self) -> tuple[str, str]:
+        """(label, hover note) for the bar's cost readout, in dollars.
+
+        The mock shows "$0.10 / 5g CO2". Only the dollars ship: credits convert exactly via
+        ADDON_CREDITS_PER_DOLLAR, whereas nothing in this codebase can produce a CO2 figure,
+        and inventing one would put a fabricated environmental claim in the product.
+        """
+        credits = self.get_run_cost_credits()
+        if credits is None:
+            # deferred pricing - show nothing rather than "$None"
+            return "", ""
+
+        label = f"${credits / settings.ADDON_CREDITS_PER_DOLLAR:.2f}"
+
+        notes = [n for n in (self.get_cost_note(), self.additional_notes()) if n]
+        return label, " ".join(n.strip() for n in notes)
+
+    def _is_run_in_progress(self) -> bool:
+        return bool(
+            gui.session_state.get(StateKeys.run_status)
+            and not self.current_sr.is_cancelled
+            and (self.is_current_user_owner() or self.is_current_user_admin())
+        )
 
     def _render_top_bar(self, *, tabs: list[TabSpec], active: TabSpec | None):
         from daras_ai_v2.gooey_builder import GOOEY_BUILDER_EVENT_KEY
@@ -542,6 +590,7 @@ class BasePage:
 
         sr, pr = self.current_sr_pr
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
+        cost_label, cost_title = self._top_bar_cost()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -566,6 +615,11 @@ class BasePage:
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 menu_key=self.TOP_BAR_MENU_KEY,
                 builder_toggle_key=GOOEY_BUILDER_EVENT_KEY,
+                run_key=self.TOP_BAR_RUN_KEY,
+                is_running=self._is_run_in_progress(),
+                cost_label=cost_label,
+                cost_href=self.get_credits_click_url(),
+                cost_title=cost_title,
             )
         )
 

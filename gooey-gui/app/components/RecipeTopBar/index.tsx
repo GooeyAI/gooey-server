@@ -234,11 +234,17 @@ export function RecipeTopBar({
 
         {!!cost_label &&
           (cost_href ? (
-            <a className="gooey-topbar-cost" href={cost_href}>
+            <a
+              className="gooey-topbar-cost"
+              href={cost_href}
+              title={cost_title || undefined}
+            >
               {cost_label}
             </a>
           ) : (
-            <span className="gooey-topbar-cost">{cost_label}</span>
+            <span className="gooey-topbar-cost" title={cost_title || undefined}>
+              {cost_label}
+            </span>
           ))}
 
         {!!run_key && (

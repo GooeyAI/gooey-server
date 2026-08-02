@@ -1559,15 +1559,18 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             ):
                 render_pane()
 
-            # Deploy configures channels rather than producing a run, so it gets no run
-            # bar - and with it gone there is nothing for this column to submit.
-            submitted = False
+            # Run and the cost readout live in the top bar now, so the column keeps only
+            # the terms notice - a legal line, not decoration. Deploy configures channels
+            # rather than producing a run, so it gets neither.
             if gui.session_state.get(self.CONFIG_PANE_KEY) != self.DEPLOY_PANE:
-                with gui.div(className="flex-shrink-0"):
-                    submitted = self.render_submit_row()
-                    with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
-                        gui.caption(f"_{self.get_terms_caption()}_")
-        return submitted
+                with gui.div(
+                    className="flex-shrink-0 pt-2",
+                    style={"textAlign": "right", "fontSize": "smaller"},
+                ):
+                    gui.caption(f"_{self.get_terms_caption()}_")
+
+        # nothing in this column submits any more; the top bar owns Run
+        return False
 
     def _render_llm_instructions_pane(self):
         """Model selector pinned on top, editor filling whatever height is left.

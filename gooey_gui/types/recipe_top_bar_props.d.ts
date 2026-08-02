@@ -57,5 +57,6 @@ export interface RecipeTopBarProps {
   is_running: boolean;
   cost_label: string;
   cost_href: string;
+  cost_title: string;
   builder_toggle_key: string;
 }

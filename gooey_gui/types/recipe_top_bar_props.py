@@ -70,6 +70,9 @@ class RecipeTopBarProps(pydantic.BaseModel):
     is_running: bool = False  # swaps Run for Stop
     cost_label: str = ""  # e.g. "$0.10"
     cost_href: str = ""
+    # per-recipe cost notes (e.g. "+1 (lipsync)"), shown on hover rather than inline so a
+    # long note cannot push the Run button around
+    cost_title: str = ""
 
     # toggles the Gooey Builder panel; reuses the builder's own event key
     builder_toggle_key: str = ""
