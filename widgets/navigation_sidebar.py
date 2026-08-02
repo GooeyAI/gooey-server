@@ -410,7 +410,16 @@ def _load_gooey_builder_data(
 ) -> GooeyBuilderData | None:
     from routers.root import RecipeTabs
 
-    if page is None or page.tab not in (RecipeTabs.run, RecipeTabs.preview):
+    from routers.root import _is_layout_v2_page
+
+    # v2 keeps the Builder available on every tab and pane of the recipe page; v1 only
+    # offers it on Run/Preview.
+    if page is None:
+        return None
+    if not _is_layout_v2_page(page) and page.tab not in (
+        RecipeTabs.run,
+        RecipeTabs.preview,
+    ):
         return None
 
     from daras_ai_v2.gooey_builder import can_launch_gooey_builder

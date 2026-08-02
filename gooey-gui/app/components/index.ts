@@ -20,5 +20,6 @@ export * from "./InsufficientCredits";
 export * from "./LoginForm";
 export * from "./PaymentRequired";
 export * from "./NavigationSidebar";
+export * from "./RecipeTopBar";
 export * from "./Sidebar";
 export * from "./ToolPage";

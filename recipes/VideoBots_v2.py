@@ -1507,6 +1507,19 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         ]
 
     CONFIG_PANE_KEY = "--config-subtab"
+    DEPLOY_PANE = "Deploy"
+
+    def _render_split_tab(self):
+        """Split is two columns, except on Deploy.
+
+        Deploy is a wide configuration surface that carries its own web preview, so pairing
+        it with the chat preview leaves both cramped. It takes the full width instead.
+        """
+        if gui.session_state.get(self.CONFIG_PANE_KEY) == self.DEPLOY_PANE:
+            # no submit row on Deploy, so nothing to redirect on
+            self._render_input_col()
+            return
+        super()._render_split_tab()
 
     def _config_panes(self) -> dict[str, typing.Callable[[], None]]:
         """The working column's panes, in strip order.
@@ -1546,10 +1559,14 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             ):
                 render_pane()
 
-            with gui.div(className="flex-shrink-0"):
-                submitted = self.render_submit_row()
-                with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
-                    gui.caption(f"_{self.get_terms_caption()}_")
+            # Deploy configures channels rather than producing a run, so it gets no run
+            # bar - and with it gone there is nothing for this column to submit.
+            submitted = False
+            if gui.session_state.get(self.CONFIG_PANE_KEY) != self.DEPLOY_PANE:
+                with gui.div(className="flex-shrink-0"):
+                    submitted = self.render_submit_row()
+                    with gui.div(style={"textAlign": "right", "fontSize": "smaller"}):
+                        gui.caption(f"_{self.get_terms_caption()}_")
         return submitted
 
     def _render_llm_instructions_pane(self):

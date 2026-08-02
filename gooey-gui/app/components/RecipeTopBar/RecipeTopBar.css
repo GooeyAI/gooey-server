@@ -1,0 +1,318 @@
+/* Three tracks so the pill group sits in the true centre of the bar. With flex +
+   `margin: auto` it would only be centred in the space the left block happens to leave,
+   so it drifted as the title got longer. */
+.gooey-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- left */
+
+.gooey-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  justify-self: start;
+}
+
+.gooey-topbar-avatar {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex: 0 0 auto;
+}
+
+.gooey-topbar-avatar-circle {
+  border-radius: 50%;
+}
+
+.gooey-topbar-titleblock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* long workflow names truncate rather than shoving the pill group sideways */
+  max-width: 280px;
+}
+
+.gooey-topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.gooey-topbar-title:disabled {
+  cursor: default;
+}
+
+.gooey-topbar-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gooey-topbar-chevron {
+  font-size: 0.7em;
+  color: #6b6b6b;
+  flex: 0 0 auto;
+}
+
+.gooey-topbar-author {
+  font-size: 0.8125rem;
+  color: #6b6b6b;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.gooey-topbar-author:hover {
+  color: #111;
+  text-decoration: underline;
+}
+
+.gooey-topbar-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #6b6b6b;
+  flex: 0 0 auto;
+}
+
+.gooey-topbar-iconbtn:hover {
+  background: #f2f2f2;
+  color: #111;
+}
+
+/* ---------------------------------------------------------------- tabs */
+
+/* The pill group is centred in the bar but never pushes the right cluster off
+   screen: it may shrink and scroll sideways instead of wrapping. */
+.gooey-topbar-tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #ececec;
+  border-radius: 12px;
+  background: #fafafa;
+  justify-self: center;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.gooey-topbar-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.gooey-topbar-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: #5f5f5f;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.gooey-topbar-tab:hover {
+  color: #111;
+}
+
+.gooey-topbar-tab-active {
+  background: #fff;
+  color: #111;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.gooey-topbar-tab-icon {
+  font-size: 0.9em;
+  opacity: 0.85;
+}
+
+/* --------------------------------------------------------------- right */
+
+.gooey-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: end;
+  min-width: 0;
+}
+
+.gooey-topbar-integration {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f2f2f2;
+  color: #fff;
+  font-size: 1.05rem;
+  text-decoration: none;
+}
+
+.gooey-topbar-integration:hover {
+  filter: brightness(0.95);
+  color: #fff;
+}
+
+.gooey-topbar-publish {
+  position: relative;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: #111;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.gooey-topbar-publish:hover {
+  text-decoration: underline;
+}
+
+.gooey-topbar-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #f0a020;
+  vertical-align: middle;
+}
+
+.gooey-topbar-cost {
+  color: #111;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.gooey-topbar-cost:hover {
+  text-decoration: underline;
+}
+
+.gooey-topbar-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: #111;
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gooey-topbar-run:hover {
+  background: #000;
+  color: #fff;
+}
+
+.gooey-topbar-run:disabled {
+  opacity: 0.5;
+}
+
+.gooey-topbar-run-stop {
+  background: #c0392b;
+}
+
+.gooey-topbar-run-stop:hover {
+  background: #a93226;
+}
+
+/* --------------------------------------------------------------- menus */
+
+.gooey-topbar-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid #e6e6e6;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.gooey-topbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #111;
+  font-size: 0.9375rem;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.gooey-topbar-menu-item:hover {
+  background: #f5f5f5;
+}
+
+.gooey-topbar-menu-icon {
+  width: 16px;
+  color: #6b6b6b;
+}
+
+/* -------------------------------------------------------------- mobile */
+
+@media (max-width: 991.98px) {
+  .gooey-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* the pill group drops to its own row and stops trying to centre itself */
+  .gooey-topbar-tabs {
+    order: 3;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .gooey-topbar-titleblock {
+    max-width: none;
+  }
+
+  .gooey-topbar-author {
+    display: none;
+  }
+}

@@ -88,7 +88,7 @@ from payments.plans import PricingPlan
 from routers.base_auth import get_login_url
 from routers.root import PREVIEW_ROUTE_WORKFLOWS, RecipeTabs
 from widgets.author import render_author_from_user
-from widgets.base_header import render_header_title, render_help_button
+from widgets.base_header import render_help_button
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
 from widgets.workflow_image import (
@@ -461,7 +461,7 @@ class BasePage:
         # The bar's node is reserved first (so it comes first in the DOM) but filled last:
         # _has_request_changed() - and so the publish state - is only settled once the inputs
         # have rendered. v1 renders its header last for the same reason.
-        top_bar_placeholder = gui.div(className="flex-shrink-0 w-100 px-4 pt-3")
+        top_bar_placeholder = gui.div(className="flex-shrink-0 w-100 px-4 py-2")
 
         with gui.div(
             className="flex-grow-1 w-100 overflow-auto px-4 pb-2",
@@ -478,6 +478,26 @@ class BasePage:
 
         with top_bar_placeholder:
             self._render_top_bar(tabs=tabs, active=active)
+
+        self._handle_top_bar_actions()
+
+    def _handle_top_bar_actions(self):
+        """Pop the keys RecipeTopBar wrote and act on them.
+
+        The bar mutates session state and calls onChange(); the server sees the key on the
+        next render. Same contract `handle_workspace_switch` uses for the sidebar.
+        """
+        publish_ref = gui.use_alert_dialog(key="publish-modal")
+
+        if gui.session_state.pop(self.TOP_BAR_PUBLISH_KEY, None):
+            if self.is_logged_in():
+                clear_publish_form()
+                publish_ref.set_open(True)
+            else:
+                self._publish_for_anonymous_user()
+
+        if publish_ref.is_open:
+            self._render_publish_dialog(ref=publish_ref)
 
     def _resolve_active_tab(self, tabs: list[TabSpec]) -> TabSpec | None:
         """The tab this request is for, or None for a v1 tab url with no matching TabSpec."""
@@ -511,32 +531,76 @@ class BasePage:
             return ""
         return segments[-1]
 
+    # keys the RecipeTopBar writes into session state; popped by _handle_top_bar_actions
+    TOP_BAR_MENU_KEY = "--topbar-menu"
+    TOP_BAR_PUBLISH_KEY = "--topbar-publish"
+
     def _render_top_bar(self, *, tabs: list[TabSpec], active: TabSpec | None):
-        """Unstyled stand-in for the v2 top bar. Slice 6 replaces this markup with the
-        RecipeTopBar react component (avatar, publish, run cost, run button).
-        """
+        from daras_ai_v2.gooey_builder import GOOEY_BUILDER_EVENT_KEY
+        from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps, TopBarTab
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+
         sr, pr = self.current_sr_pr
+        tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
 
-        with gui.div(className="d-flex align-items-center gap-2 w-100"):
-            render_header_title(get_title_breadcrumbs(self, sr, pr, tab=self.tab))
-            if self._has_request_changed() or (
-                self.can_user_save_run(sr, pr) and pr.saved_run != sr
-            ):
-                self._render_unpublished_changes_indicator()
+        gui.model_component(
+            RecipeTopBarProps(
+                title=tbreadcrumbs.title_with_prefix() or self.get_run_title(sr, pr),
+                photo_url=pr.photo_url or None,
+                circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
+                author=self._top_bar_author(),
+                # a single-tab recipe renders no pill group - the component checks length
+                tabs=[
+                    TopBarTab(
+                        slug=tab.slug,
+                        label=tab.label,
+                        icon=tab.icon,
+                        href=self.current_tab_url(tab.slug),
+                        is_active=bool(active and tab.slug == active.slug),
+                    )
+                    for tab in tabs
+                ],
+                publish_label=self._top_bar_publish_label(),
+                publish_key=self.TOP_BAR_PUBLISH_KEY,
+                has_unpublished_changes=self._has_request_changed()
+                or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
+                menu_key=self.TOP_BAR_MENU_KEY,
+                builder_toggle_key=GOOEY_BUILDER_EVENT_KEY,
+            )
+        )
 
-        self._render_tab_strip(tabs=tabs, active=active)
+    def _top_bar_author(self):
+        """The "by <someone>" line. Workspace when there is one, else the run's user."""
+        from gooey_gui.types.recipe_top_bar_props import TopBarAuthor
 
-    def _render_tab_strip(self, *, tabs: list[TabSpec], active: TabSpec | None):
-        if len(tabs) < 2:
-            # a single-tab recipe (media gen, bulk/eval) gets no strip at all
-            return
-        with gui.div(className="d-flex gap-3 w-100", id="recipe-tab-strip"):
-            for tab in tabs:
-                with gui.link(
-                    to=self.current_tab_url(tab.slug),
-                    className=("fw-bold" if active and tab.slug == active.slug else ""),
-                ):
-                    gui.html(f"{tab.icon} {tab.label}" if tab.icon else tab.label)
+        pr = self.current_pr
+        if pr.workspace_id and not pr.workspace.is_personal:
+            return TopBarAuthor(
+                label=f"by {pr.workspace.display_name(self.request.user)}",
+                photo_url=pr.workspace.photo_url or None,
+            )
+        user = self.current_sr_user
+        if user:
+            return TopBarAuthor(
+                label=f"by {user.display_name or user.first_name(fallback='User')}",
+                photo_url=user.photo_url or None,
+            )
+        return None
+
+    def _top_bar_publish_label(self) -> str:
+        """Same permission-derived wording v1's save button uses."""
+        if not self.is_logged_in():
+            return "Save"
+        if WorkflowAccessLevel.can_user_edit_published_run(
+            workspace=self.current_workspace,
+            user=self.request.user,
+            pr=self.current_pr,
+        ):
+            return "Update"
+        elif self._has_request_changed():
+            return "Save and Run"
+        else:
+            return "Save as New"
 
     def _render_pane_strip(
         self, panes: dict[str, typing.Callable[[], None]], *, key: str
@@ -555,7 +619,7 @@ class BasePage:
         if gui.session_state.get(key) not in panes:
             gui.session_state[key] = labels[0]
 
-        with gui.styled(PANE_STRIP_CSS), gui.div(className="mb-3"):
+        with gui.styled(PANE_STRIP_CSS), gui.div(className="my-2"):
             for label in labels:
                 is_active = label == gui.session_state[key]
                 if gui.button(
@@ -2173,10 +2237,18 @@ class BasePage:
         sr = self.on_submit(unsaved_state=unsaved_state, **defaults)
         if not sr:
             return
-        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+
+        active = self._resolve_active_tab(self.get_tab_spec())
+        if active is not None and active.slug == "":
+            # Split shows the output beside the inputs already, so running there should not
+            # yank the user over to Preview. Its slug is "", i.e. the entry url.
+            tab = None
+        elif self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            # from a tab with no output pane (Config), land somewhere the run is visible
             tab = RecipeTabs.preview
         else:
             tab = None
+
         raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid, tab=tab))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
@@ -2993,6 +3065,9 @@ SPLIT_PANES_CSS = """
     & > div {
         height: 100%;
         min-height: 0;
+        /* breathing room inside each pane; on the row's children, because a wrapper div
+           around `with input_col:` would mount beside the row, not around the columns */
+        padding: 8px 12px;
     }
     /* Neither column scrolls as a whole. The left column is a flex stack whose *pane*
        scrolls, so its strip and submit row stay put; the right column is the preview,

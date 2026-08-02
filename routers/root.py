@@ -770,7 +770,12 @@ def sidebar_page_wrapper(
 
     context = {"request": request, "block_incognito": True}
 
-    display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]
+    # v1 shows the Builder only on Run/Preview. v2's tabs and panes all live on one recipe
+    # page, so the Builder stays available across every one of them rather than vanishing
+    # when you switch pane.
+    display_gooey_builder = bool(page) and (
+        _is_layout_v2_page(page) or page.tab in [RecipeTabs.run, RecipeTabs.preview]
+    )
 
     default_collapsed = persist_toggle_state(
         navigation_sidebar.NAV_COLLAPSED_STATE_KEY,
