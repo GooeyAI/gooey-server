@@ -316,7 +316,7 @@ button .gui-html-container,
 }
 
 :root {
-  --sidebar_open_width: 340px;
+  --sidebar_open_width: 460px;
   --sidebar_closed_width: 0;
   --sidebar_mobile_width: 100vw;
   --sidebar_desktop_breakpoint: 1140px;

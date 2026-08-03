@@ -46,6 +46,11 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.github_tools import github_url_for_file
+from daras_ai_v2.gooey_builder import (
+    GOOEY_BUILDER_EVENT_KEY,
+    can_launch_gooey_builder,
+    render_gooey_builder,
+)
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
 from daras_ai_v2.manage_api_keys_widget import manage_api_keys
@@ -91,6 +96,7 @@ from widgets.author import render_author_from_user
 from widgets.base_header import render_help_button
 from widgets.publish_form import clear_publish_form
 from widgets.saved_workflow import render_saved_workflow_preview
+from widgets.sidebar import sidebar_layout
 from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
@@ -472,13 +478,23 @@ class BasePage:
         # The Builder sits *beside* the tab body rather than wrapping the whole page, which
         # is what lets the bar above run the full width. v1 wraps the page instead, so the
         # shell skips its own sidebar_layout for v2 pages.
-        builder_pane, body_pane = self._builder_layout()
+        # The Sidebar component's root is `h-100`, so it needs a parent with a definite
+        # height to resolve against - as a bare flex child next to the bar it would resolve
+        # to the full column and overflow by the bar's height.
+        with gui.div(
+            className="d-flex flex-column flex-grow-1 w-100",
+            style=dict(minHeight=0),
+        ):
+            builder_pane, body_pane = self._builder_layout()
 
         with (
             body_pane,
             gui.div(
                 className=(
-                    "d-flex flex-column flex-grow-1 w-100 overflow-auto px-2 px-lg-4 pb-1 pb-lg-2"
+                    # h-100 rather than flex-grow-1: the Sidebar puts three elements between
+                    # this and the flex column above, and the nearest parent is a plain
+                    # block, so there is no flex context left to grow into
+                    "d-flex flex-column h-100 w-100 overflow-auto px-2 px-lg-4 pb-1 pb-lg-2"
                     # below lg an immersive tab fills everything under the app header, so
                     # the page's own padding gets out of its way
                     + (" v2-immersive-mobile" if immersive else "")
@@ -505,8 +521,6 @@ class BasePage:
         self._handle_top_bar_actions()
 
     def _can_show_builder(self) -> bool:
-        from daras_ai_v2.gooey_builder import can_launch_gooey_builder
-
         try:
             workspace = self.current_workspace
         except Workspace.DoesNotExist:
@@ -519,9 +533,6 @@ class BasePage:
         Returns `(None, dummy)` when the Builder is unavailable, so the body renders with
         no extra wrapper at all rather than an empty sidebar.
         """
-        from daras_ai_v2.gooey_builder import GOOEY_BUILDER_EVENT_KEY
-        from widgets.sidebar import sidebar_layout
-
         if not self._can_show_builder():
             return None, gui.dummy()
 
@@ -532,11 +543,16 @@ class BasePage:
         )
 
     def _render_gooey_builder(self):
-        from daras_ai_v2.gooey_builder import (
-            GOOEY_BUILDER_EVENT_KEY,
-            render_gooey_builder,
+        # Below the sidebar's desktop breakpoint the panel goes full-screen fixed and covers
+        # the top bar, close button included - and v2 hides the widget's own header - so the
+        # panel has to carry its own way out. Absolute against `.gooey-sidebar`, which is
+        # positioned at every breakpoint; the `display: contents` html wrapper adds no box,
+        # so this costs the panel's height chain nothing.
+        gui.html(
+            '<button type="button" class="v2-builder-close" title="Close Builder"'
+            ' aria-label="Close Builder" onclick="window.dispatchEvent(new Event('
+            f"'{GOOEY_BUILDER_EVENT_KEY}:close'))\">{icons.cancel}</button>"
         )
-
         render_gooey_builder(
             event_key=GOOEY_BUILDER_EVENT_KEY, request=self.request, page=self
         )
@@ -619,6 +635,11 @@ class BasePage:
     TOP_BAR_PUBLISH_KEY = "--topbar-publish"
     TOP_BAR_RUN_KEY = "--topbar-run"
 
+    # Not popped: unlike the others this is a standing fact about the client, not an
+    # action. The bar keeps it current and `submit_and_redirect` reads it to decide
+    # whether Split is on screen at all.
+    TOP_BAR_WIDE_KEY = "--topbar-wide"
+
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars.
 
@@ -662,6 +683,8 @@ class BasePage:
                 photo_url=pr.photo_url or None,
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._top_bar_author(),
+                builder_close_event=f"{GOOEY_BUILDER_EVENT_KEY}:close",
+                builder_open=bool(gui.session_state.get(GOOEY_BUILDER_EVENT_KEY)),
                 # a single-tab recipe renders no pill group - the component checks length
                 immersive_on_mobile=bool(active and active.immersive_on_mobile),
                 tabs=[
@@ -682,6 +705,7 @@ class BasePage:
                 menu_key=self.TOP_BAR_MENU_KEY,
                 integrations=self._top_bar_integrations(),
                 run_key=self.TOP_BAR_RUN_KEY,
+                viewport_wide_key=self.TOP_BAR_WIDE_KEY,
                 is_running=self._is_run_in_progress(),
                 cost_label=cost_label,
                 cost_href=self.get_credits_click_url(),
@@ -1462,12 +1486,14 @@ class BasePage:
                 label="Preview",
                 icon=icons.preview,
                 render=self._render_preview_tab,
+                shows_output=True,
             ),
             TabSpec(
                 slug="split",
                 label="Split",
                 icon=icons.run,
                 render=self._render_split_tab,
+                shows_output=True,
             ),
         ]
 
@@ -1654,7 +1680,7 @@ class BasePage:
                 gui.markdown(f"###### {root_run.title or page.title}")
                 gui.caption(truncate_text_words(root_run.notes, maxlen=210))
 
-        grid_layout(4, page_clses, _render)
+        grid_layout(2, page_clses, _render)
 
     def related_workflows(self) -> list:
         return []
@@ -2285,7 +2311,7 @@ class BasePage:
             self.submit_and_redirect()
 
         if self.tab == RecipeTabs.run and self.workflow in PREVIEW_ROUTE_WORKFLOWS:
-            hide_on_mobile = "d-none d-lg-block pb-2"
+            hide_on_mobile = "d-none d-lg-block"
         else:
             hide_on_mobile = ""
         # h-100 so a percentage-height child (the chat widget) resolves against the
@@ -2387,18 +2413,34 @@ class BasePage:
         if not sr:
             return
 
-        active = self._resolve_active_tab(self.get_tab_spec())
-        if active is not None and active.slug == "":
-            # Split shows the output beside the inputs already, so running there should not
-            # yank the user over to Preview. Its slug is "", i.e. the entry url.
-            tab = None
-        elif self.workflow in PREVIEW_ROUTE_WORKFLOWS:
-            # from a tab with no output pane (Config), land somewhere the run is visible
-            tab = RecipeTabs.preview
-        else:
-            tab = None
-
+        tabs = self.get_tab_spec()
+        tab = self._run_landing_tab(tabs, self._resolve_active_tab(tabs))
         raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid, tab=tab))
+
+    def _run_landing_tab(self, tabs: list[TabSpec], active: TabSpec | None):
+        """Where a just-started run should land. `None` means the entry url.
+
+        The point is to leave the user somewhere the output is visible, without moving them
+        if they can already see it.
+        """
+        entry_tab = next((t for t in tabs if t.slug == ""), None)
+
+        if active is not None and active.shows_output:
+            # already looking at the output - Split, or Preview after a chat message - so
+            # stay put. The entry tab is `None` rather than a slug of its own.
+            return None if active.slug == "" else TabRoute(active.slug)
+        if (
+            entry_tab is not None
+            and entry_tab.shows_output
+            and gui.session_state.get(self.TOP_BAR_WIDE_KEY)
+        ):
+            # ran from a tab with no output pane (Config) on a screen wide enough for
+            # Split - land there, so the inputs stay in view beside the run. Narrower than
+            # that, Split is hidden and Preview below is the only option.
+            return None
+        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
+            return RecipeTabs.preview
+        return None
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.is_logged_in()

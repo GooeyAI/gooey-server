@@ -9,6 +9,8 @@ declare global {
   }
 }
 
+export const GOOEY_EMBED_REMOUNT_EVENT = "gooey-embed-remount";
+
 export function GooeyBuilderInlineEmbed(
   props: CustomComponentProps & {
     config: Record<string, any>;
@@ -93,8 +95,15 @@ export function GooeyBuilderInlineEmbed(
     script?.addEventListener("load", loadEmbed);
     loadEmbed();
 
+    // GooeyEmbed.unmount() takes no target, so anything else that mounts a widget - the
+    // Deploy pane's web preview, for one - tears this panel down as collateral. Whoever
+    // does that fires this event, and the panel puts itself back. loadEmbed() is a no-op
+    // when the target still has children, so a spurious event costs nothing.
+    window.addEventListener(GOOEY_EMBED_REMOUNT_EVENT, loadEmbed);
+
     return () => {
       script?.removeEventListener("load", loadEmbed);
+      window.removeEventListener(GOOEY_EMBED_REMOUNT_EVENT, loadEmbed);
     };
   }, []);
 

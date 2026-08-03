@@ -48,6 +48,8 @@ export interface RecipeTopBarProps {
   photo_url: string | null;
   circle_photo: boolean;
   author: TopBarAuthor | null;
+  builder_close_event: string;
+  builder_open: boolean;
   tabs: TopBarTab[];
   immersive_on_mobile: boolean;
   overflow_items: TopBarMenuItem[];
@@ -58,6 +60,7 @@ export interface RecipeTopBarProps {
   has_unpublished_changes: boolean;
   menu_key: string;
   run_key: string;
+  viewport_wide_key: string;
   run_label: string;
   run_disabled: boolean;
   is_running: boolean;

@@ -29,6 +29,10 @@ class TabSpec(pydantic.BaseModel):
     strip, and a floating back link instead. For a tab that is one full-bleed surface, like
     the chat preview."""
 
+    shows_output: bool = False
+    """This tab renders the run's output. Starting a run here leaves the user where they
+    are; starting one anywhere else redirects somewhere the output is visible."""
+
     # server-only: the top bar renders links and labels, never behaviour
     render: typing.Callable[[], None] = pydantic.Field(exclude=True)
 

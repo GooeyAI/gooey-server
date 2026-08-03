@@ -1196,16 +1196,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
     scroll_into_view = False
 
     def _render_running_output(self):
-        ## The embedded web widget includes a running output, so just scroll it into view to tabs which just above the widget
-
-        # language=JavaScript
-        gui.js(
-            """
-            let elem = document.querySelector("#gooey-embed");
-            if (!elem) return;
-            elem.scrollIntoView({ behavior: "smooth", block: "start" });
-            """
-        )
+        # The embedded widget renders its own running state. Do not call scrollIntoView:
+        # the v2 app shell keeps its header outside the body scroller.
+        return
 
     def render_output(self):
         gui.tag(
@@ -1539,6 +1532,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 render=self._render_preview_tab,
                 # one full-bleed surface; on a phone it takes the whole screen
                 immersive_on_mobile=True,
+                shows_output=True,
             ),
             TabSpec(
                 slug="",
@@ -1547,6 +1541,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 render=self._render_split_tab,
                 # two columns side by side - there is no room for it on a phone
                 desktop_only=True,
+                shows_output=True,
             ),
         ]
 
@@ -1588,9 +1583,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         Overriding this - rather than the tabs - is what gives both of them the pane strip
         without duplicating the layout.
         """
-        with gui.div(
-            className="d-flex flex-column h-100", style=dict(minHeight=0)
-        ):
+        with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
             # strip and submit row are fixed; only the pane between them scrolls, and only
             # when its content actually overflows
             render_pane = self._render_pane_strip(
@@ -1622,8 +1615,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 with gui.div(className="ms-auto", style=dict(minWidth="40%")):
                     language_model_selector(label="")
 
-            with gui.styled(FILL_HEIGHT_EDITOR_CSS), gui.div(
-                className="flex-grow-1 d-flex flex-column", style=dict(minHeight=0)
+            with (
+                gui.styled(FILL_HEIGHT_EDITOR_CSS),
+                gui.div(
+                    className="flex-grow-1 d-flex flex-column", style=dict(minHeight=0)
+                ),
             ):
                 gui.code_editor(
                     label="",

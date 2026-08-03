@@ -458,3 +458,38 @@ a.gooey-topbar-cost:hover {
     display: none;
   }
 }
+
+/* ------------------------------------------------- gooey builder, mobile
+
+   Desktop closes the Builder from the top bar. Below the *sidebar's* breakpoint - 1140px,
+   not Bootstrap's lg - the panel goes full-screen fixed and covers that bar, so it needs a
+   close of its own. v2 only: v1 keeps the widget's own header and never renders this. */
+.v2-builder-close {
+  display: none;
+}
+
+@media (max-width: 1140px) {
+  .v2-builder-close {
+    /* absolute against `.gooey-sidebar` - sticky on desktop, fixed here, positioned either
+       way - so there is no app-header offset to hardcode */
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    line-height: 1;
+    border: 1px solid #e0ddd7;
+    border-radius: 999px;
+    background: #fff;
+    color: #111;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  .v2-builder-close:hover {
+    background: #fbfaf8;
+    color: #111;
+  }
+}

@@ -546,8 +546,12 @@ def web_widget_config(bi: BotIntegration, user: AppUser | None, hostname: str | 
                 async function loadGooeyEmbed() {
                     await window.waitUntilHydrated;
                     if (typeof GooeyEmbed === 'undefined') return;
+                    // unmount() takes no target and there is one global instance, so this
+                    // also tears down the Gooey Builder panel where both are on screen.
+                    // The event tells it to put itself back.
                     GooeyEmbed.unmount();
                     GooeyEmbed.mount(config);
+                    window.dispatchEvent(new Event("gooey-embed-remount"));
                 }
                 const script = document.getElementById("gooey-embed-script");
                 if (script) script.onload = loadGooeyEmbed;

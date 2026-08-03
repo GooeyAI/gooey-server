@@ -82,6 +82,8 @@ export function RecipeTopBar({
   photo_url,
   circle_photo,
   author,
+  builder_close_event,
+  builder_open,
   tabs,
   immersive_on_mobile,
   overflow_items,
@@ -92,6 +94,7 @@ export function RecipeTopBar({
   has_unpublished_changes,
   menu_key,
   run_key,
+  viewport_wide_key,
   run_label,
   run_disabled,
   is_running,
@@ -113,6 +116,23 @@ export function RecipeTopBar({
     state[key] = value;
     onChange();
   };
+
+  // Where a run lands is the server's call, but Split - the only tab showing output beside
+  // the inputs - exists on wide screens only, and the server cannot see the viewport. So
+  // report which side of the line we are on. Deliberately no onChange(): this is not an
+  // action, and the value rides along with the next post, which every run is.
+  useEffect(() => {
+    if (!viewport_wide_key) return;
+    // the counterpart of the `max-width: 991.98px` block in RecipeTopBar.css, which is
+    // what actually hides .gooey-topbar-tab-desktop-only
+    const mq = window.matchMedia("(min-width: 992px)");
+    const sync = () => {
+      state[viewport_wide_key] = mq.matches;
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [viewport_wide_key, state]);
 
   // Below lg the chips and the title compete for one row and the title always loses, so
   // the chips move into the overflow menu. Both lists are rendered and CSS picks one - no
@@ -141,7 +161,7 @@ export function RecipeTopBar({
     <div
       className={clsx(
         "gooey-topbar",
-        immersive_on_mobile && "gooey-topbar-immersive",
+        immersive_on_mobile && "gooey-topbar-immersive"
       )}
     >
       <div className="gooey-topbar-left">
@@ -151,7 +171,7 @@ export function RecipeTopBar({
             alt=""
             className={clsx(
               "gooey-topbar-avatar",
-              circle_photo && "gooey-topbar-avatar-circle",
+              circle_photo && "gooey-topbar-avatar-circle"
             )}
           />
         )}
@@ -183,6 +203,17 @@ export function RecipeTopBar({
           />
         </div>
 
+        {!!builder_close_event && builder_open && (
+          <button
+            type="button"
+            className="btn text-muted p-1 d-flex align-items-center bg-hover-light"
+            title="Close Builder"
+            aria-label="Close Builder"
+            onClick={() => window.dispatchEvent(new Event(builder_close_event))}
+          >
+            <i className="fa-regular fa-arrow-down-left-and-arrow-up-right-to-center fs-5" />
+          </button>
+        )}
       </div>
 
       {/* A single-tab recipe (media gen, bulk/eval) renders no pill group at all. */}
@@ -195,7 +226,7 @@ export function RecipeTopBar({
               className={clsx(
                 "gooey-topbar-tab",
                 tab.is_active && "gooey-topbar-tab-active",
-                tab.desktop_only && "gooey-topbar-tab-desktop-only",
+                tab.desktop_only && "gooey-topbar-tab-desktop-only"
               )}
             >
               <Icon html={tab.icon} className="gooey-topbar-tab-icon" />
@@ -212,7 +243,7 @@ export function RecipeTopBar({
               type="button"
               className={clsx(
                 "gooey-topbar-overflow-btn",
-                overflowDesktopOnly && "d-lg-none",
+                overflowDesktopOnly && "d-lg-none"
               )}
               onClick={() => setOverflowOpen((v) => !v)}
               aria-label="More"
@@ -234,7 +265,7 @@ export function RecipeTopBar({
               href={integration.href}
               className={clsx(
                 "gooey-topbar-integration d-none d-lg-inline-flex",
-                integration.color && "gooey-topbar-integration-brand",
+                integration.color && "gooey-topbar-integration-brand"
               )}
               style={
                 integration.color
@@ -251,7 +282,7 @@ export function RecipeTopBar({
               type="button"
               className={clsx(
                 "gooey-topbar-integration d-none d-lg-inline-flex",
-                integration.color && "gooey-topbar-integration-brand",
+                integration.color && "gooey-topbar-integration-brand"
               )}
               style={
                 integration.color
@@ -263,7 +294,7 @@ export function RecipeTopBar({
             >
               <Icon html={integration.icon} />
             </button>
-          ),
+          )
         )}
 
         {!!publish_label && (
@@ -307,7 +338,7 @@ export function RecipeTopBar({
             type="button"
             className={clsx(
               "gooey-topbar-run",
-              is_running && "gooey-topbar-run-stop",
+              is_running && "gooey-topbar-run-stop"
             )}
             disabled={run_disabled}
             onClick={() => fire(run_key)}

@@ -133,8 +133,15 @@ def render_gooey_builder_embed(
     # conversations live in the navigation sidebar, not the builder widget
     config["enableConversations"] = False
     config["theme"] = "builder"
-    # the panel has its own "Ask Gooey" header, so the widget does not need one too
-    config["showHeader"] = False
+
+    # imported here rather than at module level: routers.root imports this module
+    from routers.root import _is_layout_v2_page
+
+    # v2 only: its panel supplies its own chrome, and below the sidebar breakpoint its own
+    # floating close. v1 has neither and still needs the widget's header to close at all.
+    if _is_layout_v2_page(page):
+        config["showHeader"] = False
+
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 

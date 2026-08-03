@@ -55,6 +55,8 @@ class RecipeTopBarProps(pydantic.BaseModel):
     photo_url: str | None = None
     circle_photo: bool = False  # some workflows render the avatar as a circle
     author: TopBarAuthor | None = None
+    builder_close_event: str = ""
+    builder_open: bool = False
 
     tabs: list[TopBarTab] = []
     # the active tab owns the screen below lg, so the strip and the run cluster
@@ -73,6 +75,11 @@ class RecipeTopBarProps(pydantic.BaseModel):
     # mutate-then-notify contract NavigationSidebar uses for workspace switching.
     menu_key: str = ""
     run_key: str = ""
+
+    # Written by the client whenever the viewport crosses lg, and never popped: the server
+    # cannot see the viewport, but it has to know whether the desktop-only tabs are on
+    # screen before it redirects anyone to one. See `BasePage.TOP_BAR_WIDE_KEY`.
+    viewport_wide_key: str = ""
 
     run_label: str = "Run"
     run_disabled: bool = False
