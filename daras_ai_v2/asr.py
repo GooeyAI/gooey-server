@@ -52,6 +52,7 @@ if typing.TYPE_CHECKING:
     from google.auth.transport.requests import AuthorizedSession
 
 TRANSLATE_BATCH_SIZE = 8
+MAYURA_MAX_INPUT_CHARS = 1_000
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -269,6 +270,8 @@ GHANA_NLP_ASR_V2_SUPPORTED = {
 # https://docs.lelapa.ai/getting-started/language-support
 LELAPA_ASR_SUPPORTED = {"eng", "afr", "zul", "sot", "fra"}
 LELAPA_MT_SUPPORTED = {"nso_Latn", "afr_Latn", "sot_Latn", "ssw_Latn", "tso_Latn", "tsn_Latn", "xho_Latn", "zul_Latn", "eng_Latn", "swh_Latn", "sna_Latn", "yor_Latn", "hau_Latn"}  # fmt: skip
+# https://docs.sarvam.ai/api-reference/text/translate-text
+MAYURA_SUPPORTED_LANGUAGES = {"bn-IN","en-IN","gu-IN","hi-IN","kn-IN","ml-IN","mr-IN","od-IN","pa-IN","ta-IN","te-IN",}  # fmt:skip
 INTRON_SUPPORTED = {
     "af", "ak", "am", "ar", "bem", "bg", "cs", "da", "de", "el", "en", "es", "et", "ff", "fi", "fr", "gaa", "ha",
     "hr", "hu", "ig", "it", "lg", "lt", "lv", "mt", "nl", "nso", "nyn", "om", "pcm", "pl", "pt", "ro", "ru", "rw",
@@ -455,6 +458,10 @@ class TranslationModels(TranslationModel, Enum):
     )
     ghana_nlp = TranslationModel(label="Ghana NLP Translate")
     lelapa = TranslationModel(label="Vulavula (Lelapa AI)")
+    sarvam_mayura_v1 = TranslationModel(
+        label="Mayura v1 (Sarvam AI)",
+        supports_auto_detect=True,
+    )
     whisper_large_v2 = TranslationModel(
         label="Whisper Large v2 (inbuilt)", is_asr_model=True
     )
@@ -490,6 +497,8 @@ class TranslationModels(TranslationModel, Enum):
                 return SEAMLESS_v2_ASR_SUPPORTED
             case self.lelapa:
                 return LELAPA_MT_SUPPORTED
+            case self.sarvam_mayura_v1:
+                return MAYURA_SUPPORTED_LANGUAGES
             case _:
                 return ["en"]
 
@@ -738,6 +747,8 @@ def run_translate(
     if not model:
         return texts
 
+    _validate_translate_texts(texts)
+
     if model == TranslationModels.google.name:
         return run_google_translate(
             texts=texts,
@@ -757,8 +768,21 @@ def run_translate(
             target_language=target_language,
             source_language=source_language,
         )
+    elif model == TranslationModels.sarvam_mayura_v1.name:
+        return run_sarvam_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+        )
     else:
         raise ValueError("Unsupported translation model: " + str(model))
+
+
+def _validate_translate_texts(texts: list[str]) -> None:
+    if not texts:
+        raise UserError("At least one text is required for translation.")
+    if any(not text.strip() for text in texts):
+        raise UserError("Translation inputs cannot be empty.")
 
 
 def run_ghana_nlp_translate(
@@ -831,6 +855,50 @@ def _call_lelapa_translate_raw(
     )
     raise_for_status(r)
     return r.json()["translation"][0]["translated_text"]  # yes
+
+
+def run_sarvam_translate(
+    texts: list[str], target_language: str, source_language: str | None = None
+) -> list[str]:
+    assert target_language, "Target language is required for Sarvam AI"
+    if source_language and source_language != "auto":
+        source_language = normalised_lang_in_collection(
+            source_language, MAYURA_SUPPORTED_LANGUAGES
+        )
+    else:
+        source_language = "auto"
+    target_language = normalised_lang_in_collection(
+        target_language, MAYURA_SUPPORTED_LANGUAGES
+    )
+    if source_language == target_language:
+        return texts
+    return map_parallel(
+        lambda text: _call_sarvam_translate_raw(
+            text, source_language, target_language
+        ),
+        texts,
+        max_workers=TRANSLATE_BATCH_SIZE,
+    )
+
+def _call_sarvam_translate_raw(
+    text: str, source_language: str, target_language: str
+) -> str:
+    if len(text) > MAYURA_MAX_INPUT_CHARS:
+        raise UserError(
+            f"Mayura v1 accepts at most {MAYURA_MAX_INPUT_CHARS:,} characters per text."
+        )
+    r = requests.post(
+        "https://api.sarvam.ai/translate",
+        headers={"api-subscription-key": settings.SARVAM_API_KEY},
+        json={
+            "input": text,
+            "source_language_code": source_language,
+            "target_language_code": target_language,
+            "model": "mayura:v1",
+        },
+    )
+    raise_for_status(r)
+    return r.json()["translated_text"]
 
 
 def run_google_translate(
