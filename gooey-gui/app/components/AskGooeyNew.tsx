@@ -5,14 +5,12 @@ import { fetchServerAPI } from "~/fetchServerAPI";
 import type { CustomComponentProps } from "~/components";
 
 type AskGooeyNewProps = CustomComponentProps & {
-  workflow_url: string;
   title?: string;
   highlight?: string;
   placeholder?: string;
 };
 
 export function AskGooeyNew({
-  workflow_url,
   title = "What do you want to build today?",
   highlight = "build",
   placeholder = "India stock market today",
@@ -37,7 +35,6 @@ export function AskGooeyNew({
       const redirectUrl = await fetchServerAPI<string | null>(
         "/__/gooey-builder/send-message",
         {
-          workflow_url,
           input_data: { input_prompt: prompt },
         }
       );
