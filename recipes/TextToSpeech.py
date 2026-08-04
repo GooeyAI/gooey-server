@@ -475,14 +475,15 @@ class TextToSpeechPage(BasePage):
                 raise_for_status(response)
 
                 audios = response.json().get("audios") or []
+                if not audios:
+                    raise ValueError("Sarvam AI returned no audio.")
+
                 try:
-                    audio = b"".join(
-                        base64.b64decode(chunk, validate=True) for chunk in audios
-                    )
-                except (binascii.Error, ValueError, TypeError) as exc:
-                    raise UserError("Sarvam AI returned invalid audio data.") from exc
+                    audio = base64.b64decode(audios[0], validate=True)
+                except (binascii.Error, TypeError) as exc:
+                    raise ValueError("Sarvam AI returned invalid audio data.") from exc
                 if not audio:
-                    raise UserError("Sarvam AI returned no audio.")
+                    raise ValueError("Sarvam AI returned no audio.")
 
                 state["audio_url"] = upload_file_from_bytes(
                     "sarvam_bulbul_v3.wav", audio, "audio/wav"
