@@ -95,6 +95,7 @@ from daras_ai_v2.web_widget_embed import (
     chat_widget_input_to_request_body,
     get_chat_widget_messages,
 )
+from daras_ai_v2.workflow_url_input import url_to_runs
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -1311,7 +1312,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             gui.session_state["final_search_query"] = ""
             gui.rerun()
 
-        messages = get_chat_widget_messages(gui.session_state)
+        messages = get_chat_widget_messages(
+            gui.session_state, web_url=self.current_sr.get_app_url()
+        )
 
         # fill branding with bot integration data if available
         bot_integration = (
@@ -1371,14 +1374,11 @@ async function loadGooeyEmbed() {
         btn.value = JSON.stringify(payload);
         btn.click();
     }
-    function editQuery(messageId, payload) {
-        const prefix = "simple-msg-id-";
-        if (!messageId.startsWith(prefix)) return;
-        const messageIndex = Number(messageId.slice(prefix.length));
-        if (!Number.isInteger(messageIndex) || messageIndex < 0) return;
-        if (messageIndex >= messages.length) return;
-
-        sendMessage({ ...payload, messages: messages.slice(0, messageIndex) });
+    function editQuery(_messageId, payload) {
+        const controllerMessages = controller.messages;
+        const response = controllerMessages[controllerMessages.length - 1];
+        if (!response?.web_url) return;
+        sendMessage({ ...payload, edit_run_url: response.web_url });
     }
     let controller = {
         messages,
@@ -1399,6 +1399,7 @@ loadGooeyEmbed();
 window.addEventListener("hydrated", loadGooeyEmbed);
 // once the widget is already mounted, update the messages and branding to latest
 if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
+    GooeyEmbed.copilotPreviewControl.messages = messages;
     GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
     GooeyEmbed.copilotPreviewControl.updateConfig?.({ branding: config.branding });
 }
@@ -1409,8 +1410,14 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         )
 
     def on_send(self, input_data: dict):
+        edit_sr = None
+        if edit_run_url := input_data.get("edit_run_url"):
+            _, edit_sr, _ = url_to_runs(edit_run_url)
         request_body, message_thread = chat_widget_input_to_request_body(
-            self.current_sr, gui.session_state, input_data
+            self.current_sr,
+            gui.session_state,
+            input_data,
+            edit_sr=edit_sr,
         )
         gui.session_state.update(request_body)
         self.submit_and_redirect(message_thread=message_thread)
