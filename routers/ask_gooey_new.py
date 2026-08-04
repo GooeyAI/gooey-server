@@ -100,9 +100,9 @@ def build_meta_tags(url: str):
 def render_ask_gooey_new(
     request: fastapi.Request,
     workspace: Workspace | None,
-    title: str = "What do you want to build today?",
-    highlight: str = "build",
-    placeholder: str = "India stock market today",
+    title: str = "What will you build today?",
+    highlight: str = "",
+    placeholder: str = "Ask Gooey to build an agent for farmers in Kenya",
 ):
     """Centered "What can I help with?" hero prompt for /explore.
 

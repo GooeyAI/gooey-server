@@ -11,20 +11,35 @@ type AskGooeyNewProps = CustomComponentProps & {
 };
 
 export function AskGooeyNew({
-  title = "What do you want to build today?",
-  highlight = "build",
-  placeholder = "India stock market today",
+  title = "What will you build today?",
+  highlight = "",
+  placeholder = "Ask Gooey to build an agent for farmers in Kenya",
 }: AskGooeyNewProps) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showScrollArrow, setShowScrollArrow] = useState(true);
+
+  const checkScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setShowScrollArrow(scrollLeft + clientWidth < scrollWidth - 1);
+    }
+  };
 
   useEffect(() => {
     autoResize(textareaRef.current);
   }, [value]);
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener("resize", checkScroll);
+    return () => window.removeEventListener("resize", checkScroll);
+  }, []);
 
   const submit = async () => {
     const prompt = value.trim();
@@ -63,17 +78,19 @@ export function AskGooeyNew({
   const canSubmit = value.trim().length > 0 && !isSubmitting;
   const titleParts = renderTitleWithHighlight(title, highlight);
 
+  const suggestions = [
+    "Swahili WhatsApp bot for community health workers",
+    "Which AI models best understand Hausa?",
+    "Eval models using google sheet of audi...",
+  ];
+
   return (
     <div
       style={{
         width: "100%",
         minHeight: "75vh",
         padding: "48px 24px",
-        background:
-          "linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 18%, #F4FFFB 55%, #DFFCF1 100%)",
-        borderBottom: "1px solid #CFE9DD",
-        borderRadius: "0 0 16px 16px",
-        marginBottom: "8px",
+        background: "#FFFFFF",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -81,7 +98,7 @@ export function AskGooeyNew({
     >
       <div
         style={{
-          maxWidth: "720px",
+          maxWidth: "840px",
           width: "100%",
           margin: "0 auto",
           display: "flex",
@@ -91,22 +108,23 @@ export function AskGooeyNew({
         }}
       >
         <div
-          className="d-flex align-items-center"
-          style={{ gap: "10px", color: "#1f1f1f" }}
+          className="d-flex align-items-center justify-content-center"
+          style={{ gap: "16px", color: "#1f1f1f", marginBottom: "8px" }}
         >
-          <i
-            className="fa-solid fa-sparkles"
-            style={{ color: "#000", fontSize: "1.1rem" }}
-            aria-hidden="true"
+          <img 
+            src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/47e069e2-5b65-11f1-80ef-02420a00016f/gooey-builder-logo-fit.gif" 
+            alt="Gooey Logo" 
+            style={{ width: "64px", height: "64px" }} 
           />
           <h1
             style={{
               margin: 0,
               textAlign: "center",
-              fontSize: "1.65rem",
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
+              fontSize: "3.2rem",
+              fontWeight: 400,
+              fontFamily: "Georgia, serif",
               color: "#111",
+              letterSpacing: "-0.02em",
             }}
           >
             {titleParts}
@@ -117,78 +135,202 @@ export function AskGooeyNew({
           style={{
             position: "relative",
             width: "100%",
-            background: "#fff",
-            border: `1px solid ${isFocused ? "#111" : "#d8d8d8"}`,
+            borderRadius: "16px",
+            padding: "1px", // For the gradient border
+            background: "linear-gradient(135deg, #5EE6D0 0%, #B7C8FE 50%, #E3E0F9 100%)",
             boxShadow: isFocused
-              ? "0 6px 24px rgba(0,0,0,0.08)"
-              : "0 2px 10px rgba(0,0,0,0.04)",
-            borderRadius: "22px",
-            padding: "16px 56px 14px 20px",
-            transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+              ? "0 0 10px rgba(94, 230, 208, 0.5)"
+              : "0 0 6px rgba(94, 230, 208, 0.3)",
+            transition: "box-shadow 0.15s ease",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          <textarea
-            ref={textareaRef}
-            data-submit-disabled
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={onKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder={placeholder}
-            rows={2}
-            disabled={isSubmitting}
-            aria-label={title}
+          <div
             style={{
               width: "100%",
-              minHeight: "52px",
-              maxHeight: "240px",
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              color: "#111",
-              fontSize: "1rem",
-              lineHeight: 1.5,
-              resize: "none",
-              padding: 0,
-              fontFamily: "inherit",
-            }}
-          />
-          <button
-            type="button"
-            data-submit-disabled
-            onClick={submit}
-            disabled={!canSubmit}
-            aria-label="Send message"
-            className="btn btn-theme p-0 m-0"
-            style={{
-              position: "absolute",
-              right: "10px",
-              bottom: "10px",
-              width: "34px",
-              height: "34px",
-              minWidth: "34px",
-              borderRadius: "50%",
+              background: "rgba(255, 255, 255, 0.99)",
+              borderRadius: "15.5px",
+              padding: "16px 8px 8px 16px",
               display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: canSubmit ? 1 : 0.45,
-              cursor: canSubmit ? "pointer" : "not-allowed",
-              fontWeight: "normal",
+              flexDirection: "column",
+              gap: "8px",
             }}
           >
-            {isSubmitting ? (
-              <i
-                className="fa-regular fa-spinner-third fa-spin"
-                style={{ fontSize: "0.95rem" }}
-              />
-            ) : (
-              <i
-                className="fa-solid fa-arrow-up"
-                style={{ fontSize: "0.95rem" }}
-              />
-            )}
-          </button>
+            <textarea
+              ref={textareaRef}
+              data-submit-disabled
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={onKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder={placeholder}
+              rows={1}
+              disabled={isSubmitting}
+              aria-label={title}
+              style={{
+                width: "100%",
+                minHeight: "24px",
+                maxHeight: "240px",
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                color: "#4B587A",
+                fontSize: "14px",
+                lineHeight: "20px",
+                resize: "none",
+                padding: "0",
+                fontFamily: "'Inter', sans-serif",
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: "36px" }}>
+              <button
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: "5px",
+                  color: "#000",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "24px",
+                  height: "24px",
+                  borderRadius: "8px",
+                }}
+              >
+                <i className="fa-regular fa-plus" style={{ fontSize: "14px" }} />
+              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  type="button"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "0",
+                    color: "#0A1021",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "32px",
+                    height: "32px",
+                  }}
+                >
+                  <i className="fa-regular fa-microphone" style={{ fontSize: "16px" }} />
+                </button>
+                <button
+                  type="button"
+                  data-submit-disabled
+                  onClick={submit}
+                  disabled={!canSubmit}
+                  aria-label="Send message"
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "12px",
+                    background: canSubmit ? "#e0e0e0" : "#D9D9D9",
+                    border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: canSubmit ? "#333" : "#8994B1",
+                    cursor: canSubmit ? "pointer" : "not-allowed",
+                    transition: "background 0.2s ease, color 0.2s ease",
+                  }}
+                >
+                  {isSubmitting ? (
+                    <i
+                      className="fa-regular fa-spinner-third fa-spin"
+                      style={{ fontSize: "16px" }}
+                    />
+                  ) : (
+                    <i
+                      className="fa-solid fa-arrow-up"
+                      style={{ fontSize: "16px" }}
+                    />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ position: "relative", width: "100%" }}>
+          <div 
+            id="suggestions-container"
+            ref={scrollContainerRef}
+            onScroll={checkScroll}
+            style={{ 
+              display: "flex", 
+              gap: "12px", 
+              width: "100%", 
+              overflowX: "auto", 
+              paddingBottom: "4px",
+              alignItems: "center",
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            }}
+          >
+            {suggestions.map((chip, i) => (
+              <button
+                key={i}
+                onClick={() => setValue(chip)}
+                style={{
+                  background: "#fff",
+                  border: "1px solid #eaeaea",
+                  borderRadius: "16px",
+                  padding: "6px 12px",
+                  fontSize: "13px",
+                  color: "#000",
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                  transition: "background 0.2s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f9f9f9")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+          {showScrollArrow && (
+            <div
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+                bottom: "4px",
+                width: "80px",
+                background: "linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 60%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                pointerEvents: "none",
+              }}
+            >
+              <button
+                onClick={() => {
+                  if (scrollContainerRef.current) scrollContainerRef.current.scrollBy({ left: 250, behavior: "smooth" });
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "8px 4px 8px 16px",
+                  color: "#000",
+                  pointerEvents: "auto",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <i className="fa-solid fa-chevron-right" style={{ fontSize: "14px" }} />
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (
