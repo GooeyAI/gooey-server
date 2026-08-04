@@ -176,7 +176,7 @@ export function AskGooeyNew({
                 background: "transparent",
                 border: "none",
                 outline: "none",
-                color: "#4B587A",
+                color: value ? "#000" : "#4B587A",
                 fontSize: "14px",
                 lineHeight: "20px",
                 resize: "none",
