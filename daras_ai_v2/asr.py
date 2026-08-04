@@ -296,6 +296,7 @@ SAARAS_V3_SUPPORTED = {
     "ml-IN", "mni-IN", "mr-IN", "ne-IN", "od-IN", "pa-IN", "sa-IN", "sat-IN", "sd-IN", "ta-IN", "te-IN", "ur-IN",
 }  # fmt: skip
 
+
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
@@ -472,9 +473,7 @@ class TranslationModels(TranslationModel, Enum):
         label="Mayura v1 (Sarvam AI)",
         supports_auto_detect=True,
     )
-    saaras_v3 = TranslationModel(
-        label="Saaras v3 (Sarvam AI)", is_asr_model=True
-    )
+    saaras_v3 = TranslationModel(label="Saaras v3 (Sarvam AI)", is_asr_model=True)
     whisper_large_v2 = TranslationModel(
         label="Whisper Large v2 (inbuilt)", is_asr_model=True
     )
@@ -760,8 +759,6 @@ def run_translate(
     if not model:
         return texts
 
-    _validate_translate_texts(texts)
-
     if model == TranslationModels.google.name:
         return run_google_translate(
             texts=texts,
@@ -789,13 +786,6 @@ def run_translate(
         )
     else:
         raise ValueError("Unsupported translation model: " + str(model))
-
-
-def _validate_translate_texts(texts: list[str]) -> None:
-    if not texts:
-        raise UserError("At least one text is required for translation.")
-    if any(not text.strip() for text in texts):
-        raise UserError("Translation inputs cannot be empty.")
 
 
 def run_ghana_nlp_translate(
@@ -886,12 +876,11 @@ def run_sarvam_translate(
     if source_language == target_language:
         return texts
     return map_parallel(
-        lambda text: _call_sarvam_translate_raw(
-            text, source_language, target_language
-        ),
+        lambda text: _call_sarvam_translate_raw(text, source_language, target_language),
         texts,
         max_workers=TRANSLATE_BATCH_SIZE,
     )
+
 
 def _call_sarvam_translate_raw(
     text: str, source_language: str, target_language: str
