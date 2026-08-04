@@ -71,6 +71,8 @@ class CandidateEvaluationTool(BaseLLMTool):
             name="submit_evaluation",
             label="Submit Evaluation",
             description=(
+                "Set skipped to true when the evaluation prompt explicitly requests "
+                "that this row be skipped; omit scores and summaries in that case. "
                 "Score only the workflow output columns requested by the evaluation "
                 "prompt. When no columns are named, score evaluation-worthy fields "
                 "such as Output Text or Run Time, not metadata such as Price, Run URL, "
@@ -85,6 +87,13 @@ class CandidateEvaluationTool(BaseLLMTool):
                 "title, or infer or invent another candidate token."
             ),
             properties={
+                "skipped": {
+                    "type": "boolean",
+                    "description": (
+                        "True only when the evaluation prompt explicitly requests that "
+                        "this row be skipped."
+                    ),
+                },
                 "scores": {
                     "type": "array",
                     "minItems": 1,
@@ -149,14 +158,22 @@ class CandidateEvaluationTool(BaseLLMTool):
                     },
                 },
             },
-            required=["scores"],
         )
 
     @property
     def spec_parameters(self) -> dict:
         return super().spec_parameters | {"additionalProperties": False}
 
-    def call(self, scores: list[dict], summaries: list[dict] | None = None) -> dict:
+    def call(
+        self,
+        skipped: bool = False,
+        scores: list[dict] | None = None,
+        summaries: list[dict] | None = None,
+    ) -> dict:
+        if skipped:
+            self.output = {"skipped": True}
+            return self.output
+
         output = {"scores": scores, "summaries": summaries or []}
         _validate_evaluation_result(output, self.candidate_spec)
         self.output = output
@@ -675,9 +692,7 @@ def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
         yield out_df_recs, out_df_recs[prev_group_ix], prompt_columns
 
 
-def _run_evaluation_job(
-    model_spec: AIModelSpec, prompt: str, result: TaskResult
-):
+def _run_evaluation_job(model_spec: AIModelSpec, prompt: str, result: TaskResult):
     from recipes.VideoBots import VideoBotsPage
 
     request = VideoBotsPage.RequestModel(
@@ -706,8 +721,9 @@ def _run_evaluation_job(
             {
                 "role": CHATML_ROLE_USER,
                 "content": (
-                    "You must call submit_evaluation with the requested scores "
-                    "and summaries."
+                    "You must call submit_evaluation. Set skipped to true if the "
+                    "evaluation prompt requests a skip; otherwise submit the "
+                    "requested scores and summaries."
                 ),
             }
         )
@@ -746,12 +762,13 @@ def iterate(
             result.evaluation_result
         )
 
-        apply_eval_metrics(
-            current_rec=result.current_rec,
-            ep=result.ep,
-            candidate_spec=result.candidate_spec,
-            evaluation_result=result.evaluation_result,
-        )
+        if not result.evaluation_result.get("skipped"):
+            apply_eval_metrics(
+                current_rec=result.current_rec,
+                ep=result.ep,
+                candidate_spec=result.candidate_spec,
+                evaluation_result=result.evaluation_result,
+            )
 
         out_df = pd.DataFrame.from_records(result.out_df_recs)
         f = upload_file_from_bytes(
@@ -837,9 +854,7 @@ def _validate_evaluation_result(
 ) -> None:
     scores = evaluation_result["scores"]
     if not scores:
-        raise ValueError(
-            "Submit scores for at least one output column."
-        )
+        raise ValueError("Submit scores for at least one output column.")
 
     score_columns = [score["column"] for score in scores]
     unknown_columns = set(score_columns) - set(candidate_spec["output_columns"])
@@ -849,9 +864,7 @@ def _validate_evaluation_result(
             f"Allowed columns: {candidate_spec['output_columns']}."
         )
     if len(score_columns) != len(set(score_columns)):
-        raise ValueError(
-            "Submit each output column at most once."
-        )
+        raise ValueError("Submit each output column at most once.")
 
     expected_candidates = set(candidate_spec["workflow_title_by_candidate"])
     for score in scores:
