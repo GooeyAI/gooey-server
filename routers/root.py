@@ -220,18 +220,6 @@ def explore_page(
     }
 
 
-@gui.route(app, "/explore2/")
-def explore2_page(request: Request):
-    from widgets import explore2
-
-    with page_wrapper(request, show_search_bar=False):
-        explore2.render(request)
-
-    return {
-        "meta": explore2.build_meta_tags(url=get_og_url_path(request)),
-    }
-
-
 @gui.route(app, "/home/")
 def home_page(request: Request):
     from widgets import home

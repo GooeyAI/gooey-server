@@ -4,19 +4,19 @@ import { useNavigate } from "@remix-run/react";
 import { fetchServerAPI } from "~/fetchServerAPI";
 import type { CustomComponentProps } from "~/components";
 
-type ExploreBuilderPromptProps = CustomComponentProps & {
+type AskGooeyNewProps = CustomComponentProps & {
   workflow_url: string;
   title?: string;
   highlight?: string;
   placeholder?: string;
 };
 
-export function ExploreBuilderPrompt({
+export function AskGooeyNew({
   workflow_url,
   title = "What do you want to build today?",
   highlight = "build",
   placeholder = "India stock market today",
-}: ExploreBuilderPromptProps) {
+}: AskGooeyNewProps) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState("");

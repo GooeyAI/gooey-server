@@ -6,15 +6,25 @@ from bots.models import PublishedRun
 from daras_ai_v2 import settings
 from daras_ai_v2.gooey_builder import can_launch_gooey_builder
 from daras_ai_v2.meta_content import raw_build_meta_tags
+from routers.custom_api_router import CustomAPIRouter
+from routers.root import get_og_url_path, page_wrapper
 from workspaces.models import Workspace
-
 
 META_TITLE = "Explore | Gooey.AI"
 META_DESCRIPTION = "Find, fork and run your field’s favorite AI recipes on Gooey.AI"
 
+app = CustomAPIRouter()
 
-def render(request: Request):
-    render_explore_builder_prompt(request=request, workspace=None)
+
+@gui.route(app, "/new/")
+@gui.route(app, "/explore2/")
+def ask_gooey_new_page(request: Request):
+    with page_wrapper(request, show_search_bar=False):
+        render_ask_gooey_new(request=request, workspace=None)
+
+    return {
+        "meta": build_meta_tags(url=get_og_url_path(request)),
+    }
 
 
 def build_meta_tags(url: str):
@@ -25,7 +35,7 @@ def build_meta_tags(url: str):
     )
 
 
-def render_explore_builder_prompt(
+def render_ask_gooey_new(
     request: fastapi.Request,
     workspace: Workspace | None,
     title: str = "What do you want to build today?",
@@ -51,7 +61,7 @@ def render_explore_builder_prompt(
     except PublishedRun.DoesNotExist:
         return
     gui.component(
-        "ExploreBuilderPrompt",
+        "AskGooeyNew",
         workflow_url=bot_generator_pr.get_app_url(),
         title=title,
         highlight=highlight,

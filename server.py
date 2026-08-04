@@ -31,6 +31,7 @@ from daras_ai_v2.settings import templates
 from memory import routers as memory_routers
 from routers import (
     account,
+    ask_gooey_new,
     facebook_api,
     api,
     root,
@@ -86,6 +87,7 @@ for router in api_routers:
 
 app_routers = [
     account.app,
+    ask_gooey_new.app,
     memory_routers.app,
     facebook_api.app,
     onedrive_api.app,
