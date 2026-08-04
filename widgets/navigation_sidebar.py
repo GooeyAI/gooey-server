@@ -32,7 +32,6 @@ from widgets.workflow_queries import (
 if TYPE_CHECKING:
     from app_users.models import AppUser
     from bots.models import PublishedRun, SavedRun
-    from bots.models.workflow import WorkflowMetadata
     from workspaces.models import Workspace
 
 RECENT_WORKFLOW_LIST_LIMIT = 20
@@ -317,9 +316,7 @@ def _recent_run_srs(
         .annotate(
             builder_thread_title=F(
                 "parent_builder_saved_run__thread_as_last_run__title"
-            ),
-            # threads are titled asynchronously, so fall back to the message text
-            builder_prompt=F("parent_builder_saved_run__state__input_prompt"),
+            )
         )
         .order_by("-updated_at")
     )
@@ -335,11 +332,11 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
 
     builder_intent: BuilderIntent | None = None
     if sr.surface == SavedRun.Surface.builder_child:
-        title = (sr.builder_thread_title or sr.builder_prompt or "").strip()
+        title = (sr.builder_thread_title or "").strip()
         # Only Builder runs opened from the rail force-open the Builder panel.
         builder_intent = "open"
     else:
-        title = _history_title(sr, pr, metadata)
+        title = _history_title(sr, pr)
 
     return NavWorkflowItem(
         title=title or (pr and pr.title) or workflow.label,
@@ -363,14 +360,12 @@ def _pr_to_nav_workflow(pr: PublishedRun) -> NavWorkflowItem:
     )
 
 
-def _history_title(
-    sr: SavedRun, pr: PublishedRun | None, metadata: WorkflowMetadata
-) -> str:
+def _history_title(sr: SavedRun, pr: PublishedRun | None) -> str:
     from bots.models.workflow import Workflow
     from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 
     return get_title_breadcrumbs(
-        Workflow(sr.workflow).page_cls, sr, pr, metadata=metadata
+        Workflow(sr.workflow).page_cls, sr, pr
     ).title_with_prefix()
 
 
