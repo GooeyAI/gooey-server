@@ -25,7 +25,7 @@ from daras_ai_v2.language_model import CHATML_ROLE_USER
 from daras_ai_v2.language_model_openai_realtime import yield_from
 from daras_ai_v2.language_model_settings_widgets import LanguageModelSettings
 from daras_ai_v2.variables_widget import render_prompt_vars
-from functions.base_llm_tool import BaseLLMTool, BaseLLMToolError
+from functions.base_llm_tool import BaseLLMTool
 from recipes.BulkRunner import read_df_any, list_view_editor, del_button
 from recipes.DocSearch import render_documents
 
@@ -59,10 +59,6 @@ AggFunctionsList = [
 class CandidateEvalSpec(typing_extensions.TypedDict):
     output_columns: list[str]
     workflow_title_by_candidate: dict[str, str]
-
-
-class CandidateEvaluationValidationError(BaseLLMToolError):
-    """The evaluator submitted invalid scoring arguments."""
 
 
 class CandidateEvaluationTool(BaseLLMTool):
@@ -513,6 +509,10 @@ def submit(
     futs = []
     for ep in request.eval_prompts or []:
         validate_eval_prompt(ep)
+    try:
+        model_spec = AIModelSpec.objects.get(name=request.selected_model)
+    except AIModelSpec.DoesNotExist:
+        raise UserError(f"Model {request.selected_model!r} not found.")
     for doc_ix, doc in enumerate(request.documents):
         response.output_documents.append(doc)
         response.final_prompts.append([])
@@ -542,7 +542,7 @@ def submit(
                 futs.append(
                     pool.submit(
                         _run_evaluation_job,
-                        model=request.selected_model,
+                        model_spec=model_spec,
                         prompt=prompt,
                         result=TaskResult(
                             evaluation_result={},
@@ -675,12 +675,13 @@ def iter_eval_groups(df: "pd.DataFrame", array_columns: list[str] | None):
         yield out_df_recs, out_df_recs[prev_group_ix], prompt_columns
 
 
-def _run_evaluation_job(model: str, prompt: str, result: TaskResult):
+def _run_evaluation_job(
+    model_spec: AIModelSpec, prompt: str, result: TaskResult
+):
     from recipes.VideoBots import VideoBotsPage
 
-    model_spec = AIModelSpec.objects.get(name=model)
     request = VideoBotsPage.RequestModel(
-        selected_model=model,
+        selected_model=model_spec.name,
         max_tokens=model_spec.llm_max_output_tokens,
         num_outputs=1,
         sampling_temperature=0,
@@ -836,19 +837,19 @@ def _validate_evaluation_result(
 ) -> None:
     scores = evaluation_result["scores"]
     if not scores:
-        raise CandidateEvaluationValidationError(
+        raise ValueError(
             "Submit scores for at least one output column."
         )
 
     score_columns = [score["column"] for score in scores]
     unknown_columns = set(score_columns) - set(candidate_spec["output_columns"])
     if unknown_columns:
-        raise CandidateEvaluationValidationError(
+        raise ValueError(
             f"Unknown output columns: {sorted(unknown_columns)}. "
             f"Allowed columns: {candidate_spec['output_columns']}."
         )
     if len(score_columns) != len(set(score_columns)):
-        raise CandidateEvaluationValidationError(
+        raise ValueError(
             "Submit each output column at most once."
         )
 
@@ -861,7 +862,7 @@ def _validate_evaluation_result(
             len(score_candidates) != len(expected_candidates)
             or set(score_candidates) != expected_candidates
         ):
-            raise CandidateEvaluationValidationError(
+            raise ValueError(
                 f"Scores for {output_column!r} must contain every candidate exactly "
                 f"once. Expected candidates: {sorted(expected_candidates)}."
             )
