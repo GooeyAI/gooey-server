@@ -9,7 +9,7 @@ from workspaces.widgets import get_current_workspace
 
 app = CustomAPIRouter()
 
-LIVE_TRANSCRIBE_MODEL = "gpt-live-transcribe"
+LIVE_TRANSCRIBE_MODEL = "gpt-transcribe"
 
 
 @app.post("/__/asr/live-transcribe/token", dependencies=[fastapi_login_required])
@@ -41,7 +41,6 @@ def create_live_transcribe_token(request: fastapi.Request) -> dict:
                         "transcription": {
                             "model": LIVE_TRANSCRIBE_MODEL,
                             "keywords": ["Gooey.AI", "Gooey"],
-                            "delay": "low",
                         },
                     },
                 },
