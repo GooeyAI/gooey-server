@@ -71,6 +71,11 @@ class RecipeTopBarProps(pydantic.BaseModel):
     publish_key: str = ""  # set by the client to open the publish dialog
     has_unpublished_changes: bool = False
 
+    # Only set when the user may actually change who can see the workflow - everyone else
+    # gets a copy-link button elsewhere rather than a visibility dialog they cannot use.
+    share_key: str = ""
+    share_icon: str = ""  # reflects current visibility: a globe, a lock, ...
+
     # Written by the client and popped by the server on the next render, the same
     # mutate-then-notify contract NavigationSidebar uses for workspace switching.
     menu_key: str = ""

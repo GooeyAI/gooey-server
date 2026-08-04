@@ -1,3 +1,4 @@
+import html
 import json
 import math
 import traceback
@@ -1500,17 +1501,29 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
 
     @classmethod
     def all_tab_slugs(cls) -> set[str]:
-        # "" and "preview" are urls v1 already routes - listing them keeps this an honest
-        # description of the strip; recipe_v2 skips registering a route for them.
-        return {"about", "config", "preview", ""}
+        # "preview" is a url v1 already routes - listing it keeps this an honest description
+        # of the strip; recipe_v2 skips registering a route for it.
+        return {"about", "config", "preview", "split"}
+
+    def entry_tab_slug(self, tabs: list[TabSpec]) -> str:
+        """`/agent/` shows About to a first-time visitor and Split to everyone else.
+
+        Someone who has arrived at a workflow they do not own wants to know what it is
+        before they meet its knobs; someone opening their own run wants to work.
+        """
+        return "about" if self.is_unowned_example() else "split"
 
     def get_tab_spec(self) -> list[TabSpec]:
         """The agent tab set.
 
-        Split sits at the entry url because it *is* v1's Run tab, so `/video-bots/` keeps
-        behaving as it always has. Deploy is deliberately absent: it becomes a sub-tab of
-        Config in a later slice, and until then its body stays reachable through v1's
-        `/integrations/` url via `render_selected_tab()`.
+        No tab holds `slug=""`: the entry url resolves per request (see `entry_tab_slug`),
+        so both candidates need a url of their own to link to. `/agent/` therefore still
+        renders Split for anyone working on a run, exactly as v1's Run tab did - it is only
+        a first-time visitor who lands on About instead.
+
+        Deploy is deliberately absent: it becomes a sub-tab of Config in a later slice, and
+        until then its body stays reachable through v1's `/integrations/` url via
+        `render_selected_tab()`.
         """
         return [
             TabSpec(
@@ -1535,7 +1548,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 shows_output=True,
             ),
             TabSpec(
-                slug="",
+                slug="split",
                 label="Split",
                 icon=icons.split,
                 render=self._render_split_tab,
@@ -1548,6 +1561,59 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
     CONFIG_PANE_KEY = "--config-subtab"
     DEPLOY_PANE = "Deploy"
 
+    def _render_about_meta(self):
+        """How this agent is put together: its model, what it knows, what it can do.
+
+        Each card is a way into the Config pane that owns the setting, so About reads as a
+        summary you can act on rather than a dead-end description.
+        """
+        cards = []
+        if model := self._about_model_summary():
+            cards.append((*model, "LLM Instructions"))
+        if documents := len(gui.session_state.get("documents") or []):
+            plural = "" if documents == 1 else "s"
+            cards.append((icons.library, f"{documents} document{plural}", "Knowledge"))
+        if tools := len(gui.session_state.get("functions") or []):
+            plural = "" if tools == 1 else "s"
+            cards.append((icons.code, f"{tools} tool{plural}", "Tools"))
+
+        # a row of zeroes says less than no row: skip the heading too, not just the cards
+        if not cards:
+            return
+
+        gui.html(
+            '<div class="v2-about-section-title">Model, Knowledge base &amp; Tools</div>'
+        )
+        with gui.div(className="v2-about-meta"):
+            for icon, label, pane in cards:
+                self._render_about_meta_card(icon=icon, label=label, pane=pane)
+
+    def _about_model_summary(self) -> tuple[str, str] | None:
+        """(icon html, label) for the selected LLM, or None if the run has not picked one."""
+        name = gui.session_state.get("selected_model")
+        if not name:
+            return None
+        spec = AIModelSpec.objects.filter(name=name).select_related("creator").first()
+        if not spec:
+            # a model that has since been removed - its name is still better than nothing
+            return icons.sparkles, name
+        return (spec.creator and spec.creator.html_icon()) or icons.sparkles, spec.label
+
+    def _render_about_meta_card(self, *, icon: str, label: str, pane: str):
+        # the link *is* the card: an <a> wrapping a <button> is invalid html, and the
+        # nested control swallows the navigation
+        with gui.link(
+            to=self.current_tab_url(
+                "config", query_params={self.PANE_QUERY_PARAM: pane}
+            ),
+            className="v2-about-meta-card",
+        ):
+            gui.html(
+                f'<span class="v2-about-meta-icon">{icon}</span>'
+                f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
+                f'<span class="v2-about-meta-chevron">{icons.chevron_right}</span>'
+            )
+
     def _render_split_tab(self):
         """Split is two columns, except on Deploy.
 
@@ -1555,8 +1621,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         it with the chat preview leaves both cramped. It takes the full width instead.
         """
         if gui.session_state.get(self.CONFIG_PANE_KEY) == self.DEPLOY_PANE:
-            # no submit row on Deploy, so nothing to redirect on
-            self._render_input_col()
+            # one column of 12 rather than no column at all, so the full-width pane keeps
+            # the same gutters as the two-column layout. No submit row here to redirect on.
+            self._render_solo_input_col()
             return
         super()._render_split_tab()
 
@@ -1607,12 +1674,19 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         """
         with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
             # a compact row - small label left, selector right - rather than v1's full-width
-            # heading and field, so the editor gets the height instead
-            with gui.div(
-                className="d-flex align-items-center gap-3 mb-2 flex-shrink-0"
+            # heading and field, so the editor gets the height instead.
+            # The selector carries app.css's `.gui-input { margin-bottom: .9rem }`, which is
+            # meant for stacked form fields and here just pushes the editor down. Scoped
+            # override rather than a change to the widget: `.<hash> .gui-input` outranks a
+            # bare `.gui-input`, so it needs no `!important` and leaks nowhere.
+            with (
+                gui.styled("& .gui-input { margin-bottom: 0; }"),
+                gui.div(className="d-flex align-items-center gap-3 mb-2 flex-shrink-0"),
             ):
                 gui.html('<span class="text-muted">Model</span>')
-                with gui.div(className="ms-auto", style=dict(minWidth="40%")):
+                with gui.div(
+                    style=dict(maxWidth="40%", minWidth="40%"), className="m-0"
+                ):
                     language_model_selector(label="")
 
             with (

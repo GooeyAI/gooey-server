@@ -58,6 +58,8 @@ export interface RecipeTopBarProps {
   publish_label: string;
   publish_key: string;
   has_unpublished_changes: boolean;
+  share_key: string;
+  share_icon: string;
   menu_key: string;
   run_key: string;
   viewport_wide_key: string;

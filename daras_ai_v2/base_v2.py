@@ -101,7 +101,7 @@ from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
 )
-from widgets.workflow_share import render_share_button
+from widgets.workflow_share import render_share_button, render_share_modal
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import (
     get_current_workspace,
@@ -215,9 +215,11 @@ class BasePage:
     def canonical_slug(cls) -> str:
         return cls.slug_versions[-1]
 
-    def current_tab_url(self, tab_slug: str) -> str:
+    def current_tab_url(
+        self, tab_slug: str, *, query_params: dict[str, str] | None = None
+    ) -> str:
         """Url of one of this page's v2 tabs, for the run this request is on."""
-        return self.current_app_url(TabRoute(tab_slug))
+        return self.current_app_url(TabRoute(tab_slug), query_params=query_params)
 
     def current_app_url(
         self,
@@ -575,6 +577,20 @@ class BasePage:
         if publish_ref.is_open:
             self._render_publish_dialog(ref=publish_ref)
 
+        # the one Share dialog on the page: the bar's button and About's both set the key
+        share_ref = gui.use_alert_dialog(key="share-modal")
+        if gui.session_state.pop(self.TOP_BAR_SHARE_KEY, None):
+            share_ref.set_open(True)
+        if share_ref.is_open:
+            render_share_modal(
+                dialog=share_ref,
+                publish_dialog_ref=publish_ref,
+                user=self.request.user,
+                pr=self.current_pr,
+                current_app_url=self.current_app_url(self.tab),
+                session=self.request.session,
+            )
+
         if gui.session_state.pop(self.TOP_BAR_RUN_KEY, None):
             self._handle_top_bar_run()
 
@@ -610,7 +626,38 @@ class BasePage:
             return by_slug.get(v1_slug)
 
         # RecipeTabs.run: either the entry url or one of the v2-only tab urls
-        return by_slug.get(self._url_tab_slug()) or by_slug.get("") or tabs[0]
+        return (
+            by_slug.get(self._url_tab_slug())
+            or by_slug.get(self.entry_tab_slug(tabs))
+            or tabs[0]
+        )
+
+    def entry_tab_slug(self, tabs: list[TabSpec]) -> str:
+        """Slug of the tab the entry url `/{page_slug}/` renders.
+
+        Defaults to whichever tab claims the entry url outright with `slug=""`, else the
+        first in the strip. Recipes override it for a landing that depends on the request -
+        VideoBots sends a first-time visitor to About and everyone else to Split.
+
+        A recipe whose entry tab varies must not give any tab `slug=""`: the empty slug *is*
+        the entry url, so a tab holding it would have no url of its own to link to.
+        """
+        return next((t.slug for t in tabs if t.slug == ""), tabs[0].slug)
+
+    def _wide_output_tab(self, tabs: list[TabSpec]) -> TabSpec | None:
+        """The tab showing the output *beside* the inputs, if this recipe has one.
+
+        It is the output tab that needs the width to exist at all, which is exactly what
+        `desktop_only` marks. Preview shows output too, but on its own.
+        """
+        return next((t for t in tabs if t.shows_output and t.desktop_only), None)
+
+    def is_unowned_example(self) -> bool:
+        """The url points at a published workflow the viewer does not own, rather than at a
+        run of it - an example, or the recipe's root. In other words, a first-time visitor.
+        """
+        sr, pr = self.current_sr_pr
+        return pr.saved_run_id == sr.id and not self.is_current_user_owner()
 
     def _url_tab_slug(self) -> str:
         """Tab slug of a v2 tab url - `/video-bots/my-agent-abc123/config/` -> "config".
@@ -634,6 +681,54 @@ class BasePage:
     TOP_BAR_MENU_KEY = "--topbar-menu"
     TOP_BAR_PUBLISH_KEY = "--topbar-publish"
     TOP_BAR_RUN_KEY = "--topbar-run"
+    TOP_BAR_SHARE_KEY = "--topbar-share"
+
+    def can_manage_sharing(self) -> bool:
+        """Whether this user may change who can see the workflow, rather than only copy
+        its url.
+
+        Deliberately *not* v1's condition: `render_share_button` also requires the url to
+        point at the published run itself, so v1 hides Share the moment you open a run. The
+        dialog only ever edits `pr`, which is the same object either way, and it gates its
+        own options by role - so being on a run is no reason to lose the control.
+        """
+        pr = self.current_pr
+        user = self.request.user
+        # render_share_modal asserts both of these
+        if not user or not pr.workspace_id:
+            return False
+        if pr.is_root():
+            # the recipe's own template: sharing it is not a user's call
+            return False
+        if user.is_admin():
+            return True
+        try:
+            return self.current_workspace.id == pr.workspace_id
+        except Workspace.DoesNotExist:
+            return False
+
+    def _render_share_trigger(self, *, key: str, className: str = "mb-0"):
+        """Share, wherever it appears outside the top bar.
+
+        It only sets the key the bar's Share menu item sets - `_handle_top_bar_actions` owns
+        the one dialog, so two triggers can never render two of them.
+        """
+        if not self.can_manage_sharing():
+            copy_to_clipboard_button(
+                label=f"{icons.link} Share",
+                value=self.current_app_url(self.tab),
+                type="secondary",
+                className=className,
+            )
+            return
+        if gui.button(
+            f"{self.current_pr.get_share_icon()} Share",
+            key=key,
+            type="secondary",
+            className=className,
+        ):
+            gui.session_state[self.TOP_BAR_SHARE_KEY] = True
+            gui.rerun()
 
     # Not popped: unlike the others this is a standing fact about the client, not an
     # action. The bar keeps it current and `submit_and_redirect` reads it to decide
@@ -700,6 +795,8 @@ class BasePage:
                 ],
                 publish_label=self._top_bar_publish_label(),
                 publish_key=self.TOP_BAR_PUBLISH_KEY,
+                share_key=(self.TOP_BAR_SHARE_KEY if self.can_manage_sharing() else ""),
+                share_icon="<i class='fa-regular fa-share-nodes'></i>",
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 menu_key=self.TOP_BAR_MENU_KEY,
@@ -746,6 +843,8 @@ class BasePage:
         else:
             return "Save as New"
 
+    PANE_QUERY_PARAM = "pane"
+
     def _render_pane_strip(
         self, panes: dict[str, typing.Callable[[], None]], *, key: str
     ) -> typing.Callable[[], None]:
@@ -760,7 +859,15 @@ class BasePage:
         pane must never depend on another pane's *return value* - read `gui.session_state`.
         """
         labels = list(panes)
-        if gui.session_state.get(key) not in panes:
+
+        # A link from another tab (About's meta cards) names its pane in the url, because
+        # session state does not survive a navigation. Honour it once: `seen_key` stops it
+        # overriding the strip on every later render, which would pin the pane forever.
+        seen_key = key + ":from-url"
+        requested = self.request.query_params.get(self.PANE_QUERY_PARAM)
+        if requested in panes and gui.session_state.get(seen_key) != requested:
+            gui.session_state[key] = gui.session_state[seen_key] = requested
+        elif gui.session_state.get(key) not in panes:
             gui.session_state[key] = labels[0]
 
         with gui.styled(PANE_STRIP_CSS), gui.div(className="my-2"):
@@ -1500,12 +1607,12 @@ class BasePage:
     def _render_about_tab(self):
         """What this workflow is, beside a live preview of it.
 
-        Same column split as Split/Config/Preview so the preview keeps its position as you
-        move between tabs, instead of jumping around the page.
+        Same column split as Split/Config/Preview, so the preview keeps its position as you
+        move between tabs instead of jumping around the page.
         """
         with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
             about_col, preview_col = gui.columns([3, 2], gap="medium")
-            with about_col:
+            with about_col, gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
                 self._render_about_content()
             with preview_col:
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
@@ -1518,18 +1625,90 @@ class BasePage:
                         self._render_output_col()
 
     def _render_about_content(self):
-        if self.current_pr.notes:
-            with gui.div(className="container-margin-reset"):
-                gui.write(self.current_pr.notes)
-        self._render_help()
-        self.render_related_workflows()
+        """What this workflow is. The one surface in v2 that is not a re-slice of v1.
+
+        Deliberately not here: version history, which lives in the title chevron menu, and
+        Related Workflows, which is what /explore/ is for. About is about *this* workflow,
+        and nothing on it is shown twice.
+        """
+        sr, pr = self.current_sr_pr
+        with gui.div(className="v2-about-card"):
+            gui.html(
+                f'<h1 class="v2-about-title">{html.escape(pr.title or self.title)}</h1>'
+            )
+            self._render_about_byline(sr, pr)
+            # full text, unlike v1's `line_clamp=3` on the Run tab - the tab exists to be read
+            if pr.notes:
+                with gui.div(className="container-margin-reset v2-about-notes"):
+                    gui.write(pr.notes)
+            self._render_about_meta()
+            self._render_about_help()
+
+    def _render_about_byline(self, sr: SavedRun, pr: PublishedRun):
+        """Who published this and how much else they have published, with Share opposite."""
+        with gui.div(className="v2-about-byline"):
+            workspace = pr.workspace
+            if workspace:
+                if photo := workspace.get_photo():
+                    gui.html(
+                        f'<img class="v2-about-byline-photo" src="{html.escape(photo)}" alt="">'
+                    )
+                with gui.div(className="v2-about-byline-text"):
+                    gui.html(
+                        f'<div class="v2-about-byline-name">'
+                        f"{html.escape(workspace.display_name())}</div>"
+                    )
+                    count = self._public_workflow_count(workspace)
+                    if count:
+                        gui.html(
+                            f'<div class="v2-about-byline-sub">{count} Public Workflows</div>'
+                        )
+
+            with gui.div(className="v2-about-byline-actions"):
+                self._render_share_trigger(key="about-share")
+
+    @staticmethod
+    def _public_workflow_count(workspace: Workspace) -> int:
+        """The same expression the public profile page counts with, so the two can never
+        disagree. `VIEW_ONLY` is labelled "Private", so excluding it leaves the public ones.
+        """
+        return (
+            PublishedRun.objects.filter(workspace=workspace)
+            .exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
+            .count()
+        )
+
+    def _render_about_meta(self):
+        """Hook: a strip of cards summarising how this workflow is put together.
+
+        What "put together" means is per-recipe - an agent has a model, a knowledge base and
+        tools; a media-gen recipe has none of those - so the base renders nothing.
+        """
+
+    def _render_about_help(self):
+        """The usage guide, last and small. It is reference material, not the pitch."""
+        with gui.div(className="v2-about-help"):
+            self._render_help()
 
     def _render_config_tab(self):
         if self._render_deleted_output_if_needed():
             return
-        if self._render_input_col():
+        if self._render_solo_input_col():
             # v1 submits from the output col, which this tab doesn't render
             self.submit_and_redirect()
+
+    def _render_solo_input_col(self) -> bool:
+        """The working column on its own, in the same row/column wrapper Split uses.
+
+        Going through `gui.columns` rather than styling a bare div is what keeps Config's
+        gutters, background and pane height identical to Split's: Bootstrap's grid supplies
+        the padding and `SPLIT_PANES_CSS` the rest, so there is nothing to keep in sync by
+        hand. One column of 12, instead of Split's 3-and-2.
+        """
+        with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
+            (input_col,) = gui.columns([1])
+            with input_col:
+                return self._render_input_col()
 
     def _render_mobile_back_link(self, to_slug: str = "config"):
         """Floating way out of an immersive tab, since it hides the tab strip below lg."""
@@ -2421,18 +2600,15 @@ class BasePage:
         """Where a just-started run should land. `None` means the entry url.
 
         The point is to leave the user somewhere the output is visible, without moving them
-        if they can already see it.
+        if they can already see it. `None` is safe for Split even though the entry url can
+        also resolve to About: the run this creates belongs to the current user, so it is
+        never the unowned example that sends a visitor to About.
         """
-        entry_tab = next((t for t in tabs if t.slug == ""), None)
-
-        if active is not None and active.shows_output:
-            # already looking at the output - Split, or Preview after a chat message - so
-            # stay put. The entry tab is `None` rather than a slug of its own.
-            return None if active.slug == "" else TabRoute(active.slug)
-        if (
-            entry_tab is not None
-            and entry_tab.shows_output
-            and gui.session_state.get(self.TOP_BAR_WIDE_KEY)
+        if active is not None and active.shows_output and not active.desktop_only:
+            # Preview - already looking at the output, and it has a url of its own
+            return TabRoute(active.slug)
+        if self._wide_output_tab(tabs) is not None and gui.session_state.get(
+            self.TOP_BAR_WIDE_KEY
         ):
             # ran from a tab with no output pane (Config) on a screen wide enough for
             # Split - land there, so the inputs stay in view beside the run. Narrower than
@@ -3230,6 +3406,7 @@ PANE_STRIP_CSS = """
     color: #6b6b6b !important;
     font-weight: 500 !important;
     line-height: 1.4 !important;
+    font-size: 0.875rem !important;
 }
 
 & button:hover {
@@ -3277,7 +3454,7 @@ SPLIT_PANES_CSS = """
         min-height: 0;
         /* breathing room inside each pane; on the row's children, because a wrapper div
            around `with input_col:` would mount beside the row, not around the columns */
-        padding: 8px 12px;
+        padding-left: 0px;
     }
     /* Neither column scrolls as a whole. The left column is a flex stack whose *pane*
        scrolls, so its strip and submit row stay put; the right column is the preview,
@@ -3308,5 +3485,152 @@ INPUT_OUTPUT_COLS_CSS = """
         padding-left: calc(var(--bs-gutter-x) * .5);
         padding-right: calc(var(--bs-gutter-x) * .5);
     }
+}
+"""
+
+# The About tab: one card holding the title, who published it, the description, a strip of
+# "how it is put together" cards, and the usage guide last. `!important` on the buttons for
+# the same reason PANE_STRIP_CSS needs it - the app's own button styling is more specific
+# than a scoped `& button` rule.
+ABOUT_CSS = """
+/* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
+   here scrolls unless this does - a description longer than the viewport is simply clipped.
+   Split needs no equivalent because its working column has an `overflow-auto` pane inside;
+   About is one card, so the card's container is what has to scroll. */
+@media (min-width: 992px) {
+    & {
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        /* keeps the scrollbar off the card's border instead of on top of it */
+        padding-right: 0.5rem;
+    }
+}
+
+& .v2-about-card {
+    background: #fff;
+    border: 1px solid #e0ddd7;
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+& .v2-about-title {
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 1rem 0;
+}
+
+& .v2-about-byline {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+& .v2-about-byline-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+& .v2-about-byline-name {
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+& .v2-about-byline-sub {
+    color: #6b6b6b;
+    font-size: 0.8125rem;
+}
+
+/* pushed to the far end of the row, so it stays put however long the name is */
+& .v2-about-byline-actions {
+    margin-left: auto;
+}
+
+& .v2-about-notes {
+    color: #333;
+    margin-bottom: 1.5rem;
+}
+
+& .v2-about-section-title {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    margin: 0 0 0.75rem 0;
+}
+
+& .v2-about-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+& .v2-about-meta-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* a floor rather than a fixed width, so a long model name grows the card instead of
+       being clipped, and a short one does not leave a stub */
+    min-width: 11rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid #e0ddd7;
+    border-radius: 10px;
+    background: #fff;
+    color: #111;
+    text-decoration: none;
+}
+
+& .v2-about-meta-card:hover {
+    background: #FBFAF8;
+    border-color: #cfcbc3;
+    color: #111;
+}
+
+& .v2-about-meta-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+    color: #6b6b6b;
+    flex-shrink: 0;
+}
+
+& .v2-about-meta-icon img {
+    height: 1.1rem;
+    width: 1.1rem;
+}
+
+& .v2-about-meta-label {
+    flex: 1 1 auto;
+    font-size: 0.875rem;
+    line-height: 1.25;
+}
+
+& .v2-about-meta-chevron {
+    color: #9b9b9b;
+    flex-shrink: 0;
+}
+
+/* Reference material, not the pitch: the usage guide sits last and its video is capped so
+   a 16:9 embed cannot dominate a tab that is meant to be read. */
+& .v2-about-help {
+    margin-top: 2rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #ececec;
+}
+
+& .v2-about-help h2 {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* `youtube_video()` is a `padding-bottom: 56.25%` aspect box with the iframe absolutely
+   filling it, so capping the iframe would leave a narrow player in a full-width hole - the
+   *box* is what has to shrink. Matched on the inline style because that helper is shared
+   with v1 and takes no class. */
+& .v2-about-help div[style*="56.25%"] {
+    max-width: 22rem;
 }
 """

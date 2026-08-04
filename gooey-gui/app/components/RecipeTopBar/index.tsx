@@ -29,7 +29,11 @@ function useDismissOnOutsideClick(onDismiss: () => void) {
   return ref;
 }
 
-type MenuEntry = TopBarMenuItem & { mobileOnly?: boolean };
+type MenuEntry = TopBarMenuItem & { mobileOnly?: boolean; heading?: boolean };
+
+// the Publish menu's own entries, distinguishable from anything the server declares
+const PUBLISH_ITEM_KEY = "--topbar-item-publish";
+const SHARE_ITEM_KEY = "--topbar-item-share";
 
 function Menu({
   items,
@@ -44,7 +48,17 @@ function Menu({
   return (
     <div className="gooey-topbar-menu">
       {items.map((item) =>
-        item.href ? (
+        item.heading ? (
+          <div
+            key={item.key}
+            className={clsx(
+              "gooey-topbar-menu-heading",
+              item.mobileOnly && "d-lg-none",
+            )}
+          >
+            {item.label}
+          </div>
+        ) : item.href ? (
           <Link
             key={item.key}
             to={item.href}
@@ -92,6 +106,8 @@ export function RecipeTopBar({
   publish_label,
   publish_key,
   has_unpublished_changes,
+  share_key,
+  share_icon,
   menu_key,
   run_key,
   viewport_wide_key,
@@ -106,9 +122,11 @@ export function RecipeTopBar({
 }: CustomComponentProps & RecipeTopBarProps) {
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [publishMenuOpen, setPublishMenuOpen] = useState(false);
 
   const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
   const overflowRef = useDismissOnOutsideClick(() => setOverflowOpen(false));
+  const publishMenuRef = useDismissOnOutsideClick(() => setPublishMenuOpen(false));
 
   // mutate-then-notify: the server pops these keys on the next render
   const fire = (key: string, value: unknown = true) => {
@@ -134,11 +152,52 @@ export function RecipeTopBar({
     return () => mq.removeEventListener("change", sync);
   }, [viewport_wide_key, state]);
 
+  // What the Publish control offers. `publish_label` is permission-derived (Update / Save
+  // and Run / Save as New); Share only appears when the user may change visibility, and
+  // its icon is the current setting, so it doubles as a read-out.
+  const publishEntries: MenuEntry[] = [];
+  if (publish_label) {
+    publishEntries.push({
+      key: PUBLISH_ITEM_KEY,
+      label: publish_label,
+      icon: '<i class="fa-regular fa-floppy-disk"></i>',
+      href: null,
+      is_danger: false,
+    });
+  }
+  if (share_key) {
+    publishEntries.push({
+      key: SHARE_ITEM_KEY,
+      label: "Share",
+      icon: share_icon,
+      href: null,
+      is_danger: false,
+    });
+  }
+
   // Below lg the chips and the title compete for one row and the title always loses, so
   // the chips move into the overflow menu. Both lists are rendered and CSS picks one - no
-  // media-query JS, and the chip count stops mattering.
+  // media-query JS, and the chip count stops mattering. Publish folds in the same way:
+  // there is one menu on a phone, not a menu plus a button.
   const overflowEntries: MenuEntry[] = [
+    // the actions first - they are what the menu is for on a phone
+    ...publishEntries.map((it) => ({ ...it, mobileOnly: true })),
     ...overflow_items,
+    // ...then the channels this workflow is live on, under their own label so a long list
+    // of them cannot be mistaken for more actions
+    ...(integrations.length
+      ? [
+          {
+            key: "--topbar-heading-deployments",
+            label: "Deployments",
+            icon: "",
+            href: null,
+            is_danger: false,
+            mobileOnly: true,
+            heading: true,
+          },
+        ]
+      : []),
     ...integrations.map((it, i) => ({
       key: it.key || it.href || `integration-${i}`,
       label: it.label,
@@ -154,6 +213,11 @@ export function RecipeTopBar({
   const pickMenuItem = (item: TopBarMenuItem) => {
     setTitleMenuOpen(false);
     setOverflowOpen(false);
+    setPublishMenuOpen(false);
+    // these two are the component's own entries, not server-declared menu items, so they
+    // go straight to their keys instead of round-tripping through menu_key
+    if (item.key === PUBLISH_ITEM_KEY) return fire(publish_key);
+    if (item.key === SHARE_ITEM_KEY) return fire(share_key);
     fire(menu_key, item.key);
   };
 
@@ -297,19 +361,33 @@ export function RecipeTopBar({
           )
         )}
 
-        {!!publish_label && (
-          <button
-            type="button"
-            className="gooey-topbar-publish"
-            onClick={() => fire(publish_key)}
-            title={publish_label}
+        {/* One control rather than two buttons: Publish opens Update and Share. Below lg
+            it is hidden entirely and the same two entries live in the ... menu, which is
+            the only menu on a phone. */}
+        {!!publishEntries.length && (
+          <div
+            className="gooey-topbar-overflow-wrap d-none d-lg-block"
+            ref={publishMenuRef}
           >
-            <i className="fa-regular fa-floppy-disk" />
-            <span className="gooey-topbar-btn-label">{publish_label}</span>
-            {has_unpublished_changes && (
-              <span className="gooey-topbar-dot" title="Unpublished changes" />
-            )}
-          </button>
+            <button
+              type="button"
+              className="gooey-topbar-publish"
+              onClick={() => setPublishMenuOpen((v) => !v)}
+              title="Publish"
+            >
+              <i className="fa-regular fa-floppy-disk" />
+              <span className="gooey-topbar-btn-label">Publish</span>
+              <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+              {has_unpublished_changes && (
+                <span className="gooey-topbar-dot" title="Unpublished changes" />
+              )}
+            </button>
+            <Menu
+              items={publishEntries}
+              open={publishMenuOpen}
+              onPick={pickMenuItem}
+            />
+          </div>
         )}
 
         {!!cost_label &&

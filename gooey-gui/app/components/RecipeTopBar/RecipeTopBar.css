@@ -329,6 +329,26 @@ a.gooey-topbar-cost:hover {
   background: #FBFAF8;
 }
 
+/* A section label, not a control - it groups the entries below it and takes no click. The
+   rule above it does the separating, so the group needs no divider element of its own. */
+.gooey-topbar-menu-heading {
+  margin-top: 6px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid #ececec;
+  color: #6b6b6b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* nothing above it to separate from */
+.gooey-topbar-menu-heading:first-child {
+  margin-top: 0;
+  border-top: 0;
+}
+
 .gooey-topbar-menu-icon {
   width: 16px;
   color: #6b6b6b;
