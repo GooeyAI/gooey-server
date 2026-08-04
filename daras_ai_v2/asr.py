@@ -53,7 +53,7 @@ if typing.TYPE_CHECKING:
     from google.auth.transport.requests import AuthorizedSession
 
 TRANSLATE_BATCH_SIZE = 8
-MAYURA_MAX_INPUT_CHARS = 1_000
+MAYURA_MAX_LEN = 1_000
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -876,19 +876,35 @@ def run_sarvam_translate(
     if source_language == target_language:
         return texts
     return map_parallel(
-        lambda text: _call_sarvam_translate_raw(text, source_language, target_language),
+        lambda text: _call_sarvam_translate_chunked(
+            text, source_language, target_language
+        ),
         texts,
         max_workers=TRANSLATE_BATCH_SIZE,
+    )
+
+
+def _call_sarvam_translate_chunked(
+    text: str, source_language: str, target_language: str
+) -> str:
+    return "\n".join(
+        map_parallel(
+            lambda doc: _call_sarvam_translate_raw(
+                doc.text, source_language, target_language
+            ),
+            text_splitter(
+                text,
+                chunk_size=MAYURA_MAX_LEN,
+                length_function=len,
+            ),
+            max_workers=TRANSLATE_BATCH_SIZE,
+        )
     )
 
 
 def _call_sarvam_translate_raw(
     text: str, source_language: str, target_language: str
 ) -> str:
-    if len(text) > MAYURA_MAX_INPUT_CHARS:
-        raise UserError(
-            f"Mayura v1 accepts at most {MAYURA_MAX_INPUT_CHARS:,} characters per text."
-        )
     r = requests.post(
         "https://api.sarvam.ai/translate",
         headers={"api-subscription-key": settings.SARVAM_API_KEY},
