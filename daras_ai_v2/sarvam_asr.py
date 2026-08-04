@@ -18,9 +18,7 @@ def sarvam_saaras_v3_asr(
     with_timestamps: bool,
 ) -> dict:
     if not settings.SARVAM_API_KEY:
-        raise UserError(
-            "Sarvam AI ASR is not configured: missing SARVAM_API_KEY"
-        )
+        raise UserError("Sarvam AI ASR is not configured: missing SARVAM_API_KEY")
 
     audio_response = requests.get(audio_url)
     raise_for_status(audio_response, is_user_url=True)
@@ -84,30 +82,21 @@ def _sarvam_saaras_v3_batch_asr(
     raise_for_status(response)
 
     status = _wait_for_sarvam_batch_job(job_id=job_id, headers=headers)
-    output_filenames = [
-        output["file_name"]
-        for detail in status.get("job_details", [])
-        if detail.get("state") == "Success"
-        for output in detail.get("outputs", [])
-    ]
-    if not output_filenames:
-        error = next(
-            (
-                detail.get("error_message")
-                for detail in status.get("job_details", [])
-                if detail.get("error_message")
-            ),
-            None,
+    job_detail = status["job_details"][0]
+    if job_detail["state"] != "Success":
+        raise UserError(
+            job_detail.get("error_message")
+            or "Sarvam AI did not produce a transcription."
         )
-        raise UserError(error or "Sarvam AI did not produce a transcription.")
+    output_filename = job_detail["outputs"][0]["file_name"]
 
     response = requests.post(
         f"{SARVAM_ASR_BASE_URL}/job/v1/download-files",
         headers=headers,
-        json={"job_id": job_id, "files": output_filenames},
+        json={"job_id": job_id, "files": [output_filename]},
     )
     raise_for_status(response)
-    download_url = response.json()["download_urls"][output_filenames[0]]["file_url"]
+    download_url = response.json()["download_urls"][output_filename]["file_url"]
 
     response = requests.get(download_url)
     raise_for_status(response)
