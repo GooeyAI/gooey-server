@@ -10,7 +10,7 @@ export type CustomComponentProps = {
 export * from "./WorkspaceMemoryTable";
 export * from "./bulkProgress/BulkProgressCard";
 export * from "./ComposioAuthRequired";
-export * from "./ExploreBuilderPrompt";
+export * from "./AskGooeyNew";
 export * from "./ForgotPasswordForm";
 export * from "./GooeyBuilderInlineEmbed";
 export * from "./GooeyPopover";
