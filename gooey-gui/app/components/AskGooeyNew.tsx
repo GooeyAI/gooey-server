@@ -10,6 +10,14 @@ type AskGooeyNewProps = CustomComponentProps & {
   placeholder?: string;
 };
 
+type Attachment = {
+  id: string;
+  name: string;
+  contentType: string;
+  url: string | null;
+  uploading: boolean;
+};
+
 export function AskGooeyNew({
   title = "What will you build today?",
   highlight = "",
@@ -18,11 +26,51 @@ export function AskGooeyNew({
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showScrollArrow, setShowScrollArrow] = useState(true);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  const onFilesSelected = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    setError(null);
+    for (const file of Array.from(files)) {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setAttachments((prev) => [
+        ...prev,
+        {
+          id,
+          name: file.name,
+          contentType: file.type,
+          url: null,
+          uploading: true,
+        },
+      ]);
+      try {
+        const url = await uploadFile(file);
+        setAttachments((prev) =>
+          prev.map((a) => {
+            if (a.id === id) return { ...a, url, uploading: false };
+            return a;
+          })
+        );
+      } catch (err) {
+        console.error(err);
+        setAttachments((prev) => prev.filter((a) => a.id !== id));
+        setError(
+          err instanceof Error ? err.message : "Upload failed. Try again."
+        );
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
 
   const checkScroll = () => {
     if (scrollContainerRef.current) {
@@ -41,16 +89,32 @@ export function AskGooeyNew({
     return () => window.removeEventListener("resize", checkScroll);
   }, []);
 
+  const isUploading = attachments.some((a) => a.uploading);
+
   const submit = async () => {
     const prompt = value.trim();
-    if (!prompt || isSubmitting) return;
+    if (!prompt || isSubmitting || isUploading) return;
     setIsSubmitting(true);
     setError(null);
+    const inputImages = [];
+    const inputDocuments = [];
+    for (const a of attachments) {
+      if (!a.url) continue;
+      if (a.contentType.startsWith("image/")) {
+        inputImages.push(a.url);
+      } else {
+        inputDocuments.push(a.url);
+      }
+    }
     try {
       const redirectUrl = await fetchServerAPI<string | null>(
         "/__/gooey-builder/send-message",
         {
-          input_data: { input_prompt: prompt },
+          input_data: {
+            input_prompt: prompt,
+            input_images: inputImages,
+            input_documents: inputDocuments,
+          },
         }
       );
       if (!redirectUrl) {
@@ -75,7 +139,7 @@ export function AskGooeyNew({
     }
   };
 
-  const canSubmit = value.trim().length > 0 && !isSubmitting;
+  const canSubmit = value.trim().length > 0 && !isSubmitting && !isUploading;
   const titleParts = renderTitleWithHighlight(title, highlight);
 
   const suggestions = [
@@ -157,6 +221,68 @@ export function AskGooeyNew({
               gap: "8px",
             }}
           >
+            {attachments.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {attachments.map((a) => (
+                  <div
+                    key={a.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "#F4F5F7",
+                      border: "1px solid #eaeaea",
+                      borderRadius: "10px",
+                      padding: "4px 8px",
+                      fontSize: "12px",
+                      color: "#333",
+                      maxWidth: "260px",
+                    }}
+                  >
+                    {a.uploading ? (
+                      <i
+                        className="fa-regular fa-spinner-third fa-spin"
+                        style={{ fontSize: "12px" }}
+                      />
+                    ) : (
+                      <i
+                        className={
+                          a.contentType.startsWith("image/")
+                            ? "fa-regular fa-image"
+                            : "fa-regular fa-file"
+                        }
+                        style={{ fontSize: "12px" }}
+                      />
+                    )}
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {a.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(a.id)}
+                      aria-label={`Remove ${a.name}`}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: "0",
+                        cursor: "pointer",
+                        color: "#888",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <i className="fa-regular fa-xmark" style={{ fontSize: "12px" }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               data-submit-disabled
@@ -185,8 +311,18 @@ export function AskGooeyNew({
               }}
             />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: "36px" }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={(e) => onFilesSelected(e.target.files)}
+                style={{ display: "none" }}
+              />
               <button
                 type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSubmitting}
+                aria-label="Attach files"
                 style={{
                   background: "none",
                   border: "none",
@@ -345,6 +481,21 @@ export function AskGooeyNew({
       </div>
     </div>
   );
+}
+
+async function uploadFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/__/file-upload/", {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Upload failed with status ${response.status}`);
+  }
+  const data = (await response.json()) as { url: string };
+  return data.url;
 }
 
 function renderTitleWithHighlight(title: string, highlight: string) {
