@@ -71,7 +71,6 @@ from functions.base_llm_tool import (
     call_recipe_functions,
     functions_input,
     get_workflow_tools_from_state,
-    is_functions_enabled,
     render_called_functions,
 )
 from functions.composio_tools import ComposioLLMTool
@@ -2432,6 +2431,16 @@ class BasePage:
         return "With each run, you agree to Gooey.AI's [terms](https://gooey.ai/terms) & [privacy policy](https://gooey.ai/privacy)."
 
     def render_variables(self):
+        """v1's combined block, kept whole for the default input column.
+
+        A recipe that wants them apart uses the two halves directly - VideoBots keeps
+        functions on the Tools pane and opens the variables editor in a dialog beside the
+        prompt, which is where the variables are actually referenced.
+        """
+        self._render_functions()
+        self._render_variables_editor()
+
+    def _render_functions(self):
         if not self.functions_in_settings:
             functions_input(
                 workspace=self.request.user and self.current_workspace,
@@ -2439,16 +2448,56 @@ class BasePage:
                 published_run=self.current_pr,
             )
 
+    def _variable_exclusions(self) -> list[str]:
+        """Names the variables editor must not offer: the request/response fields, and the
+        function slugs, which have inputs of their own.
+
+        Shared with `variable_names()` so the count beside the prompt cannot disagree with
+        what the editor actually lists.
+        """
         function_slugs = [
             slug
             for fn in gui.session_state.get("functions", [])
             if (slug := fn.get("slug"))
         ]
+        return self.fields_to_save() + function_slugs
 
+    def _render_variables_editor(self, *, heading: bool = True):
+        """`heading=False` where the surface already names itself - the dialog's own title.
+
+        Emptying the label also drops the help tooltip beside it: `variables_input` always
+        passes a `help=` string, but `RenderedMarkdown` returns nothing at all for an empty
+        body, so the icon never gets built. The dialog's intro says the same thing in full,
+        Learn more link included.
+        """
         variables_input(
             template_keys=self.template_keys,
-            allow_add=is_functions_enabled(),
-            exclude=self.fields_to_save() + function_slugs,
+            # v1 gated Add on `is_functions_enabled()` - the switch inside `functions_input`,
+            # which in v1 sits directly above this editor, so the gate is at least visible.
+            # v2 puts functions on the Tools pane and variables in a dialog, so there it
+            # reads as nothing but a missing button. Adding a variable needs no function
+            # either way: the prompt is what consumes them.
+            allow_add=True,
+            exclude=self._variable_exclusions(),
+            **({} if heading else dict(label="")),
+        )
+
+    def variable_names(self) -> set[str]:
+        """The variables the editor would list, for a count shown before it renders.
+
+        Mirrors `variables_input`'s own set arithmetic: whatever the prompt references plus
+        whatever has been set explicitly, less the jinja globals and the exclusions. Derived
+        from `template_keys` rather than from the editor's session-state list, so the count
+        is right even when the editor has never been opened.
+        """
+        from daras_ai_v2.variables_widget import context_globals, find_template_vars
+
+        _, template_var_names = find_template_vars(self.template_keys)
+        explicit = gui.session_state.get("variables") or {}
+        return (
+            (template_var_names | set(explicit))
+            - set(context_globals())
+            - set(self._variable_exclusions())
         )
 
     @classmethod
@@ -3492,6 +3541,26 @@ INPUT_OUTPUT_COLS_CSS = """
 # "how it is put together" cards, and the usage guide last. `!important` on the buttons for
 # the same reason PANE_STRIP_CSS needs it - the app's own button styling is more specific
 # than a scoped `& button` rule.
+# The variables editor, shown in a dialog rather than on a pane of its own.
+VARIABLES_DIALOG_CSS = """
+/* `.modal-header` and `.modal-body` each bring a rem of padding, and the h4 title its own
+   margin, so three lots of spacing stack up between the title and the first line. Pulled
+   back here rather than restyled on the modal itself - every other dialog wants that
+   spacing. */
+& {
+    margin-top: -0.75rem;
+}
+
+/* `variables_input` wraps itself in a grey card, which earns its keep on a crowded pane but
+   not in a dialog - the dialog *is* the card. With no variables to list it has nothing in it
+   either, and renders as an empty grey bar. */
+& .bg-light {
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+"""
+
 ABOUT_CSS = """
 /* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
    here scrolls unless this does - a description longer than the viewport is simply clipped.

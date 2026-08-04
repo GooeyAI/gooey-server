@@ -40,6 +40,7 @@ from daras_ai_v2.azure_doc_extract import (
 )
 from daras_ai_v2.base_v2 import (
     FILL_HEIGHT_EDITOR_CSS,
+    VARIABLES_DIALOG_CSS,
     BasePage,
     RecipeTabs,
     STARTING_STATE,
@@ -1636,9 +1637,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         return {
             "LLM Instructions": self._render_llm_instructions_pane,
             "Knowledge": self._render_knowledge_pane,
-            # functions_in_settings is False, so render_variables() gives us both the
-            # function/tool inputs and the variables editor
-            "Tools": self.render_variables,
+            # functions only - the variables half of v1's block moved to a dialog beside the
+            # prompt. Rendering it here too would mean two editors on the same widget keys.
+            "Tools": self._render_functions,
             "Settings": self._render_settings_pane,
             "Deploy": self._render_deploy_panel,
             "Debug": self._render_debug_pane,
@@ -1666,6 +1667,47 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         # nothing in this column submits any more; the top bar owns Run
         return False
 
+    def _render_variables_button(self):
+        """Variables live beside the prompt that references them, not on a pane of their own.
+
+        The editor is a list of name/value rows that would crowd this pane and steal height
+        from the instructions, so the button carries the count and the editing happens in a
+        dialog. The count comes from `variable_names()`, which reads the prompt directly -
+        so it is right even before the editor has ever been opened.
+        """
+        ref = gui.use_alert_dialog(key="variables-modal")
+        # "(0)" reads as a broken counter rather than an empty list, so it is left off
+        count = len(self.variable_names())
+        if gui.button(
+            '<i class="fa-solid fa-brackets-curly"></i> Variables'
+            + (f" ({count})" if count else ""),
+            type="tertiary",
+            # ms-auto pushes it to the far end of the row, opposite the model selector.
+            # fw-normal because `.btn.btn-theme` is bold, and a secondary action next to a
+            # form field should not shout louder than the field's own label.
+            className="mb-0 p-2 text-nowrap ms-auto fw-normal",
+            key="open-variables",
+        ):
+            ref.set_open(True)
+        if not ref.is_open:
+            return
+
+        with (
+            gui.alert_dialog(ref=ref, modal_title="#### Variables", large=True),
+            gui.styled(VARIABLES_DIALOG_CSS),
+            gui.div(),
+        ):
+            # kept whether or not any exist: the editor never says where variables come
+            # from, and most are declared by writing them into the prompt, not added here
+            with gui.div(className="container-margin-reset mb-3"):
+                gui.caption(
+                    "Variables let you pass custom parameters into this agent.  \n"
+                    "Reference one in your instructions with Jinja - "
+                    "`{{ my_variable }}` - and it appears here to fill in. "
+                    "[Learn more](/variables-help)."
+                )
+            self._render_variables_editor(heading=False)
+
     def _render_llm_instructions_pane(self):
         """Model selector pinned on top, editor filling whatever height is left.
 
@@ -1688,6 +1730,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                     style=dict(maxWidth="40%", minWidth="40%"), className="m-0"
                 ):
                     language_model_selector(label="")
+                self._render_variables_button()
 
             with (
                 gui.styled(FILL_HEIGHT_EDITOR_CSS),
