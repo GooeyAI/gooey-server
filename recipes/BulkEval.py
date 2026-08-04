@@ -71,6 +71,8 @@ class CandidateEvaluationTool(BaseLLMTool):
             name="submit_evaluation",
             label="Submit Evaluation",
             description=(
+                "Set skipped to true when the evaluation prompt explicitly requests "
+                "that this row be skipped; omit scores and summaries in that case. "
                 "Score only the workflow output columns requested by the evaluation "
                 "prompt. When no columns are named, score evaluation-worthy fields "
                 "such as Output Text or Run Time, not metadata such as Price, Run URL, "
@@ -85,6 +87,13 @@ class CandidateEvaluationTool(BaseLLMTool):
                 "title, or infer or invent another candidate token."
             ),
             properties={
+                "skipped": {
+                    "type": "boolean",
+                    "description": (
+                        "True only when the evaluation prompt explicitly requests that "
+                        "this row be skipped."
+                    ),
+                },
                 "scores": {
                     "type": "array",
                     "minItems": 1,
@@ -149,14 +158,22 @@ class CandidateEvaluationTool(BaseLLMTool):
                     },
                 },
             },
-            required=["scores"],
         )
 
     @property
     def spec_parameters(self) -> dict:
         return super().spec_parameters | {"additionalProperties": False}
 
-    def call(self, scores: list[dict], summaries: list[dict] | None = None) -> dict:
+    def call(
+        self,
+        skipped: bool = False,
+        scores: list[dict] | None = None,
+        summaries: list[dict] | None = None,
+    ) -> dict:
+        if skipped:
+            self.output = {"skipped": True}
+            return self.output
+
         output = {"scores": scores, "summaries": summaries or []}
         _validate_evaluation_result(output, self.candidate_spec)
         self.output = output
@@ -706,8 +723,9 @@ def _run_evaluation_job(
             {
                 "role": CHATML_ROLE_USER,
                 "content": (
-                    "You must call submit_evaluation with the requested scores "
-                    "and summaries."
+                    "You must call submit_evaluation. Set skipped to true if the "
+                    "evaluation prompt requests a skip; otherwise submit the "
+                    "requested scores and summaries."
                 ),
             }
         )
@@ -746,12 +764,13 @@ def iterate(
             result.evaluation_result
         )
 
-        apply_eval_metrics(
-            current_rec=result.current_rec,
-            ep=result.ep,
-            candidate_spec=result.candidate_spec,
-            evaluation_result=result.evaluation_result,
-        )
+        if not result.evaluation_result.get("skipped"):
+            apply_eval_metrics(
+                current_rec=result.current_rec,
+                ep=result.ep,
+                candidate_spec=result.candidate_spec,
+                evaluation_result=result.evaluation_result,
+            )
 
         out_df = pd.DataFrame.from_records(result.out_df_recs)
         f = upload_file_from_bytes(
