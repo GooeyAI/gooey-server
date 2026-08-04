@@ -46,7 +46,7 @@ from routers import (
     onedrive_api,
     workspace,
 )
-from routers import twilio_ws_api
+from routers import live_transcribe_api, twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
 from routers import base_auth
 from widgets import history
@@ -100,6 +100,7 @@ app_routers = [
     telegram_api.router,
     static_pages.app,
     twilio_ws_api.app,
+    live_transcribe_api.app,
     gooey_builder.router,
     base_auth.app,
     history.app,

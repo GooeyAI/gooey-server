@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useNavigate } from "@remix-run/react";
 import { fetchServerAPI } from "~/fetchServerAPI";
+import { useLiveTranscription } from "~/useLiveTranscription";
 import type { CustomComponentProps } from "~/components";
 
 type AskGooeyNewProps = CustomComponentProps & {
@@ -33,6 +34,11 @@ export function AskGooeyNew({
   const [error, setError] = useState<string | null>(null);
   const [showScrollArrow, setShowScrollArrow] = useState(true);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const { micState, toggleRecording, stopRecording } = useLiveTranscription({
+    value,
+    setValue,
+    setError,
+  });
 
   const onFilesSelected = async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -94,6 +100,7 @@ export function AskGooeyNew({
   const submit = async () => {
     const prompt = value.trim();
     if (!prompt || isSubmitting || isUploading) return;
+    stopRecording();
     setIsSubmitting(true);
     setError(null);
     const inputImages = [];
@@ -342,20 +349,45 @@ export function AskGooeyNew({
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   type="button"
+                  onClick={toggleRecording}
+                  disabled={isSubmitting || micState === "connecting"}
+                  aria-label={
+                    micState === "recording"
+                      ? "Stop dictation"
+                      : "Dictate with microphone"
+                  }
                   style={{
-                    background: "none",
+                    background: micState === "recording" ? "#FDECEC" : "none",
                     border: "none",
                     padding: "0",
-                    color: "#0A1021",
-                    cursor: "pointer",
+                    color: micState === "recording" ? "#DC3545" : "#0A1021",
+                    cursor:
+                      micState === "connecting" ? "not-allowed" : "pointer",
+                    opacity: micState === "connecting" ? 0.6 : 1,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     width: "32px",
                     height: "32px",
+                    borderRadius: "8px",
+                    transition: "background 0.2s ease, color 0.2s ease",
                   }}
                 >
-                  <i className="fa-regular fa-microphone" style={{ fontSize: "16px" }} />
+                  {micState === "connecting" ? (
+                    <i
+                      className="fa-regular fa-spinner-third fa-spin"
+                      style={{ fontSize: "16px" }}
+                    />
+                  ) : (
+                    <i
+                      className={
+                        micState === "recording"
+                          ? "fa-solid fa-microphone fa-beat-fade"
+                          : "fa-regular fa-microphone"
+                      }
+                      style={{ fontSize: "16px" }}
+                    />
+                  )}
                 </button>
                 <button
                   type="button"
