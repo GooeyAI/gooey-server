@@ -23,6 +23,7 @@ from gooey_gui.types.navigation_sidebar_props import (
     NavWorkflowItem,
     WorkspaceData,
 )
+from routers.ask_gooey_new import ask_gooey_new_page
 from widgets.workflow_queries import (
     recent_run_ids,
     recent_workflow_items,
@@ -55,6 +56,7 @@ def render(
         handle_workspace_switch,
     )
 
+    new_path = get_route_path(ask_gooey_new_page)
     home_path = get_route_path(home_page)
     explore_path = get_route_path(explore_page)
     history_path = get_route_path(history_page)
@@ -78,6 +80,7 @@ def render(
 
     active_key = _active_nav_key(
         request,
+        new_path=new_path,
         home_path=home_path,
         explore_path=explore_path,
         history_path=history_path,
@@ -94,6 +97,7 @@ def render(
             logo_image_url=settings.GOOEY_LOGO_IMG,
             nav_items=_load_nav_items(
                 is_anonymous,
+                new_path=new_path,
                 home_path=home_path,
                 explore_path=explore_path,
                 saved_path=saved_path,
@@ -126,6 +130,7 @@ def render(
 def _load_nav_items(
     is_anonymous: bool,
     *,
+    new_path: str,
     home_path: str,
     explore_path: str,
     saved_path: str,
@@ -143,6 +148,12 @@ def _load_nav_items(
     if is_anonymous:
         return [explore_item]
     items = [
+        NavItemData(
+            key="new",
+            label="New",
+            icon=icons.add,
+            href=new_path,
+        ),
         NavItemData(
             key="home",
             label="Home",
@@ -409,12 +420,16 @@ def _load_gooey_builder_data(
 def _active_nav_key(
     request: Request,
     *,
+    new_path: str,
     home_path: str,
     explore_path: str,
     history_path: str,
     saved_workspace_filter: str | None,
 ) -> str | None:
     current = _normalize_path(request.url.path)
+
+    if current == _normalize_path(new_path):
+        return "new"
 
     if current == _normalize_path(explore_path):
         # Saved is Explore scoped to the current workspace: both live at
