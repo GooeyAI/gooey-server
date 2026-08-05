@@ -15,14 +15,14 @@ Gooey Server itself is licensed under [Apache License 2.0](LICENSE).
 | PostgreSQL | Database | — (already open, PostgreSQL License) | n/a | ✅ Open |
 | RabbitMQ | Message broker | — (already open, MPL-2.0) | n/a | ✅ Open |
 | Vespa | Search / vector store | — (already open, Apache-2.0) | n/a | ✅ Open |
-| Redis | Cache / result backend | Redis 8 under AGPL-3.0 (OSI-approved); Valkey (BSD-3) also drop-in | Container image only — zero code coupling | ✅ Open (pinned `redis:8`) |
+| Redis | Cache / result backend | Redis 8 (tri-licensed; used under its OSI-approved AGPL-3.0 option); Valkey (BSD-3) also drop-in | Container image only — zero code coupling | ✅ Open (`redis:8`) |
 | Firebase Auth | Authentication | Built-in local Django auth | Feature flag (`ENABLE_FIREBASE_AUTH`, default **off**) | ✅ Abstracted |
 | Google Cloud Storage | File storage | Local filesystem storage | Feature flag (`GS_BUCKET_NAME`, default **unset**) | ✅ Abstracted |
 | Cloud LLM APIs (OpenAI, Anthropic, Google, etc.) | AI models | Any OpenAI-compatible server (Ollama, vLLM, LocalAI, llama.cpp) | Abstraction layer (`AIModelSpec.base_url`) | ✅ Abstracted |
 | Cloud STT / TTS / embeddings | AI models | Self-hosted Whisper, Seamless, MMS, Bark, E5/GTE on GPU worker | Abstraction layer (provider enums + GPU Celery worker) | ✅ Abstracted |
 | Stripe / PayPal | Payments | Not required — billing gracefully disabled when keys unset (default) | Feature flag with graceful UI fallback | ✅ Abstracted |
-| Azure Content Moderator | Image safety checker | Open-weight NSFW classifier on GPU worker | Abstraction layer + env toggle | 🔧 In progress |
-| Azure Key Vault | Managed secrets | Encrypted-at-rest storage in PostgreSQL | Pluggable secrets backend | 🔧 In progress |
+| Azure Content Moderator | Image safety checker | Not required — check skipped when endpoint unset (default) | Feature flag (`AZURE_IMAGE_MODERATION_ENDPOINT`, default **unset**) | ✅ Optional |
+| Azure Key Vault | Managed secrets | Not required — pass API keys as plain environment variables to functions instead | Optional (`AZURE_KEY_VAULT_ENDPOINT` unset ⇒ disabled) | ✅ Optional |
 | Modal (MMS TTS, Omnilingual ASR) | AI model hosting | Optional feature; core TTS/ASR works via GPU worker or other providers | Optional integration | ✅ Optional |
 | Font Awesome Pro | UI icons | Font Awesome Free (self-hosted) | Asset swap for self-hosted builds | 🔧 In progress |
 | Google Tag Manager | Analytics | Not required for operation | Env-gated script (unset ⇒ not rendered) | 🔧 In progress |
@@ -39,7 +39,7 @@ The mandatory backing services are all under OSI-approved licenses and ship in [
 - **PostgreSQL 15** (PostgreSQL License) — primary database for all application data, via the Django ORM.
 - **RabbitMQ** (MPL-2.0) — Celery task broker.
 - **Vespa** (Apache-2.0) — search and vector store for document retrieval, self-hosted.
-- **Redis 8** (AGPL-3.0, OSI-approved) — cache and Celery result backend, pinned in [docker-compose.local.yml](docker-compose.local.yml). The application has zero Redis-version coupling: it uses only connection URLs ([daras_ai_v2/settings.py#L455](daras_ai_v2/settings.py#L455)) and the MIT-licensed `redis-py` client over the standard wire protocol, so [Valkey](https://valkey.io) (BSD-3-Clause) is an equally drop-in alternative with no code changes.
+- **Redis 8** — cache and Celery result backend. Redis 8 is tri-licensed (RSALv2 / SSPLv1 / AGPL-3.0); this deployment uses it under the AGPL-3.0 option, which is OSI-approved. The `redis:8` image is used in both [docker-compose.local.yml](docker-compose.local.yml) and the CapRover deployment ([scripts/deployment/redis.Dockerfile](scripts/deployment/redis.Dockerfile)). The application has zero Redis-version coupling: it uses only connection URLs ([daras_ai_v2/settings.py#L455](daras_ai_v2/settings.py#L455)) and the MIT-licensed `redis-py` client over the standard wire protocol, so [Valkey](https://valkey.io) (BSD-3-Clause) is an equally drop-in alternative with no code changes.
 
 ## 2. Authentication — abstraction layer (Path 2)
 
@@ -62,7 +62,7 @@ Any S3-compatible open object store (e.g., MinIO, AGPL-3.0) can also be fronted 
 
 ## 4. AI models — abstraction layers with self-hosted alternatives (Path 2)
 
-Gooey Server is multi-provider by design. No single AI vendor is mandatory. Full setup instructions for every self-hosted path are in [docs/local-models.md](docs/local-models.md).
+Gooey Server is multi-provider by design. No single AI vendor is mandatory. Each self-hosted path is runtime configuration, as described below — no code changes required.
 
 ### LLMs
 Any server exposing an OpenAI-compatible `/v1/chat/completions` endpoint works — **Ollama, vLLM, LocalAI, LM Studio, llama.cpp** — by setting `base_url`/`api_key`/`model_id` on an `AIModelSpec` in the Django admin ([daras_ai_v2/language_model.py](daras_ai_v2/language_model.py)). No code changes required; this is runtime configuration.
@@ -89,17 +89,13 @@ Stripe and PayPal power billing on the hosted gooey.ai service. Payment processi
 
 Credit accounting itself is fully open (rows in PostgreSQL); self-hosted operators grant credits through the Django admin.
 
-## 6. Image safety checker — abstraction layer (Path 2, in progress)
+## 6. Image safety checker — feature flag (Path 2)
 
-Image moderation currently calls Azure Content Moderator ([daras_ai_v2/azure_image_moderation.py](daras_ai_v2/azure_image_moderation.py)) from [daras_ai_v2/safety_checker.py](daras_ai_v2/safety_checker.py). Text moderation already runs through the LLM abstraction (any configured model, including self-hosted ones).
+Image moderation calls Azure Content Moderator from [daras_ai_v2/safety_checker.py](daras_ai_v2/safety_checker.py), gated on `AZURE_IMAGE_MODERATION_ENDPOINT`. When the endpoint is unset — the default for self-hosted deployments — the check is simply skipped ([daras_ai_v2/azure_image_moderation.py#L13-L14](daras_ai_v2/azure_image_moderation.py#L13)). Text moderation runs through the LLM abstraction (any configured model, including self-hosted ones).
 
-Mechanism (in progress): a provider interface for image moderation with an open-weight NSFW classifier running on the self-hosted GPU Celery worker (the same infrastructure that serves Whisper and embeddings), selected by an environment toggle. Azure becomes one optional provider among alternatives.
+## 7. Managed secrets — optional feature
 
-## 7. Managed secrets — pluggable backend (Path 2, in progress)
-
-The managed-secrets feature (user-supplied API keys) currently stores values in Azure Key Vault ([managed_secrets/models.py](managed_secrets/models.py)).
-
-Mechanism (in progress): a pluggable secrets backend with encrypted-at-rest storage in PostgreSQL as the default for self-hosted deployments; Azure Key Vault becomes an opt-in backend. [OpenBao](https://openbao.org) (MPL-2.0) is a further open external-vault option.
+The managed-secrets feature (user-supplied API keys) stores values in Azure Key Vault ([managed_secrets/models.py](managed_secrets/models.py)), gated on `AZURE_KEY_VAULT_ENDPOINT` (default unset, [daras_ai_v2/settings.py#L481](daras_ai_v2/settings.py#L481)). It is not required: self-hosted deployments pass API keys to functions as plain environment variables instead.
 
 ## 8. Frontend assets (in progress)
 
@@ -123,8 +119,8 @@ docker compose -f docker-compose.local.yml up -d
 
 - Auth: local Django email/password (`ENABLE_FIREBASE_AUTH` unset)
 - Storage: local filesystem (`GS_BUCKET_NAME` unset)
-- LLM: Ollama or any OpenAI-compatible server (see [docs/local-models.md](docs/local-models.md))
+- LLM: Ollama or any OpenAI-compatible server (configured via `AIModelSpec` in the Django admin — see section 4 above)
 - STT/TTS/embeddings: GPU Celery worker (optional, for AI features that need it)
 - Payments, analytics, cloud moderation, Key Vault: disabled (keys unset)
 
-Backing services: PostgreSQL, RabbitMQ, Redis 8 (AGPL-3.0), Vespa — all open source.
+Backing services: PostgreSQL, RabbitMQ, Redis 8 (AGPL-3.0 option), Vespa — all open source.
