@@ -75,7 +75,8 @@ def recent_run_ids(
     )
     builder_runs = []
     if include_builder_runs:
-        builder_runs = list(
+        # workflow runs the builder produced (shown on their workflow page)
+        builder_child_runs = (
             SavedRun.objects.filter(
                 uid=user.uid,
                 workspace=workspace,
@@ -85,6 +86,19 @@ def recent_run_ids(
             .order_by("-updated_at")
             .values("id", "updated_at")[:limit]
         )
+        # /new page builder runs
+        builder_prompt_runs = (
+            SavedRun.objects.filter(
+                uid=user.uid,
+                workspace=workspace,
+                surface=SavedRun.Surface.builder_prompt,
+                thread_as_last_run__isnull=False,
+                child_builder_saved_runs__isnull=True,
+            )
+            .order_by("-updated_at")
+            .values("id", "updated_at")[:limit]
+        )
+        builder_runs = list(builder_child_runs) + list(builder_prompt_runs)
 
     return _merge_recent_run_ids(history_runs, builder_runs, limit)
 

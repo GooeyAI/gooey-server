@@ -335,7 +335,9 @@ def _recent_run_srs(
         .annotate(
             builder_thread_title=F(
                 "parent_builder_saved_run__thread_as_last_run__title"
-            )
+            ),
+            # title of a standalone builder conversation's own thread
+            builder_prompt_title=F("thread_as_last_run__title"),
         )
         .order_by("-updated_at")
     )
@@ -354,12 +356,20 @@ def _sr_to_nav_workflow(sr: SavedRun) -> NavWorkflowItem:
         title = (sr.builder_thread_title or "").strip()
         # Only Builder runs opened from the rail force-open the Builder panel.
         builder_intent = "open"
+        href = sr.get_app_url()
+    elif sr.surface == SavedRun.Surface.builder_prompt:
+        # standalone builder conversation -> the /new/ page for this run
+        from routers.ask_gooey_new import get_gooey_builder_run_url
+
+        title = (sr.builder_prompt_title or "").strip()
+        href = get_gooey_builder_run_url(sr)
     else:
         title = _history_title(sr, pr)
+        href = sr.get_app_url()
 
     return NavWorkflowItem(
         title=title or (pr and pr.title) or workflow.label,
-        href=sr.get_app_url(),
+        href=href,
         image_url=(pr and pr.photo_url) or None,
         icon=_workflow_icon(metadata),
         builder_intent=builder_intent,
