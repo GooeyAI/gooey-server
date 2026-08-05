@@ -1,9 +1,9 @@
 import fastapi
-import gooey_gui as gui
 from django.utils.text import slugify
 from furl import furl
 from starlette.requests import Request
 
+import gooey_gui as gui
 from bots.models import SavedRun
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import settings
@@ -25,6 +25,11 @@ app = CustomAPIRouter()
 
 @gui.route(app, "/new/")
 def ask_gooey_new_page(request: Request):
+    if not request.user or request.user.is_anonymous:
+        raise gui.RedirectException(
+            str(furl("/login", query_params={"next": str(request.url)}))
+        )
+
     with sidebar_page_wrapper(request, full_width_content=True):
         render_ask_gooey_new(request=request, workspace=None)
 
