@@ -24,7 +24,7 @@ class GooeyMemoryLLMTool(BaseLLMTool):
 class GooeyMemoryLLMToolRead(GooeyMemoryLLMTool):
     name = "GOOEY_MEMORY_READ_VALUE"
 
-    def __init__(self, scope: FunctionScopes | None):
+    def __init__(self, scope: FunctionScopes | None, variables: dict):
         self.scope = scope
         super().__init__(
             name=self.name,
@@ -52,7 +52,7 @@ class GooeyMemoryLLMToolRead(GooeyMemoryLLMTool):
 class GooeyMemoryLLMToolWrite(GooeyMemoryLLMTool):
     name = "GOOEY_MEMORY_WRITE_VALUE"
 
-    def __init__(self, scope: FunctionScopes):
+    def __init__(self, scope: FunctionScopes, variables: dict):
         self.scope = scope
         super().__init__(
             name=self.name,
@@ -79,7 +79,7 @@ class GooeyMemoryLLMToolWrite(GooeyMemoryLLMTool):
 class GooeyMemoryLLMToolDelete(GooeyMemoryLLMTool):
     name = "GOOEY_MEMORY_DELETE_VALUE"
 
-    def __init__(self, scope: FunctionScopes):
+    def __init__(self, scope: FunctionScopes, variables: dict):
         self.scope = scope
         super().__init__(
             name=self.name,

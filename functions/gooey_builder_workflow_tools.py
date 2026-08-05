@@ -4,6 +4,7 @@ from bots.models import WorkflowAccessLevel, PublishedRun, SavedRun
 import typing
 
 from app_users.models import AppUser
+from bots.models.workflow import Workflow
 from daras_ai_v2.crypto import get_random_doc_id
 from functions.base_llm_tool import (
     BaseLLMTool,
@@ -17,9 +18,77 @@ import gooey_gui as gui
 import json
 from fastapi.encoders import jsonable_encoder
 
+from widgets.workflow_search import SearchFilters, get_filtered_published_runs
 from workspaces.models import Workspace
 
 WORKFLOW_URL_KEY = "builder_workflow_url"
+
+MAX_SEARCH_RESULTS = 10
+
+
+class SearchWorkflowsLLMTool(BaseLLMTool):
+    disable_dynamic_loader = True
+
+    name = "search_workflows"
+
+    def __init__(self, uid: str):
+        self.uid = uid
+        super().__init__(
+            name=self.name,
+            label="Search Workflows",
+            description=(
+                "Search Gooey.AI's workflow library (same search as the /explore page) "
+                "to find a workflow to use as the starting point for the user's request. "
+                "This is a keyword (full-text) search, NOT semantic search: every word in "
+                "the query must literally match the workflow's title/description/tags, so "
+                "long free-form queries usually return nothing. "
+                "Use 1-3 short generic keywords (e.g. 'image', 'lipsync', 'copilot') and "
+                "broaden the query further if there are no results. "
+            ),
+            properties={
+                "search": {
+                    "type": "string",
+                    "description": (
+                        "Keyword search query. All words must match, so keep it to 1-3 "
+                        "short keywords, e.g. 'image', 'lipsync video', 'qr code'. "
+                        "Do NOT paste the user's full request here."
+                    ),
+                },
+            },
+            required=["search"],
+        )
+
+    def call(self, search: str) -> dict:
+        user = AppUser.objects.filter(uid=self.uid).first()
+        search_filters = SearchFilters(search=search)
+        qs = get_filtered_published_runs(user, search_filters)
+
+        results = [
+            dict(
+                title=pr.title,
+                description=(pr.notes or "")[:300],
+                workflow=Workflow(pr.workflow).label,
+                run_url=pr.get_app_url(),
+            )
+            for pr in qs[:MAX_SEARCH_RESULTS]
+        ]
+        if not results:
+            return dict(
+                results=[],
+                message=(
+                    "No workflows found. This is a keyword search where every word "
+                    "must match - retry with fewer, more generic keywords "
+                    "(e.g. a single word like 'image')."
+                ),
+            )
+
+        return dict(results=results)
+
+
+NO_CURRENT_WORKFLOW_ERROR = (
+    "No workflow is currently selected and no run_url was provided. "
+    f"Call `{SearchWorkflowsLLMTool.name}` to find a workflow and pass its run_url to this tool."
+)
 
 
 class FetchWorkflowStateLLMTool(BaseLLMTool):
@@ -27,7 +96,7 @@ class FetchWorkflowStateLLMTool(BaseLLMTool):
 
     name = "fetch_workflow_state"
 
-    def __init__(self, page_cls: typing.Type[BasePage]):
+    def __init__(self, page_cls: typing.Type[BasePage] | None):
         self.page_cls = page_cls
         super().__init__(
             name=self.name,
@@ -37,8 +106,6 @@ class FetchWorkflowStateLLMTool(BaseLLMTool):
         )
 
     def call(self, run_url: str) -> typing.Any:
-        from daras_ai_v2.workflow_url_input import url_to_runs
-
         page_cls, sr, pr = url_to_runs(run_url)
         ret = dict(success=True, state=sr.state)
 
@@ -58,9 +125,9 @@ class FetchWorkflowStateLLMTool(BaseLLMTool):
 class GooeyBuilderLLMTool(BaseLLMTool):
     disable_dynamic_loader = True
 
-    page_cls: typing.Type[BasePage]
-    sr: SavedRun
-    pr: PublishedRun
+    page_cls: typing.Type[BasePage] | None
+    sr: SavedRun | None
+    pr: PublishedRun | None
     builder_sr: SavedRun
 
     def handle_redirect(self, background: bool):
@@ -78,8 +145,9 @@ class GooeyBuilderLLMTool(BaseLLMTool):
     ) -> tuple[typing.Type[BasePage], SavedRun, PublishedRun]:
         if run_url:
             return url_to_runs(run_url)
-        else:
-            return self.page_cls, self.sr, self.pr
+        if not self.sr:
+            raise ValueError(NO_CURRENT_WORKFLOW_ERROR)
+        return self.page_cls, self.sr, self.pr
 
     def get_current_user(self) -> AppUser:
         return AppUser.objects.get(uid=self.builder_sr.uid)
@@ -106,9 +174,9 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
 
     def __init__(
         self,
-        page_cls: typing.Type[BasePage],
-        sr: SavedRun,
-        pr: PublishedRun,
+        page_cls: typing.Type[BasePage] | None,
+        sr: SavedRun | None,
+        pr: PublishedRun | None,
         builder_sr: SavedRun,
     ):
         self.page_cls = page_cls
@@ -116,30 +184,38 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
         self.pr = pr
         self.builder_sr = builder_sr
 
-        state = sr.state
+        if sr:
+            state = sr.state
+            properties = page_cls.get_tool_call_schema(state)
 
-        properties = page_cls.get_tool_call_schema(state)
+            current_workflow_state = dict(
+                request=extract_model_fields(page_cls.RequestModel, state),
+                response=extract_model_fields(page_cls.ResponseModel, state),
+            )
+            description = (
+                "Call this tool to update the current workflow state without running it.\n\n"
+                f"Once updated you can run the updated workflow by calling the `{RunWorkflowLLMTool.name}` tool.\n"
+                "By default, this tool will update the current workflow state. "
+                f"You may call `{FetchWorkflowStateLLMTool.name}` to get the state of any workflow given its run_url "
+                "and then call this tool with the run_url to update.\n\n"
+                f"Current Workflow State: {json.dumps(jsonable_encoder(current_workflow_state))}"
+            )
+        else:
+            properties = {}
+            description = (
+                "Call this tool to update a workflow's state without running it.\n\n"
+                "There is no currently selected workflow, so you MUST pass `run_url`. "
+                f"Call `{SearchWorkflowsLLMTool.name}` to find a workflow, then call "
+                f"`{FetchWorkflowStateLLMTool.name}` with its run_url to get the "
+                "workflow's state and schema properties before calling this tool.\n"
+                f"Once updated you can run the updated workflow by calling the `{RunWorkflowLLMTool.name}` tool."
+            )
+
         properties.update(
             {
-                "run_url": {
-                    "type": "string",
-                    "description": "(optional) The run_url of the workflow to update. Defaults to the current workflow.",
-                },
+                "run_url": run_url_prop("update", sr),
                 "background": BACKGROUND_PROP,
             }
-        )
-
-        current_workflow_state = dict(
-            request=extract_model_fields(page_cls.RequestModel, state),
-            response=extract_model_fields(page_cls.ResponseModel, state),
-        )
-        description = (
-            "Call this tool to update the current workflow state without running it.\n\n"
-            f"Once updated you can run the updated workflow by calling the `{RunWorkflowLLMTool.name}` tool.\n"
-            "By default, this tool will update the current workflow state. "
-            f"You may call `{FetchWorkflowStateLLMTool.name}` to get the state of any workflow given its run_url "
-            "and then call this tool with the run_url to update.\n\n"
-            f"Current Workflow State: {json.dumps(jsonable_encoder(current_workflow_state))}"
         )
         super().__init__(
             name=self.name,
@@ -187,24 +263,22 @@ class RunWorkflowLLMTool(GooeyBuilderLLMTool):
 
     def __init__(
         self,
-        page_cls: typing.Type[BasePage],
-        sr: SavedRun,
-        pr: PublishedRun,
+        page_cls: typing.Type[BasePage] | None,
+        sr: SavedRun | None,
+        pr: PublishedRun | None,
         builder_sr: SavedRun,
     ):
         self.page_cls = page_cls
         self.sr = sr
         self.pr = pr
         self.builder_sr = builder_sr
+
         super().__init__(
             name=self.name,
             label="Run Workflow",
             description="Submit and Run the workflow",
             properties={
-                "run_url": {
-                    "type": "string",
-                    "description": "(optional) The url of the workflow to run. Defaults to the current workflow.",
-                },
+                "run_url": run_url_prop("run", sr),
                 "background": BACKGROUND_PROP,
             },
         )
@@ -252,9 +326,9 @@ class SaveWorkflowLLMTool(GooeyBuilderLLMTool):
 
     def __init__(
         self,
-        page_cls: typing.Type[BasePage],
-        sr: SavedRun,
-        pr: PublishedRun,
+        page_cls: typing.Type[BasePage] | None,
+        sr: SavedRun | None,
+        pr: PublishedRun | None,
         builder_sr: SavedRun,
     ):
         self.page_cls = page_cls
@@ -262,18 +336,26 @@ class SaveWorkflowLLMTool(GooeyBuilderLLMTool):
         self.pr = pr
         self.builder_sr = builder_sr
 
+        if pr:
+            current_title = f"\n\nCurrent title: {pr.title}"
+            current_description = f"\n\nCurrent description: {pr.notes}"
+            last_change_notes = f"\n\nLast change notes: {sr.parent_version and sr.parent_version.change_notes}"
+        else:
+            current_title = ""
+            current_description = ""
+            last_change_notes = ""
+
         super().__init__(
             name=self.name,
             label="Save Workflow",
             description=(
-                "Save changes to the current published workflow as a new version. "
-                "Call this when the user asks to save, publish, or update the current workflow "
+                "Save changes to a published workflow as a new version. "
+                "Call this when the user asks to save, publish, or update a workflow "
                 "(including its title or description) in place. "
                 "If the user wants to copy/duplicate/fork the workflow into a new one, "
                 f"call `{SaveAsNewWorkflowLLMTool.name}` instead. "
                 "Pass `run_url` to save a specific saved run "
-                f"(e.g. the `run_url` returned by `{UpdateWorkflowStateLLMTool.name}`); "
-                "otherwise the currently open workflow run is saved."
+                f"(e.g. the `run_url` returned by `{UpdateWorkflowStateLLMTool.name}`)."
             ),
             properties={
                 "title": {
@@ -282,8 +364,8 @@ class SaveWorkflowLLMTool(GooeyBuilderLLMTool):
                     "description": (
                         "Optional new value for the 'Title' "
                         "field in the Save Workflow dialog. "
-                        "Leave unset to keep the existing title.\n\n"
-                        f"Current title: {self.pr.title}"
+                        "Leave unset to keep the existing title."
+                        f"{current_title}"
                     ),
                 },
                 "description": {
@@ -292,20 +374,17 @@ class SaveWorkflowLLMTool(GooeyBuilderLLMTool):
                     "description": (
                         "Optional new value for the 'Description' "
                         "field in the Save Workflow dialog "
-                        "Leave unset to keep the existing description.\n\n"
-                        f"Current description: {self.pr.notes}"
+                        "Leave unset to keep the existing description."
+                        f"{current_description}"
                     ),
                 },
                 "change_notes": {
                     "type": "string",
                     "title": "Add change notes",
-                    "description": "Used as the changelog entry for the new version.\n\n"
-                    f"Last change notes: {self.sr.parent_version and self.sr.parent_version.change_notes}",
+                    "description": "Used as the changelog entry for the new version."
+                    f"{last_change_notes}",
                 },
-                "run_url": {
-                    "type": "string",
-                    "description": "(optional) The url of the workflow to save. Defaults to the current workflow.",
-                },
+                "run_url": run_url_prop("save", sr),
                 "background": BACKGROUND_PROP,
             },
         )
@@ -354,9 +433,9 @@ class SaveAsNewWorkflowLLMTool(GooeyBuilderLLMTool):
 
     def __init__(
         self,
-        page_cls: typing.Type[BasePage],
-        sr: SavedRun,
-        pr: PublishedRun,
+        page_cls: typing.Type[BasePage] | None,
+        sr: SavedRun | None,
+        pr: PublishedRun | None,
         builder_sr: SavedRun,
     ):
         self.page_cls = page_cls
@@ -368,7 +447,7 @@ class SaveAsNewWorkflowLLMTool(GooeyBuilderLLMTool):
             name=self.name,
             label="Save as New Workflow",
             description=(
-                "Create a new published workflow that is a copy of the current one. "
+                "Create a new published workflow that is a copy of an existing one. "
                 "Call this when the user asks to save as new workflow, save as new version, duplicate, fork, clone, etc. "
                 f"Use `{SaveWorkflowLLMTool.name}` instead if the user wants to update an existing workflow in place. "
             ),
@@ -389,13 +468,7 @@ class SaveAsNewWorkflowLLMTool(GooeyBuilderLLMTool):
                         "Defaults to the original description."
                     ),
                 },
-                "run_url": {
-                    "type": "string",
-                    "description": (
-                        "(optional) The url of the workflow to save as new. "
-                        "Defaults to the current workflow."
-                    ),
-                },
+                "run_url": run_url_prop("save as new", sr),
                 "background": BACKGROUND_PROP,
             },
         )
@@ -428,3 +501,18 @@ class SaveAsNewWorkflowLLMTool(GooeyBuilderLLMTool):
         self.url = new_pr.get_app_url()
         self.handle_redirect(background)
         return dict(success=True, run_url=self.url)
+
+
+def run_url_prop(action: str, sr: SavedRun | None) -> dict:
+    if sr:
+        description = (
+            f"(optional) The url of the workflow to {action}. "
+            "Defaults to the current workflow."
+        )
+    else:
+        description = (
+            f"The url of the workflow to {action}. "
+            "Required because there is no currently selected workflow - "
+            f"call `{SearchWorkflowsLLMTool.name}` to find one."
+        )
+    return {"type": "string", "description": description}

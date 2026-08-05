@@ -31,6 +31,7 @@ from daras_ai_v2.settings import templates
 from memory import routers as memory_routers
 from routers import (
     account,
+    ask_gooey_new,
     facebook_api,
     api,
     root,
@@ -45,7 +46,7 @@ from routers import (
     onedrive_api,
     workspace,
 )
-from routers import twilio_ws_api
+from routers import live_transcribe_api, twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
 from routers import base_auth
 from widgets import history, workflow_queries
@@ -86,6 +87,7 @@ for router in api_routers:
 
 app_routers = [
     account.app,
+    ask_gooey_new.app,
     memory_routers.app,
     facebook_api.app,
     onedrive_api.app,
@@ -98,6 +100,7 @@ app_routers = [
     telegram_api.router,
     static_pages.app,
     twilio_ws_api.app,
+    live_transcribe_api.app,
     gooey_builder.router,
     base_auth.app,
     history.app,

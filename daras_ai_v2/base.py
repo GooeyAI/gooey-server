@@ -69,7 +69,7 @@ from functions.base_llm_tool import (
     render_called_functions,
 )
 from functions.composio_tools import ComposioLLMTool
-from functions.inbuilt_tools import get_inbuilt_tools
+from functions.inbuilt_tools import UpdateConversationTitleLLMTool, get_inbuilt_tools
 from functions.memory_tools import GooeyMemoryLLMTool
 from functions.models import (
     FunctionScopes,
@@ -1510,6 +1510,8 @@ class BasePage:
                     variables=gui.session_state.get("variables"),
                 )
                 return tool.bind(memory_entry)
+            case UpdateConversationTitleLLMTool():
+                return tool.bind(current_user=self.request.user)
             case _:
                 return tool
 

@@ -49,6 +49,73 @@ def render_gooey_builder(
 ):
     if not can_launch_gooey_builder(request, page.current_workspace):
         return
+
+    builder_sr = page.current_sr.parent_builder_saved_run
+    handle_gooey_builder_redirect(builder_sr)
+
+    if builder_sr and not gui.session_state.get("builderOnNewConversation"):
+        builder_run_url = builder_sr.get_app_url()
+        messages = get_chat_widget_messages(
+            builder_sr.to_dict(), web_url=builder_run_url
+        )
+    else:
+        builder_run_url = None
+        messages = []
+
+    render_gooey_builder_embed(
+        event_key=event_key,
+        builder_run_url=builder_run_url,
+        messages=messages,
+        workflow_state={
+            field_name: gui.session_state[field_name]
+            for field_name in page.fields_to_save()
+            if field_name in gui.session_state
+        },
+    )
+
+
+def render_standalone_gooey_builder(
+    *,
+    event_key: str,
+    request: fastapi.Request,
+    builder_sr: SavedRun,
+):
+    """Render only the gooey builder chat for a builder prompt run, without any
+    associated workflow page."""
+    if not can_launch_gooey_builder(request, None):
+        return
+
+    handle_gooey_builder_redirect(builder_sr)
+
+    if builder_sr.run_status:
+        # subscribe to the builder run so the page re-renders while it's
+        # running and picks up the redirect_url set by the builder's
+        # workflow tools as soon as it lands
+        channel = Workflow(builder_sr.workflow).page_cls.realtime_channel_name(
+            builder_sr.run_id, builder_sr.uid
+        )
+        gui.realtime_pull([channel])
+
+    builder_run_url = builder_sr.get_app_url()
+    render_gooey_builder_embed(
+        event_key=event_key,
+        builder_run_url=builder_run_url,
+        messages=get_chat_widget_messages(
+            builder_sr.to_dict(), web_url=builder_run_url
+        ),
+        workflow_state={},
+        builder_only=True,
+    )
+
+
+def render_gooey_builder_embed(
+    *,
+    event_key: str,
+    builder_run_url: str | None,
+    messages: list,
+    workflow_state: dict,
+    builder_only: bool = False,
+):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
     bi = BotIntegration.objects.select_related("published_run").get(
@@ -63,26 +130,10 @@ def render_gooey_builder(
     config["showRunLink"] = True
     config["showToolCalls"] = True
     config["enableSourcePreview"] = False
+    # conversations live in the navigation sidebar, not the builder widget
     config["enableConversations"] = False
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
-
-    builder_sr = page.current_sr.parent_builder_saved_run
-
-    redirect_url = builder_sr and builder_sr.redirect_url
-    if redirect_url:
-        builder_sr.redirect_url = ""
-        builder_sr.save(update_fields=["redirect_url"])
-        raise gui.RedirectException(redirect_url)
-
-    if builder_sr and not gui.session_state.get("builderOnNewConversation"):
-        builder_run_url = builder_sr.get_app_url()
-        messages = get_chat_widget_messages(
-            builder_sr.to_dict(), web_url=builder_sr.get_app_url()
-        )
-    else:
-        builder_run_url = bi.published_run.get_app_url()
-        messages = []
 
     load_chat_widget_lib()
     gui.component(
@@ -90,13 +141,20 @@ def render_gooey_builder(
         config=config,
         event_key=event_key,
         messages=messages,
-        builder_run_url=builder_run_url,
-        workflow_state={
-            field_name: gui.session_state[field_name]
-            for field_name in page.fields_to_save()
-            if field_name in gui.session_state
-        },
+        builder_run_url=builder_run_url or bi.published_run.get_app_url(),
+        workflow_state=workflow_state,
+        builder_only=builder_only,
     )
+
+
+def handle_gooey_builder_redirect(builder_sr: SavedRun | None):
+    """Redirect to the child workflow whenever the gooey builder has updated it."""
+    redirect_url = builder_sr and builder_sr.redirect_url
+    if not redirect_url:
+        return
+    builder_sr.redirect_url = ""
+    builder_sr.save(update_fields=["redirect_url"])
+    raise gui.RedirectException(redirect_url)
 
 
 def can_launch_gooey_builder(
@@ -116,7 +174,7 @@ router = CustomAPIRouter()
 
 
 class GooeyBuilderSendMessage(pydantic.BaseModel):
-    workflow_url: str
+    workflow_url: str | None = None
     builder_run_url: str | None = None
     input_data: dict | None = None
     workflow_state: dict = {}
@@ -127,22 +185,30 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
     from daras_ai_v2.workflow_url_input import url_to_runs
     from functions.gooey_builder_tools import insert_gooey_builder_variables
 
+    # inline import to avoid a circular dependency with routers.ask_gooey_new
+    from routers.ask_gooey_new import get_gooey_builder_run_url
+
     workspace = get_current_workspace(request.user, request.session)
 
-    # copy the workflow_url into a new run linked to
-    # builder_sr so the chat widget can navigate the user to a workflow page
-    # that knows which builder iteration produced it
-    workflow_page_cls, workflow_sr, workflow_pr = url_to_runs(body.workflow_url)
-    workflow_sr = workflow_sr.clone(
-        parent_pr=workflow_pr,
-        uid=request.user.uid,
-        workspace_id=workspace.id,
-        surface=SavedRun.Surface.builder_child,
-    )
-    workflow_sr.state.update(body.workflow_state)
-    workflow_sr.save()
+    if body.workflow_url:
+        # copy the workflow_url into a new run linked to
+        # builder_sr so the chat widget can navigate the user to a workflow page
+        # that knows which builder iteration produced it
+        workflow_page_cls, workflow_sr, workflow_pr = url_to_runs(body.workflow_url)
+        workflow_sr = workflow_sr.clone(
+            parent_pr=workflow_pr,
+            uid=request.user.uid,
+            workspace_id=workspace.id,
+            surface=SavedRun.Surface.builder_child,
+        )
+        workflow_sr.state.update(body.workflow_state)
+        workflow_sr.save()
+        workflow_url = workflow_sr.get_app_url()
+    else:
+        # no workflow attached - user is chatting with just the builder
+        workflow_sr = None
+        workflow_url = ""
 
-    workflow_url = workflow_sr.get_app_url()
     builder_run_url = body.builder_run_url or get_default_builder_pr().get_app_url()
     builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
     request_body, message_thread = chat_widget_input_to_request_body(
@@ -150,16 +216,21 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
     )
     insert_gooey_builder_variables(request_body, workflow_url)
 
-    workflow_sr.parent_builder_saved_run = builder_pr.submit_api_call(
+    builder_prompt_sr = builder_pr.submit_api_call(
         current_user=request.user,
         workspace=workspace,
         request_body=request_body,
         surface=SavedRun.Surface.builder_prompt,
         message_thread=message_thread,
     )[1]
-    workflow_sr.save(update_fields=["parent_builder_saved_run"])
-
-    return workflow_url
+    if workflow_sr:
+        workflow_sr.parent_builder_saved_run = builder_prompt_sr
+        workflow_sr.save(update_fields=["parent_builder_saved_run"])
+        return workflow_url
+    else:
+        # no workflow attached - navigate to the standalone builder page,
+        # which redirects to the child workflow once the builder creates one
+        return get_gooey_builder_run_url(builder_prompt_sr)
 
 
 def get_default_builder_pr() -> PublishedRun:

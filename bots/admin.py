@@ -1143,10 +1143,8 @@ class TagAdmin(GooeyModelAdmin):
 @admin.register(MessageThread)
 class MessageThreadAdmin(GooeyModelAdmin):
     list_display = [
-        "title",
+        "truncated_title",
         "view_bot_conversation",
-        "view_first_run",
-        "view_last_run",
         "view_messages",
         "get_created_at",
         "get_updated_at",
@@ -1154,28 +1152,35 @@ class MessageThreadAdmin(GooeyModelAdmin):
     autocomplete_fields = ["bot_conversation", "first_run", "last_run"]
     readonly_fields = ["view_messages"]
 
+    @admin.display(description="Title", ordering="title")
+    def truncated_title(self, message_thread: MessageThread):
+        title = (message_thread.title or "").replace("\n", " ")
+        return format_html(
+            '<span style="display: block; max-width: 400px; overflow: hidden; '
+            'text-overflow: ellipsis; white-space: nowrap;">{}</span>',
+            title,
+        )
+
     @admin.display(description="Bot Conversation")
     def view_bot_conversation(self, message_thread: MessageThread):
         return message_thread.bot_conversation and change_obj_url(
             message_thread.bot_conversation
         )
 
-    @admin.display(description="First Message")
-    def view_first_run(self, message_thread: MessageThread):
-        return message_thread.first_run and change_obj_url(message_thread.first_run)
-
-    @admin.display(description="Last Message")
-    def view_last_run(self, message_thread: MessageThread):
-        return message_thread.last_run and change_obj_url(message_thread.last_run)
-
     @admin.display(description="Messages")
     def view_messages(self, message_thread: MessageThread):
-        return list_related_html_url(message_thread.saved_runs)
+        return list_related_html_url(
+            message_thread.saved_runs,
+            count=message_thread.saved_runs_count,
+        )
 
     def get_queryset(self, request):
         return (
             super()
             .get_queryset(request)
-            .select_related("first_run", "last_run", "bot_conversation")
+            .select_related(
+                "first_run", "last_run", "bot_conversation__bot_integration"
+            )
+            .annotate(saved_runs_count=Count("saved_runs"))
             .order_by("-last_run__updated_at")
         )
