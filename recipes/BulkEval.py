@@ -793,6 +793,8 @@ def iterate(
             for col in cols:
                 if col in result.input_cols:
                     continue
+                if col not in out_df.columns:
+                    continue
                 col_values = out_df[col].dropna()
                 agg_value = col_values.agg(agg["function"])
                 aggs.append(
