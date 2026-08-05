@@ -497,7 +497,7 @@ Here's what you uploaded:
             gui.write(f"###### {doc}")
             for i, prompt in enumerate(prompts):
                 gui.write(f"**Evaluation Row {i + 1}**")
-                gui.text_area("", value=prompt, key=f"--final-prompt-{i}")
+                gui.text_area("", value=prompt)
                 evaluation_result = results[i] if i < len(results) else None
                 if evaluation_result is None:
                     continue
