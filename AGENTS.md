@@ -32,3 +32,52 @@
 
 - If you are asked to create a new page, create a React component for that page, add the corresponding Python route/page entrypoint, and render that React component from the new Python route.
 - When the page should live inside the standard Gooey page shell, render the component under `page_wrapper` as appropriate instead of building a separate ad hoc layout path.
+
+## Cursor Cloud specific instructions
+
+### Architecture overview
+
+Gooey.AI is a low-code AI recipe platform. The stack is:
+- **Python backend** (FastAPI on port 8080, Django ORM/admin on port 8000) — serves API + renders gooey-gui component trees
+- **Node frontend** (Remix on port 3000) — renders the React UI from the Python render tree
+- **Celery** worker — runs async AI recipe tasks (broker: RabbitMQ, result backend: Redis)
+- **PostgreSQL** — primary database
+- **Redis** — caching, Celery result backend, gooey-gui realtime pub/sub
+- **RabbitMQ** — Celery message broker
+
+### Services and startup
+
+Background services (PostgreSQL, Redis, RabbitMQ) must be running before starting the application servers.
+
+```bash
+# Start background services
+sudo pg_ctlcluster 16 main start
+sudo redis-server --daemonize yes
+sudo rabbitmq-server -detached
+```
+
+Application services (see `README.md` Services table and `Procfile` for commands):
+- FastAPI: `poetry run uvicorn server:app --host 127.0.0.1 --port 8080 --reload`
+- Node frontend: `cd gooey-gui && PORT=3000 REDIS_URL=redis://localhost:6379 npm run dev`
+- Celery: `poetry run celery -A celeryapp worker -P threads -c 16 -l DEBUG`
+
+### Python environment
+
+- Python 3.10.12 is installed via pyenv and set as the local version in `/workspace`.
+- Poetry manages Python deps. The virtualenv lives at `/workspace/.venv/`.
+- Use `poetry run <cmd>` or activate the venv at `/workspace/.venv/bin/activate`.
+- Node.js 20 is installed via nvm. Run `source ~/.nvm/nvm.sh && nvm use 20` before Node commands.
+
+### Lint and test
+
+- Lint: `poetry run ruff check .` and `poetry run ruff format --diff .`
+- Tests: `poetry run pytest` (requires `fixture.json` in repo root; download via `wget -N -nv https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/f0769d1a-ed38-11f0-96f2-02420a0001b0/fixture.json`)
+- TypeScript check: `cd gooey-gui && npx tsc --noEmit` (pre-existing Remix v1 type errors in node_modules are expected)
+
+### Gotchas
+
+- The `.venv` file at repo root is created by `pyenv local` (contains `3.10.12`), not a virtualenv name as described in Code Style. In Cloud, use `/workspace/.venv/bin/python` directly or `poetry run`.
+- `ruff check` reports ~134 pre-existing lint errors in the repo; `ruff format` is clean.
+- Test fixture must be downloaded before running pytest — tests that load `fixture.json` will fail otherwise.
+- The `test_apis_async` tests fail because they need a running Celery worker with RabbitMQ. Run them with Celery up or skip with `-k "not test_apis_async"`.
+- The `serviceAccountKey.json` must exist at the repo root for the app to start (Firebase/GCP init happens at import time in `settings.py`).
