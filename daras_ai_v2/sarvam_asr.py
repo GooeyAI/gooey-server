@@ -1,13 +1,14 @@
 import time
 
 import requests
+import yarl
 
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import UserError, raise_for_status
 
 SAARAS_V3_BATCH_MAX_POLLS = 360
 SAARAS_V3_BATCH_POLL_INTERVAL_SECONDS = 5
-SARVAM_ASR_BASE_URL = "https://api.sarvam.ai/speech-to-text"
+SARVAM_ASR_BASE_URL = yarl.URL("https://api.sarvam.ai/speech-to-text")
 
 
 def sarvam_saaras_v3_asr(
@@ -44,9 +45,10 @@ def _sarvam_saaras_v3_batch_asr(
 ) -> dict:
     headers = {"api-subscription-key": settings.SARVAM_API_KEY}
     filename = "audio.wav"
+    job_url = SARVAM_ASR_BASE_URL / "job" / "v1"
 
     response = requests.post(
-        f"{SARVAM_ASR_BASE_URL}/job/v1",
+        str(job_url),
         headers=headers,
         json={
             "job_parameters": {
@@ -61,7 +63,7 @@ def _sarvam_saaras_v3_batch_asr(
     job_id = response.json()["job_id"]
 
     response = requests.post(
-        f"{SARVAM_ASR_BASE_URL}/job/v1/upload-files",
+        str(job_url / "upload-files"),
         headers=headers,
         json={"job_id": job_id, "files": [filename]},
     )
@@ -76,7 +78,7 @@ def _sarvam_saaras_v3_batch_asr(
     raise_for_status(response)
 
     response = requests.post(
-        f"{SARVAM_ASR_BASE_URL}/job/v1/{job_id}/start",
+        str(job_url / job_id / "start"),
         headers=headers,
     )
     raise_for_status(response)
@@ -91,7 +93,7 @@ def _sarvam_saaras_v3_batch_asr(
     output_filename = job_detail["outputs"][0]["file_name"]
 
     response = requests.post(
-        f"{SARVAM_ASR_BASE_URL}/job/v1/download-files",
+        str(job_url / "download-files"),
         headers=headers,
         json={"job_id": job_id, "files": [output_filename]},
     )
@@ -104,7 +106,7 @@ def _sarvam_saaras_v3_batch_asr(
 
 
 def _wait_for_sarvam_batch_job(*, job_id: str, headers: dict[str, str]) -> dict:
-    status_url = f"{SARVAM_ASR_BASE_URL}/job/v1/{job_id}/status"
+    status_url = str(SARVAM_ASR_BASE_URL / "job" / "v1" / job_id / "status")
     for _ in range(SAARAS_V3_BATCH_MAX_POLLS):
         response = requests.get(status_url, headers=headers)
         raise_for_status(response)
