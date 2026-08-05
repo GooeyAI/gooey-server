@@ -1,0 +1,20 @@
+.ask-gooey-title {
+  font-size: 2rem;
+}
+
+.ask-gooey-logo {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .ask-gooey-title {
+    font-size: 3.2rem;
+  }
+
+  .ask-gooey-logo {
+    width: 64px;
+    height: 64px;
+  }
+}

@@ -14,7 +14,7 @@ from daras_ai_v2.gooey_builder import (
 )
 from daras_ai_v2.meta_content import raw_build_meta_tags
 from routers.custom_api_router import CustomAPIRouter
-from routers.root import get_og_url_path, page_wrapper
+from routers.root import get_og_url_path, sidebar_page_wrapper
 from workspaces.models import Workspace
 
 META_TITLE = "Explore | Gooey.AI"
@@ -24,9 +24,8 @@ app = CustomAPIRouter()
 
 
 @gui.route(app, "/new/")
-@gui.route(app, "/explore2/")
 def ask_gooey_new_page(request: Request):
-    with page_wrapper(request, show_search_bar=False):
+    with sidebar_page_wrapper(request, full_width_content=True):
         render_ask_gooey_new(request=request, workspace=None)
 
     return {
@@ -58,16 +57,19 @@ def gooey_builder_run_route(request: Request, title: str, run_id: str):
     if gui.session_state.pop("builderOnNewConversation", None):
         raise gui.RedirectException(get_route_path(ask_gooey_new_page))
 
-    with page_wrapper(request, show_search_bar=False):
-        with gui.div(
-            className="w-100 mx-auto",
-            style={"maxWidth": "900px", "height": "calc(100vh - 200px)"},
-        ):
-            render_standalone_gooey_builder(
-                sidebar_key="gooey-builder",
-                request=request,
-                builder_sr=builder_sr,
-            )
+    # explicit viewport height so the embed's h-100 fills the screen
+    with (
+        sidebar_page_wrapper(request, full_width_content=True),
+        gui.div(
+            className="w-100 d-flex flex-column",
+            style={"height": "100dvh"},
+        ),
+    ):
+        render_standalone_gooey_builder(
+            event_key="gooey-builder",
+            request=request,
+            builder_sr=builder_sr,
+        )
 
     return {
         "meta": build_meta_tags(url=get_og_url_path(request)),

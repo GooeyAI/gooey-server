@@ -1,0 +1,355 @@
+.nav-sidebar {
+  width: 264px;
+  flex: none;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+  /* Keep wheel scrolling inside the rail from chaining to the page behind it. */
+  overscroll-behavior: contain;
+  transition: width 200ms ease;
+}
+
+.nav-sidebar--collapsed {
+  width: 64px;
+  cursor: e-resize;
+}
+
+.gooey-bot-icon {
+  display: block;
+  transition: opacity 100ms ease;
+}
+
+.nav-sidebar-header {
+  height: 56px;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.nav-sidebar--collapsed .nav-sidebar-header {
+  gap: 0;
+  justify-content: center;
+}
+
+.nav-brand {
+  min-width: 0;
+}
+
+a.nav-brand {
+  overflow: hidden;
+}
+
+.nav-brand__expand-icon {
+  display: none !important;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.nav-brand--collapsed:hover .gooey-bot-icon {
+  opacity: 0;
+  display: none;
+}
+
+.nav-brand--collapsed:hover .nav-brand__expand-icon {
+  display: block !important;
+  opacity: 1;
+}
+
+.nav-item-inner-link {
+  min-width: 0;
+}
+
+.nav-chevron-icon {
+  font-size: 11px;
+  transition: opacity 100ms ease;
+}
+
+.nav-section-toggle .nav-chevron-icon {
+  opacity: 0;
+}
+
+.nav-section-toggle:hover .nav-chevron-icon {
+  opacity: 1;
+}
+
+/* The primary-nav block fills the height between the pinned header and footer
+   (and can shrink below its content via min-height:0) so its inner
+   .nav-scroll-region scrolls instead of pushing the footer past the 100vh nav. */
+.nav-primary-items {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Only the middle region scrolls; header + New (above) and the footer (below)
+   stay pinned. */
+.nav-scroll-region {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Stop scroll chaining: at the list's top/bottom, don't scroll the page. */
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.nav-scroll-region::-webkit-scrollbar {
+  width: 4px;
+}
+
+.nav-scroll-region::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav-scroll-region::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+.nav-sidebar--collapsed .nav-item-link {
+  width: 100%;
+}
+
+.nav-workflow-thumb {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+}
+
+/* Gooey Builder button: a cyan brand-color light that travels around the
+   border. A conic-gradient "comet" rotates and is masked down to just the
+   border ring, so the bright arc sweeps left→right and around the perimeter.
+   #03dac5 is the Gooey brand cyan (see the spinner accent in custom.css). */
+@property --gooey-builder-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.gooey-builder-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px; /* ring thickness */
+  background: conic-gradient(
+    from var(--gooey-builder-angle),
+    rgba(3, 218, 197, 0.35) 0deg,
+    rgba(3, 218, 197, 0.35) 70deg,
+    rgba(3, 218, 197, 0.9) 130deg,
+    #a5ffee 160deg,
+    rgba(3, 218, 197, 0.9) 190deg,
+    rgba(3, 218, 197, 0.35) 250deg,
+    rgba(3, 218, 197, 0.35) 360deg
+  );
+  /* Mask out the center, leaving only the padding-width border ring. */
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  /* Two sweeps, then fade the entire ring out and keep it hidden (forwards),
+     so the border disappears after the animation. */
+  animation:
+    gooey-builder-orbit 2.8s linear 2,
+    gooey-builder-fade 5.6s ease-out forwards;
+}
+
+@keyframes gooey-builder-orbit {
+  to {
+    --gooey-builder-angle: 360deg;
+  }
+}
+
+@keyframes gooey-builder-fade {
+  0%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Respect reduced-motion: park the light as a static cyan rim (no sweep, no
+   fade-out). */
+@media (prefers-reduced-motion: reduce) {
+  .gooey-builder-btn::before {
+    animation: none;
+  }
+}
+
+/* On mobile the button lives in the top bar: disable the sweep entirely and
+   drop the ring so no border is left behind. */
+@media (max-width: 991.98px) {
+  .gooey-builder-btn::before {
+    display: none;
+  }
+}
+
+/* Hover + active (current page) background for nav items */
+.nav-item-link {
+  transition: background-color 100ms ease;
+  text-decoration: none;
+  min-height: 40px;
+}
+
+.nav-item-link.dense {
+  min-height: 28px;
+}
+.nav-item-link--active {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-recent-item {
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.sidebar-recent-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Current page: the saved/recent row whose href matches the URL. */
+.sidebar-recent-item--active {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-saved-view-all {
+  display: block;
+  margin: 2px 0 4px 2rem;
+  padding: 4px 8px;
+  color: var(--bs-body-color);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.sidebar-saved-view-all:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-recent-item-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+}
+
+.tippy-box[data-theme~="account-menu"] {
+  min-width: 0 !important;
+  max-width: none !important;
+  background-color: transparent;
+}
+
+.tippy-box[data-theme~="account-menu"] > .tippy-content {
+  padding: 0;
+}
+
+.account-menu-panel {
+  min-width: 300px;
+  max-width: 300px;
+  max-height: 70vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Circular workspace icon slot; sizes the FontAwesome fallback glyph. */
+.account-menu-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+}
+
+.account-menu-icon > img,
+.account-menu-icon > .workspace-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* User avatar (photo or initial fallback) in the account button. */
+.account-menu-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+/* Fixed-width icon column so account-menu row labels line up. */
+.account-menu-row-icon {
+  width: 20px;
+}
+
+/* Saved tree vertical line */
+.saved-tree {
+  position: relative;
+}
+.saved-tree::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--bs-border-color);
+}
+
+/* Google Sign-In icon button sometimes drops its SVG; keep the 40px box so the
+   icon stays visible (mirrors the old google_one_tap_button.html hack). */
+.nav-google-signin div:has(> svg) {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+/* ── Mobile: rail becomes an off-canvas drawer below lg (992px) ────────── */
+
+/* Slim top bar (hamburger + logo); hidden on desktop via d-lg-none. */
+.nav-mobile-topbar {
+  height: 56px;
+  width: 100vw;
+  top: 0;
+  z-index: 1030;
+}
+
+/* Scrim behind the open drawer. */
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1044;
+}
+
+@media (max-width: 991.98px) {
+  .nav-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 70vw;
+    max-width: 85vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 9999;
+    transform: translateX(-100%);
+    transition: transform 200ms ease;
+  }
+  /* Always full drawer width, even if desktop persisted a collapsed rail. */
+  .nav-sidebar--collapsed {
+    width: 264px;
+    max-width: 85vw;
+  }
+  .nav-sidebar--drawer-open {
+    transform: translateX(0);
+  }
+
+  html:has(.gooey-sidebar-open),
+  html:has(.nav-sidebar--drawer-open),
+  html:has(.nav-sidebar--drawer-open) body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}

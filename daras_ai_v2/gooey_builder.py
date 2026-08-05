@@ -31,58 +31,7 @@ if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
 DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg"
-
-
-def render_gooey_builder_launcher(
-    sidebar_key: str,
-    request: fastapi.Request,
-    workspace: Workspace | None,
-):
-    if not can_launch_gooey_builder(request, workspace):
-        return
-
-    try:
-        bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
-    except BotIntegration.DoesNotExist:
-        return
-    branding = bi.get_web_widget_branding()
-    photo_url = branding.get("photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL)
-
-    with gui.styled("& button:hover { scale: 1.2; }"):
-        with gui.div(
-            className="position-fixed d-none d-xxl-block",
-            style={"bottom": "24px", "left": "16px", "zIndex": "99"},
-        ):
-            with gui.tag(
-                "button",
-                type="button",
-                className=f"btn btn-secondary border-0 p-0 {sidebar_key}-button",
-                onClick=f"window.dispatchEvent(new CustomEvent(`{sidebar_key}:open`))",
-                style={
-                    "width": "56px",
-                    "height": "56px",
-                    "borderRadius": "50%",
-                    "boxShadow": "#0000001a 0 1px 4px, #0003 0 2px 12px",
-                },
-            ):
-                gui.html(
-                    f"<img src='{photo_url}' style='width: 56px; height: 56px; border-radius: 50%;' />"
-                )
-
-    with gui.tag(
-        "button",
-        type="button",
-        className=f"border-0 m-0 btn btn-secondary rounded-pill d-xxl-none p-0 {sidebar_key}-button",
-        onClick=f"window.dispatchEvent(new CustomEvent(`{sidebar_key}:open`))",
-        style={
-            "width": "36px",
-            "height": "36px",
-            "borderRadius": "50%",
-        },
-    ):
-        gui.html(
-            f"<img src='{photo_url}' style='width: 36px; height: 36px; border-radius: 50%;' />"
-        )
+GOOEY_BUILDER_EVENT_KEY = "builder-sidebar"
 
 
 class GooeyBuilderWorkflow(typing.TypedDict):
@@ -94,7 +43,7 @@ class GooeyBuilderWorkflow(typing.TypedDict):
 
 def render_gooey_builder(
     *,
-    sidebar_key: str,
+    event_key: str,
     request: fastapi.Request,
     page: BasePage,
 ):
@@ -114,7 +63,7 @@ def render_gooey_builder(
         messages = []
 
     render_gooey_builder_embed(
-        sidebar_key=sidebar_key,
+        event_key=event_key,
         builder_run_url=builder_run_url,
         messages=messages,
         workflow_state={
@@ -127,7 +76,7 @@ def render_gooey_builder(
 
 def render_standalone_gooey_builder(
     *,
-    sidebar_key: str,
+    event_key: str,
     request: fastapi.Request,
     builder_sr: SavedRun,
 ):
@@ -149,7 +98,7 @@ def render_standalone_gooey_builder(
 
     builder_run_url = builder_sr.get_app_url()
     render_gooey_builder_embed(
-        sidebar_key=sidebar_key,
+        event_key=event_key,
         builder_run_url=builder_run_url,
         messages=get_chat_widget_messages(
             builder_sr.to_dict(), web_url=builder_run_url
@@ -161,7 +110,7 @@ def render_standalone_gooey_builder(
 
 def render_gooey_builder_embed(
     *,
-    sidebar_key: str,
+    event_key: str,
     builder_run_url: str | None,
     messages: list,
     workflow_state: dict,
@@ -181,8 +130,8 @@ def render_gooey_builder_embed(
     config["showRunLink"] = True
     config["showToolCalls"] = True
     config["enableSourcePreview"] = False
-    # builder-only pages (e.g. ask gooey) have no workflow to attach conversations to
-    config["enableConversations"] = not builder_only
+    # conversations live in the navigation sidebar, not the builder widget
+    config["enableConversations"] = False
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 
@@ -190,7 +139,7 @@ def render_gooey_builder_embed(
     gui.component(
         "GooeyBuilderInlineEmbed",
         config=config,
-        sidebar_key=sidebar_key,
+        event_key=event_key,
         messages=messages,
         builder_run_url=builder_run_url or bi.published_run.get_app_url(),
         workflow_state=workflow_state,

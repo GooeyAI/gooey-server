@@ -12,7 +12,7 @@ declare global {
 export function GooeyBuilderInlineEmbed(
   props: CustomComponentProps & {
     config: Record<string, any>;
-    sidebar_key: string;
+    event_key: string;
     messages?: Record<string, any> | null;
     builder_run_url: string;
     workflow_state: Record<string, any>;
@@ -42,7 +42,7 @@ export function GooeyBuilderInlineEmbed(
       if (!propsRef.current.builder_only) {
         config.onClose = function () {
           window.dispatchEvent(
-            new CustomEvent(`${propsRef.current.sidebar_key}:close`)
+            new CustomEvent(`${propsRef.current.event_key}:close`)
           );
         };
       }
@@ -69,13 +69,6 @@ export function GooeyBuilderInlineEmbed(
         onNewConversation: async () => {
           ctx.current.update_session_state({ builderOnNewConversation: true });
         },
-        // builder-only pages have no workflow_url, so no conversations sidebar
-        fetchConversations: propsRef.current.builder_only
-          ? undefined
-          : () =>
-              fetchServerAPI("/__/gooey-builder/fetch-conversations", {
-                run_url: propsRef.current.builder_run_url,
-              }),
         rerun: async (run_url: string) => {
           let redirectUrl = await fetchServerAPI<string | null>(
             "/__/gooey-builder/send-message",

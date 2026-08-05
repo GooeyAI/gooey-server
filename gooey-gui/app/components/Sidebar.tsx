@@ -61,13 +61,11 @@ export function Sidebar({
 
   if (disabled) {
     return (
-      <div className="container-xl">
-        <RenderedChildren
-          children={pageDiv.children}
-          onChange={onChange}
-          state={state}
-        />
-      </div>
+      <RenderedChildren
+        children={pageDiv.children}
+        onChange={onChange}
+        state={state}
+      />
     );
   }
 
@@ -82,7 +80,7 @@ export function Sidebar({
   if (isOpen) {
     pageClassName = "mx-2 w-100";
   } else {
-    pageClassName = "container-xxl";
+    pageClassName = "w-100";
   }
 
   const sidebarContainerStyles = sidebarWidth

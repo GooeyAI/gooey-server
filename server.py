@@ -49,7 +49,7 @@ from routers import (
 from routers import live_transcribe_api, twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
 from routers import base_auth
-from widgets import history
+from widgets import history, workflow_queries
 
 
 @asynccontextmanager
@@ -104,6 +104,7 @@ app_routers = [
     gooey_builder.router,
     base_auth.app,
     history.app,
+    workflow_queries.router,
 ]
 
 if settings.ENABLE_FIREBASE_AUTH:
