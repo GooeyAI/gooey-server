@@ -200,7 +200,7 @@ class AggFunctionResult(typing_extensions.TypedDict):
 
 
 def remove_common_prefix_suffix(a: list[str]) -> list[str]:
-    if not a:
+    if len(a) < 2:
         return a
     prefix = _common_affix_at_boundary(a)
     suffix = _common_affix_at_boundary(a, reverse=True)
