@@ -456,17 +456,15 @@ class TextToSpeechPage(BasePage):
                     "speech_sample_rate": 24_000,
                     "output_audio_codec": "wav",
                 }
-                sarvam_request.update(
-                    {
-                        key: value
-                        for key, value in {
-                            "speaker": speaker,
-                            "pace": state.get("sarvam_tts_pace"),
-                            "temperature": state.get("sarvam_tts_temperature"),
-                        }.items()
-                        if value is not None
-                    }
-                )
+                if speaker:
+                    sarvam_request["speaker"] = speaker
+                pace = state.get("sarvam_tts_pace")
+                if pace:
+                    sarvam_request["pace"] = pace
+                temperature = state.get("sarvam_tts_temperature")
+                if temperature:
+                    sarvam_request["temperature"] = temperature
+
                 response = requests.post(
                     "https://api.sarvam.ai/text-to-speech",
                     headers={"api-subscription-key": settings.SARVAM_API_KEY},
