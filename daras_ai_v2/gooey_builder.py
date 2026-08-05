@@ -34,13 +34,6 @@ DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.app
 GOOEY_BUILDER_EVENT_KEY = "builder-sidebar"
 
 
-class GooeyBuilderWorkflow(typing.TypedDict):
-    current_url: str
-    current_user: str
-    current_workspace: str
-    state: dict
-
-
 def render_gooey_builder(
     *,
     event_key: str,
@@ -178,17 +171,30 @@ def builder_thread_is_empty(page: BasePage) -> bool:
     return not page.current_sr.parent_builder_saved_run
 
 
-def get_gooey_builder_photo_url() -> str:
-    """The builder's avatar, from its deployment's branding.
+def get_gooey_builder_integration() -> BotIntegration | None:
+    """The builder's deployment, or None when it is unconfigured or missing.
 
-    Falls back to the packaged image, so a missing or unconfigured integration costs a
-    default rather than a broken <img>.
+    The one place that lookup happens, so every surface showing the builder - the nav rail's
+    button, the panel's title - agrees on whether it exists at all.
     """
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
-        return DEFAULT_GOOEY_BUILDER_PHOTO_URL
+        return None
     try:
-        bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
+        return BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
     except BotIntegration.DoesNotExist:
+        return None
+
+
+def get_gooey_builder_photo_url(bi: BotIntegration | None = None) -> str:
+    """The builder's avatar, from its deployment's branding.
+
+    Falls back to the packaged image, so a missing, unconfigured or blank-branded
+    integration costs a default rather than a broken <img>. Pass `bi` when the caller has
+    already fetched it, to save the query.
+    """
+    if bi is None:
+        bi = get_gooey_builder_integration()
+    if bi is None:
         return DEFAULT_GOOEY_BUILDER_PHOTO_URL
     return (
         bi.get_web_widget_branding().get("photoUrl") or DEFAULT_GOOEY_BUILDER_PHOTO_URL

@@ -61,27 +61,22 @@ function main() {
     addEdit: false,
     addPreview: true,
     mergePreview: false,
-    newChat: false,
   });
   assertDeepEqual(workspaceControlsForLayout(preview), {
     addEdit: true,
     addPreview: false,
     mergePreview: false,
-    newChat: true,
   });
   assertDeepEqual(workspaceControlsForLayout(split), {
     addEdit: false,
     addPreview: false,
     mergePreview: true,
-    newChat: true,
   });
   assertDeepEqual(workspaceControlsForLayout(about), {
     addEdit: false,
     addPreview: false,
     mergePreview: false,
-    newChat: true,
   });
-  assertEqual(workspaceControlsForLayout(preview, false).newChat, false);
   assertDeepEqual(collapsePane(about, "preview"), {
     mode: "about",
     editorOpen: true,

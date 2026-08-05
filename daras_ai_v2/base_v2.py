@@ -64,7 +64,15 @@ from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
-from daras_ai_v2.tab_spec import TabSpec
+from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
+
+# a leaf module - pydantic models only - so there is no cycle to dodge with a lazy import
+from gooey_gui.types.recipe_top_bar_props import (
+    RecipeTopBarProps,
+    TopBarAuthor,
+    TopBarIntegration,
+    TopBarView,
+)
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
@@ -74,7 +82,6 @@ from functions.base_llm_tool import (
     call_recipe_functions,
     functions_input,
     get_workflow_tools_from_state,
-    render_called_functions,
 )
 from functions.composio_tools import ComposioLLMTool
 from functions.inbuilt_tools import get_inbuilt_tools
@@ -430,7 +437,7 @@ class BasePage:
 
     def render_unauthorized(self, owner_workspace: Workspace | None = None):
         with gui.div(className="d-flex flex-column align-items-center"):
-            gui.write('# <i class="fa-solid fa-lock"></i>', unsafe_allow_html=True)
+            gui.write(f"# {icons.lock}", unsafe_allow_html=True)
             gui.caption("Welcome to Gooey.AI")
             gui.write("# You need access")
             if not self.request.user or self.request.user.is_anonymous:
@@ -540,9 +547,11 @@ class BasePage:
             "RecipeWorkspace",
             storage_key=self._workspace_storage_key(),
             initial_view=initial_view,
-            show_preview_new_chat=self._show_preview_new_chat_button(),
         ):
-            with gui.div():
+            # mt-1 on the About card and the preview, not on the editor: those two are framed
+            # surfaces that would otherwise sit flush against the top bar's rule, while the
+            # editor leads with the pane strip, which brings its own spacing.
+            with gui.div(className="mt-1"):
                 with gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
                     self._render_about_content()
 
@@ -552,7 +561,7 @@ class BasePage:
                 else:
                     submitted = self._render_solo_input_col()
 
-            with gui.div():
+            with gui.div(className="mt-1"):
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                 else:
@@ -563,9 +572,6 @@ class BasePage:
             f"gooey:recipe-layout:{self.workflow.value}:"
             f"{self.current_pr.published_run_id}"
         )
-
-    def _show_preview_new_chat_button(self) -> bool:
-        return True
 
     def _can_show_builder(self) -> bool:
         try:
@@ -600,7 +606,7 @@ class BasePage:
         gui.component(
             "WorkspacePaneControl",
             label="Close Ask gooey",
-            icon="fa-regular fa-xmark",
+            icon=icons.cls.cancel,
             event_name=f"{GOOEY_BUILDER_EVENT_KEY}:close",
             className="v2-builder-close",
         )
@@ -620,7 +626,10 @@ class BasePage:
                 photo_url=get_gooey_builder_photo_url(),
                 show_label=True,
                 event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new",
-                className="v2-builder-new p-2",
+                # no Bootstrap padding utility here: `.v2-pane-control-labelled` owns this
+                # button's padding, and `p-2` competed with it on equal specificity, so which
+                # one won came down to stylesheet order
+                className="v2-builder-new",
             )
         render_gooey_builder(
             event_key=GOOEY_BUILDER_EVENT_KEY, request=self.request, page=self
@@ -681,7 +690,7 @@ class BasePage:
 
         self.submit_and_redirect()
 
-    def entry_tab_slug(self, tabs: list[TabSpec]) -> str:
+    def entry_tab_slug(self, tabs: list[TabSpec]) -> RecipeView:
         """Initial client view when this workflow has no stored pane layout."""
         return tabs[0].slug
 
@@ -767,7 +776,7 @@ class BasePage:
         notes = [n for n in (self.get_cost_note(), self.additional_notes()) if n]
         return label, " ".join(n.strip() for n in notes)
 
-    def _top_bar_integrations(self) -> list:
+    def _top_bar_integrations(self) -> list[TopBarIntegration]:
         """Channel shortcuts for the bar's right cluster. Recipes with public deployments
         override this; most have none."""
         return []
@@ -780,7 +789,6 @@ class BasePage:
         )
 
     def _render_top_bar(self, *, tabs: list[TabSpec]):
-        from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps, TopBarView
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
         sr, pr = self.current_sr_pr
@@ -811,7 +819,7 @@ class BasePage:
                 publish_key=self.TOP_BAR_PUBLISH_KEY,
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
                 share_key=(self.TOP_BAR_SHARE_KEY if self.can_manage_sharing() else ""),
-                share_icon="<i class='fa-regular fa-share-nodes'></i>",
+                share_icon=icons.share,
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 menu_key=self.TOP_BAR_MENU_KEY,
@@ -827,7 +835,6 @@ class BasePage:
 
     def _top_bar_author(self):
         """The "by <someone>" line. Workspace when there is one, else the run's user."""
-        from gooey_gui.types.recipe_top_bar_props import TopBarAuthor
 
         pr = self.current_pr
         if pr.workspace_id and not pr.workspace.is_personal:
@@ -861,43 +868,44 @@ class BasePage:
     PANE_QUERY_PARAM = "pane"
 
     def _render_pane_strip(
-        self, panes: dict[str, typing.Callable[[], None]], *, key: str
+        self, panes: list[PaneSpec], *, key: str
     ) -> typing.Callable[[], None]:
         """Render an in-page strip of panes and return the one to draw.
 
-        Panes are panels inside a single tab, so - unlike tabs - they have no url and no
-        spec: just an ordered label -> renderer map and a session-state key.
+        Panes are panels inside a single view, so - unlike tabs - they have no url: just an
+        ordered list of specs and a session-state key. Session state and deep links carry
+        `PaneSpec.id`, never the label, so relabelling a pane cannot break a link to it.
 
         Only the active pane renders. That is safe because the server round-trips the whole
         `session_state` regardless of what was drawn, so widgets on the panes that did not
         render keep their values (see `gooey_gui/core/renderer.py`). The corollary is that a
         pane must never depend on another pane's *return value* - read `gui.session_state`.
         """
-        labels = list(panes)
+        by_id = {pane.id: pane for pane in panes}
 
-        # A link from another tab (About's meta cards) names its pane in the url, because
+        # A link from another view (About's meta cards) names its pane in the url, because
         # session state does not survive a navigation. Honour it once: `seen_key` stops it
         # overriding the strip on every later render, which would pin the pane forever.
         seen_key = key + ":from-url"
         requested = self.request.query_params.get(self.PANE_QUERY_PARAM)
-        if requested in panes and gui.session_state.get(seen_key) != requested:
+        if requested in by_id and gui.session_state.get(seen_key) != requested:
             gui.session_state[key] = gui.session_state[seen_key] = requested
-        elif gui.session_state.get(key) not in panes:
-            gui.session_state[key] = labels[0]
+        elif gui.session_state.get(key) not in by_id:
+            gui.session_state[key] = panes[0].id
 
         with gui.styled(PANE_STRIP_CSS), gui.div(className="my-1"):
-            for label in labels:
-                is_active = label == gui.session_state[key]
+            for pane in panes:
+                is_active = pane.id == gui.session_state[key]
                 if gui.button(
-                    label,
-                    key=f"{key}:{label}",
+                    pane.label,
+                    key=f"{key}:{pane.id}",
                     type="tertiary",
                     className="pane-active" if is_active else "",
                 ):
-                    gui.session_state[key] = label
+                    gui.session_state[key] = pane.id
                     gui.rerun()
 
-        return panes[gui.session_state[key]]
+        return by_id[gui.session_state[key]].render
 
     def render_header_extra(self):
         pass
@@ -925,70 +933,6 @@ class BasePage:
                 )
             )
         )
-
-    def _render_unpublished_changes_indicator(self):
-        with gui.tag(
-            "span",
-            className="d-none d-sm-inline-block text-muted text-nowrap mx-2",
-            style=dict(fontSize="smaller", fontWeight="normal"),
-        ):
-            gui.html("Unpublished changes")
-
-    def _render_saved_generated_timestamp(self):
-        if self.get_run_state(gui.session_state) not in {
-            RecipeRunState.completed,
-            RecipeRunState.failed,
-        }:
-            # only render for completed/failed runs and on run/preview tab
-            return
-
-        sr, pr = self.current_sr_pr
-        if pr.saved_run_id == sr.id:
-            dt = pr.updated_at
-        else:
-            dt = sr.updated_at
-
-        tooltip_content = ""
-        run_time = gui.session_state.get(StateKeys.run_time, 0)
-        if run_time:
-            tooltip_content += (
-                f'Generated in <span style="color: black;">{run_time:.1f}s</span>'
-            )
-
-        if seed := gui.session_state.get("seed"):
-            tooltip_content += f' with seed <span style="color: black;">{seed}</span> '
-
-        updated_at = gui.session_state.get(
-            StateKeys.updated_at, datetime.datetime.today()
-        )
-        if isinstance(updated_at, str):
-            updated_at = datetime.datetime.fromisoformat(updated_at)
-        if updated_at:
-            tooltip_content += " on " + updated_at.strftime("%b %d, %-I:%M %p")
-
-        with (
-            gui.div(
-                className="container-margin-reset d-none d-md-block",
-                style=dict(
-                    position="absolute",
-                    top="50%",
-                    right="0",
-                    transform="translateY(-50%)",
-                    fontSize="smaller",
-                    fontWeight="normal",
-                ),
-            ),
-            gui.tag(
-                "span", className="text-muted d-none d-md-flex gap-2 align-items-center"
-            ),
-        ):
-            self._render_report_button()
-            gui.write(get_relative_time(dt))
-            with (
-                gui.tooltip(tooltip_content),
-                gui.tag("span", className="text-muted d-inline-block"),
-            ):
-                gui.html(icons.info)
 
     def _render_options_button_with_dialog(self):
         ref = gui.use_alert_dialog(key="options-modal")
@@ -1412,7 +1356,7 @@ class BasePage:
                 ref = gui.use_confirm_dialog(key="--delete-run-modal")
                 gui.button_with_confirm_dialog(
                     ref=ref,
-                    trigger_label='<i class="fa-regular fa-trash"></i> Delete',
+                    trigger_label=f"{icons.trash} Delete",
                     trigger_className="w-100 text-danger",
                     modal_title="#### Are you sure?",
                     modal_content=f"""
@@ -1576,46 +1520,26 @@ class BasePage:
         """The client views for this request, in selector order."""
         return [
             TabSpec(
-                slug="about",
+                slug=RecipeView.about,
                 label="About",
                 icon=icons.info,
             ),
             TabSpec(
-                slug="edit",
+                slug=RecipeView.edit,
                 label="Edit",
                 icon=icons.edit,
             ),
             TabSpec(
-                slug="preview",
+                slug=RecipeView.preview,
                 label="Preview",
                 icon=icons.preview,
             ),
             TabSpec(
-                slug="split",
+                slug=RecipeView.split,
                 label="Split",
                 icon=icons.run,
             ),
         ]
-
-    def _render_about_tab(self):
-        """What this workflow is, beside a live preview of it.
-
-        Same column split as Split/Config/Preview, so the preview keeps its position as you
-        move between tabs instead of jumping around the page.
-        """
-        with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
-            about_col, preview_col = gui.columns([3, 2], gap="medium")
-            with about_col, gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
-                self._render_about_content()
-            with preview_col:
-                if self.current_sr.retention_policy == RetentionPolicy.delete:
-                    # the description is still worth reading even when the run's data is gone
-                    gui.caption(
-                        "This run's output has been deleted as per the retention policy."
-                    )
-                else:
-                    with self._preview_frame():
-                        self._render_output_col()
 
     def _render_about_content(self):
         """What this workflow is. The one surface in v2 that is not a re-slice of v1.
@@ -1701,13 +1625,6 @@ class BasePage:
         tools; a media-gen recipe has none of those - so the base renders nothing.
         """
 
-    def _render_config_tab(self):
-        if self._render_deleted_output_if_needed():
-            return
-        if self._render_solo_input_col():
-            # v1 submits from the output col, which this tab doesn't render
-            self.submit_and_redirect()
-
     def _render_solo_input_col(self) -> bool:
         """The working column on its own, in the same row/column wrapper Split uses.
 
@@ -1731,11 +1648,6 @@ class BasePage:
                 ),
             ):
                 return self._render_input_col()
-
-    def _render_preview_tab(self):
-        if self._render_deleted_output_if_needed():
-            return
-        self._render_output_col()
 
     def _preview_frame(self):
         """Frames the preview when it shares the view with something else.
@@ -2293,25 +2205,6 @@ class BasePage:
         else:
             return self.get_price_roundoff(gui.session_state)
 
-    def _render_step_row(self, key="details-expander"):
-        with gui.expander("**🐞 Debug**", key=key):
-            if not gui.session_state.get(key):
-                return
-            render_called_functions(
-                saved_run=self.current_sr, trigger=FunctionTrigger.pre
-            )
-            self.render_steps()
-            render_called_functions(
-                saved_run=self.current_sr, trigger=FunctionTrigger.post
-            )
-            gui.caption(
-                f"""
-                Run Time: {self.current_sr.run_time.total_seconds():.2f}s\n\n
-                [Parent Run]({self.current_sr.parent and self.current_sr.parent.get_app_url()})
-                """,
-                unsafe_allow_html=True,
-            )
-
     # v1's `_render_help` - the "How to Use This Recipe" guide plus the Discord embed - is
     # deliberately absent. About is the recipe's description, not its manual, and it was the
     # only v2 surface that rendered it. `render_usage_guide` stays: recipes still override it
@@ -2374,7 +2267,7 @@ class BasePage:
 
         with gui.tooltip("Report"):
             reported = gui.button(
-                '<i class="fa-regular fa-flag"></i>',
+                icons.flag,
                 type="tertiary",
                 className="mb-0 p-1",
             )
@@ -2826,9 +2719,7 @@ class BasePage:
 
     def _render_regenerate_button(self):
         if "seed" in self.RequestModel.schema_json():
-            randomize = gui.button(
-                '<i class="fa-solid fa-recycle"></i> Regenerate', type="tertiary"
-            )
+            randomize = gui.button(f"{icons.regenerate} Regenerate", type="tertiary")
             if randomize:
                 gui.session_state[StateKeys.pressed_randomize] = True
                 gui.rerun()

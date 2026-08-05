@@ -20,11 +20,9 @@ export function RecipeWorkspace({
   state,
   storage_key,
   initial_view,
-  show_preview_new_chat,
 }: CustomComponentProps & {
   storage_key: string;
   initial_view: RecipeView;
-  show_preview_new_chat: boolean;
 }) {
   const { layout, hydrated, selectView, collapse } = usePaneLayout(
     storage_key,
@@ -35,10 +33,7 @@ export function RecipeWorkspace({
   const editorOpen = layout.mode === "work" && layout.editorOpen;
   const previewOpen =
     layout.previewOpen && (layout.mode === "about" || layout.mode === "work");
-  const controls = workspaceControlsForLayout(layout, show_preview_new_chat);
-  const startNewChat = () => {
-    document.getElementById("onNewConversation")?.click();
-  };
+  const controls = workspaceControlsForLayout(layout);
 
   return (
     <div
@@ -109,17 +104,6 @@ export function RecipeWorkspace({
               onClick={() => selectView("split")}
             />
           )
-        }
-        rightControls={
-          <>
-            {controls.newChat && (
-              <WorkspacePaneControl
-                label="New chat"
-                icon="fa-regular fa-plus"
-                onClick={startNewChat}
-              />
-            )}
-          </>
         }
       />
     </div>

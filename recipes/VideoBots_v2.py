@@ -3,6 +3,7 @@ import json
 import math
 import traceback
 import typing
+from enum import Enum
 from functools import cached_property
 from itertools import zip_longest
 
@@ -97,7 +98,8 @@ from daras_ai_v2.search_ref import (
     apply_response_formattings_suffix,
     parse_refs,
 )
-from daras_ai_v2.tab_spec import TabSpec
+from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
+from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -171,6 +173,23 @@ MODEL_ROW_CSS = """
     border-radius: 10px;
 }
 """
+
+
+# `(str, Enum)` rather than `enum.StrEnum`: this runs on 3.10, where StrEnum does not exist.
+# Matching `BulkRunnerRunState` in gooey_gui/types/bulk_progress_props.py.
+class ConfigPane(str, Enum):
+    """Stable ids for the working column's panes.
+
+    These are what session state and the About cards' deep links carry, so they must not
+    change; the labels beside them in `_config_panes()` are display-only and can.
+    """
+
+    llm_instructions = "llm-instructions"
+    knowledge = "knowledge"
+    tools = "tools"
+    settings = "settings"
+    deploy = "deploy"
+    debug = "debug"
 
 
 class ReplyButton(typing_extensions.TypedDict):
@@ -1375,9 +1394,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             run_url=str(self.request.url),
         )
 
-    def _show_preview_new_chat_button(self) -> bool:
-        return not self._has_whatsapp_integration
-
     @cached_property
     def _has_whatsapp_integration(self) -> bool:
         return BotIntegration.objects.filter(
@@ -1430,7 +1446,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 text_output("###### `final_prompt`", value=final_prompt, height=300)
             else:
                 gui.write(
-                    '###### <i class="fa-sharp fa-light fa-rectangle-terminal"></i> `final_prompt`',
+                    f"###### {icons.terminal} `final_prompt`",
                     unsafe_allow_html=True,
                 )
                 gui.json(final_prompt, depth=5)
@@ -1504,13 +1520,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
 
     DEMO_ACTION_PREFIX = "demo:"
 
-    def _top_bar_integrations(self) -> list:
+    def _top_bar_integrations(self) -> list[TopBarIntegration]:
         """v1's demo buttons, as chips in the top bar.
 
         They open a dialog rather than navigating, so each carries an action key instead of
         an href and comes back through the bar's menu key.
         """
-        from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
         from widgets.demo_button import get_demo_bots
 
         integrations = []
@@ -1547,13 +1562,13 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         # v2 surfaces the demo buttons as chips in the top bar instead
         pass
 
-    def entry_tab_slug(self, tabs: list[TabSpec]) -> str:
+    def entry_tab_slug(self, tabs: list[TabSpec]) -> RecipeView:
         """Show About to a first-time visitor and Split to everyone else.
 
         Someone who has arrived at a workflow they do not own wants to know what it is
         before they meet its knobs; someone opening their own run wants to work.
         """
-        return "about" if self.is_unowned_example() else "split"
+        return RecipeView.about if self.is_unowned_example() else RecipeView.split
 
     def get_tab_spec(self) -> list[TabSpec]:
         """The agent tab set.
@@ -1564,24 +1579,24 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         """
         return [
             TabSpec(
-                slug="about",
+                slug=RecipeView.about,
                 label="About",
                 icon=icons.info,
             ),
             TabSpec(
-                slug="edit",
+                slug=RecipeView.edit,
                 label="Edit",
                 icon=icons.edit,
             ),
             TabSpec(
-                slug="preview",
+                slug=RecipeView.preview,
                 label="Preview",
                 icon=icons.preview,
                 # one full-bleed surface; on a phone it takes the whole screen
                 immersive_on_mobile=True,
             ),
             TabSpec(
-                slug="split",
+                slug=RecipeView.split,
                 label="Split",
                 icon=icons.split,
                 # two columns side by side - there is no room for it on a phone
@@ -1590,7 +1605,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         ]
 
     CONFIG_PANE_KEY = "--config-subtab"
-    DEPLOY_PANE = "Deploy"
 
     def _render_about_meta(self):
         """How this agent is put together: its model, what it knows, what it can do.
@@ -1598,15 +1612,17 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         Each card is a way into the Config pane that owns the setting, so About reads as a
         summary you can act on rather than a dead-end description.
         """
-        cards = []
+        cards: list[tuple[str, str, ConfigPane]] = []
         if model := self._about_model_summary():
-            cards.append((*model, "LLM Instructions"))
+            cards.append((*model, ConfigPane.llm_instructions))
         if documents := len(gui.session_state.get("documents") or []):
             plural = "" if documents == 1 else "s"
-            cards.append((icons.library, f"{documents} document{plural}", "Knowledge"))
+            cards.append(
+                (icons.library, f"{documents} document{plural}", ConfigPane.knowledge)
+            )
         if tools := len(gui.session_state.get("functions") or []):
             plural = "" if tools == 1 else "s"
-            cards.append((icons.code, f"{tools} tool{plural}", "Tools"))
+            cards.append((icons.code, f"{tools} tool{plural}", ConfigPane.tools))
 
         # a row of zeroes says less than no row: skip the heading too, not just the cards
         if not cards:
@@ -1630,12 +1646,12 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             return icons.sparkles, name
         return (spec.creator and spec.creator.html_icon()) or icons.sparkles, spec.label
 
-    def _render_about_meta_card(self, *, icon: str, label: str, pane: str):
+    def _render_about_meta_card(self, *, icon: str, label: str, pane: ConfigPane):
         with gui.component(
             "RecipeWorkspaceTrigger",
             storage_key=self._workspace_storage_key(),
             initial_view=self.entry_tab_slug(self.get_tab_spec()),
-            view="edit",
+            view=RecipeView.edit,
             state_key=self.CONFIG_PANE_KEY,
             state_value=pane,
             className="v2-about-meta-card",
@@ -1652,29 +1668,33 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         Deploy is a wide configuration surface that carries its own web preview, so pairing
         it with the chat preview leaves both cramped. It takes the full width instead.
         """
-        if gui.session_state.get(self.CONFIG_PANE_KEY) == self.DEPLOY_PANE:
+        if gui.session_state.get(self.CONFIG_PANE_KEY) == ConfigPane.deploy:
             # one column of 12 rather than no column at all, so the full-width pane keeps
             # the same gutters as the two-column layout. No submit row here to redirect on.
             self._render_solo_input_col()
             return
         super()._render_split_tab()
 
-    def _config_panes(self) -> dict[str, typing.Callable[[], None]]:
+    def _config_panes(self) -> list[PaneSpec]:
         """The working column's panes, in strip order.
 
         These regroup what v1 spread across `render_form_v2` and the Settings expander -
         every pane composes existing widgets, none of them reimplement anything.
         """
-        return {
-            "LLM Instructions": self._render_llm_instructions_pane,
-            "Knowledge": self._render_knowledge_pane,
+        return [
+            PaneSpec(
+                ConfigPane.llm_instructions,
+                "LLM Instructions",
+                self._render_llm_instructions_pane,
+            ),
+            PaneSpec(ConfigPane.knowledge, "Knowledge", self._render_knowledge_pane),
             # functions only - the variables half of v1's block moved to a dialog beside the
             # prompt. Rendering it here too would mean two editors on the same widget keys.
-            "Tools": self._render_functions,
-            "Settings": self._render_settings_pane,
-            "Deploy": self._render_deploy_panel,
-            "Debug": self._render_debug_pane,
-        }
+            PaneSpec(ConfigPane.tools, "Tools", self._render_functions),
+            PaneSpec(ConfigPane.settings, "Settings", self._render_settings_pane),
+            PaneSpec(ConfigPane.deploy, "Deploy", self._render_deploy_panel),
+            PaneSpec(ConfigPane.debug, "Debug", self._render_debug_pane),
+        ]
 
     def _render_input_col(self):
         """The working column, shared by Config (alone) and Split (beside the preview).
@@ -1710,8 +1730,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         # "(0)" reads as a broken counter rather than an empty list, so it is left off
         count = len(self.variable_names())
         if gui.button(
-            '<i class="fa-solid fa-brackets-curly"></i> Variables'
-            + (f" ({count})" if count else ""),
+            f"{icons.variables} Variables" + (f" ({count})" if count else ""),
             type="tertiary",
             # ms-auto pushes it to the far end of the row, opposite the model selector.
             # fw-normal + small because `.btn.btn-theme` is bold at body size, and a
@@ -1785,8 +1804,7 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         ).exists():
             bulk_documents_uploader(
                 label=(
-                    "#### <i class='fa-light fa-books' style='fontSize:20px'></i> "
-                    + field_title(self.RequestModel, "documents")
+                    f"#### {icons.books} " + field_title(self.RequestModel, "documents")
                 ),
                 accept=["audio/*", "application/*", "video/*", "text/*"],
                 help=field_desc(self.RequestModel, "documents"),

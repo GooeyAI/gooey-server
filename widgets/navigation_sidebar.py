@@ -9,7 +9,6 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.gooey_builder import (
-    DEFAULT_GOOEY_BUILDER_PHOTO_URL,
     GOOEY_BUILDER_EVENT_KEY,
 )
 from gooey_gui.types.navigation_sidebar_props import (
@@ -33,6 +32,7 @@ from widgets.workflow_queries import (
 if TYPE_CHECKING:
     from app_users.models import AppUser
     from bots.models import PublishedRun, SavedRun
+    from bots.models.workflow import WorkflowMetadata
     from workspaces.models import Workspace
 
 RECENT_WORKFLOW_LIST_LIMIT = 20
@@ -224,14 +224,14 @@ def _load_menu_links(
             MenuLinkData(
                 label="Profile",
                 href=get_route_path(profile_route),
-                icon="fa-regular fa-user",
+                icon=icons.cls.user,
             )
         )
     links.append(
         MenuLinkData(
             label="Billing",
             href=get_route_path(account_route),
-            icon="fa-regular fa-credit-card",
+            icon=icons.cls.credit_card,
         )
     )
     # Pricing targets logged-out visitors; signed-in users manage spend via Billing.
@@ -399,7 +399,7 @@ def _history_title(sr: SavedRun, pr: PublishedRun | None) -> str:
     ).title_with_prefix()
 
 
-def _workflow_icon(metadata) -> str:
+def _workflow_icon(metadata: WorkflowMetadata | None) -> str:
     return (metadata and (metadata.fa_icon or metadata.emoji)) or ""
 
 
@@ -427,19 +427,18 @@ def _load_gooey_builder_data(
     if not can_launch_gooey_builder(request, workspace):
         return None
 
-    from bots.models import BotIntegration
-
-    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
-        return None
-    try:
-        bi = BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
-    except BotIntegration.DoesNotExist:
-        return None
-    photo_url = bi.get_web_widget_branding().get(
-        "photoUrl", DEFAULT_GOOEY_BUILDER_PHOTO_URL
+    from daras_ai_v2.gooey_builder import (
+        get_gooey_builder_integration,
+        get_gooey_builder_photo_url,
     )
+
+    bi = get_gooey_builder_integration()
+    if bi is None:
+        return None
     return GooeyBuilderData(
-        photo_url=photo_url,
+        # shared with the Builder panel's own title button, so the rail and the panel cannot
+        # end up showing different avatars
+        photo_url=get_gooey_builder_photo_url(bi),
         name=bi.name,
         event_key=GOOEY_BUILDER_EVENT_KEY,
     )
@@ -481,7 +480,7 @@ def _normalize_path(path: str) -> str:
     return path.rstrip("/") or "/"
 
 
-def _workspace_subtitle(ws, member_count: int) -> str:
+def _workspace_subtitle(ws: Workspace, member_count: int) -> str:
     if ws.is_personal:
         return "Personal"
     return f"Org · {member_count} member" + ("" if member_count == 1 else "s")

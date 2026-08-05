@@ -86,3 +86,23 @@ integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_
 help_guide = '<i class="fa-duotone fa-solid fa-life-ring"></i>'
 
 split = '<i class="fa-regular fa-table-columns"></i>'
+share = '<i class="fa-regular fa-share-nodes"></i>'
+trash = '<i class="fa-regular fa-trash"></i>'
+flag = '<i class="fa-regular fa-flag"></i>'
+regenerate = '<i class="fa-solid fa-recycle"></i>'
+terminal = '<i class="fa-sharp fa-light fa-rectangle-terminal"></i>'
+variables = '<i class="fa-solid fa-brackets-curly"></i>'
+books = '<i class="fa-light fa-books"></i>'
+
+
+# Bare FontAwesome class names, no <i> wrapper.
+#
+# Most of this module is ready-to-render html, which is what `gui.html`, `NavItemData.icon`
+# and friends want. A few React props build the element themselves - `MenuLinkData.icon`
+# (AccountMenuItem, PrimaryNavItems) and `WorkspacePaneControl.icon` both render
+# `<i className={icon}>` - so they need the class alone and cannot use the constants above.
+# Names here mirror their html counterparts.
+class cls:
+    user = "fa-regular fa-user"
+    credit_card = "fa-regular fa-credit-card"
+    cancel = "fa-regular fa-xmark"

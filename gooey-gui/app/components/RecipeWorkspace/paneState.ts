@@ -151,16 +151,12 @@ export function viewAfterRun(
   return activeView;
 }
 
-export function workspaceControlsForLayout(
-  layout: PaneLayout,
-  allowNewChat = true
-) {
+export function workspaceControlsForLayout(layout: PaneLayout) {
   if (layout.mode === "about") {
     return {
       addEdit: false,
       addPreview: false,
       mergePreview: false,
-      newChat: allowNewChat && layout.previewOpen,
     };
   }
   if (layout.editorOpen && layout.previewOpen) {
@@ -168,7 +164,6 @@ export function workspaceControlsForLayout(
       addEdit: false,
       addPreview: false,
       mergePreview: true,
-      newChat: allowNewChat,
     };
   }
   if (layout.editorOpen) {
@@ -176,14 +171,12 @@ export function workspaceControlsForLayout(
       addEdit: false,
       addPreview: true,
       mergePreview: false,
-      newChat: false,
     };
   }
   return {
     addEdit: layout.previewOpen,
     addPreview: false,
     mergePreview: false,
-    newChat: allowNewChat && layout.previewOpen,
   };
 }
 
