@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-from bots.models import WorkflowAccessLevel, PublishedRun, SavedRun
+import json
 import typing
 
+import pydantic
+from fastapi.encoders import jsonable_encoder
+
+import gooey_gui as gui
 from app_users.models import AppUser
+from bots.models import PublishedRun, SavedRun, WorkflowAccessLevel
 from bots.models.workflow import Workflow
+from daras_ai_v2.base import BasePage, extract_model_fields
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.workflow_url_input import url_to_runs
 from functions.base_llm_tool import (
     BaseLLMTool,
 )
-
-from daras_ai_v2.base import BasePage, extract_model_fields
-
-from daras_ai_v2.workflow_url_input import url_to_runs
-import gooey_gui as gui
-
-import json
-from fastapi.encoders import jsonable_encoder
-
 from widgets.workflow_search import SearchFilters, get_filtered_published_runs
 from workspaces.models import Workspace
 
@@ -188,9 +186,20 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
             state = sr.state
             properties = page_cls.get_tool_call_schema(state)
 
-            current_workflow_state = dict(
-                request=extract_model_fields(page_cls.RequestModel, state),
-                response=extract_model_fields(page_cls.ResponseModel, state),
+            try:
+                request = page_cls.RequestModel.model_validate(state)
+            except pydantic.ValidationError:
+                request = extract_model_fields(page_cls.RequestModel, state)
+            try:
+                response = page_cls.ResponseModel.model_validate(state)
+            except pydantic.ValidationError:
+                response = extract_model_fields(page_cls.ResponseModel, state)
+
+            current_workflow_state = json.dumps(
+                jsonable_encoder(
+                    dict(request=request, response=response),
+                    exclude_unset=True,
+                )
             )
             description = (
                 "Call this tool to update the current workflow state without running it.\n\n"
@@ -198,7 +207,7 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
                 "By default, this tool will update the current workflow state. "
                 f"You may call `{FetchWorkflowStateLLMTool.name}` to get the state of any workflow given its run_url "
                 "and then call this tool with the run_url to update.\n\n"
-                f"Current Workflow State: {json.dumps(jsonable_encoder(current_workflow_state))}"
+                f"Current Workflow State: {current_workflow_state}"
             )
         else:
             properties = {}
