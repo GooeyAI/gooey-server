@@ -20,6 +20,7 @@ const MOBILE_MEDIA_QUERY = "(max-width: 991.98px)";
 
 export function NavigationSidebar({
   logo_image_url,
+  logo_href,
   nav_items,
   active_key,
   collapsed_state_key,
@@ -121,6 +122,7 @@ export function NavigationSidebar({
     <div>
       <NavigationHeaderMobile
         logo_image_url={logo_image_url}
+        logo_href={logo_href}
         isMobile={isMobile}
         drawerOpen={drawerOpen}
         onDrawerOpen={() => setCollapsed(false)}
@@ -137,6 +139,7 @@ export function NavigationSidebar({
       >
         <NavigationHeader
           logo_image_url={logo_image_url}
+          logo_href={logo_href}
           railCollapsed={railCollapsed}
           isMobile={isMobile}
           onExpand={expandRail}

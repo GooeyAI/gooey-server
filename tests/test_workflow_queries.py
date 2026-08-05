@@ -95,6 +95,42 @@ def test_recent_run_ids_optionally_includes_builder_runs(
     assert navigation_ids == [builder_run.id, history_run.id]
 
 
+def test_recent_run_ids_includes_childless_builder_conversations(
+    transactional_db, force_authentication
+):
+    user = force_authentication
+    workspace = user.get_or_create_personal_workspace()[0]
+    # a standalone /new/ conversation: the builder_prompt is its thread head and
+    # never produced a workflow child, so it isn't covered by the history or
+    # builder_child queries.
+    thread = MessageThread.objects.create(title="Which AI models understand Hausa?")
+    builder_prompt = _make_sr(
+        uid=user.uid,
+        workspace=workspace,
+        surface=SavedRun.Surface.builder_prompt,
+        message_thread=thread,
+    )
+    thread.last_run = builder_prompt
+    thread.save(update_fields=["last_run"])
+
+    home_ids = recent_run_ids(
+        user,
+        workspace,
+        limit=5,
+        include_builder_runs=False,
+    )
+    navigation_ids = recent_run_ids(
+        user,
+        workspace,
+        limit=5,
+        include_builder_runs=True,
+    )
+
+    # absent from the home page, surfaced in the navigation sidebar
+    assert home_ids == []
+    assert navigation_ids == [builder_prompt.id]
+
+
 def _make_published_run(user, workspace) -> PublishedRun:
     root_sr = _make_sr(
         uid=user.uid,

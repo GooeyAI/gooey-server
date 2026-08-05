@@ -53,6 +53,7 @@ export interface NavAccountData {
 }
 export interface NavigationSidebarProps {
   logo_image_url: string;
+  logo_href: string;
   nav_items: NavItemData[];
   active_key: string | null;
   collapsed_state_key: string;
