@@ -117,6 +117,16 @@ PUBLISH_AFTER_LOGIN_Q = "publishafterlogin"
 STARTING_STATE = "Starting..."
 
 
+def format_credits_as_dollars(credits: int) -> str:
+    """A credit count as the price a user pays for it.
+
+    `ADDON_CREDITS_PER_DOLLAR` is the one conversion rate in the codebase - at its default of
+    100 a credit is exactly a cent - so prices shown here always agree with what billing
+    charges, whatever the rate is set to.
+    """
+    return f"${credits / settings.ADDON_CREDITS_PER_DOLLAR:.2f}"
+
+
 class RecipeRunState(Enum):
     standby = "standby"
     starting = "starting"
@@ -471,7 +481,10 @@ class BasePage:
         immersive = bool(active and active.immersive_on_mobile)
         top_bar_placeholder = gui.div(
             className=(
-                "flex-shrink-0 w-100 px-2 px-lg-4 py-2"
+                # v2-topbar-container makes this a CSS query container, so the bar's chips size
+                # themselves against the bar's own width rather than the viewport's - the two
+                # differ whenever the Builder is open or the rail is expanded
+                "v2-topbar-container flex-shrink-0 w-100 px-2 px-lg-4 py-2"
                 + (" v2-immersive-topbar" if immersive else "")
             )
         )
@@ -494,8 +507,10 @@ class BasePage:
                 className=(
                     # h-100 rather than flex-grow-1: the Sidebar puts three elements between
                     # this and the flex column above, and the nearest parent is a plain
-                    # block, so there is no flex context left to grow into
-                    "d-flex flex-column h-100 w-100 overflow-auto px-2 px-lg-4 pb-1 pb-lg-2"
+                    # block, so there is no flex context left to grow into.
+                    # px-lg-3 rather than px-4: the working column adds no gutter of its own,
+                    # so the page's padding is the whole left margin the panes get.
+                    "d-flex flex-column h-100 w-100 overflow-auto px-2 px-lg-3 pb-1 pb-lg-2"
                     # below lg an immersive tab fills everything under the app header, so
                     # the page's own padding gets out of its way
                     + (" v2-immersive-mobile" if immersive else "")
@@ -544,15 +559,17 @@ class BasePage:
         )
 
     def _render_gooey_builder(self):
-        # Below the sidebar's desktop breakpoint the panel goes full-screen fixed and covers
-        # the top bar, close button included - and v2 hides the widget's own header - so the
-        # panel has to carry its own way out. Absolute against `.gooey-sidebar`, which is
-        # positioned at every breakpoint; the `display: contents` html wrapper adds no box,
-        # so this costs the panel's height chain nothing.
+        # The panel's own collapse control, pinned to its top-right corner at every
+        # breakpoint. Absolute against `.gooey-sidebar`, which is positioned either way
+        # (sticky on desktop, fixed below the sidebar breakpoint), so there is no app-header
+        # offset to hardcode; the `display: contents` html wrapper adds no box, so this costs
+        # the panel's height chain nothing.
         gui.html(
-            '<button type="button" class="v2-builder-close" title="Close Builder"'
-            ' aria-label="Close Builder" onclick="window.dispatchEvent(new Event('
-            f"'{GOOEY_BUILDER_EVENT_KEY}:close'))\">{icons.cancel}</button>"
+            '<button type="button" class="v2-builder-close" title="Collapse Builder"'
+            ' aria-label="Collapse Builder" onclick="window.dispatchEvent(new Event('
+            f"'{GOOEY_BUILDER_EVENT_KEY}:close'))\">"
+            '<i class="fa-regular fa-arrow-down-left-and-arrow-up-right-to-center"></i>'
+            "</button>"
         )
         render_gooey_builder(
             event_key=GOOEY_BUILDER_EVENT_KEY, request=self.request, page=self
@@ -746,7 +763,7 @@ class BasePage:
             # deferred pricing - show nothing rather than "$None"
             return "", ""
 
-        label = f"${credits / settings.ADDON_CREDITS_PER_DOLLAR:.2f}"
+        label = format_credits_as_dollars(credits)
 
         notes = [n for n in (self.get_cost_note(), self.additional_notes()) if n]
         return label, " ".join(n.strip() for n in notes)
@@ -777,8 +794,6 @@ class BasePage:
                 photo_url=pr.photo_url or None,
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._top_bar_author(),
-                builder_close_event=f"{GOOEY_BUILDER_EVENT_KEY}:close",
-                builder_open=bool(gui.session_state.get(GOOEY_BUILDER_EVENT_KEY)),
                 # a single-tab recipe renders no pill group - the component checks length
                 immersive_on_mobile=bool(active and active.immersive_on_mobile),
                 tabs=[
@@ -794,6 +809,7 @@ class BasePage:
                 ],
                 publish_label=self._top_bar_publish_label(),
                 publish_key=self.TOP_BAR_PUBLISH_KEY,
+                api_href=self.current_app_url(RecipeTabs.run_as_api),
                 share_key=(self.TOP_BAR_SHARE_KEY if self.can_manage_sharing() else ""),
                 share_icon="<i class='fa-regular fa-share-nodes'></i>",
                 has_unpublished_changes=self._has_request_changed()
@@ -1582,8 +1598,10 @@ class BasePage:
                 render=self._render_about_tab,
             ),
             TabSpec(
+                # slug stays "config": it is the url and the route name, and renaming it
+                # would break every published link. Only the label is the product's to change.
                 slug="config",
-                label="Config",
+                label="Edit",
                 icon=icons.edit,
                 render=self._render_config_tab,
             ),
@@ -1632,16 +1650,39 @@ class BasePage:
         """
         sr, pr = self.current_sr_pr
         with gui.div(className="v2-about-card"):
-            gui.html(
-                f'<h1 class="v2-about-title">{html.escape(pr.title or self.title)}</h1>'
-            )
-            self._render_about_byline(sr, pr)
+            # photo, title and byline are one row: the image identifies the workflow and the
+            # title names it, so they belong on the same line rather than stacked with the
+            # image taking a band of its own
+            with gui.div(className="v2-about-head"):
+                self._render_about_photo(pr)
+                with gui.div(className="v2-about-headtext"):
+                    gui.html(
+                        f'<h1 class="v2-about-title">'
+                        f"{html.escape(pr.title or self.title)}</h1>"
+                    )
+                    self._render_about_byline(sr, pr)
             # full text, unlike v1's `line_clamp=3` on the Run tab - the tab exists to be read
             if pr.notes:
                 with gui.div(className="container-margin-reset v2-about-notes"):
                     gui.write(pr.notes)
             self._render_about_meta()
-            self._render_about_help()
+
+    def _render_about_photo(self, pr: PublishedRun):
+        """The workflow's own image, beside the title - an avatar, not a banner.
+
+        A workflow photo is a square-ish icon, so it is drawn at a fixed size either way and
+        only its corner radius changes: `CIRCLE_IMAGE_WORKFLOWS` (agents) get the same round
+        portrait the top bar and the rail already give them.
+        """
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+
+        if not pr.photo_url:
+            return
+        circle = self.workflow in CIRCLE_IMAGE_WORKFLOWS
+        gui.html(
+            f'<img class="v2-about-photo{" v2-about-photo-circle" if circle else ""}"'
+            f' src="{html.escape(pr.photo_url)}" alt="">'
+        )
 
     def _render_about_byline(self, sr: SavedRun, pr: PublishedRun):
         """Who published this and how much else they have published, with Share opposite."""
@@ -1683,11 +1724,6 @@ class BasePage:
         What "put together" means is per-recipe - an agent has a model, a knowledge base and
         tools; a media-gen recipe has none of those - so the base renders nothing.
         """
-
-    def _render_about_help(self):
-        """The usage guide, last and small. It is reference material, not the pitch."""
-        with gui.div(className="v2-about-help"):
-            self._render_help()
 
     def _render_config_tab(self):
         if self._render_deleted_output_if_needed():
@@ -2255,7 +2291,11 @@ class BasePage:
         url = self.get_credits_click_url()
         run_cost = self.get_run_cost_credits()
         if run_cost is not None:
-            ret = f'Run cost = <a href="{url}">{run_cost} credits</a>'
+            # dollars, not credits - the same readout the top bar shows, so the two places a
+            # price appears on this page cannot disagree
+            ret = (
+                f'Run cost = <a href="{url}">{format_credits_as_dollars(run_cost)}</a>'
+            )
         else:
             ret = ""
 
@@ -2296,36 +2336,10 @@ class BasePage:
                 unsafe_allow_html=True,
             )
 
-    def _render_help(self):
-        placeholder = gui.div()
-        try:
-            self.render_usage_guide()
-        except NotImplementedError:
-            pass
-        else:
-            with placeholder:
-                gui.write(
-                    """
-                    ## How to Use This Recipe
-                    """
-                )
-
-        key = "discord-expander"
-        with gui.expander(
-            f"**🙋🏽‍♀️ Need more help? [Join our Discord]({settings.DISCORD_INVITE_URL})**",
-            key=key,
-        ):
-            if not gui.session_state.get(key):
-                return
-            gui.markdown(
-                """
-                <div style="position: relative; padding-bottom: 56.25%; height: 500px; max-width: 500px;">
-                <iframe src="https://e.widgetbot.io/channels/643360566970155029/1046049067337273444" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
+    # v1's `_render_help` - the "How to Use This Recipe" guide plus the Discord embed - is
+    # deliberately absent. About is the recipe's description, not its manual, and it was the
+    # only v2 surface that rendered it. `render_usage_guide` stays: recipes still override it
+    # and v1 still shows it.
     def render_usage_guide(self):
         raise NotImplementedError
 
@@ -3501,8 +3515,9 @@ SPLIT_PANES_CSS = """
     & > div {
         height: 100%;
         min-height: 0;
-        /* breathing room inside each pane; on the row's children, because a wrapper div
-           around `with input_col:` would mount beside the row, not around the columns */
+        /* the working column starts at the page's own padding, with no gutter on top of it -
+           on the row's children, because a wrapper div around `with input_col:` would mount
+           beside the row, not around the columns */
         padding-left: 0px;
     }
     /* Neither column scrolls as a whole. The left column is a flex stack whose *pane*
@@ -3510,6 +3525,13 @@ SPLIT_PANES_CSS = """
        which manages its own scrolling. */
     & > div {
         overflow: hidden;
+    }
+    /* The preview sits flush against the page's right edge: it is a framed surface of its
+       own, so a gutter between the frame and the edge just wastes width the chat could use.
+       `:not(:first-child)` keeps this to the *second* of two columns - on Config the single
+       working column is both first and last, and it keeps its gutter. */
+    & > div:last-child:not(:first-child) {
+        padding-right: 0;
     }
 }
 """
@@ -3583,11 +3605,42 @@ ABOUT_CSS = """
     padding: 1.25rem;
 }
 
+/* Leads the card. A banner by default; `CIRCLE_IMAGE_WORKFLOWS` gets a portrait instead,
+   which is the shape an agent's avatar is drawn for. */
+/* The card's header: avatar on one side, title and byline stacked beside it. */
+& .v2-about-head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+/* takes the rest of the row, so the byline's `margin-left: auto` still puts Share against
+   the card's right edge rather than against the title's */
+& .v2-about-headtext {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+& .v2-about-photo {
+    display: block;
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+& .v2-about-photo-circle {
+    border-radius: 50%;
+}
+
 & .v2-about-title {
     font-size: 1.6rem;
     font-weight: 600;
     line-height: 1.3;
-    margin: 0 0 1rem 0;
+    /* the byline sits directly under it inside the same column */
+    margin: 0 0 0.25rem 0;
 }
 
 & .v2-about-byline {
@@ -3595,19 +3648,21 @@ ABOUT_CSS = """
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
-    margin-bottom: 1.25rem;
 }
 
+/* a secondary line under the title now, not a block of its own - so the author's mark stays
+   well under the workflow avatar it sits beside */
 & .v2-about-byline-photo {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     object-fit: cover;
     flex-shrink: 0;
 }
 
 & .v2-about-byline-name {
     font-weight: 600;
+    font-size: 0.875rem;
     line-height: 1.2;
 }
 
@@ -3627,79 +3682,91 @@ ABOUT_CSS = """
 }
 
 & .v2-about-section-title {
-    font-size: 0.9375rem;
-    font-weight: 500;
-    margin: 0 0 0.75rem 0;
+    /* a quiet label over the cards, not a heading competing with the title */
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8a8578;
+    margin: 0 0 0.625rem 0;
 }
 
+/* Cards keep one fixed width and wrap. They are chips summarising a setting, not table rows:
+   stretching them to fill the row leaves a card with three words in it spanning the pane, and
+   a set of two looks broken next to a set of three. Fixed width also means the row reflows
+   identically whether the Builder is open beside it or not. */
 & .v2-about-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.625rem;
 }
 
 & .v2-about-meta-card {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 0.5rem;
-    /* a floor rather than a fixed width, so a long model name grows the card instead of
-       being clipped, and a short one does not leave a stub */
-    min-width: 11rem;
-    padding: 0.625rem 0.75rem;
-    border: 1px solid #e0ddd7;
-    border-radius: 10px;
+    gap: 0.625rem;
+    /* 13rem, never wider: `0` grow so a long model name cannot stretch it, `1` shrink so a
+       pane narrower than one card (Builder open, or a phone) makes it smaller rather than
+       overflowing sideways */
+    flex: 0 1 13rem;
+    max-width: 13rem;
+    padding: 0.75rem;
+    border: 1px solid #ebe8e2;
+    border-radius: 12px;
     background: #fff;
     color: #111;
     text-decoration: none;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 & .v2-about-meta-card:hover {
-    background: #FBFAF8;
-    border-color: #cfcbc3;
+    border-color: #d6d1c7;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     color: #111;
 }
 
+/* the icon gets its own tinted chip so a monochrome FontAwesome glyph and a model
+   creator's colour logo both sit on the same footprint */
 & .v2-about-meta-icon {
-    font-size: 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: #f6f4f0;
+    font-size: 0.9375rem;
     line-height: 1;
-    color: #6b6b6b;
+    color: #5f5a4e;
     flex-shrink: 0;
 }
 
 & .v2-about-meta-icon img {
-    height: 1.1rem;
-    width: 1.1rem;
+    height: 1.125rem;
+    width: 1.125rem;
+    object-fit: contain;
 }
 
 & .v2-about-meta-label {
     flex: 1 1 auto;
+    min-width: 0;
     font-size: 0.875rem;
-    line-height: 1.25;
+    font-weight: 500;
+    line-height: 1.3;
+    /* a long model name ellipsises instead of wrapping the card to two lines and breaking
+       the grid's even row height */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 & .v2-about-meta-chevron {
-    color: #9b9b9b;
+    font-size: 0.75rem;
+    color: #b5b0a6;
     flex-shrink: 0;
 }
 
-/* Reference material, not the pitch: the usage guide sits last and its video is capped so
-   a 16:9 embed cannot dominate a tab that is meant to be read. */
-& .v2-about-help {
-    margin-top: 2rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid #ececec;
-}
-
-& .v2-about-help h2 {
-    font-size: 1rem;
-    font-weight: 500;
-}
-
-/* `youtube_video()` is a `padding-bottom: 56.25%` aspect box with the iframe absolutely
-   filling it, so capping the iframe would leave a narrow player in a full-width hole - the
-   *box* is what has to shrink. Matched on the inline style because that helper is shared
-   with v1 and takes no class. */
-& .v2-about-help div[style*="56.25%"] {
-    max-width: 22rem;
+& .v2-about-meta-card:hover .v2-about-meta-chevron {
+    color: #6b6b6b;
 }
 """

@@ -142,6 +142,36 @@ DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
 SAFETY_BUFFER = 100
 
 
+# The "Model <selector>" row above the instructions editor.
+MODEL_ROW_CSS = """
+/* app.css gives `.gui-input` a `margin-bottom: .9rem` meant for stacked form fields; on a
+   one-line row it just pushes the editor down. Scoped rather than changed on the widget:
+   `.<hash> .gui-input` outranks a bare `.gui-input`, so it needs no `!important` and leaks
+   nowhere. */
+& .gui-input {
+    margin-bottom: 0;
+}
+
+/* Match the pane strip's pills (PANE_STRIP_CSS: 0.875rem). Neither react-select nor
+   `AIModelSpec.display_html()` sets a font size, so the control was inheriting the page's 1rem
+   and reading a size larger than the tabs directly above it. Set on the wrapper so the value,
+   the placeholder and the open menu all shift together. */
+& .gui-input-select {
+    font-size: 0.875rem;
+}
+
+/* ...and the pills' 10px corners. `gui.selectbox` renders react-select with no
+   `classNamePrefix`, so its control has only emotion-generated classes (`css-xxxxx-control`) -
+   hence the attribute match on the one stable part of that name. Scoped under two classes, so
+   it outranks emotion's own single-class rule without `!important`.
+   If we end up restyling selects in more than this one place, the better fix is to add
+   `classNamePrefix` in GooeySelect.tsx and target `.gooey-select__control` everywhere. */
+& .gui-input-select [class*="-control"] {
+    border-radius: 10px;
+}
+"""
+
+
 class ReplyButton(typing_extensions.TypedDict):
     id: str
     title: str
@@ -1473,7 +1503,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             platform = Platform(platform_id)
             integrations.append(
                 TopBarIntegration(
-                    label=platform.get_title(),
+                    # the chip opens a demo of the live bot, so it says so - v1 could get away
+                    # with a bare platform name because its buttons sat under a "Demos" header
+                    label=f"Try in {platform.get_title()}",
                     icon=platform.get_icon(),
                     color=platform.get_demo_button_color() or None,
                     key=f"{self.DEMO_ACTION_PREFIX}{bi_id}",
@@ -1534,8 +1566,9 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 render=self._render_about_tab,
             ),
             TabSpec(
+                # slug stays "config" - see the base class: it is the url, not the label
                 slug="config",
-                label="Config",
+                label="Edit",
                 icon=icons.edit,
                 render=self._render_config_tab,
             ),
@@ -1683,9 +1716,10 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             + (f" ({count})" if count else ""),
             type="tertiary",
             # ms-auto pushes it to the far end of the row, opposite the model selector.
-            # fw-normal because `.btn.btn-theme` is bold, and a secondary action next to a
-            # form field should not shout louder than the field's own label.
-            className="mb-0 p-2 text-nowrap ms-auto fw-normal",
+            # fw-normal + small because `.btn.btn-theme` is bold at body size, and a
+            # secondary action next to a form field should not shout louder than the field's
+            # own label.
+            className="mb-0 p-2 text-nowrap ms-auto fw-normal small",
             key="open-variables",
         ):
             ref.set_open(True)
@@ -1717,17 +1751,16 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
             # a compact row - small label left, selector right - rather than v1's full-width
             # heading and field, so the editor gets the height instead.
-            # The selector carries app.css's `.gui-input { margin-bottom: .9rem }`, which is
-            # meant for stacked form fields and here just pushes the editor down. Scoped
-            # override rather than a change to the widget: `.<hash> .gui-input` outranks a
-            # bare `.gui-input`, so it needs no `!important` and leaks nowhere.
             with (
-                gui.styled("& .gui-input { margin-bottom: 0; }"),
+                gui.styled(MODEL_ROW_CSS),
                 gui.div(className="d-flex align-items-center gap-3 mb-2 flex-shrink-0"),
             ):
-                gui.html('<span class="text-muted">Model</span>')
+                gui.html('<span class="text-muted small">Model</span>')
+                # a fixed width rather than a percentage: the selector holds one model name,
+                # so it should not keep growing with the pane. Capped as a share of the pane
+                # too, so it still fits when the Builder squeezes the column.
                 with gui.div(
-                    style=dict(maxWidth="40%", minWidth="40%"), className="m-0"
+                    style=dict(width="14rem", maxWidth="45%"), className="m-0"
                 ):
                     language_model_selector(label="")
                 self._render_variables_button()

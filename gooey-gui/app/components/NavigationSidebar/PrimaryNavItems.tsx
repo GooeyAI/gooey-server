@@ -42,7 +42,6 @@ export function PrimaryNavItems({
               item={item}
               isActive={item.key === active_key}
               collapsed={railCollapsed}
-              dense={item.dense}
             />
           );
         })}
@@ -89,33 +88,30 @@ function NavItem({
   isActive: boolean;
   collapsed: boolean;
   children?: ReactNode;
-  dense: boolean;
 }) {
+  // `item.dense` deliberately does NOT shrink this row. It marks a section whose *children*
+  // are a flat list rather than an indented tree (History, see `indent={!item.dense}`) - the
+  // section's own heading still reads like every other one, so History and Saved sit at the
+  // same weight and size in the rail instead of History looking like a caption.
   const className = clsx(
-    "nav-item-link d-flex align-items-center rounded",
-    collapsed && "justify-content-center px-0 py-2",
+    "nav-item-link d-flex align-items-center rounded px-2 py-2",
+    collapsed && "justify-content-center px-0",
     isActive ? "fw-bold nav-item-link--active text-body" : "text-body",
     collapsed && "position-relative",
     children && "nav-section-toggle",
-    !!item.href && "bg-hover-light",
-    item.dense ? "dense px-2 py-1 small" : "px-2 py-2"
+    !!item.href && "bg-hover-light"
   );
   const content = (
     <Fragment>
       <span
         className={clsx(
-          "d-flex align-items-center flex-grow-1",
+          "d-flex align-items-center flex-grow-1 gap-2",
           collapsed && "justify-content-center",
-          collapsed && !item.href && "d-none", // hide when no href and collapsed
-          item.dense ? "gap-1" : "gap-2"
+          collapsed && !item.href && "d-none" // hide when no href and collapsed
         )}
       >
         <span
-          className={clsx(
-            "nav-item-icon",
-            !isActive && "text-muted",
-            item.dense && !collapsed && "small"
-          )}
+          className={clsx("nav-item-icon", !isActive && "text-muted")}
           dangerouslySetInnerHTML={{ __html: item.icon }}
         />
         {!collapsed && <span>{item.label}</span>}
@@ -165,7 +161,6 @@ function NavItemChildren({
         item={item}
         isActive={isActive}
         collapsed={false}
-        dense={item.dense}
       />
     );
   }
@@ -179,7 +174,6 @@ function NavItemChildren({
         item={item}
         isActive={isActive}
         collapsed={false}
-        dense={item.dense}
       >
         {/* the chevron after the label toggles the nested items open/closed */}
         {item.collapsible && (

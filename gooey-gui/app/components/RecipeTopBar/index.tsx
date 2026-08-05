@@ -1,7 +1,7 @@
 import "./RecipeTopBar.css";
 
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { CustomComponentProps } from "~/components";
 import type {
   RecipeTopBarProps,
@@ -34,6 +34,7 @@ type MenuEntry = TopBarMenuItem & { mobileOnly?: boolean; heading?: boolean };
 // the Publish menu's own entries, distinguishable from anything the server declares
 const PUBLISH_ITEM_KEY = "--topbar-item-publish";
 const SHARE_ITEM_KEY = "--topbar-item-share";
+const API_ITEM_KEY = "--topbar-item-api";
 
 function Menu({
   items,
@@ -96,8 +97,6 @@ export function RecipeTopBar({
   photo_url,
   circle_photo,
   author,
-  builder_close_event,
-  builder_open,
   tabs,
   immersive_on_mobile,
   overflow_items,
@@ -106,6 +105,7 @@ export function RecipeTopBar({
   publish_label,
   publish_key,
   has_unpublished_changes,
+  api_href,
   share_key,
   share_icon,
   menu_key,
@@ -171,6 +171,17 @@ export function RecipeTopBar({
       label: "Share",
       icon: share_icon,
       href: null,
+      is_danger: false,
+    });
+  }
+  // Shipping this workflow over HTTP is the third way to publish it. A plain link, so it
+  // needs no key round-trip - Menu renders any entry with an href as a <Link>.
+  if (api_href) {
+    publishEntries.push({
+      key: API_ITEM_KEY,
+      label: "API",
+      icon: '<i class="fa-regular fa-code"></i>',
+      href: api_href,
       is_danger: false,
     });
   }
@@ -267,17 +278,9 @@ export function RecipeTopBar({
           />
         </div>
 
-        {!!builder_close_event && builder_open && (
-          <button
-            type="button"
-            className="btn text-muted p-1 d-flex align-items-center bg-hover-light"
-            title="Close Builder"
-            aria-label="Close Builder"
-            onClick={() => window.dispatchEvent(new Event(builder_close_event))}
-          >
-            <i className="fa-regular fa-arrow-down-left-and-arrow-up-right-to-center fs-5" />
-          </button>
-        )}
+        {/* The collapse control lives on the Builder panel's own right edge, not here -
+            see `.v2-builder-close`. Next to the title it read as belonging to the workflow
+            rather than to the panel it closes. */}
       </div>
 
       {/* A single-tab recipe (media gen, bulk/eval) renders no pill group at all. */}
@@ -292,6 +295,10 @@ export function RecipeTopBar({
                 tab.is_active && "gooey-topbar-tab-active",
                 tab.desktop_only && "gooey-topbar-tab-desktop-only"
               )}
+              // no title: these carry a visible label, so a tooltip repeating it is noise.
+              // `aria-current` is the part that was missing - the active pill is styled, which
+              // says nothing to a screen reader.
+              aria-current={tab.is_active ? "page" : undefined}
             >
               <Icon html={tab.icon} className="gooey-topbar-tab-icon" />
               {tab.label}
@@ -310,7 +317,10 @@ export function RecipeTopBar({
                 overflowDesktopOnly && "d-lg-none"
               )}
               onClick={() => setOverflowOpen((v) => !v)}
-              aria-label="More"
+              title="More actions"
+              aria-label="More actions"
+              aria-haspopup="menu"
+              aria-expanded={overflowOpen}
             >
               <i className="fa-solid fa-ellipsis" />
             </button>
@@ -322,44 +332,59 @@ export function RecipeTopBar({
           </div>
         )}
 
-        {integrations.map((integration, i) =>
-          integration.href ? (
+        {/* At most ONE chip is ever labelled, and none at all once there are more than two.
+            The pill group is centred, so the right cluster only gets half the bar's slack; a
+            workflow deployed to three channels has enough chips that even one label pushes the
+            cluster over the pills. Unlabelled chips keep their name in the tooltip, and every
+            channel appears with its full label in the ... menu regardless. */}
+        {integrations.map((integration, i) => {
+          const labelled = i === 0 && integrations.length <= 2;
+          const className = clsx(
+            "gooey-topbar-integration d-none d-lg-inline-flex",
+            labelled && "gooey-topbar-integration--labelled",
+            integration.color && "gooey-topbar-integration-brand"
+          );
+          const style = integration.color
+            ? { backgroundColor: integration.color }
+            : undefined;
+          const content = (
+            <Fragment>
+              <Icon html={integration.icon} />
+              {labelled && (
+                <span className="gooey-topbar-integration-label">
+                  {integration.label}
+                </span>
+              )}
+            </Fragment>
+          );
+          // aria-label as well as title: every chip past the first renders no text at all, so
+          // the tooltip is the only thing naming it and `title` alone is not a reliable
+          // accessible name
+          return integration.href ? (
             <a
               key={integration.href}
               href={integration.href}
-              className={clsx(
-                "gooey-topbar-integration d-none d-lg-inline-flex",
-                integration.color && "gooey-topbar-integration-brand"
-              )}
-              style={
-                integration.color
-                  ? { backgroundColor: integration.color }
-                  : undefined
-              }
+              className={className}
+              style={style}
               title={integration.label}
+              aria-label={integration.label}
             >
-              <Icon html={integration.icon} />
+              {content}
             </a>
           ) : (
             <button
               key={integration.key || i}
               type="button"
-              className={clsx(
-                "gooey-topbar-integration d-none d-lg-inline-flex",
-                integration.color && "gooey-topbar-integration-brand"
-              )}
-              style={
-                integration.color
-                  ? { backgroundColor: integration.color }
-                  : undefined
-              }
+              className={className}
+              style={style}
               title={integration.label}
+              aria-label={integration.label}
               onClick={() => fire(menu_key, integration.key)}
             >
-              <Icon html={integration.icon} />
+              {content}
             </button>
-          )
-        )}
+          );
+        })}
 
         {/* One control rather than two buttons: Publish opens Update and Share. Below lg
             it is hidden entirely and the same two entries live in the ... menu, which is
@@ -373,7 +398,14 @@ export function RecipeTopBar({
               type="button"
               className="gooey-topbar-publish"
               onClick={() => setPublishMenuOpen((v) => !v)}
-              title="Publish"
+              title={
+                has_unpublished_changes
+                  ? "Publish (unpublished changes)"
+                  : "Publish"
+              }
+              aria-label="Publish"
+              aria-haspopup="menu"
+              aria-expanded={publishMenuOpen}
             >
               <i className="fa-regular fa-floppy-disk" />
               <span className="gooey-topbar-btn-label">Publish</span>
@@ -390,20 +422,32 @@ export function RecipeTopBar({
           </div>
         )}
 
+        {/* `cost_label` on its own is a bare price. The tooltip names what it is and appends
+            any per-recipe note; the aria-label says it outright, since "$0.05" read aloud in
+            a row of controls is meaningless. */}
         {!!cost_label &&
-          (cost_href ? (
-            <a
-              className="gooey-topbar-cost"
-              href={cost_href}
-              title={cost_title || undefined}
-            >
-              {cost_label}
-            </a>
-          ) : (
-            <span className="gooey-topbar-cost" title={cost_title || undefined}>
-              {cost_label}
-            </span>
-          ))}
+          (() => {
+            const costName = `Run cost: ${cost_label}`;
+            const costTip = cost_title ? `${costName} (${cost_title})` : costName;
+            return cost_href ? (
+              <a
+                className="gooey-topbar-cost"
+                href={cost_href}
+                title={costTip}
+                aria-label={costTip}
+              >
+                {cost_label}
+              </a>
+            ) : (
+              <span
+                className="gooey-topbar-cost"
+                title={costTip}
+                aria-label={costTip}
+              >
+                {cost_label}
+              </span>
+            );
+          })()}
 
         {!!cost_label && !!run_key && (
           <span className="gooey-topbar-sep" aria-hidden="true">
@@ -420,6 +464,10 @@ export function RecipeTopBar({
             )}
             disabled={run_disabled}
             onClick={() => fire(run_key)}
+            // `.gooey-topbar-btn-label` is hidden below lg, so on a phone this is an
+            // unlabelled icon - the tooltip and aria-label are its only name there
+            title={is_running ? "Stop this run" : run_label}
+            aria-label={is_running ? "Stop this run" : run_label}
           >
             {is_running ? (
               <i className="fa-regular fa-xmark-large" />

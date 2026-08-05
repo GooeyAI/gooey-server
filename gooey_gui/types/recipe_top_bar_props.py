@@ -55,8 +55,6 @@ class RecipeTopBarProps(pydantic.BaseModel):
     photo_url: str | None = None
     circle_photo: bool = False  # some workflows render the avatar as a circle
     author: TopBarAuthor | None = None
-    builder_close_event: str = ""
-    builder_open: bool = False
 
     tabs: list[TopBarTab] = []
     # the active tab owns the screen below lg, so the strip and the run cluster
@@ -70,6 +68,9 @@ class RecipeTopBarProps(pydantic.BaseModel):
     publish_label: str = ""  # permission-derived: Update / Save and Run / Save as New
     publish_key: str = ""  # set by the client to open the publish dialog
     has_unpublished_changes: bool = False
+    # The recipe's API tab, offered from the Publish menu: calling the workflow over HTTP is
+    # another way to ship it, alongside saving and sharing. A link, not an action.
+    api_href: str = ""
 
     # Only set when the user may actually change who can see the workflow - everyone else
     # gets a copy-link button elsewhere rather than a visibility dialog they cannot use.
