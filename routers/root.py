@@ -803,7 +803,7 @@ def sidebar_page_wrapper(
                     with gui.div(id="main-content", className=className):
                         yield current_workspace
 
-                    gui.html(templates.get_template("footer.html").render(**context))
+                    # gui.html(templates.get_template("footer.html").render(**context)) # remove footer for now
                     gui.html(
                         templates.get_template("login_scripts.html").render(**context)
                     )
