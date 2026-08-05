@@ -116,6 +116,10 @@ PUBLISH_AFTER_LOGIN_Q = "publishafterlogin"
 
 STARTING_STATE = "Starting..."
 
+# Reading width for the working column when it has the row to itself (the Config tab). Split
+# needs none - the preview column caps it there.
+SOLO_COL_MAX_WIDTH = "56rem"
+
 
 def format_credits_as_dollars(credits: int) -> str:
     """A credit count as the price a user pays for it.
@@ -1742,7 +1746,18 @@ class BasePage:
         """
         with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
             (input_col,) = gui.columns([1])
-            with input_col:
+            with (
+                input_col,
+                # Centred and capped. With the whole row to itself this column would otherwise
+                # run a form and a code editor edge to edge across a wide monitor, which is
+                # both hard to read and unlike Split, where the preview caps it naturally.
+                # `d-flex flex-column` + `minHeight: 0` because everything below depends on the
+                # app shell's definite-height chain - a plain block here would break it.
+                gui.div(
+                    className="mx-auto w-100 h-100 d-flex flex-column",
+                    style=dict(maxWidth=SOLO_COL_MAX_WIDTH, minHeight=0),
+                ),
+            ):
                 return self._render_input_col()
 
     def _render_mobile_back_link(self, to_slug: str = "config"):
@@ -3452,6 +3467,11 @@ PANE_STRIP_CSS = """
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
+    /* A rule under the strip, separating it from the pane it switches. The padding is what
+       keeps the line off the pills - and it doubles as room for the active pill's shadow,
+       which `overflow-y: hidden` was clipping. */
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e6e6e6;
 }
 
 & button {
