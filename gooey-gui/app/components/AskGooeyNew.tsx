@@ -4,6 +4,7 @@ import { useNavigate } from "@remix-run/react";
 import { fetchServerAPI } from "~/fetchServerAPI";
 import { useLiveTranscription } from "~/useLiveTranscription";
 import type { CustomComponentProps } from "~/components";
+import "./AskGooeyNew.css";
 
 type AskGooeyNewProps = CustomComponentProps & {
   title?: string;
@@ -159,7 +160,7 @@ export function AskGooeyNew({
     <div
       style={{
         width: "100%",
-        minHeight: "75vh",
+        minHeight: "100dvh",
         padding: "48px 24px",
         background: "#FFFFFF",
         display: "flex",
@@ -182,16 +183,16 @@ export function AskGooeyNew({
           className="d-flex align-items-center justify-content-center"
           style={{ gap: "16px", color: "#1f1f1f", marginBottom: "8px" }}
         >
-          <img 
-            src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/47e069e2-5b65-11f1-80ef-02420a00016f/gooey-builder-logo-fit.gif" 
-            alt="Gooey Logo" 
-            style={{ width: "64px", height: "64px" }} 
+          <img
+            className="ask-gooey-logo"
+            src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/47e069e2-5b65-11f1-80ef-02420a00016f/gooey-builder-logo-fit.gif"
+            alt="Gooey Logo"
           />
           <h1
+            className="ask-gooey-title"
             style={{
               margin: 0,
               textAlign: "center",
-              fontSize: "3.2rem",
               fontWeight: 400,
               fontFamily: "Georgia, serif",
               color: "#111",

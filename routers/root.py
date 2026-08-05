@@ -751,6 +751,7 @@ def sidebar_page_wrapper(
     request: Request,
     className="",
     page: typing.Optional["BasePage"] = None,
+    full_width_content: bool = False,  # without container-xxl max-width
 ):
     from widgets import navigation_sidebar
 
@@ -799,7 +800,8 @@ def sidebar_page_wrapper(
                 else:
                     current_workspace = None
 
-                with gui.div(className="container-xxl"):
+                container_class = "container-xxl" if not full_width_content else ""
+                with gui.div(className=container_class):
                     with gui.div(id="main-content", className=className):
                         yield current_workspace
 
