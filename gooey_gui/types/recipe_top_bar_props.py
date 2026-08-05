@@ -74,10 +74,13 @@ class RecipeTopBarProps(pydantic.BaseModel):
     # another way to ship it, alongside saving and sharing. A link, not an action.
     api_href: str = ""
 
-    # Only set when the user may actually change who can see the workflow - everyone else
-    # gets a copy-link button elsewhere rather than a visibility dialog they cannot use.
+    # Only set when the user may actually change who can see the workflow; everyone else gets
+    # `share_copy_url` instead of a visibility dialog they cannot use.
     share_key: str = ""
     share_icon: str = ""  # reflects current visibility: a globe, a lock, ...
+    # The counterpart for a viewer: the url to copy. Set only when `share_key` is not, so the
+    # bar always offers Share one way or the other.
+    share_copy_url: str = ""
 
     # Written by the client and popped by the server on the next render, the same
     # mutate-then-notify contract NavigationSidebar uses for workspace switching.

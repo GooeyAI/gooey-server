@@ -1577,6 +1577,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         until then its body stays reachable through v1's `/integrations/` url via
         `render_selected_tab()`.
         """
+        if self.is_unowned_example():
+            return self.get_viewer_tab_spec()
         return [
             TabSpec(
                 slug=RecipeView.about,
@@ -1612,28 +1614,40 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         Each card is a way into the Config pane that owns the setting, so About reads as a
         summary you can act on rather than a dead-end description.
         """
-        cards: list[tuple[str, str, ConfigPane]] = []
-        if model := self._about_model_summary():
-            cards.append((*model, ConfigPane.llm_instructions))
+        model = self._about_model_summary()
+
+        # Knowledge and Tools read as one idea - what the agent can reach outside itself -
+        # so they share a group, leaving the model on its own as the thing it *is*.
+        integrations: list[tuple[str, str, ConfigPane]] = []
         if documents := len(gui.session_state.get("documents") or []):
             plural = "" if documents == 1 else "s"
-            cards.append(
+            integrations.append(
                 (icons.library, f"{documents} document{plural}", ConfigPane.knowledge)
             )
         if tools := len(gui.session_state.get("functions") or []):
             plural = "" if tools == 1 else "s"
-            cards.append((icons.code, f"{tools} tool{plural}", ConfigPane.tools))
+            integrations.append((icons.code, f"{tools} tool{plural}", ConfigPane.tools))
 
         # a row of zeroes says less than no row: skip the heading too, not just the cards
-        if not cards:
+        if not model and not integrations:
             return
 
-        gui.html(
-            '<div class="v2-about-section-title">Model, Knowledge base &amp; Tools</div>'
-        )
-        with gui.div(className="v2-about-meta"):
-            for icon, label, pane in cards:
-                self._render_about_meta_card(icon=icon, label=label, pane=pane)
+        with gui.div(className="v2-about-groups"):
+            if model:
+                self._render_about_meta_group(
+                    "Model", [(*model, ConfigPane.llm_instructions)]
+                )
+            if integrations:
+                self._render_about_meta_group("Tools & Integrations", integrations)
+
+    def _render_about_meta_group(
+        self, title: str, cards: list[tuple[str, str, ConfigPane]]
+    ):
+        with gui.div(className="v2-about-group"):
+            gui.html(f'<div class="v2-about-section-title">{html.escape(title)}</div>')
+            with gui.div(className="v2-about-meta"):
+                for icon, label, pane in cards:
+                    self._render_about_meta_card(icon=icon, label=label, pane=pane)
 
     def _about_model_summary(self) -> tuple[str, str] | None:
         """(icon html, label) for the selected LLM, or None if the run has not picked one."""
@@ -1656,10 +1670,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             state_value=pane,
             className="v2-about-meta-card",
         ):
+            # icon over label, and no chevron: the whole card is the link, so an affordance
+            # arrow only competed with the icon for the eye
             gui.html(
                 f'<span class="v2-about-meta-icon">{icon}</span>'
                 f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
-                f'<span class="v2-about-meta-chevron">{icons.chevron_right}</span>'
             )
 
     def _render_split_tab(self):

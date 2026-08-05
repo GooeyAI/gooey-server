@@ -61,6 +61,7 @@ export interface RecipeTopBarProps {
   api_href: string;
   share_key: string;
   share_icon: string;
+  share_copy_url: string;
   menu_key: string;
   run_key: string;
   viewport_wide_key: string;

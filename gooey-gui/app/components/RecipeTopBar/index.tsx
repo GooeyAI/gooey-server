@@ -121,6 +121,7 @@ export function RecipeTopBar({
   api_href,
   share_key,
   share_icon,
+  share_copy_url,
   menu_key,
   run_key,
   viewport_wide_key,
@@ -133,6 +134,19 @@ export function RecipeTopBar({
   onChange,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
+  const [shareCopied, setShareCopied] = useState(false);
+  // the tick is the only feedback a copy gets, so it has to fall back to something rather
+  // than leave the click looking like it did nothing
+  const copyShareUrl = () => {
+    navigator.clipboard
+      ?.writeText(share_copy_url)
+      .then(() => {
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      })
+      .catch(() => window.prompt("Copy this link", share_copy_url));
+  };
+
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
@@ -345,6 +359,25 @@ export function RecipeTopBar({
       )}
 
       <div className="gooey-topbar-right">
+        {/* Share for someone who cannot change who sees this. The owner's Share lives in the
+            Publish menu and opens the visibility dialog; this one only copies the link, so it
+            is a button of its own rather than an entry under a menu called "Publish". */}
+        {!!share_copy_url && !share_key && (
+          <button
+            type="button"
+            className="gooey-topbar-integration"
+            title={shareCopied ? "Link copied" : "Copy link"}
+            aria-label="Copy link to this workflow"
+            onClick={copyShareUrl}
+          >
+            {shareCopied ? (
+              <i className="fa-regular fa-check" />
+            ) : (
+              <Icon html={share_icon} />
+            )}
+          </button>
+        )}
+
         {!!overflowEntries.length && (
           <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
             <button

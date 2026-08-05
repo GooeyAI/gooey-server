@@ -794,6 +794,7 @@ class BasePage:
         sr, pr = self.current_sr_pr
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         cost_label, cost_title = self._top_bar_cost()
+        can_manage_sharing = self.can_manage_sharing()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -818,7 +819,12 @@ class BasePage:
                 publish_label=self._top_bar_publish_label(),
                 publish_key=self.TOP_BAR_PUBLISH_KEY,
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
-                share_key=(self.TOP_BAR_SHARE_KEY if self.can_manage_sharing() else ""),
+                # Share is always offered, but means different things: change who can see
+                # this (owners) versus copy the link (everyone else). Exactly one is set.
+                share_key=(self.TOP_BAR_SHARE_KEY if can_manage_sharing else ""),
+                share_copy_url=(
+                    "" if can_manage_sharing else self.current_app_url(self.tab)
+                ),
                 share_icon=icons.share,
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
@@ -1518,6 +1524,8 @@ class BasePage:
 
     def get_tab_spec(self) -> list[TabSpec]:
         """The client views for this request, in selector order."""
+        if self.is_unowned_example():
+            return self.get_viewer_tab_spec()
         return [
             TabSpec(
                 slug=RecipeView.about,
@@ -1541,6 +1549,28 @@ class BasePage:
             ),
         ]
 
+    def get_viewer_tab_spec(self) -> list[TabSpec]:
+        """What a first-time visitor sees: what this workflow is, and how it is put together.
+
+        Two entries rather than four - someone who does not own this run has nothing to edit
+        and no output of their own, so Edit/Preview/Split would be three ways of looking at
+        somebody else's settings. "How it works" is backed by `split`, not `edit`: seeing the
+        configuration next to a live preview of what it produces is the whole point for a
+        visitor deciding whether they want this workflow.
+        """
+        return [
+            TabSpec(
+                slug=RecipeView.about,
+                label="About",
+                icon=icons.info,
+            ),
+            TabSpec(
+                slug=RecipeView.split,
+                label="How it works",
+                icon=icons.edit,
+            ),
+        ]
+
     def _render_about_content(self):
         """What this workflow is. The one surface in v2 that is not a re-slice of v1.
 
@@ -1548,31 +1578,25 @@ class BasePage:
         Related Workflows, which is what /explore/ is for. About is about *this* workflow,
         and nothing on it is shown twice.
         """
-        sr, pr = self.current_sr_pr
-        with gui.div(className="v2-about-card"):
-            # photo, title and byline are one row: the image identifies the workflow and the
-            # title names it, so they belong on the same line rather than stacked with the
-            # image taking a band of its own
-            with gui.div(className="v2-about-head"):
-                self._render_about_photo(pr)
-                with gui.div(className="v2-about-headtext"):
-                    gui.html(
-                        f'<h1 class="v2-about-title">'
-                        f"{html.escape(pr.title or self.title)}</h1>"
-                    )
-                    self._render_about_byline(sr, pr)
-            # full text, unlike v1's `line_clamp=3` on the Run tab - the tab exists to be read
+        pr = self.current_pr
+        # No wrapper: `.v2-about` is already the container, and the pane it sits in is already
+        # a surface. The portrait leads and is the only thing identifying the workflow here -
+        # the top bar carries the title and the "by <workspace>" line.
+        self._render_about_photo(pr)
+        # description and the "how it is put together" cards share one panel: they answer the
+        # same question at two levels of detail, so framing them separately split one idea
+        with gui.div(className="v2-about-panel"):
+            # full text, unlike v1's `line_clamp=3` on the Run tab - the tab is made to be read
             if pr.notes:
                 with gui.div(className="container-margin-reset v2-about-notes"):
                     gui.write(pr.notes)
             self._render_about_meta()
 
     def _render_about_photo(self, pr: PublishedRun):
-        """The workflow's own image, beside the title - an avatar, not a banner.
+        """The workflow's portrait, centred at the top of the card.
 
-        A workflow photo is a square-ish icon, so it is drawn at a fixed size either way and
-        only its corner radius changes: `CIRCLE_IMAGE_WORKFLOWS` (agents) get the same round
-        portrait the top bar and the rail already give them.
+        `CIRCLE_IMAGE_WORKFLOWS` (agents) get a round crop, matching the top bar and the
+        rail; anything else keeps square corners rounded off.
         """
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
@@ -1582,40 +1606,6 @@ class BasePage:
         gui.html(
             f'<img class="v2-about-photo{" v2-about-photo-circle" if circle else ""}"'
             f' src="{html.escape(pr.photo_url)}" alt="">'
-        )
-
-    def _render_about_byline(self, sr: SavedRun, pr: PublishedRun):
-        """Who published this and how much else they have published, with Share opposite."""
-        with gui.div(className="v2-about-byline"):
-            workspace = pr.workspace
-            if workspace:
-                if photo := workspace.get_photo():
-                    gui.html(
-                        f'<img class="v2-about-byline-photo" src="{html.escape(photo)}" alt="">'
-                    )
-                with gui.div(className="v2-about-byline-text"):
-                    gui.html(
-                        f'<div class="v2-about-byline-name">'
-                        f"{html.escape(workspace.display_name())}</div>"
-                    )
-                    count = self._public_workflow_count(workspace)
-                    if count:
-                        gui.html(
-                            f'<div class="v2-about-byline-sub">{count} Public Workflows</div>'
-                        )
-
-            with gui.div(className="v2-about-byline-actions"):
-                self._render_share_trigger(key="about-share")
-
-    @staticmethod
-    def _public_workflow_count(workspace: Workspace) -> int:
-        """The same expression the public profile page counts with, so the two can never
-        disagree. `VIEW_ONLY` is labelled "Private", so excluding it leaves the public ones.
-        """
-        return (
-            PublishedRun.objects.filter(workspace=workspace)
-            .exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
-            .count()
         )
 
     def _render_about_meta(self):
@@ -3457,82 +3447,32 @@ ABOUT_CSS = """
     }
 }
 
-& .v2-about-card {
-    background: #fff;
-    border: 1px solid #e0ddd7;
-    border-radius: 12px;
-    padding: 1.25rem;
-}
+/* No card around this content. The pane it sits in is already a surface, so a white box
+   inside it was a second frame around the same thing - only the description panel and the
+   meta chips carry their own background now. */
 
-/* Leads the card. A banner by default; `CIRCLE_IMAGE_WORKFLOWS` gets a portrait instead,
-   which is the shape an agent's avatar is drawn for. */
-/* The card's header: avatar on one side, title and byline stacked beside it. */
-& .v2-about-head {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-}
-
-/* takes the rest of the row, so the byline's `margin-left: auto` still puts Share against
-   the card's right edge rather than against the title's */
-& .v2-about-headtext {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
+/* The portrait leads, centred and large: the top bar names the workflow, so this is what
+   identifies it here. `CIRCLE_IMAGE_WORKFLOWS` (agents) get a round crop. */
 & .v2-about-photo {
     display: block;
-    width: 72px;
-    height: 72px;
+    width: 15rem;
+    height: 15rem;
+    max-width: 100%;
     object-fit: cover;
-    border-radius: 12px;
-    flex-shrink: 0;
+    border-radius: 16px;
+    margin: 0.5rem auto 1.5rem;
 }
 
 & .v2-about-photo-circle {
     border-radius: 50%;
 }
 
-& .v2-about-title {
-    font-size: 1.6rem;
-    font-weight: 600;
-    line-height: 1.3;
-    /* the byline sits directly under it inside the same column */
-    margin: 0 0 0.25rem 0;
-}
-
-& .v2-about-byline {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-/* a secondary line under the title now, not a block of its own - so the author's mark stays
-   well under the workflow avatar it sits beside */
-& .v2-about-byline-photo {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    object-fit: cover;
-    flex-shrink: 0;
-}
-
-& .v2-about-byline-name {
-    font-weight: 600;
-    font-size: 0.875rem;
-    line-height: 1.2;
-}
-
-& .v2-about-byline-sub {
-    color: #6b6b6b;
-    font-size: 0.8125rem;
-}
-
-/* pushed to the far end of the row, so it stays put however long the name is */
-& .v2-about-byline-actions {
-    margin-left: auto;
+/* Description and the meta groups share one tinted panel - they answer "what is this" at two
+   levels of detail. Only the cards inside carry their own surface. */
+& .v2-about-panel {
+    background: #f5f4f0;
+    border-radius: 16px;
+    padding: 1.5rem;
 }
 
 & .v2-about-notes {
@@ -3540,39 +3480,56 @@ ABOUT_CSS = """
     margin-bottom: 1.5rem;
 }
 
-& .v2-about-section-title {
-    /* a quiet label over the cards, not a heading competing with the title */
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #8a8578;
-    margin: 0 0 0.625rem 0;
-}
-
-/* Cards keep one fixed width and wrap. They are chips summarising a setting, not table rows:
-   stretching them to fill the row leaves a card with three words in it spanning the pane, and
-   a set of two looks broken next to a set of three. Fixed width also means the row reflows
-   identically whether the Builder is open beside it or not. */
-& .v2-about-meta {
+/* Model and Tools & Integrations, side by side while there is room. Model holds one card, so
+   it takes only what it needs and the integrations group gets the rest. */
+& .v2-about-groups {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.625rem;
+    gap: 1.5rem;
 }
 
+/* Sizes to its own cards. With `min-width: 0` the group could be squeezed narrower than one
+   card, which made the cards inside wrap into a column while the row still looked half empty.
+   Whole groups wrap instead. */
+& .v2-about-group {
+    flex: 0 1 auto;
+    min-width: min-content;
+}
+
+& .v2-about-section-title {
+    /* names the group - plain and dark, since it labels content rather than decorating it */
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #111;
+    margin: 0 0 0.5rem 0;
+}
+
+/* `nowrap`: a group's cards belong on one line, and the group is what gives way when the row
+   runs out of width. Below lg they stack - see the media query at the end. */
+& .v2-about-meta {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+}
+
+/* Icon above label, not beside it: the label is the longer of the two and wraps, so a row
+   layout made every card as tall as its text anyway. Fixed width so a set of one lines up
+   with a set of three. */
 & .v2-about-meta-card {
     display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    /* 13rem, never wider: `0` grow so a long model name cannot stretch it, `1` shrink so a
-       pane narrower than one card (Builder open, or a phone) makes it smaller rather than
-       overflowing sideways */
-    flex: 0 1 13rem;
-    max-width: 13rem;
-    padding: 0.75rem;
-    border: 1px solid #ebe8e2;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.25rem;
+    /* One fixed width for every card, so a one-card group lines up with a three-card one.
+       `min-width: 0` is what makes that stick: a flex item defaults to `min-width: auto`,
+       which resolves to the label's min-content width, and a min-width beats a max-width -
+       so without it each card grew to fit its own text and no two matched. */
+    flex: 0 0 11rem;
+    min-width: 0;
+    padding: 0.875rem;
+    border: 1px solid #e6e3dd;
     border-radius: 12px;
-    background: #fff;
+    background: #fbfaf8;
     color: #111;
     text-decoration: none;
     transition: border-color 0.12s ease, box-shadow 0.12s ease;
@@ -3584,48 +3541,56 @@ ABOUT_CSS = """
     color: #111;
 }
 
-/* the icon gets its own tinted chip so a monochrome FontAwesome glyph and a model
-   creator's colour logo both sit on the same footprint */
+/* No chip behind it: at this size the glyph and a model creator's colour logo both read
+   fine on the card itself, and the extra surface only muddied a card that is already a
+   surface. */
 & .v2-about-meta-icon {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 8px;
-    background: #f6f4f0;
-    font-size: 0.9375rem;
+    font-size: 1.5rem;
     line-height: 1;
-    color: #5f5a4e;
-    flex-shrink: 0;
+    color: #3d3a34;
 }
 
 & .v2-about-meta-icon img {
-    height: 1.125rem;
-    width: 1.125rem;
+    height: 1.5rem;
+    width: 1.5rem;
     object-fit: contain;
 }
 
 & .v2-about-meta-label {
-    flex: 1 1 auto;
     min-width: 0;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.9375rem;
     line-height: 1.3;
-    /* a long model name ellipsises instead of wrapping the card to two lines and breaking
-       the grid's even row height */
+    /* a long name ellipsises rather than wrapping, so every card in a row is the same height */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-& .v2-about-meta-chevron {
-    font-size: 0.75rem;
-    color: #b5b0a6;
-    flex-shrink: 0;
-}
+@media (max-width: 991.98px) {
+    /* One column: side by side there is not room for two groups plus their cards, and the
+       cards were being squeezed to the point the labels all ellipsised. */
+    & .v2-about-groups {
+        flex-direction: column;
+        gap: 1.25rem;
+    }
 
-& .v2-about-meta-card:hover .v2-about-meta-chevron {
-    color: #6b6b6b;
+    /* the group is full width now, so its cards may wrap within it */
+    & .v2-about-meta {
+        flex-wrap: wrap;
+    }
+
+    /* `1 1 0` rather than a basis: the cards share the row evenly instead of each taking its
+       own content width, so they stay equal here too */
+    & .v2-about-meta-card {
+        flex: 1 1 0;
+    }
+
+    /* clears the tab pills, which below lg float over the bottom of the viewport rather than
+       sitting in the top bar */
+    & .v2-about-panel {
+        margin-bottom: 4.5rem;
+    }
 }
 """
