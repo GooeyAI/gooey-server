@@ -16,10 +16,12 @@ import type { CustomComponentProps } from "~/components";
  * identified by the `.gooey-embed-container` inside its shadow root, and deliberately skips
  * anything under `#gooey-builder-embed` so the Builder is never touched.
  *
- * Renders nothing: it exists only for the unmount hook, which React runs exactly when the
- * preview's tab is navigated away from.
+ * Renders nothing: it exists only for the cleanup hook, which React runs when the preview
+ * disappears or its workflow identity changes.
  */
-export function GooeyEmbedTeardown({}: CustomComponentProps) {
+export function GooeyEmbedTeardown({
+  embed_key,
+}: CustomComponentProps & { embed_key: string }) {
   useEffect(() => {
     return () => {
       document.querySelectorAll("div").forEach((el) => {
@@ -31,7 +33,7 @@ export function GooeyEmbedTeardown({}: CustomComponentProps) {
         el.remove();
       });
     };
-  }, []);
+  }, [embed_key]);
 
   return null;
 }

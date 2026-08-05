@@ -114,7 +114,7 @@ a.gooey-topbar-author:hover {
   padding: 3px;
   border: 1px solid #ececec;
   border-radius: 12px;
-  background: #F1F2F4;
+  background: #f1f2f4;
   justify-self: center;
   min-width: 0;
   overflow-x: auto;
@@ -211,7 +211,7 @@ a.gooey-topbar-author:hover {
 }
 
 .gooey-topbar-integration:hover {
-  background: #FBFAF8;
+  background: #fbfaf8;
   border-color: #cfcbc3;
   color: #111;
 }
@@ -246,7 +246,7 @@ a.gooey-topbar-author:hover {
 }
 
 .gooey-topbar-overflow-btn:hover {
-  background: #FBFAF8;
+  background: #fbfaf8;
   border-color: #cfcbc3;
   color: #111;
 }
@@ -273,7 +273,7 @@ a.gooey-topbar-author:hover {
 }
 
 .gooey-topbar-publish:hover {
-  background: #FBFAF8;
+  background: #fbfaf8;
   border-color: #cfcbc3;
   color: #111;
 }
@@ -370,7 +370,7 @@ a.gooey-topbar-cost:hover {
 }
 
 .gooey-topbar-menu-item:hover {
-  background: #FBFAF8;
+  background: #fbfaf8;
 }
 
 /* A section label, not a control - it groups the entries below it and takes no click. The
@@ -422,7 +422,7 @@ a.gooey-topbar-cost:hover {
     max-width: calc(100% - 24px);
     margin: 0;
     padding: 4px;
-    background: #F1F2F4;
+    background: #f1f2f4;
     border-color: #e0ddd7;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   }
@@ -474,7 +474,7 @@ a.gooey-topbar-cost:hover {
 
   .v2-back-link:hover {
     color: #111;
-    background: #FBFAF8;
+    background: #fbfaf8;
   }
 
   /* Icon-only actions below lg - the labels are what crowd the title out. Square, so they
@@ -537,29 +537,7 @@ a.gooey-topbar-cost:hover {
   /* absolute against `.gooey-sidebar` - sticky on desktop, fixed below 1140px, positioned
      either way - so there is no app-header offset to hardcode */
   position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.4rem 0.5rem;
-  line-height: 1;
-  border: 1px solid #e0ddd7;
-  border-radius: 999px;
-  background: #fff;
-  color: #6b6b6b;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.v2-builder-close:hover {
-  background: #fbfaf8;
-  color: #111;
-}
-
-/* over a full-screen panel it needs the heavier shadow to separate from the content */
-@media (max-width: 1140px) {
-  .v2-builder-close {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  }
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 5;
 }

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import gooey_gui as gui
 from furl import furl
 from starlette.requests import Request
 
+import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import SavedRun
+from bots.models.workflow import Workflow, WorkflowMetadata
 from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -18,15 +19,14 @@ from gooey_gui.types.history_page_props import (
 from gooey_gui.types.home_page_props import WorkflowCardData
 from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
-from routers.root import get_og_url_path, history_route, sidebar_page_wrapper
+from routers.root import get_og_url_path, sidebar_page_wrapper
 from widgets.surface_filters import (
     DEFAULT_SURFACE,
     SURFACE_ICONS,
     parse_surface,
     visible_surfaces,
 )
-from bots.models.workflow import Workflow, WorkflowMetadata
-from widgets.workflow_cards import history_card, author_from_user
+from widgets.workflow_cards import author_from_user, history_card
 from workspaces.models import Workspace
 from workspaces.widgets import get_current_workspace
 
@@ -39,41 +39,62 @@ app = CustomAPIRouter()
 
 
 @gui.route(app, "/history/", "/history/{surface}/")
-def history_page(request: Request, surface: str | None = None):
+def history_page(request: Request, surface: str | None = None, workflow: str = ""):
     history_surface = parse_surface(surface)
+    history_workflow = parse_workflow(workflow)
     with sidebar_page_wrapper(request):
-        render(request, history_surface)
+        render(request, history_surface, history_workflow)
 
     return {
         "meta": build_meta_tags(url=get_og_url_path(request)),
     }
 
 
-def render(request: Request, surface: SavedRun.Surface):
+def render(
+    request: Request,
+    surface: SavedRun.Surface,
+    workflow: Workflow | None,
+):
     user = request.user
     if user is None or user.is_anonymous:
         raise gui.RedirectException(get_login_url(request))
 
     surfaces = visible_surfaces(user)
     if surface not in surfaces:
-        raise gui.RedirectException(_surface_href(DEFAULT_SURFACE))
+        raise gui.RedirectException(_surface_href(DEFAULT_SURFACE, workflow))
 
     workspace = get_current_workspace(user, request.session)
     cards, load_more_href = _load_history(
         user=user,
         workspace=workspace,
         surface=surface,
+        workflow=workflow,
         request=request,
     )
 
     gui.model_component(
         HistoryPageProps(
-            workflow_options=_build_workflow_options(surface),
-            surface_tabs=_build_surface_tabs(surface, surfaces),
+            workflow_options=_build_workflow_options(surface, workflow),
+            surface_tabs=_build_surface_tabs(surface, surfaces, workflow),
             cards=cards,
             load_more_href=load_more_href,
             empty_message=f"No {surface.label} history yet.",
         )
+    )
+
+
+def parse_workflow(slug: str) -> Workflow | None:
+    if not slug:
+        return None
+    normalized_slug = slug.lower()
+    return next(
+        (
+            workflow
+            for workflow in Workflow
+            if normalized_slug
+            in {page_slug.lower() for page_slug in workflow.page_cls.slug_versions}
+        ),
+        None,
     )
 
 
@@ -91,12 +112,15 @@ def _load_history(
     user: AppUser,
     workspace: Workspace,
     surface: SavedRun.Surface,
+    workflow: Workflow | None,
     request: Request,
 ) -> tuple[list[WorkflowCardData], str | None]:
     # uses the ["workspace", "surface", "-updated_at"] index on SavedRun
     qs = SavedRun.objects.filter(workspace=workspace, surface=surface).select_related(
         "parent_version__published_run", "workflow_metadata", "created_by"
     )
+    if workflow is not None:
+        qs = qs.filter(workflow=workflow)
 
     runs, next_cursor = paginate_queryset(
         qs=qs,
@@ -111,46 +135,56 @@ def _load_history(
     return cards, _load_more_href(request, next_cursor)
 
 
-def _build_workflow_options(surface: SavedRun.Surface) -> list[WorkflowFilterOption]:
-    return [
+def _build_workflow_options(
+    surface: SavedRun.Surface,
+    active_workflow: Workflow | None,
+) -> list[WorkflowFilterOption]:
+    options = [
         WorkflowFilterOption(
             id="",
             title=f"{icons.example}&nbsp; Any",
             href=_surface_href(surface),
-            active=True,
-        ),
-    ] + [
-        WorkflowFilterOption(
-            id=str(metadata.workflow),
-            title=f"{metadata.emoji} {metadata.short_title}",
-            href=get_route_path(
-                history_route,
-                path_params={
-                    "page_slug": Workflow(metadata.workflow).short_slug.lower()
-                },
-            ),
+            active=active_workflow is None,
         )
-        for metadata in WorkflowMetadata.objects.all().order_by("-priority")
     ]
+    for metadata in WorkflowMetadata.objects.all().order_by("-priority"):
+        workflow = Workflow(metadata.workflow)
+        options.append(
+            WorkflowFilterOption(
+                id=workflow.page_cls.canonical_slug(),
+                title=f"{metadata.emoji} {metadata.short_title}",
+                href=_surface_href(surface, workflow),
+                active=workflow == active_workflow,
+            )
+        )
+    return options
 
 
 def _build_surface_tabs(
-    active: SavedRun.Surface, surfaces: list[SavedRun.Surface]
+    active: SavedRun.Surface,
+    surfaces: list[SavedRun.Surface],
+    workflow: Workflow | None,
 ) -> list[SurfaceTabData]:
     return [
         SurfaceTabData(
             id=surface.name,
             title=surface.label,
             icon=SURFACE_ICONS.get(surface),
-            href=_surface_href(surface),
+            href=_surface_href(surface, workflow),
             active=surface == active,
         )
         for surface in surfaces
     ]
 
 
-def _surface_href(surface: SavedRun.Surface) -> str:
-    return get_route_path(history_page, path_params={"surface": surface.name})
+def _surface_href(
+    surface: SavedRun.Surface,
+    workflow: Workflow | None = None,
+) -> str:
+    href = furl(get_route_path(history_page, path_params={"surface": surface.name}))
+    if workflow is not None:
+        href.args["workflow"] = workflow.page_cls.canonical_slug()
+    return str(href)
 
 
 def _load_more_href(request: Request, next_cursor: dict[str, str] | None) -> str | None:

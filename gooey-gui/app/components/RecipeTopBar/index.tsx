@@ -7,7 +7,16 @@ import type {
   RecipeTopBarProps,
   TopBarMenuItem,
 } from "@gooey-types/recipe_top_bar_props";
-import { Link } from "@remix-run/react";
+import { Link, useNavigate } from "@remix-run/react";
+import type { RecipeView } from "../RecipeWorkspace/paneState";
+import {
+  paneVisibility,
+  selectedWorkspaceView,
+  viewAfterRun,
+  viewForLayout,
+  workspaceTargetForView,
+} from "../RecipeWorkspace/paneState";
+import { usePaneLayout } from "../RecipeWorkspace/usePaneLayout";
 
 /** Raw FontAwesome html arrives from python, the same way NavItemData.icon does. */
 function Icon({ html, className }: { html?: string; className?: string }) {
@@ -54,7 +63,7 @@ function Menu({
             key={item.key}
             className={clsx(
               "gooey-topbar-menu-heading",
-              item.mobileOnly && "d-lg-none",
+              item.mobileOnly && "d-lg-none"
             )}
           >
             {item.label}
@@ -66,7 +75,7 @@ function Menu({
             className={clsx(
               "gooey-topbar-menu-item",
               item.is_danger && "text-danger",
-              item.mobileOnly && "d-lg-none",
+              item.mobileOnly && "d-lg-none"
             )}
           >
             <Icon html={item.icon} className="gooey-topbar-menu-icon" />
@@ -79,14 +88,14 @@ function Menu({
             className={clsx(
               "gooey-topbar-menu-item",
               item.is_danger && "text-danger",
-              item.mobileOnly && "d-lg-none",
+              item.mobileOnly && "d-lg-none"
             )}
             onClick={() => onPick(item)}
           >
             <Icon html={item.icon} className="gooey-topbar-menu-icon" />
             {item.label}
           </button>
-        ),
+        )
       )}
     </div>
   );
@@ -97,7 +106,11 @@ export function RecipeTopBar({
   photo_url,
   circle_photo,
   author,
-  tabs,
+  views,
+  storage_key,
+  initial_view,
+  workspace_href,
+  workspace_active,
   immersive_on_mobile,
   overflow_items,
   title_menu_items,
@@ -123,10 +136,33 @@ export function RecipeTopBar({
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const { layout, hydrated, selectView } = usePaneLayout(
+    storage_key,
+    initial_view
+  );
+  const activeView = viewForLayout(layout);
+  const selectedView = selectedWorkspaceView(activeView, workspace_active);
+  const activeViewSpec = views.find((view) => view.slug === selectedView);
+  const chooseView = (view: RecipeView) => {
+    selectView(view);
+    const target = workspaceTargetForView(workspace_active, workspace_href);
+    if (target) {
+      navigate(target);
+    }
+  };
+  const handleRun = () => {
+    if (workspace_active) {
+      selectView(viewAfterRun(activeView, is_running));
+    }
+    fire(run_key);
+  };
 
   const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
   const overflowRef = useDismissOnOutsideClick(() => setOverflowOpen(false));
-  const publishMenuRef = useDismissOnOutsideClick(() => setPublishMenuOpen(false));
+  const publishMenuRef = useDismissOnOutsideClick(() =>
+    setPublishMenuOpen(false)
+  );
 
   // mutate-then-notify: the server pops these keys on the next render
   const fire = (key: string, value: unknown = true) => {
@@ -236,7 +272,8 @@ export function RecipeTopBar({
     <div
       className={clsx(
         "gooey-topbar",
-        immersive_on_mobile && "gooey-topbar-immersive"
+        (activeViewSpec?.immersive_on_mobile || immersive_on_mobile) &&
+          "gooey-topbar-immersive"
       )}
     >
       <div className="gooey-topbar-left">
@@ -277,32 +314,32 @@ export function RecipeTopBar({
             onPick={pickMenuItem}
           />
         </div>
-
-        {/* The collapse control lives on the Builder panel's own right edge, not here -
-            see `.v2-builder-close`. Next to the title it read as belonging to the workflow
-            rather than to the panel it closes. */}
       </div>
 
-      {/* A single-tab recipe (media gen, bulk/eval) renders no pill group at all. */}
-      {tabs.length > 1 && (
-        <div className="gooey-topbar-tabs">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.slug}
-              to={tab.href}
+      {/* A single-view recipe does not need a selector. */}
+      {views.length > 1 && (
+        <div
+          className="gooey-topbar-tabs"
+          style={{ visibility: paneVisibility(hydrated) }}
+        >
+          {views.map((view) => (
+            <button
+              type="button"
+              key={view.slug}
               className={clsx(
                 "gooey-topbar-tab",
-                tab.is_active && "gooey-topbar-tab-active",
-                tab.desktop_only && "gooey-topbar-tab-desktop-only"
+                view.slug === selectedView && "gooey-topbar-tab-active",
+                view.desktop_only && "gooey-topbar-tab-desktop-only"
               )}
+              onClick={() => chooseView(view.slug as RecipeView)}
               // no title: these carry a visible label, so a tooltip repeating it is noise.
-              // `aria-current` is the part that was missing - the active pill is styled, which
-              // says nothing to a screen reader.
-              aria-current={tab.is_active ? "page" : undefined}
+              // `aria-pressed` conveys that these controls change the workspace layout rather
+              // than navigate to another page.
+              aria-pressed={view.slug === selectedView}
             >
-              <Icon html={tab.icon} className="gooey-topbar-tab-icon" />
-              {tab.label}
-            </Link>
+              <Icon html={view.icon} className="gooey-topbar-tab-icon" />
+              {view.label}
+            </button>
           ))}
         </div>
       )}
@@ -411,7 +448,10 @@ export function RecipeTopBar({
               <span className="gooey-topbar-btn-label">Publish</span>
               <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
               {has_unpublished_changes && (
-                <span className="gooey-topbar-dot" title="Unpublished changes" />
+                <span
+                  className="gooey-topbar-dot"
+                  title="Unpublished changes"
+                />
               )}
             </button>
             <Menu
@@ -428,7 +468,9 @@ export function RecipeTopBar({
         {!!cost_label &&
           (() => {
             const costName = `Run cost: ${cost_label}`;
-            const costTip = cost_title ? `${costName} (${cost_title})` : costName;
+            const costTip = cost_title
+              ? `${costName} (${cost_title})`
+              : costName;
             return cost_href ? (
               <a
                 className="gooey-topbar-cost"
@@ -463,7 +505,7 @@ export function RecipeTopBar({
               is_running && "gooey-topbar-run-stop"
             )}
             disabled={run_disabled}
-            onClick={() => fire(run_key)}
+            onClick={handleRun}
             // `.gooey-topbar-btn-label` is hidden below lg, so on a phone this is an
             // unlabelled icon - the tooltip and aria-label are its only name there
             title={is_running ? "Stop this run" : run_label}

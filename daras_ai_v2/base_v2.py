@@ -61,7 +61,7 @@ from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.query_params_util import extract_query_params
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
-from daras_ai_v2.tab_spec import TabRoute, TabSpec
+from daras_ai_v2.tab_spec import TabSpec
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
@@ -90,7 +90,7 @@ from payments.auto_recharge import (
 )
 from payments.plans import PricingPlan
 from routers.base_auth import get_login_url
-from routers.root import PREVIEW_ROUTE_WORKFLOWS, RecipeTabs
+from routers.root import RecipeTabs
 from widgets.author import render_author_from_user
 from widgets.base_header import render_help_button
 from widgets.publish_form import clear_publish_form
@@ -228,15 +228,9 @@ class BasePage:
     def canonical_slug(cls) -> str:
         return cls.slug_versions[-1]
 
-    def current_tab_url(
-        self, tab_slug: str, *, query_params: dict[str, str] | None = None
-    ) -> str:
-        """Url of one of this page's v2 tabs, for the run this request is on."""
-        return self.current_app_url(TabRoute(tab_slug), query_params=query_params)
-
     def current_app_url(
         self,
-        tab: "RecipeTabs | TabRoute" = RecipeTabs.run,
+        tab: RecipeTabs = RecipeTabs.run,
         *,
         query_params: dict[str, str] | None = None,
         path_params: dict | None = None,
@@ -257,7 +251,7 @@ class BasePage:
     def app_url(
         cls,
         *,
-        tab: "RecipeTabs | TabRoute | None" = None,
+        tab: RecipeTabs | None = None,
         example_id: str | None = None,
         run_id: str | None = None,
         uid: str | None = None,
@@ -297,7 +291,7 @@ class BasePage:
         query_params: dict | None = None,
         example_id: str | None = None,
         run_slug: str | None = None,
-        tab: "RecipeTabs | TabRoute | None" = None,
+        tab: RecipeTabs | None = None,
         path_params: dict | None = None,
     ):
         if not tab:
@@ -473,7 +467,6 @@ class BasePage:
 
         tabs = self.get_tab_spec()
         assert tabs, f"{type(self).__name__}.get_tab_spec() returned no tabs"
-        active = self._resolve_active_tab(tabs)
 
         # App shell: the bar is a fixed-height row at the top and the body takes the rest of
         # the viewport, scrolling inside itself. The page as a whole never scrolls, so the
@@ -482,14 +475,13 @@ class BasePage:
         # The bar's node is reserved first (so it comes first in the DOM) but filled last:
         # _has_request_changed() - and so the publish state - is only settled once the inputs
         # have rendered. v1 renders its header last for the same reason.
-        immersive = bool(active and active.immersive_on_mobile)
         top_bar_placeholder = gui.div(
             className=(
                 # v2-topbar-container makes this a CSS query container, so the bar's chips size
                 # themselves against the bar's own width rather than the viewport's - the two
                 # differ whenever the Builder is open or the rail is expanded
-                "v2-topbar-container flex-shrink-0 w-100 px-2 px-lg-4 py-2"
-                + (" v2-immersive-topbar" if immersive else "")
+                "v2-topbar-container flex-shrink-0 w-100 border-bottom "
+                "px-2 px-lg-4 py-2"
             )
         )
 
@@ -514,21 +506,17 @@ class BasePage:
                     # block, so there is no flex context left to grow into.
                     # px-lg-3 rather than px-4: the working column adds no gutter of its own,
                     # so the page's padding is the whole left margin the panes get.
-                    "d-flex flex-column h-100 w-100 overflow-auto px-2 px-lg-3 pb-1 pb-lg-2"
-                    # below lg an immersive tab fills everything under the app header, so
-                    # the page's own padding gets out of its way
-                    + (" v2-immersive-mobile" if immersive else "")
+                    "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
+                    "px-2 px-lg-3 pt-2 pt-lg-3 pb-1 pb-lg-2"
                 ),
                 # without this a flex child refuses to shrink below its content, and the
                 # overflow lands on the page instead of here
                 style=dict(minHeight=0),
             ),
         ):
-            if active:
-                active.render()
+            if self.tab in {RecipeTabs.run, RecipeTabs.preview}:
+                self._render_workspace(tabs)
             else:
-                # a v1 tab url that the v2 strip no longer surfaces: Examples, API, Saved,
-                # History, Deploy. Their routes and deep links keep working, with v2 chrome.
                 self.render_selected_tab()
 
         if builder_pane is not None:
@@ -536,9 +524,43 @@ class BasePage:
                 self._render_gooey_builder()
 
         with top_bar_placeholder:
-            self._render_top_bar(tabs=tabs, active=active)
+            self._render_top_bar(tabs=tabs)
 
         self._handle_top_bar_actions()
+
+    def _render_workspace(self, tabs: list[TabSpec]):
+        """Render each reusable work surface once; React controls their arrangement."""
+        initial_view = self.entry_tab_slug(tabs)
+        with gui.component(
+            "RecipeWorkspace",
+            storage_key=self._workspace_storage_key(),
+            initial_view=initial_view,
+            show_preview_new_chat=self._show_preview_new_chat_button(),
+        ):
+            with gui.div():
+                with gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
+                    self._render_about_content()
+
+            with gui.div():
+                if self._render_deleted_output_if_needed():
+                    submitted = False
+                else:
+                    submitted = self._render_solo_input_col()
+
+            with gui.div():
+                if self.current_sr.retention_policy == RetentionPolicy.delete:
+                    self.render_deleted_output()
+                else:
+                    self._render_output_col(submitted=submitted)
+
+    def _workspace_storage_key(self) -> str:
+        return (
+            f"gooey:recipe-layout:{self.workflow.value}:"
+            f"{self.current_pr.published_run_id}"
+        )
+
+    def _show_preview_new_chat_button(self) -> bool:
+        return True
 
     def _can_show_builder(self) -> bool:
         try:
@@ -560,20 +582,22 @@ class BasePage:
             key=GOOEY_BUILDER_EVENT_KEY,
             session=self.request.session,
             disabled=False,
+            client_only=True,
+            storage_key=f"{self._workspace_storage_key()}:builder",
         )
 
     def _render_gooey_builder(self):
         # The panel's own collapse control, pinned to its top-right corner at every
         # breakpoint. Absolute against `.gooey-sidebar`, which is positioned either way
         # (sticky on desktop, fixed below the sidebar breakpoint), so there is no app-header
-        # offset to hardcode; the `display: contents` html wrapper adds no box, so this costs
-        # the panel's height chain nothing.
-        gui.html(
-            '<button type="button" class="v2-builder-close" title="Collapse Builder"'
-            ' aria-label="Collapse Builder" onclick="window.dispatchEvent(new Event('
-            f"'{GOOEY_BUILDER_EVENT_KEY}:close'))\">"
-            '<i class="fa-regular fa-arrow-down-left-and-arrow-up-right-to-center"></i>'
-            "</button>"
+        # offset to hardcode. The shared React control supplies the same icon, dimensions,
+        # and HTML tooltip as the editor and preview controls.
+        gui.component(
+            "WorkspacePaneControl",
+            label="Close Ask gooey",
+            icon="fa-regular fa-xmark",
+            event_name=f"{GOOEY_BUILDER_EVENT_KEY}:close",
+            className="v2-builder-close",
         )
         render_gooey_builder(
             event_key=GOOEY_BUILDER_EVENT_KEY, request=self.request, page=self
@@ -634,43 +658,9 @@ class BasePage:
 
         self.submit_and_redirect()
 
-    def _resolve_active_tab(self, tabs: list[TabSpec]) -> TabSpec | None:
-        """The tab this request is for, or None for a v1 tab url with no matching TabSpec."""
-        from routers.recipe_v2 import v1_tab_slugs
-
-        by_slug = {tab.slug: tab for tab in tabs}
-
-        if v1_slug := v1_tab_slugs().get(self.tab):
-            # a v1 tab route brought us here (/preview/, /api/, /saved/, ...), and it names
-            # the tab directly
-            return by_slug.get(v1_slug)
-
-        # RecipeTabs.run: either the entry url or one of the v2-only tab urls
-        return (
-            by_slug.get(self._url_tab_slug())
-            or by_slug.get(self.entry_tab_slug(tabs))
-            or tabs[0]
-        )
-
     def entry_tab_slug(self, tabs: list[TabSpec]) -> str:
-        """Slug of the tab the entry url `/{page_slug}/` renders.
-
-        Defaults to whichever tab claims the entry url outright with `slug=""`, else the
-        first in the strip. Recipes override it for a landing that depends on the request -
-        VideoBots sends a first-time visitor to About and everyone else to Split.
-
-        A recipe whose entry tab varies must not give any tab `slug=""`: the empty slug *is*
-        the entry url, so a tab holding it would have no url of its own to link to.
-        """
-        return next((t.slug for t in tabs if t.slug == ""), tabs[0].slug)
-
-    def _wide_output_tab(self, tabs: list[TabSpec]) -> TabSpec | None:
-        """The tab showing the output *beside* the inputs, if this recipe has one.
-
-        It is the output tab that needs the width to exist at all, which is exactly what
-        `desktop_only` marks. Preview shows output too, but on its own.
-        """
-        return next((t for t in tabs if t.shows_output and t.desktop_only), None)
+        """Initial client view when this workflow has no stored pane layout."""
+        return tabs[0].slug
 
     def is_unowned_example(self) -> bool:
         """The url points at a published workflow the viewer does not own, rather than at a
@@ -678,24 +668,6 @@ class BasePage:
         """
         sr, pr = self.current_sr_pr
         return pr.saved_run_id == sr.id and not self.is_current_user_owner()
-
-    def _url_tab_slug(self) -> str:
-        """Tab slug of a v2 tab url - `/video-bots/my-agent-abc123/config/` -> "config".
-
-        A trailing segment counts as a tab slug only if `routers.recipe_v2` actually
-        registered a route for it. Matching against the route registry rather than trusting
-        the last segment is what stops a run identifier being read as a tab: the entry url
-        `/video-bots/my-agent-abc123/` ends in the run id, which is not a registered slug,
-        so it correctly resolves to "" - the entry tab.
-        """
-        from routers.recipe_v2 import tab_routes
-
-        if not self.request.url:
-            return ""
-        segments = [seg for seg in self.request.url.path.split("/") if seg]
-        if len(segments) < 2 or segments[-1] not in tab_routes:
-            return ""
-        return segments[-1]
 
     # keys the RecipeTopBar writes into session state; popped by _handle_top_bar_actions
     TOP_BAR_MENU_KEY = "--topbar-menu"
@@ -784,8 +756,8 @@ class BasePage:
             and (self.is_current_user_owner() or self.is_current_user_admin())
         )
 
-    def _render_top_bar(self, *, tabs: list[TabSpec], active: TabSpec | None):
-        from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps, TopBarTab
+    def _render_top_bar(self, *, tabs: list[TabSpec]):
+        from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps, TopBarView
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
         sr, pr = self.current_sr_pr
@@ -798,16 +770,17 @@ class BasePage:
                 photo_url=pr.photo_url or None,
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._top_bar_author(),
-                # a single-tab recipe renders no pill group - the component checks length
-                immersive_on_mobile=bool(active and active.immersive_on_mobile),
-                tabs=[
-                    TopBarTab(
+                storage_key=self._workspace_storage_key(),
+                initial_view=self.entry_tab_slug(tabs),
+                workspace_href=self.current_app_url(RecipeTabs.run),
+                workspace_active=self.tab in {RecipeTabs.run, RecipeTabs.preview},
+                views=[
+                    TopBarView(
                         slug=tab.slug,
                         label=tab.label,
                         icon=tab.icon,
-                        href=self.current_tab_url(tab.slug),
-                        is_active=bool(active and tab.slug == active.slug),
                         desktop_only=tab.desktop_only,
+                        immersive_on_mobile=tab.immersive_on_mobile,
                     )
                     for tab in tabs
                 ],
@@ -1576,52 +1549,28 @@ class BasePage:
             gui.error(msg, icon="😵")
             gui.stop()
 
-    @classmethod
-    def all_tab_slugs(cls) -> set[str]:
-        """Every tab slug this recipe can ever show.
-
-        A classmethod, because it drives route registration at import time - there is no
-        request yet, so it must not look at request state. `get_tab_spec()` does the
-        per-request filtering. A slug missing from here has no route, and linking to it
-        raises from `routers.recipe_v2.tab_url_path()`.
-        """
-        return {"about", "config", "preview", "split"}
-
     def get_tab_spec(self) -> list[TabSpec]:
-        """The tabs for this request, in strip order. The first entry is what the entry url
-        `/{page_slug}/` renders.
-
-        Recipes override this to add, drop or reorder tabs - a spec with a single entry
-        renders no strip at all, which is the media-gen / bulk-eval shape.
-        """
+        """The client views for this request, in selector order."""
         return [
             TabSpec(
                 slug="about",
                 label="About",
                 icon=icons.info,
-                render=self._render_about_tab,
             ),
             TabSpec(
-                # slug stays "config": it is the url and the route name, and renaming it
-                # would break every published link. Only the label is the product's to change.
-                slug="config",
+                slug="edit",
                 label="Edit",
                 icon=icons.edit,
-                render=self._render_config_tab,
             ),
             TabSpec(
                 slug="preview",
                 label="Preview",
                 icon=icons.preview,
-                render=self._render_preview_tab,
-                shows_output=True,
             ),
             TabSpec(
                 slug="split",
                 label="Split",
                 icon=icons.run,
-                render=self._render_split_tab,
-                shows_output=True,
             ),
         ]
 
@@ -1760,20 +1709,9 @@ class BasePage:
             ):
                 return self._render_input_col()
 
-    def _render_mobile_back_link(self, to_slug: str = "config"):
-        """Floating way out of an immersive tab, since it hides the tab strip below lg."""
-        with gui.link(
-            to=self.current_tab_url(to_slug),
-            className="v2-back-link d-lg-none",
-        ):
-            gui.html('<i class="fa-regular fa-arrow-left"></i> Back')
-
     def _render_preview_tab(self):
         if self._render_deleted_output_if_needed():
             return
-        # this tab is immersive on mobile: it hides the tab strip, so it owes the user a
-        # way back out
-        self._render_mobile_back_link()
         self._render_output_col()
 
     def _preview_frame(self):
@@ -2567,15 +2505,11 @@ class BasePage:
         if submitted:
             self.submit_and_redirect()
 
-        if self.tab == RecipeTabs.run and self.workflow in PREVIEW_ROUTE_WORKFLOWS:
-            hide_on_mobile = "d-none d-lg-block"
-        else:
-            hide_on_mobile = ""
         # h-100 so a percentage-height child (the chat widget) resolves against the
         # scrolling body area rather than the viewport
         with gui.div(
             style=dict(height="100%", minHeight=0),
-            className=hide_on_mobile,
+            className=self._output_col_class_name(),
         ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
@@ -2591,6 +2525,10 @@ class BasePage:
                 self._render_running_output()
             elif not is_deleted:
                 self._render_after_output()
+
+    def _output_col_class_name(self) -> str:
+        """The client-side Preview view controls visibility at every breakpoint."""
+        return ""
 
     def _render_failed_output(self):
         if not self._render_custom_error():
@@ -2670,31 +2608,7 @@ class BasePage:
         if not sr:
             return
 
-        tabs = self.get_tab_spec()
-        tab = self._run_landing_tab(tabs, self._resolve_active_tab(tabs))
-        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid, tab=tab))
-
-    def _run_landing_tab(self, tabs: list[TabSpec], active: TabSpec | None):
-        """Where a just-started run should land. `None` means the entry url.
-
-        The point is to leave the user somewhere the output is visible, without moving them
-        if they can already see it. `None` is safe for Split even though the entry url can
-        also resolve to About: the run this creates belongs to the current user, so it is
-        never the unowned example that sends a visitor to About.
-        """
-        if active is not None and active.shows_output and not active.desktop_only:
-            # Preview - already looking at the output, and it has a url of its own
-            return TabRoute(active.slug)
-        if self._wide_output_tab(tabs) is not None and gui.session_state.get(
-            self.TOP_BAR_WIDE_KEY
-        ):
-            # ran from a tab with no output pane (Config) on a screen wide enough for
-            # Split - land there, so the inputs stay in view beside the run. Narrower than
-            # that, Split is hidden and Preview below is the only option.
-            return None
-        if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
-            return RecipeTabs.preview
-        return None
+        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.is_logged_in()
@@ -2849,7 +2763,7 @@ class BasePage:
         from celeryapp.tasks import runner_task
 
         result = runner_task.delay(
-            page_cls=self.__class__,
+            page_cls=self.get_runner_page_cls(),
             user_id=self.request.user.id,
             run_id=sr.run_id,
             uid=sr.uid,
@@ -2861,6 +2775,11 @@ class BasePage:
         sr.celery_task_id = result.id
         sr.save(update_fields=["celery_task_id", "updated_at"])
         return result
+
+    @classmethod
+    def get_runner_page_cls(cls):
+        """The stable page class serialized into Celery jobs."""
+        return cls
 
     @classmethod
     def realtime_channel_name(cls, run_id: str, uid: str) -> str:

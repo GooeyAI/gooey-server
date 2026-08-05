@@ -9,6 +9,7 @@ import type {
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
 import { AccountSection } from "./AccountSection";
+import { builderOpenEventName } from "./builderNavigation";
 import { clearBuilderIntent, readBuilderIntent } from "./builderIntent";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
@@ -40,8 +41,6 @@ export function NavigationSidebar({
   );
   const [isMobile, setIsMobile] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(builderInitiallyOpen);
-  const builderOpenRef = useRef(builderInitiallyOpen);
-  builderOpenRef.current = builderOpen;
   const mounted = useRef(false);
 
   const railCollapsed = !isMobile && collapsed;
@@ -94,12 +93,12 @@ export function NavigationSidebar({
   // Back to honour whatever the user last chose. Nothing ever closes the panel
   // on the user's behalf.
   const builderIntent = readBuilderIntent(location.state);
+  const builderOpenEvent = builderOpenEventName(builderEventKey, builderIntent);
   useEffect(() => {
-    if (!builderEventKey || !builderIntent) return;
+    if (!builderOpenEvent) return;
     clearBuilderIntent();
-    if (builderOpenRef.current) return;
-    window.dispatchEvent(new CustomEvent(`${builderEventKey}:open`));
-  }, [builderEventKey, builderIntent, location.key]);
+    window.dispatchEvent(new CustomEvent(builderOpenEvent));
+  }, [builderOpenEvent, location.key]);
 
   const expandRail = (e?: React.MouseEvent) => {
     e?.preventDefault();

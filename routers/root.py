@@ -26,6 +26,7 @@ from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_form,
     fastapi_request_json,
+    get_app_route_url,
     get_route_path,
 )
 from daras_ai_v2.gooey_builder import (
@@ -707,13 +708,16 @@ def render_recipe_page(
     # gate open -> swap in the v2 fork of the same recipe, if one exists yet.
     # settings.ENABLE_LAYOUT_V2 is checked here first so the kill switch being off
     # costs nothing beyond this one settings read.
+    using_layout_v2 = False
     if settings.ENABLE_LAYOUT_V2:
         from daras_ai_v2.layout_v2 import can_use_layout_v2
 
         if can_use_layout_v2(request):
             from daras_ai_v2.all_pages_v2 import page_slug_map_v2
 
-            page_cls = page_slug_map_v2.get(normalized_slug, page_cls)
+            if v2_page_cls := page_slug_map_v2.get(normalized_slug):
+                page_cls = v2_page_cls
+                using_layout_v2 = True
 
     # ensure the latest slug is used
     latest_slug = page_cls.canonical_slug()
@@ -731,6 +735,14 @@ def render_recipe_page(
             page_cls.app_url(tab=tab, query_params=dict(request.query_params))
         )
         return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
+
+    if using_layout_v2:
+        if redirect := _layout_v2_legacy_redirect(
+            request=request,
+            page_cls=page_cls,
+            tab=tab,
+        ):
+            return redirect
 
     page = page_cls(
         tab=tab,
@@ -751,6 +763,31 @@ def render_recipe_page(
             url=get_og_url_path(request), page=page, state=gui.session_state
         ),
     )
+
+
+def _layout_v2_legacy_redirect(
+    *,
+    request: Request,
+    page_cls,
+    tab: "RecipeTabs",
+) -> RedirectResponse | None:
+    workflow_slug = page_cls.canonical_slug()
+    if tab == RecipeTabs.examples:
+        location = get_app_route_url(
+            explore_page, query_params={"workflow": workflow_slug}
+        )
+    elif tab == RecipeTabs.history:
+        from widgets.history import history_page
+
+        location = get_app_route_url(
+            history_page, query_params={"workflow": workflow_slug}
+        )
+    elif tab == RecipeTabs.preview:
+        canonical_path = request.url.path.rstrip("/").rsplit("/", 1)[0] + "/"
+        location = str(furl(request.url).set(path=canonical_path, origin=None))
+    else:
+        return None
+    return RedirectResponse(location, status_code=301)
 
 
 def get_og_url_path(request) -> str:

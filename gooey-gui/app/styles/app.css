@@ -112,7 +112,7 @@ div.code-toolbar {
   color: inherit;
 }
 
-.gui-input-text input, 
+.gui-input-text input,
 .gui-input-password input {
   padding: 0.8rem;
 }
@@ -183,8 +183,7 @@ div.code-toolbar {
 }
 
 .container-margin-reset p {
-    margin: 0;
-
+  margin: 0;
 }
 
 .gui-md-container {
@@ -324,6 +323,7 @@ button .gui-html-container,
 }
 
 .gooey-sidebar {
+  display: flex;
   background-color: #f9f9f9;
   position: sticky;
   top: 0;
@@ -331,6 +331,15 @@ button .gui-html-container,
   bottom: 0;
   z-index: 999;
   height: 100dvh;
+  opacity: 1;
+  transform: translateX(0);
+  overflow: hidden;
+  transition:
+    min-width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .gooey-sidebar-bordered,
@@ -339,17 +348,18 @@ button .gui-html-container,
 }
 
 .gooey-sidebar-open {
-  display: flex;
   min-width: var(--sidebar_open_width);
   width: var(--sidebar_open_width);
   max-width: var(--sidebar_open_width);
 }
 .gooey-sidebar-closed {
-  display: none;
   min-width: var(--sidebar_closed_width);
   width: var(--sidebar_closed_width);
   max-width: var(--sidebar_closed_width);
-  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-1rem);
+  border-right-width: 0;
 }
 
 .gooey-sidebar-closed:hover {
@@ -359,28 +369,34 @@ button .gui-html-container,
 /* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
 @media (max-width: 1140px) {
   .gooey-sidebar-open {
-      position: fixed;
-      left: 0;
-      bottom: 0;
-      min-width: var(--sidebar_mobile_width);
-      width: var(--sidebar_mobile_width);
-      max-width: var(--sidebar_mobile_width);
-      /* Full-screen mobile takeover must sit above the nav top bar
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    min-width: var(--sidebar_mobile_width);
+    width: var(--sidebar_mobile_width);
+    max-width: var(--sidebar_mobile_width);
+    /* Full-screen mobile takeover must sit above the nav top bar
          (.nav-mobile-topbar, z-index 1030) but below the nav scrim/drawer
          (1044 / 9999) so reopening the nav still layers correctly. */
-      z-index: 1035;
-      border-left: 1px solid #e0e0e0;
-      border-right: none;
-      height: calc(100dvh); /* 4px for the progress bar */
+    z-index: 1035;
+    border-left: 1px solid #e0e0e0;
+    border-right: none;
+    height: calc(100dvh); /* 4px for the progress bar */
   }
   .gooey-sidebar-closed {
-      position: sticky;
-      right: 0;
-      left: auto;
-      min-width: 0px;
-      width: 0px;
-      max-width: 0px;
-      overflow: hidden;
+    position: sticky;
+    right: 0;
+    left: auto;
+    min-width: 0px;
+    width: 0px;
+    max-width: 0px;
+    overflow: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gooey-sidebar {
+    transition: none;
   }
 }
 
@@ -404,7 +420,11 @@ button .gui-html-container,
   content: "";
   width: 3px;
   height: 22px;
-  background-image: radial-gradient(circle at center, #c2c2c2 1.5px, transparent 1.6px);
+  background-image: radial-gradient(
+    circle at center,
+    #c2c2c2 1.5px,
+    transparent 1.6px
+  );
   background-size: 3px 7px;
   background-repeat: repeat-y;
   transition: background-image 150ms ease;
@@ -412,7 +432,11 @@ button .gui-html-container,
 
 .gooey-sidebar-resizer:hover::before,
 body.gooey-sidebar-resizing .gooey-sidebar-resizer::before {
-  background-image: radial-gradient(circle at center, #8a8a8a 1.5px, transparent 1.6px);
+  background-image: radial-gradient(
+    circle at center,
+    #8a8a8a 1.5px,
+    transparent 1.6px
+  );
 }
 
 body.gooey-sidebar-resizing,

@@ -3,14 +3,14 @@ import json
 import math
 import traceback
 import typing
+from functools import cached_property
 from itertools import zip_longest
 
 import sentry_sdk
-
-import gooey_gui as gui
 import typing_extensions
 from pydantic import BaseModel, Field
 
+import gooey_gui as gui
 from ai_models.llm_openapi import LLMMarker
 from ai_models.models import AIModelSpec
 from app_users.models import AppUser
@@ -23,7 +23,7 @@ from bots.models import (
 )
 from bots.models.message_thread import MessageThread
 from daras_ai.image_input import truncate_text_words
-from daras_ai_v2 import settings, exceptions, icons
+from daras_ai_v2 import exceptions, icons, settings
 from daras_ai_v2.asr import (
     AsrModels,
     TranslationModels,
@@ -40,15 +40,12 @@ from daras_ai_v2.azure_doc_extract import (
 )
 from daras_ai_v2.base_v2 import (
     FILL_HEIGHT_EDITOR_CSS,
+    STARTING_STATE,
     VARIABLES_DIALOG_CSS,
     BasePage,
     RecipeTabs,
-    STARTING_STATE,
 )
-from daras_ai_v2.tab_spec import TabSpec
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
-from daras_ai_v2.fastapi_tricks import get_api_route_url
-from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.doc_search_settings_widgets import (
     SUPPORTED_SPREADSHEET_TYPES,
     bulk_documents_uploader,
@@ -62,9 +59,11 @@ from daras_ai_v2.doc_search_settings_widgets import (
 from daras_ai_v2.embedding_model import EmbeddingModels
 from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.fastapi_tricks import get_api_route_url
 from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
 from daras_ai_v2.functional import flatapply_parallel
 from daras_ai_v2.glossary import validate_glossary_document
+from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_filters import (
     asr_languages_without_dialects,
     language_filter_selector,
@@ -90,7 +89,7 @@ from daras_ai_v2.language_model_settings_widgets import (
 from daras_ai_v2.lipsync_api import LipsyncModel, LipsyncSettings
 from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
 from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import OptionalHttpUrlStr, HttpUrlStr
+from daras_ai_v2.pydantic_validation import HttpUrlStr, OptionalHttpUrlStr
 from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     CitationStyles,
@@ -98,11 +97,7 @@ from daras_ai_v2.search_ref import (
     apply_response_formattings_suffix,
     parse_refs,
 )
-from daras_ai_v2.web_widget_embed import (
-    load_chat_widget_lib,
-    chat_widget_input_to_request_body,
-    get_chat_widget_messages,
-)
+from daras_ai_v2.tab_spec import TabSpec
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -116,8 +111,13 @@ from daras_ai_v2.vector_search import (
     doc_or_yt_url_to_file_metas,
     doc_url_to_text_pages,
 )
-from functions.base_llm_tool import BaseLLMTool
+from daras_ai_v2.web_widget_embed import (
+    chat_widget_input_to_request_body,
+    get_chat_widget_messages,
+    load_chat_widget_lib,
+)
 from functions.base_llm_tool import (
+    BaseLLMTool,
     get_tool_from_call,
     render_called_functions,
 )
@@ -128,10 +128,11 @@ from recipes.DocSearch import get_top_k_references, references_as_prompt
 from recipes.GoogleGPT import SearchReference
 from recipes.Lipsync import LipsyncPage
 from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
+from recipes.VideoBots import VideoBotsPage
 from url_shortener.models import ShortenedURL
 from usage_costs.twilio_usage_cost import (
-    get_non_ivr_price_credits,
     get_ivr_price_credits_and_seconds,
+    get_non_ivr_price_credits,
 )
 from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
@@ -178,6 +179,10 @@ class ReplyButton(typing_extensions.TypedDict):
 
 
 class VideoBotsPageV2(BasePage):
+    @classmethod
+    def get_runner_page_cls(cls):
+        return VideoBotsPage
+
     PROFIT_CREDITS = 3
 
     title = "Agent"  # "Create Interactive Video Bots"
@@ -1291,10 +1296,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
             bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
 
-        has_whatsapp_integration = BotIntegration.objects.filter(
-            published_run=self.current_pr,
-            platform=Platform.WHATSAPP,
-        ).exists()
         config = dict(
             integration_id="magic",
             target="#gooey-embed",
@@ -1310,7 +1311,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
         # the page's own top bar already names the agent, so the widget never needs its own
         config["showHeader"] = False
-        if has_whatsapp_integration:
+        if self._has_whatsapp_integration:
             config["theme"] = "whatsapp"
         if settings.DEBUG:
             from routers.bots_api import stream_create
@@ -1323,8 +1324,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
             style=dict(height="100%", minHeight=0),
             id="gooey-embed",
         )
-        # owns the widget's teardown when this tab is navigated away from client-side
-        gui.component("GooeyEmbedTeardown")
+        # Owns the widget's teardown when this preview disappears or a different workflow
+        # replaces it client-side.
+        gui.component(
+            "GooeyEmbedTeardown",
+            embed_key=str(self.current_pr.published_run_id),
+        )
         load_chat_widget_lib()
         gui.js(
             """
@@ -1369,6 +1374,16 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             messages=messages,
             run_url=str(self.request.url),
         )
+
+    def _show_preview_new_chat_button(self) -> bool:
+        return not self._has_whatsapp_integration
+
+    @cached_property
+    def _has_whatsapp_integration(self) -> bool:
+        return BotIntegration.objects.filter(
+            published_run=self.current_pr,
+            platform=Platform.WHATSAPP,
+        ).exists()
 
     def on_send(self, input_data: dict):
         request_body, message_thread = chat_widget_input_to_request_body(
@@ -1532,14 +1547,8 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         # v2 surfaces the demo buttons as chips in the top bar instead
         pass
 
-    @classmethod
-    def all_tab_slugs(cls) -> set[str]:
-        # "preview" is a url v1 already routes - listing it keeps this an honest description
-        # of the strip; recipe_v2 skips registering a route for it.
-        return {"about", "config", "preview", "split"}
-
     def entry_tab_slug(self, tabs: list[TabSpec]) -> str:
-        """`/agent/` shows About to a first-time visitor and Split to everyone else.
+        """Show About to a first-time visitor and Split to everyone else.
 
         Someone who has arrived at a workflow they do not own wants to know what it is
         before they meet its knobs; someone opening their own run wants to work.
@@ -1548,11 +1557,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
 
     def get_tab_spec(self) -> list[TabSpec]:
         """The agent tab set.
-
-        No tab holds `slug=""`: the entry url resolves per request (see `entry_tab_slug`),
-        so both candidates need a url of their own to link to. `/agent/` therefore still
-        renders Split for anyone working on a run, exactly as v1's Run tab did - it is only
-        a first-time visitor who lands on About instead.
 
         Deploy is deliberately absent: it becomes a sub-tab of Config in a later slice, and
         until then its body stays reachable through v1's `/integrations/` url via
@@ -1563,32 +1567,25 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 slug="about",
                 label="About",
                 icon=icons.info,
-                render=self._render_about_tab,
             ),
             TabSpec(
-                # slug stays "config" - see the base class: it is the url, not the label
-                slug="config",
+                slug="edit",
                 label="Edit",
                 icon=icons.edit,
-                render=self._render_config_tab,
             ),
             TabSpec(
                 slug="preview",
                 label="Preview",
                 icon=icons.preview,
-                render=self._render_preview_tab,
                 # one full-bleed surface; on a phone it takes the whole screen
                 immersive_on_mobile=True,
-                shows_output=True,
             ),
             TabSpec(
                 slug="split",
                 label="Split",
                 icon=icons.split,
-                render=self._render_split_tab,
                 # two columns side by side - there is no room for it on a phone
                 desktop_only=True,
-                shows_output=True,
             ),
         ]
 
@@ -1634,12 +1631,13 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         return (spec.creator and spec.creator.html_icon()) or icons.sparkles, spec.label
 
     def _render_about_meta_card(self, *, icon: str, label: str, pane: str):
-        # the link *is* the card: an <a> wrapping a <button> is invalid html, and the
-        # nested control swallows the navigation
-        with gui.link(
-            to=self.current_tab_url(
-                "config", query_params={self.PANE_QUERY_PARAM: pane}
-            ),
+        with gui.component(
+            "RecipeWorkspaceTrigger",
+            storage_key=self._workspace_storage_key(),
+            initial_view=self.entry_tab_slug(self.get_tab_spec()),
+            view="edit",
+            state_key=self.CONFIG_PANE_KEY,
+            state_value=pane,
             className="v2-about-meta-card",
         ):
             gui.html(

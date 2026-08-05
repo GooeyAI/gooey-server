@@ -22,5 +22,7 @@ export * from "./LoginForm";
 export * from "./PaymentRequired";
 export * from "./NavigationSidebar";
 export * from "./RecipeTopBar";
+export * from "./RecipeWorkspace";
 export * from "./Sidebar";
 export * from "./ToolPage";
+export * from "./WorkspacePaneControl";

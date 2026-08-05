@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import typing
+
 import pydantic
 
 
-class TopBarTab(pydantic.BaseModel):
-    """One tab in the bar's pill group. Mirrors the display half of `TabSpec` - the
-    `render` callable never leaves the server.
-    """
+class TopBarView(pydantic.BaseModel):
+    """One client-side workspace arrangement in the bar's view selector."""
 
-    slug: str
+    slug: typing.Literal["about", "edit", "preview", "split"]
     label: str
     icon: str = ""  # raw FontAwesome html, like NavItemData.icon
-    href: str
-    is_active: bool = False
     desktop_only: bool = False  # hidden below lg; see TabSpec.desktop_only
+    immersive_on_mobile: bool = False
 
 
 class TopBarAuthor(pydantic.BaseModel):
@@ -39,7 +38,7 @@ class TopBarIntegration(pydantic.BaseModel):
 
 
 class TopBarMenuItem(pydantic.BaseModel):
-    """An entry in the title chevron menu or the tab overflow."""
+    """An entry in the title chevron menu or the view overflow."""
 
     key: str  # echoed back through `menu_key` so the server knows what was picked
     label: str
@@ -56,9 +55,12 @@ class RecipeTopBarProps(pydantic.BaseModel):
     circle_photo: bool = False  # some workflows render the avatar as a circle
     author: TopBarAuthor | None = None
 
-    tabs: list[TopBarTab] = []
-    # the active tab owns the screen below lg, so the strip and the run cluster
-    # step out of the way and the tab supplies its own way back
+    views: list[TopBarView] = []
+    storage_key: str
+    initial_view: typing.Literal["about", "edit", "preview", "split"]
+    workspace_href: str
+    workspace_active: bool
+    # An immersive view owns the screen below lg, so the bar steps out of the way.
     immersive_on_mobile: bool = False
     overflow_items: list[TopBarMenuItem] = []  # the "..." beside the pill group
     title_menu_items: list[TopBarMenuItem] = []  # the chevron beside the title

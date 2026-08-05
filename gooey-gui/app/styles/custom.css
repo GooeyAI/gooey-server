@@ -932,6 +932,12 @@ button {
   min-width: 50vw !important;
 }
 
+.tippy-box[data-theme~="gooey-fit-content"] {
+  width: max-content;
+  min-width: 0 !important;
+  max-width: 80vw !important;
+}
+
 @media (min-width: 768px) {
   .tippy-box {
     max-width: 35vw !important;
