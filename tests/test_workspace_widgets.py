@@ -1,4 +1,5 @@
 from gooey_gui.core.state import set_session_state
+from widgets import navigation_sidebar
 from workspaces.models import Workspace
 from workspaces.widgets import (
     SESSION_SELECTED_WORKSPACE,
@@ -8,7 +9,7 @@ from workspaces.widgets import (
 )
 
 
-def test_get_current_workspace_refreshes_cached_memberships(
+def test_sidebar_refreshes_cached_workspace_memberships(
     transactional_db, force_authentication
 ):
     user = force_authentication
@@ -18,9 +19,22 @@ def test_get_current_workspace_refreshes_cached_memberships(
     team_workspace.create_with_owner()
     session = {SESSION_SELECTED_WORKSPACE: team_workspace.id}
 
+    navigation_sidebar._refresh_workspace_cache(user)
     workspace = get_current_workspace(user, session)
 
     assert workspace == team_workspace
+
+
+def test_get_current_workspace_reuses_cached_memberships(
+    transactional_db, force_authentication, django_assert_num_queries
+):
+    user = force_authentication
+    workspace = user.get_or_create_personal_workspace()[0]
+    session = {SESSION_SELECTED_WORKSPACE: workspace.id}
+    get_current_workspace(user, session)
+
+    with django_assert_num_queries(0):
+        assert get_current_workspace(user, session) == workspace
 
 
 def test_handle_workspace_switch_ignores_invalid_workspace_id():

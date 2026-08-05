@@ -37,10 +37,6 @@ def handle_workspace_switch(session: dict):
 
 def get_current_workspace(user: AppUser, session: dict) -> Workspace:
     try:
-        del user.cached_workspaces
-    except AttributeError:
-        pass
-    try:
         workspace = next(
             w
             for w in user.cached_workspaces

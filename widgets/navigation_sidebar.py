@@ -68,6 +68,7 @@ def render(
     else:
         user = request.user
         handle_workspace_switch(request.session)
+        _refresh_workspace_cache(user)
         workspace = get_current_workspace(user, request.session)
 
     saved_path = _saved_workflows_href(workspace)
@@ -125,6 +126,13 @@ def render(
             gooey_builder=_load_gooey_builder_data(request, workspace, page),
         )
     )
+
+
+def _refresh_workspace_cache(user: AppUser) -> None:
+    try:
+        del user.cached_workspaces
+    except AttributeError:
+        pass
 
 
 def _load_nav_items(
