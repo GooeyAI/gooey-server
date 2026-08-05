@@ -1147,6 +1147,7 @@ class TagAdmin(GooeyModelAdmin):
 
 @admin.register(MessageThread)
 class MessageThreadAdmin(GooeyModelAdmin):
+    search_fields = ["title"]
     list_display = [
         "truncated_title",
         "view_bot_conversation",
