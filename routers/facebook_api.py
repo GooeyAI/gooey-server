@@ -21,6 +21,7 @@ from daras_ai_v2.facebook_bots import (
 )
 from daras_ai_v2.fastapi_tricks import fastapi_request_json
 from daras_ai_v2.functional import map_parallel
+from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.widgets import get_current_workspace
 
@@ -30,8 +31,7 @@ app = CustomAPIRouter()
 @app.get("/__/fb/connect_whatsapp/")
 def fb_connect_whatsapp_redirect(request: Request):
     if not request.user or request.user.is_anonymous:
-        redirect_url = furl("/login", query_params={"next": request.url})
-        return RedirectResponse(str(redirect_url))
+        return RedirectResponse(get_login_url(request))
 
     pr = load_published_run_from_state(request)
     retry_button = f'<a href="{wa_connect_url(pr.id)}">Retry</a>'
@@ -133,8 +133,7 @@ def fb_connect_whatsapp_redirect(request: Request):
 @app.get("/__/fb/connect/")
 def fb_connect_redirect(request: Request):
     if not request.user or request.user.is_anonymous:
-        redirect_url = furl("/login", query_params={"next": request.url})
-        return RedirectResponse(str(redirect_url))
+        return RedirectResponse(get_login_url(request))
 
     pr = load_published_run_from_state(request)
     retry_button = f'<a href="{fb_connect_url(pr.id)}">Retry</a>'

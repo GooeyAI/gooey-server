@@ -10,6 +10,7 @@ from bots.models import SavedRun
 from daras_ai_v2 import settings
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.settings import templates
+from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
 
 app = CustomAPIRouter()
@@ -20,8 +21,7 @@ def onedrive_connect_redirect(request: Request):
     from daras_ai_v2.base import SUBMIT_AFTER_LOGIN_Q
 
     if not request.user or request.user.is_anonymous:
-        redirect_url = furl("/login", query_params={"next": request.url})
-        return RedirectResponse(str(redirect_url))
+        return RedirectResponse(get_login_url(request))
 
     sr = load_sr_from_state(request)
     code = request.query_params.get("code")

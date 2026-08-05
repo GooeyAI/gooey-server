@@ -22,6 +22,7 @@ from daras_ai_v2.urls import paginate_queryset, paginate_button
 from managed_secrets.widgets import manage_secrets_table
 from memory.routers import memory_route
 from payments.webhooks import PaypalWebhookHandler
+from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, sidebar_page_wrapper, get_og_url_path
 from widgets.saved_workflow import render_saved_workflow_preview
@@ -145,8 +146,7 @@ def explore_in_current_workspace(request: Request):
 
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
-        redirect_url = furl("/login", query_params={"next": next_url})
-        raise gui.RedirectException(str(redirect_url))
+        raise gui.RedirectException(get_login_url(request, next_url))
 
     current_workspace = get_current_workspace(request.user, request.session)
     search_filters = SearchFilters(
@@ -381,8 +381,7 @@ def api_keys_tab(request: Request):
 def account_page_wrapper(request: Request, current_tab: TabData):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
-        redirect_url = furl("/login", query_params={"next": next_url})
-        raise gui.RedirectException(str(redirect_url))
+        raise gui.RedirectException(get_login_url(request, next_url))
 
     with sidebar_page_wrapper(request) as current_workspace:
         gui.div(className="mt-2")

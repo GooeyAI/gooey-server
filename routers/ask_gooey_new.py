@@ -13,6 +13,7 @@ from daras_ai_v2.gooey_builder import (
     render_standalone_gooey_builder,
 )
 from daras_ai_v2.meta_content import raw_build_meta_tags
+from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import get_og_url_path, sidebar_page_wrapper
 from workspaces.models import Workspace
@@ -26,9 +27,7 @@ app = CustomAPIRouter()
 @gui.route(app, "/new/")
 def ask_gooey_new_page(request: Request):
     if not request.user or request.user.is_anonymous:
-        raise gui.RedirectException(
-            str(furl("/login", query_params={"next": str(request.url)}))
-        )
+        raise gui.RedirectException(get_login_url(request))
 
     with sidebar_page_wrapper(request, full_width_content=True):
         render_ask_gooey_new(request=request, workspace=None)
@@ -44,9 +43,7 @@ def gooey_builder_run_route(request: Request, title: str, run_id: str):
     the associated workflow. Redirects to the child workflow whenever the
     builder updates it."""
     if not request.user or request.user.is_anonymous:
-        raise gui.RedirectException(
-            str(furl("/login", query_params={"next": str(request.url)}))
-        )
+        raise gui.RedirectException(get_login_url(request))
 
     try:
         builder_sr = SavedRun.objects.get(
