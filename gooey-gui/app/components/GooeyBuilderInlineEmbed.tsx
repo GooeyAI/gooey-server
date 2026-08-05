@@ -101,9 +101,18 @@ export function GooeyBuilderInlineEmbed(
     // when the target still has children, so a spurious event costs nothing.
     window.addEventListener(GOOEY_EMBED_REMOUNT_EVENT, loadEmbed);
 
+    // v2 hides the widget's own header, which is where "new conversation" normally lives, so
+    // the panel's floating title button fires this instead. Routed through the controller
+    // rather than setting session state here, so there is one definition of what starting a
+    // conversation means - the widget's own control uses the same path.
+    const newConversationEvent = `${propsRef.current.event_key}:new`;
+    const onNewConversation = () => controllerRef.current?.onNewConversation?.();
+    window.addEventListener(newConversationEvent, onNewConversation);
+
     return () => {
       script?.removeEventListener("load", loadEmbed);
       window.removeEventListener(GOOEY_EMBED_REMOUNT_EVENT, loadEmbed);
+      window.removeEventListener(newConversationEvent, onNewConversation);
     };
   }, []);
 

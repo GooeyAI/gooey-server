@@ -48,7 +48,10 @@ from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.github_tools import github_url_for_file
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
+    GOOEY_BUILDER_TITLE,
+    builder_thread_is_empty,
     can_launch_gooey_builder,
+    get_gooey_builder_photo_url,
     render_gooey_builder,
 )
 from daras_ai_v2.grid_layout_widget import grid_layout
@@ -491,8 +494,10 @@ class BasePage:
         # The Sidebar component's root is `h-100`, so it needs a parent with a definite
         # height to resolve against - as a bare flex child next to the bar it would resolve
         # to the full column and overflow by the bar's height.
+        # v2-app-shell marks this as the shell the Builder panel lives *inside*, so its CSS
+        # can drop `.gooey-sidebar`'s `height: 100dvh` - see RecipeTopBar.css
         with gui.div(
-            className="d-flex flex-column flex-grow-1 w-100",
+            className="v2-app-shell d-flex flex-column flex-grow-1 w-100",
             style=dict(minHeight=0),
         ):
             builder_pane, body_pane = self._builder_layout()
@@ -507,7 +512,7 @@ class BasePage:
                     # px-lg-3 rather than px-4: the working column adds no gutter of its own,
                     # so the page's padding is the whole left margin the panes get.
                     "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
-                    "px-2 px-lg-3 pt-2 pt-lg-3 pb-1 pb-lg-2"
+                    "px-2 px-lg-3 pt-2 pt-lg-1 pb-1 pb-lg-2"
                 ),
                 # without this a flex child refuses to shrink below its content, and the
                 # overflow lands on the page instead of here
@@ -599,6 +604,24 @@ class BasePage:
             event_name=f"{GOOEY_BUILDER_EVENT_KEY}:close",
             className="v2-builder-close",
         )
+        # The panel's title, opposite the close button. v2 hides the widget's own header, so
+        # without this the panel is unnamed and there is no way to start a fresh conversation
+        # from it. GooeyBuilderInlineEmbed turns the event into its `onNewConversation`.
+        #
+        # Hidden on an empty thread: the widget draws its own logo-and-title splash there, so
+        # this would be a second copy of the same name - and "New Chat" is a no-op on a chat
+        # that has not started.
+        if not builder_thread_is_empty(self):
+            gui.component(
+                "WorkspacePaneControl",
+                label=GOOEY_BUILDER_TITLE,
+                # the label names the panel; the tooltip says what clicking it does
+                tooltip="New Chat",
+                photo_url=get_gooey_builder_photo_url(),
+                show_label=True,
+                event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new",
+                className="v2-builder-new p-2",
+            )
         render_gooey_builder(
             event_key=GOOEY_BUILDER_EVENT_KEY, request=self.request, page=self
         )
@@ -862,7 +885,7 @@ class BasePage:
         elif gui.session_state.get(key) not in panes:
             gui.session_state[key] = labels[0]
 
-        with gui.styled(PANE_STRIP_CSS), gui.div(className="my-2"):
+        with gui.styled(PANE_STRIP_CSS), gui.div(className="my-1"):
             for label in labels:
                 is_active = label == gui.session_state[key]
                 if gui.button(
@@ -3353,6 +3376,12 @@ FILL_HEIGHT_EDITOR_CSS = """
 & .cm-editor {
     flex: 1 1 auto;
     min-height: 0;
+    /* 10px to match the model selector directly above it and the pane pills above that -
+       they read as one group, so they should share a corner. `overflow: hidden` because the
+       line-number gutter and the scroller both paint to the editor's edge; without it their
+       square corners show through the rounded ones. */
+    border-radius: 10px;
+    overflow: hidden;
 }
 
 /* the editor's own scroller owns the overflow, so the panes above it do not */

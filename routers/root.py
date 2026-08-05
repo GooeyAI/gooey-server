@@ -26,7 +26,6 @@ from daras_ai_v2.exceptions import UserError, ffmpeg
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_form,
     fastapi_request_json,
-    get_app_route_url,
     get_route_path,
 )
 from daras_ai_v2.gooey_builder import (
@@ -708,16 +707,13 @@ def render_recipe_page(
     # gate open -> swap in the v2 fork of the same recipe, if one exists yet.
     # settings.ENABLE_LAYOUT_V2 is checked here first so the kill switch being off
     # costs nothing beyond this one settings read.
-    using_layout_v2 = False
     if settings.ENABLE_LAYOUT_V2:
         from daras_ai_v2.layout_v2 import can_use_layout_v2
 
         if can_use_layout_v2(request):
             from daras_ai_v2.all_pages_v2 import page_slug_map_v2
 
-            if v2_page_cls := page_slug_map_v2.get(normalized_slug):
-                page_cls = v2_page_cls
-                using_layout_v2 = True
+            page_cls = page_slug_map_v2.get(normalized_slug, page_cls)
 
     # ensure the latest slug is used
     latest_slug = page_cls.canonical_slug()
@@ -735,14 +731,6 @@ def render_recipe_page(
             page_cls.app_url(tab=tab, query_params=dict(request.query_params))
         )
         return RedirectResponse(str(new_url.set(origin=None)), status_code=301)
-
-    if using_layout_v2:
-        if redirect := _layout_v2_legacy_redirect(
-            request=request,
-            page_cls=page_cls,
-            tab=tab,
-        ):
-            return redirect
 
     page = page_cls(
         tab=tab,
@@ -763,31 +751,6 @@ def render_recipe_page(
             url=get_og_url_path(request), page=page, state=gui.session_state
         ),
     )
-
-
-def _layout_v2_legacy_redirect(
-    *,
-    request: Request,
-    page_cls,
-    tab: "RecipeTabs",
-) -> RedirectResponse | None:
-    workflow_slug = page_cls.canonical_slug()
-    if tab == RecipeTabs.examples:
-        location = get_app_route_url(
-            explore_page, query_params={"workflow": workflow_slug}
-        )
-    elif tab == RecipeTabs.history:
-        from widgets.history import history_page
-
-        location = get_app_route_url(
-            history_page, query_params={"workflow": workflow_slug}
-        )
-    elif tab == RecipeTabs.preview:
-        canonical_path = request.url.path.rstrip("/").rsplit("/", 1)[0] + "/"
-        location = str(furl(request.url).set(path=canonical_path, origin=None))
-    else:
-        return None
-    return RedirectResponse(location, status_code=301)
 
 
 def get_og_url_path(request) -> str:
@@ -850,6 +813,8 @@ def sidebar_page_wrapper(
             if is_v2:
                 # v2 puts the Builder beside the tab body, from inside base_v2, so the top
                 # bar can span the full width above both instead of starting after it.
+                # Opening a second `sidebar_layout` here would share GOOEY_BUILDER_EVENT_KEY
+                # with that one and render an empty panel next to the real Builder.
                 sidebar, page_content = None, gui.dummy()
             else:
                 sidebar, page_content = sidebar_layout(
@@ -886,12 +851,30 @@ def sidebar_page_wrapper(
                 else:
                     current_workspace = None
 
-                container_class = "container-xxl" if not full_width_content else ""
-                with gui.div(className=container_class):
-                    with gui.div(id="main-content", className=className):
+                # v2 drops `container-xxl` so the tab body (and the chat preview inside it)
+                # runs edge to edge instead of sitting in a centred, max-width column.
+                container_class = ""
+                if is_v2:
+                    container_class = "d-flex flex-column flex-grow-1 w-100"
+                elif not full_width_content:
+                    container_class = "container-xxl"
+
+                with gui.div(
+                    className=container_class,
+                    **fill,
+                ):
+                    with gui.div(
+                        id="main-content",
+                        className=(
+                            className + " d-flex flex-column flex-grow-1"
+                            if is_v2
+                            else className
+                        ),
+                        **fill,
+                    ):
                         yield current_workspace
 
-                    # gui.html(templates.get_template("footer.html").render(**context)) # remove footer for now
+                    # login_scripts is functional, not chrome - it stays on every page
                     gui.html(
                         templates.get_template("login_scripts.html").render(**context)
                     )

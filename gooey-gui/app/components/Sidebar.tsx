@@ -34,11 +34,19 @@ export function Sidebar({
     sidebarRef.current?.setAttribute("inert", "");
   }, [isOpen]);
 
+  // An explicit `:open` / `:close` command - the rail opening a Builder chat, the panel's own
+  // close button - outranks the persisted default. Without this the storage restore below
+  // runs on mount and puts the panel straight back to whatever the user last left it at,
+  // silently dropping the command.
+  const commandedRef = useRef(false);
+
   useEffect(() => {
     function handleOpen() {
+      commandedRef.current = true;
       setOpen(true);
     }
     function handleClose() {
+      commandedRef.current = true;
       setOpen(false);
     }
     window.addEventListener(name + ":open", handleOpen);
@@ -67,7 +75,9 @@ export function Sidebar({
     }
     try {
       const stored = window.sessionStorage.getItem(storageKey);
-      if (stored !== null) {
+      // `!commandedRef.current` so a restore cannot undo an open/close that was asked for
+      // explicitly, whichever of the two effects happens to run first
+      if (stored !== null && !commandedRef.current) {
         setOpen(stored === "true");
       }
     } catch {
