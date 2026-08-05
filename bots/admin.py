@@ -502,7 +502,12 @@ class SavedRunAdmin(GooeyModelAdmin):
         "platform",
     ]
     search_fields = ["workflow", "example_id", "run_id", "uid"]
-    autocomplete_fields = ["parent_version", "workspace", "parent_builder_saved_run"]
+    autocomplete_fields = [
+        "parent_version",
+        "workspace",
+        "parent_builder_saved_run",
+        "message_thread",
+    ]
 
     readonly_fields = [
         "open_in_gooey",
