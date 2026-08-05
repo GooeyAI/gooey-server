@@ -39,6 +39,7 @@ from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task
+from daras_ai_v2.language_model_body import to_llm_body
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
@@ -681,6 +682,8 @@ def run_openai_responses(
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
+    messages = to_llm_body(messages)
+
     kwargs = {}
 
     if model.llm_is_thinking_model:
@@ -770,6 +773,8 @@ def run_openai_chat(
 ) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from openai import NOT_GIVEN
     from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
+
+    messages = to_llm_body(messages)
 
     kwargs = {}
 
@@ -1402,7 +1407,7 @@ def _run_groq_chat(
 
     data = dict(
         model=model,
-        messages=messages,
+        messages=to_llm_body(messages),
         max_tokens=max_tokens,
         temperature=temperature,
     )
@@ -1450,35 +1455,9 @@ def _run_fireworks_chat(
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
-    fireworks_msgs = []
-    for msg in messages:
-        fireworks_msg = {
-            "role": msg.get("role") or CHATML_ROLE_USER,
-            "content": msg.get("content"),
-        }
-        tool_call_id = msg.get("tool_call_id")
-        if tool_call_id:
-            fireworks_msg["tool_call_id"] = tool_call_id
-        tool_calls = msg.get("tool_calls")
-        if tool_calls:
-            fireworks_tool_calls = []
-            for tool_call in tool_calls:
-                function = tool_call.get("function") or {}
-                fireworks_tool_call = {
-                    "id": tool_call.get("id") or "",
-                    "type": tool_call.get("type") or "function",
-                    "function": {
-                        "name": function.get("name") or "",
-                        "arguments": function.get("arguments") or "",
-                    },
-                }
-                fireworks_tool_calls.append(fireworks_tool_call)
-            fireworks_msg["tool_calls"] = fireworks_tool_calls
-        fireworks_msgs.append(fireworks_msg)
-
     data = dict(
         model=model,
-        messages=fireworks_msgs,
+        messages=to_llm_body(messages),
         max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
@@ -1531,7 +1510,7 @@ def _run_mistral_chat(
 
     data = dict(
         model=model,
-        messages=messages,
+        messages=to_llm_body(messages),
         max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
