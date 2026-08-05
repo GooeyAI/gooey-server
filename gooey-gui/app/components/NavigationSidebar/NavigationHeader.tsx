@@ -1,4 +1,3 @@
-import { Link } from "@remix-run/react";
 import { Fragment } from "react";
 import type { NavigationSidebarProps } from "@gooey-types/navigation_sidebar_props";
 import { AccountSection } from "./AccountSection";
@@ -6,6 +5,7 @@ import { GooeyBuilderButton } from "./GooeyBuilderButton";
 
 export function NavigationHeader({
   logo_image_url,
+  logo_href,
   railCollapsed,
   isMobile,
   onExpand,
@@ -13,6 +13,7 @@ export function NavigationHeader({
   onDrawerClose,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
+  logo_href: NavigationSidebarProps["logo_href"];
   railCollapsed: boolean;
   isMobile: boolean;
   onExpand: (e?: React.MouseEvent) => void;
@@ -23,6 +24,7 @@ export function NavigationHeader({
     <div className="nav-sidebar-header d-flex align-items-center p-2 flex-shrink-0">
       <NavBrand
         logo_image_url={logo_image_url}
+        logo_href={logo_href}
         collapsed={railCollapsed}
         onExpand={onExpand}
       />
@@ -53,6 +55,7 @@ export function NavigationHeader({
 
 export function NavigationHeaderMobile({
   logo_image_url,
+  logo_href,
   isMobile,
   drawerOpen,
   onDrawerOpen,
@@ -63,6 +66,7 @@ export function NavigationHeaderMobile({
   onSwitchWorkspace,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
+  logo_href: NavigationSidebarProps["logo_href"];
   isMobile: boolean;
   drawerOpen: boolean;
   onDrawerOpen: () => void;
@@ -84,8 +88,8 @@ export function NavigationHeaderMobile({
           >
             <i className="fa-regular fa-sidebar fs-5"></i>
           </button>
-          <Link
-            to="/"
+          <a
+            href={logo_href}
             className="btn m-0 d-flex align-items-center gap-2 text-body text-decoration-none bg-hover-light py-2 px-1 rounded"
           >
             <img
@@ -95,7 +99,7 @@ export function NavigationHeaderMobile({
               width={94}
               className="img-fluid"
             />
-          </Link>
+          </a>
           {gooey_builder && !builderOpen && (
             <GooeyBuilderButton gooey_builder={gooey_builder} compact mobile />
           )}
@@ -120,10 +124,12 @@ export function NavigationHeaderMobile({
 
 function NavBrand({
   logo_image_url,
+  logo_href,
   collapsed,
   onExpand,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
+  logo_href: NavigationSidebarProps["logo_href"];
   collapsed: boolean;
   onExpand?: (e?: React.MouseEvent) => void;
 }) {
@@ -150,8 +156,8 @@ function NavBrand({
   }
 
   return (
-    <Link
-      to="/"
+    <a
+      href={logo_href}
       className="nav-brand d-flex align-items-center gap-2 text-body text-decoration-none ps-2"
     >
       {mark}
@@ -162,7 +168,7 @@ function NavBrand({
         width={94}
         className="nav-brand__wordmark img-fluid"
       />
-    </Link>
+    </a>
   );
 }
 

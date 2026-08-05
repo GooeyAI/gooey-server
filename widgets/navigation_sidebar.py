@@ -96,6 +96,7 @@ def render(
     gui.model_component(
         NavigationSidebarProps(
             logo_image_url=settings.GOOEY_LOGO_IMG,
+            logo_href=settings.APP_BASE_URL,
             nav_items=_load_nav_items(
                 is_anonymous,
                 new_path=new_path,

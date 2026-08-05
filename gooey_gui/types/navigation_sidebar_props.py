@@ -77,6 +77,7 @@ class NavigationSidebarProps(pydantic.BaseModel):
     _component: str = "NavigationSidebar"
 
     logo_image_url: str
+    logo_href: str
     nav_items: list[NavItemData] = []
     active_key: str | None = None
     collapsed_state_key: str

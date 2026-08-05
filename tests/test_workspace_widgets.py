@@ -1,3 +1,6 @@
+from starlette.requests import Request
+
+from daras_ai_v2 import settings
 from gooey_gui.core.state import set_session_state
 from widgets import navigation_sidebar
 from workspaces.models import Workspace
@@ -7,6 +10,32 @@ from workspaces.widgets import (
     get_current_workspace,
     handle_workspace_switch,
 )
+
+
+def test_navigation_sidebar_logo_links_to_app_base_url(monkeypatch):
+    rendered_components = []
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/explore/",
+            "query_string": b"",
+            "headers": [],
+            "scheme": "https",
+            "server": ("testserver", 443),
+            "client": ("testclient", 123),
+            "root_path": "",
+            "user": None,
+            "session": {},
+        }
+    )
+    monkeypatch.setattr(
+        navigation_sidebar.gui, "model_component", rendered_components.append
+    )
+
+    navigation_sidebar.render(request)
+
+    assert rendered_components[0].logo_href == settings.APP_BASE_URL
 
 
 def test_sidebar_refreshes_cached_workspace_memberships(
