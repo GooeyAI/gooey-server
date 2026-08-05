@@ -1495,7 +1495,8 @@ class BasePage:
                         published_run=self.current_pr,
                         variables=gui.session_state.get("variables"),
                     ),
-                    redirect_url=self.current_app_url(
+                    sr=self.current_sr,
+                    default_url=self.current_app_url(
                         query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
                     ),
                 )

@@ -22,6 +22,8 @@ if typing.TYPE_CHECKING:
     )
     from composio_client.types.tool_proxy_response import ToolProxyResponse
 
+    from bots.models import SavedRun
+
 
 COMPOSIO_TOOL_ROUTER_SESSION_ID_KEY = "__composio_tool_router_session_id__"
 
@@ -38,9 +40,22 @@ class ComposioLLMTool(BaseLLMTool):
             required=tool.input_parameters.get("required"),
         )
 
-    def bind(self, user_id: str, redirect_url: str) -> ComposioLLMTool:
+    def bind(self, user_id: str, sr: SavedRun, default_url: str) -> ComposioLLMTool:
+        from bots.models import SavedRun
+        from functions.gooey_builder_workflow_tools import WORKFLOW_URL_KEY
+        from routers.ask_gooey_new import get_gooey_builder_run_url
+
         self.user_id = user_id
-        self.redirect_url = redirect_url
+        if sr.surface == SavedRun.Surface.builder_prompt:
+            # a builder prompt run isn't viewed on its own workflow page - send
+            # the user back to the child workflow they're editing, or to the
+            # standalone builder page if the builder run has no child workflow
+            variables = gui.session_state.get("variables") or {}
+            self.redirect_url = variables.get(WORKFLOW_URL_KEY) or (
+                get_gooey_builder_run_url(sr)
+            )
+        else:
+            self.redirect_url = default_url
         return self
 
     def call(self, **kwargs) -> dict:
