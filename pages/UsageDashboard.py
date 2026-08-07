@@ -6,7 +6,7 @@ from gooeysite import wsgi
 assert wsgi
 
 import plotly.graph_objects as go
-from django.db.models import Q, QuerySet, Count, Func, F
+from django.db.models import Q, Count, Func, F
 
 from bots.models import SavedRun, Workflow
 
@@ -22,21 +22,13 @@ import plotly.express as px
 import pytz
 import streamlit as st
 
-st.set_page_config(layout="wide")
-
-team_emails = [
-    "devxpy@gmail.com",
-    "devxpy.spam@gmail.com",
-    "sean@blagsvedt.com",
-    "ambika@ajaibghar.com",
-    "faraazmohd07@gmail.com",
-]
-team_user_Q = (
-    Q(email__in=team_emails)
-    | Q(email__endswith="gooey.ai")
-    | Q(email__endswith="dara.network")
-    | Q(email__endswith="jaaga.in")
+from daras_ai_v2.dashboard_filters import (  # noqa: F401  (re-exported for compat)
+    TEAM_EMAILS as team_emails,
+    TEAM_USER_Q as team_user_Q,
+    get_filtered_app_users,
 )
+
+st.set_page_config(layout="wide")
 
 
 def main():
@@ -112,8 +104,8 @@ def main():
         .values("workflow", "count")
     )
     sorted_workflows.sort(
-        key=lambda x: -next(
-            (sr["count"] for sr in workflow_counts if sr["workflow"] == x), 0
+        key=lambda x: (
+            -next((sr["count"] for sr in workflow_counts if sr["workflow"] == x), 0)
         ),
     )
 
@@ -369,28 +361,6 @@ def merge_user_data(df: pd.DataFrame, uids: list[str]) -> pd.DataFrame:
     df = users_df.merge(df, on="uid")
     df = df.set_index("uid")
     return df
-
-
-def get_filtered_app_users(
-    *,
-    exclude_anon: bool,
-    exclude_disabled: bool,
-    exclude_team: bool,
-    exclude_free: bool,
-    exclude_paying: bool,
-) -> QuerySet[AppUser]:
-    qs = AppUser.objects.all()
-    if exclude_anon:
-        qs = qs.exclude(is_anonymous=True)
-    if exclude_disabled:
-        qs = qs.exclude(is_disabled=True)
-    if exclude_team:
-        qs = qs.exclude(team_user_Q)
-    if exclude_free:
-        qs = qs.filter(is_paying=True)
-    if exclude_paying:
-        qs = qs.exclude(is_paying=True)
-    return qs
 
 
 # def user_sign_in_time(user, timezone):
