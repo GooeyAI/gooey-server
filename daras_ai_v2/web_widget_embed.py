@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Iterator
 
 import gooey_gui as gui
 from bots.models import SavedRun
@@ -68,14 +68,19 @@ def chat_widget_input_to_request_body(
             # input_audio=prev_input_audio,
             input_documents=prev_input_documents,
         )
+        extra_content = user_extra_content(
+            state, get_entry_text(user_entry), prev_input_audio, prev_input_documents
+        )
+        if extra_content:
+            user_entry["extra_content"] = extra_content
 
         assistant_entry = format_chat_entry(
             role=CHATML_ROLE_ASSISTANT,
             content_text=prev_output,
-        ) | {
-            "run_url": sr.get_app_url(),
-            "extra_content": _extra_content_from_state(state, prev_output),
-        }
+        ) | {"run_url": sr.get_app_url()}
+        extra_content = assistant_extra_content(state, prev_output)
+        if extra_content:
+            assistant_entry["extra_content"] = extra_content
 
         # append previous input to the history
         ret["messages"] = state.get("messages", []) + [user_entry, assistant_entry]
@@ -89,17 +94,34 @@ def chat_widget_input_to_request_body(
     return ret, message_thread
 
 
-def _extra_content_from_state(state: dict, raw_output_text: str) -> dict[str, Any]:
+def user_extra_content(
+    state: dict,
+    raw_input_text: str,
+    input_audio: str | None,
+    input_documents: list[str] | None,
+) -> dict[str, Any]:
     ret = {}
-    output_text = state.get("output_text")
+    input_prompt = state.get("input_prompt")
+    if input_prompt is not None and input_prompt != raw_input_text:
+        ret["display_content"] = input_prompt
+    if input_audio:
+        ret["audio"] = input_audio
+    if input_documents:
+        ret["documents"] = input_documents
+    return ret
+
+
+def assistant_extra_content(state: dict, raw_output_text: str) -> dict[str, Any]:
+    ret = {}
+    output_text = (state.get("output_text") or [""])[0]
     if output_text and output_text != raw_output_text:
-        ret["display_content"] = output_text[0] or ""
+        ret["display_content"] = output_text
     output_video = state.get("output_video")
     if output_video:
-        ret["output_video"] = output_video
+        ret["video"] = output_video
     output_audio = state.get("output_audio")
     if output_audio:
-        ret["output_audio"] = output_audio
+        ret["audio"] = output_audio
     return ret
 
 
@@ -118,46 +140,10 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
     else:
         entries = state.get("messages", []).copy()
 
-    for entry in entries:
-        role = entry.get("role")
-        if role == CHATML_ROLE_USER:
-            messages.append(
-                dict(
-                    role=role,
-                    input_prompt=get_entry_text(entry),
-                    input_images=get_entry_images(entry) or [],
-                )
-            )
-        elif role == CHATML_ROLE_ASSISTANT:
-            extra_content = entry.get("extra_content") or {}
-            display_content = extra_content.get("display_content") or get_entry_text(
-                entry
-            )
-            buttons, text = parse_bot_html(display_content)[:2]
-            run_url = entry.get("run_url") or extra_content.get("run_url")
-            output_video = extra_content.get("output_video") or []
-            output_audio = extra_content.get("output_audio") or []
-            messages.append(
-                dict(
-                    role=role,
-                    type="final_response",
-                    status="completed",
-                    output_text=[text],
-                    text=text,
-                    display_content=display_content,
-                    output_video=output_video,
-                    output_audio=output_audio,
-                    buttons=buttons,
-                    web_url=run_url,
-                )
-            )
+    messages.extend(history_entries_to_widget_messages(entries))
 
     # add last input to history if present
-    show_raw_msgs = False
-    if show_raw_msgs:
-        input_prompt = state.get("raw_input_text") or ""
-    else:
-        input_prompt = state.get("input_prompt") or ""
+    input_prompt = state.get("input_prompt") or ""
 
     if input_prompt or input_images or input_audio or input_documents:
         messages.append(
@@ -226,3 +212,47 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
             )
         )
     return messages
+
+
+def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
+    from daras_ai_v2.bots import parse_bot_html
+
+    for entry in entries:
+        role = entry.get("role")
+
+        run_url = entry.get("run_url")
+        extra_content = entry.get("extra_content") or {}
+        text = extra_content.get("display_content", get_entry_text(entry)) or ""
+        audio = extra_content.get("audio")
+        video = extra_content.get("video")
+        documents = extra_content.get("documents")
+
+        if role == CHATML_ROLE_USER:
+            msg = dict(
+                role=role,
+                input_prompt=text,
+                input_images=get_entry_images(entry) or [],
+            )
+            if audio:
+                msg["input_audio"] = audio
+            if documents:
+                msg["input_documents"] = documents
+            yield msg
+
+        elif role == CHATML_ROLE_ASSISTANT:
+            text = parse_bot_html(text)[1]
+            # buttons, text = parse_bot_html(text)[:2]
+            msg = dict(
+                role=role,
+                type="final_response",
+                status="completed",
+                output_text=[text],
+                buttons=[],
+            )
+            if run_url:
+                msg["web_url"] = run_url
+            if audio:
+                msg["output_audio"] = audio
+            if video:
+                msg["output_video"] = video
+            yield msg

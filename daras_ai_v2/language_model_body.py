@@ -54,8 +54,9 @@ class LLMMessageExtraContent(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="allow")
 
     display_content: str | None = None
-    output_video: list[str] | None = None
-    output_audio: list[str] | None = None
+    audio: str | list[str] | None = None
+    video: list[str] | None = None
+    documents: list[str] | None = None
 
 
 class LLMMessage(pydantic.BaseModel):
