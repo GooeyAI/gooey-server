@@ -421,15 +421,18 @@ a.gooey-topbar-cost:hover {
     width: auto;
     max-width: calc(100% - 24px);
     margin: 0;
-    padding: 4px;
+    padding: 3px;
     background: #f1f2f4;
     border-color: #e0ddd7;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   }
 
+  /* Bigger than the desktop pill, but not by as much as it was: floating over the content it
+     overlaps, the old 11px/16px pill read as a slab. This keeps the row around 36px, which is
+     still a comfortable tap target, and lets three pills sit well inside a narrow screen. */
   .gooey-topbar-tab {
-    padding: 11px 16px;
-    font-size: 0.9375rem;
+    padding: 7px 12px;
+    font-size: 0.875rem;
   }
 
   /* a tab whose layout needs the width - Split is two columns side by side */
