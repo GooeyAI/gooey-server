@@ -109,7 +109,31 @@ export default function GooeySelect({
               Placeholder,
               Menu,
             }}
+            // The menu is rendered on `body` rather than beside the control, because the
+            // control is not always somewhere a menu can escape from: layout v2 puts its
+            // forms inside a scrolling config pane nested in a pane with `overflow: hidden`,
+            // and an inline menu is clipped by the first of those it grows past. A portal has
+            // no clipping ancestor to hit. `menuPosition: fixed` goes with it - the portal is
+            // placed against the viewport, so the menu must be measured the same way.
+            menuPortalTarget={
+              typeof document !== "undefined" ? document.body : undefined
+            }
+            menuPosition="fixed"
+            // A portaled menu is positioned when it opens and does not follow a scroll
+            // container moving underneath it, so it closes instead of floating away from its
+            // control. Scrolling the menu's own list is exempt - that is not the page moving.
+            closeMenuOnScroll={(e: Event) =>
+              !(e.target instanceof Element) ||
+              !e.target.closest("." + MENU_CLASS)
+            }
             styles={{
+              // above Bootstrap's modal (1055) - a select inside a dialog is common, and the
+              // portal puts this at the end of `body` either way
+              menuPortal: (base: CSSObjectWithLabel) => ({
+                ...base,
+                zIndex: 9999,
+              }),
+              // caller styles last, so a call site can still override the defaults above
               ...Object.fromEntries(
                 Object.entries(styles ?? {}).map(([key, style]) => {
                   if (!style) return [key, undefined];
@@ -129,20 +153,42 @@ export default function GooeySelect({
   );
 }
 
+/* A stable hook on the menu. react-select's own class is an emotion hash (`css-xxxx-menu`),
+   and matching that by substring also catches unrelated things like `account-menu-icon`. */
+const MENU_CLASS = "gooey-select-menu";
+
 const Menu = (props: MenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
+  /* Keep the menu inside the viewport.
+   *
+   * A menu is only as wide as its control by default, but a call site can widen it, and then
+   * neither edge is safe: this used to right-align an overflowing menu to its control, which
+   * on a narrow screen just moved the overflow to the other side - a 300px menu on a control
+   * ending at x=224 landed at x=-76, cut off at the start of every option. Clamped to the
+   * viewport instead, and capped so a menu wider than the screen cannot happen at all. */
   useEffect(() => {
-    if (!menuRef.current) return;
-    let rect = menuRef.current.getBoundingClientRect();
-    let overflowRight = rect.right > window.innerWidth - 25;
-    if (overflowRight) {
-      menuRef.current.style.right = "0";
+    const menu = menuRef.current;
+    if (!menu || !props.selectProps.menuIsOpen) return;
+    const margin = 8;
+    // cleared first, so reopening measures the menu's natural position rather than the one
+    // the previous pass nudged it to
+    menu.style.left = "";
+    menu.style.right = "";
+    menu.style.maxWidth = `${window.innerWidth - margin * 2}px`;
+    const rect = menu.getBoundingClientRect();
+    let shift = 0;
+    if (rect.right > window.innerWidth - margin) {
+      shift = window.innerWidth - margin - rect.right;
     }
-  }, [menuRef, props.selectProps.menuIsOpen]);
+    if (rect.left + shift < margin) {
+      shift = margin - rect.left;
+    }
+    if (shift) menu.style.left = `${shift}px`;
+  }, [props.selectProps.menuIsOpen]);
 
   return (
-    <components.Menu {...props} innerRef={menuRef}>
+    <components.Menu {...props} innerRef={menuRef} className={MENU_CLASS}>
       {props.children}
     </components.Menu>
   );
