@@ -793,14 +793,21 @@ def sidebar_page_wrapper(
     fill = dict(style=dict(minHeight=0)) if is_v2 else {}
     # v2's app-shell surface colour
     shell_bg = dict(style=dict(minHeight=0, backgroundColor="#FBFAF8")) if is_v2 else {}
+    # `100dvh` rather than Bootstrap's `vh-100`. On mobile Safari `100vh` is the *large*
+    # viewport - the height the page would have with the URL bar retracted - so a shell sized
+    # to it hangs below the bar by exactly the bar's height, and the page scrolls that far on
+    # every tab. `dvh` tracks the height actually on screen. The rest of the shell is `h-100`
+    # off this element, so this is the only place the viewport is measured.
+    viewport = dict(style=dict(height="100dvh")) if is_v2 else {}
 
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
     # row on desktop (rail beside content).
     with gui.div(
         className=(
             "d-flex flex-column flex-lg-row w-100 "
-            + ("vh-100 overflow-hidden" if is_v2 else "min-vh-100")
-        )
+            + ("overflow-hidden" if is_v2 else "min-vh-100")
+        ),
+        **viewport,
     ):
         navigation_sidebar.render(
             request, default_collapsed=default_collapsed, page=page

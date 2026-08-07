@@ -1,7 +1,11 @@
 .nav-sidebar {
   width: 264px;
   flex: none;
+  /* Same pair the drawer below lg already uses: on a browser with a retracting URL bar
+     `100vh` is the height without it, so the rail would stand taller than the shell beside
+     it. `100dvh` is the height on screen; the plain `100vh` above it is the fallback. */
   height: 100vh;
+  height: 100dvh;
   position: sticky;
   top: 0;
   overflow: hidden;
