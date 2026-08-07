@@ -168,6 +168,18 @@ class BasePageRequest:
     url: URL | None
 
 
+class WorkflowIdentity(typing.NamedTuple):
+    """How a run names and pictures itself: the pair the top bar leads with.
+
+    Below lg the bar is gone from an immersive preview, so the back link out of it carries
+    the same pair - it is the only thing naming the workflow on that screen.
+    """
+
+    title: str
+    photo_url: str | None
+    circle_photo: bool
+
+
 class BasePage:
     title: str
     workflow: Workflow
@@ -543,11 +555,17 @@ class BasePage:
     def _render_workspace(self, tabs: list[TabSpec]):
         """Render each reusable work surface once; React controls their arrangement."""
         initial_view = self.entry_tab_slug(tabs)
+        identity = self._workflow_identity()
         with gui.component(
             "RecipeWorkspace",
             storage_key=self._workspace_storage_key(),
             initial_view=initial_view,
             editor_full_width=self._editor_wants_full_width(),
+            # names the workflow on the back link out of an immersive preview, where the top
+            # bar that usually carries this is hidden
+            title=identity.title,
+            photo_url=identity.photo_url,
+            circle_photo=identity.circle_photo,
         ):
             # mt-1 on the About card and the preview, not on the editor: those two are framed
             # surfaces that would otherwise sit flush against the top bar's rule, while the
@@ -567,6 +585,18 @@ class BasePage:
                     self.render_deleted_output()
                 else:
                     self._render_output_col(submitted=submitted)
+
+    def _workflow_identity(self) -> WorkflowIdentity:
+        """Derived once, so the bar's heading and the mobile back link cannot drift apart."""
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+
+        sr, pr = self.current_sr_pr
+        tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
+        return WorkflowIdentity(
+            title=tbreadcrumbs.title_with_prefix() or self.get_run_title(sr, pr),
+            photo_url=pr.photo_url or None,
+            circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
+        )
 
     def _editor_wants_full_width(self) -> bool:
         """Hook: does the open config pane need the whole row to itself?
@@ -800,10 +830,8 @@ class BasePage:
         )
 
     def _render_top_bar(self, *, tabs: list[TabSpec]):
-        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
-
         sr, pr = self.current_sr_pr
-        tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
+        identity = self._workflow_identity()
         cost_label, cost_title = self._top_bar_cost()
         can_manage_sharing = self.can_manage_sharing()
         # a root recipe has no published run behind it, so there is no published url to share
@@ -811,9 +839,9 @@ class BasePage:
 
         gui.model_component(
             RecipeTopBarProps(
-                title=tbreadcrumbs.title_with_prefix() or self.get_run_title(sr, pr),
-                photo_url=pr.photo_url or None,
-                circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
+                title=identity.title,
+                photo_url=identity.photo_url,
+                circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
                 storage_key=self._workspace_storage_key(),
                 initial_view=self.entry_tab_slug(tabs),
