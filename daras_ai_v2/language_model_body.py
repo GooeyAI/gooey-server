@@ -2,6 +2,8 @@ import typing
 
 import pydantic
 
+from ai_models.models import AIModelSpec
+
 CHATML_ROLE_USER = "user"
 
 
@@ -23,6 +25,9 @@ class LLMToolCall(pydantic.BaseModel):
     id: str = ""
     type: typing.Literal["function"] = "function"
     function: LLMFunction = LLMFunction()
+
+    # used by gemini models
+    extra_content: dict[str, typing.Any] | None = None
 
     @pydantic.field_validator("id", mode="before")
     @classmethod
@@ -54,9 +59,18 @@ class LLMMessage(pydantic.BaseModel):
         return v or CHATML_ROLE_USER
 
 
-def to_llm_body(messages: list[dict]) -> list[dict]:
+def to_llm_body(
+    messages: list[dict], *, model: AIModelSpec | None = None
+) -> list[dict]:
     """Whitelist outgoing message fields so internal keys (chunk, run_url, metrics, ...) don't cause HTTP 400s."""
+    if model and model.is_google_model():
+        exclude = None
+    else:
+        exclude = {"tool_calls": {"__all__": {"extra_content"}}}
     return [
-        LLMMessage.model_validate(entry).model_dump(exclude_none=True)
+        LLMMessage.model_validate(entry).model_dump(
+            exclude=exclude,
+            exclude_none=True,
+        )
         for entry in messages
     ]

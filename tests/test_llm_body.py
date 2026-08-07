@@ -1,3 +1,4 @@
+from ai_models.models import AIModelCreator, AIModelSpec
 from daras_ai_v2.language_model_body import to_llm_body
 
 
@@ -65,3 +66,52 @@ def test_to_llm_body_defaults():
     assert body[0]["tool_calls"] == [
         {"id": "x", "type": "function", "function": {"name": "", "arguments": ""}}
     ]
+
+
+def test_to_llm_body_strips_provider_metadata_by_default():
+    body = to_llm_body(
+        [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "function": {"name": "search", "arguments": "{}"},
+                        "extra_content": {"google": {"thought_signature": "signature"}},
+                    }
+                ],
+            }
+        ]
+    )
+    assert body[0]["tool_calls"][0] == {
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "search", "arguments": "{}"},
+    }
+
+
+def test_to_llm_body_preserves_provider_metadata_when_requested():
+    body = to_llm_body(
+        [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "function": {"name": "search", "arguments": "{}"},
+                        "extra_content": {"google": {"thought_signature": "signature"}},
+                        "label": "Search",
+                    }
+                ],
+            }
+        ],
+        model=AIModelSpec(
+            creator=AIModelCreator(website_url="https://deepmind.google/")
+        ),
+    )
+    assert body[0]["tool_calls"][0] == {
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "search", "arguments": "{}"},
+        "extra_content": {"google": {"thought_signature": "signature"}},
+    }

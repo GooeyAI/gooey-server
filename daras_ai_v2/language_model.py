@@ -774,7 +774,7 @@ def run_openai_chat(
     from openai import NOT_GIVEN
     from daras_ai_v2.safety_checker import capture_openai_content_policy_violation
 
-    messages = to_llm_body(messages)
+    messages = to_llm_body(messages, model=model)
 
     kwargs = {}
 
