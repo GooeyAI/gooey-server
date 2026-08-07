@@ -1,6 +1,6 @@
 import type { CustomComponentProps } from "~/components";
 import { RenderedChildren } from "~/renderer";
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import SidebarResizer from "./SidebarResizer";
 
 export function Sidebar({
@@ -137,10 +137,21 @@ export function Sidebar({
     pageClassName = "w-100";
   }
 
-  const sidebarContainerStyles =
-    isOpen && sidebarWidth
+  // The width the panel settles at, published as a custom property so its content can be
+  // sized against that instead of against the panel while the panel is mid-transition. The
+  // panel animates min/max/width - layout properties - so anything at `width: 100%` inside it
+  // re-lays-out on every frame, which is what makes the chat text reflow as it slides. Held
+  // here rather than in CSS because a resized panel's width only exists in JS.
+  const settledWidth = sidebarWidth
+    ? `${sidebarWidth}px`
+    : "var(--sidebar_open_width)";
+
+  const sidebarContainerStyles = {
+    ...(isOpen && sidebarWidth
       ? { width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth }
-      : undefined;
+      : {}),
+    "--sidebar-settled-width": settledWidth,
+  } as CSSProperties;
 
   const sidebarContainerClassName = `flex-column flex-grow-1 gooey-sidebar ${sidebarClassName} ${
     enableResize ? "gooey-sidebar-resizable" : "gooey-sidebar-bordered"

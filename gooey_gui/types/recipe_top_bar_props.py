@@ -58,6 +58,9 @@ class RecipeTopBarProps(pydantic.BaseModel):
     views: list[TopBarView] = []
     storage_key: str
     initial_view: typing.Literal["about", "edit", "preview", "split"]
+    # The open config pane has taken the whole row, so the bar names the arrangement on
+    # screen rather than the split still saved behind it.
+    editor_full_width: bool = False
     workspace_href: str
     workspace_active: bool
     # An immersive view owns the screen below lg, so the bar steps out of the way.

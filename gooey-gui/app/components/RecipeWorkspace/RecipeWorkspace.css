@@ -1,6 +1,18 @@
 .recipe-workspace {
   --recipe-pane-gap: 0.75rem;
   --recipe-pane-half-gap: 0.375rem;
+
+  /* Widths a pane's CONTENT settles at, in container units so they resolve against this
+     element rather than against the pane that is mid-animation. `cqw` is only meaningful on
+     descendants - an element cannot query itself - and these are only ever used on
+     `.recipe-workspace-pane-content`, where the nearest container is this. Custom properties
+     substitute as tokens, so the unit resolves at the point of use, not here. */
+  --pane-major-w: calc(60cqw - var(--recipe-pane-half-gap));
+  /* the paired preview carries a 1px border, and Bootstrap's global border-box takes that
+     out of its content box */
+  --pane-minor-w: calc(40cqw - var(--recipe-pane-half-gap) - 2px);
+
+  container-type: inline-size;
   display: flex;
   flex: 1 1 auto;
   width: 100%;
@@ -37,49 +49,58 @@
   transform: translateX(0);
 }
 
-.recipe-workspace--about.recipe-workspace--preview .recipe-workspace-about,
-.recipe-workspace--editor.recipe-workspace--preview .recipe-workspace-editor {
+/* A pane's share of the row comes from the role React gives it - major, minor or solo - not
+   from reading which panes are open off the workspace's own classes. Written that way, "the
+   preview is alone" became "the preview without the editor", which is false whenever About is
+   what it shares the row with: the solo rule matched on About, tied with the paired rule on
+   specificity, and won on source order. */
+.recipe-workspace-pane--major {
+  flex: 0 0 calc(60% - var(--recipe-pane-half-gap));
+  max-width: calc(60% - var(--recipe-pane-half-gap));
   margin-right: var(--recipe-pane-gap);
 }
 
-.recipe-workspace--about.recipe-workspace--preview .recipe-workspace-about,
-.recipe-workspace--editor.recipe-workspace--preview .recipe-workspace-editor {
-  flex: 0 0 calc(60% - var(--recipe-pane-half-gap));
-  max-width: calc(60% - var(--recipe-pane-half-gap));
-}
-
-.recipe-workspace--about.recipe-workspace--preview .recipe-workspace-preview,
-.recipe-workspace--editor.recipe-workspace--preview .recipe-workspace-preview {
+.recipe-workspace-pane--minor {
   flex: 0 0 calc(40% - var(--recipe-pane-half-gap));
   max-width: calc(40% - var(--recipe-pane-half-gap));
-}
-
-.recipe-workspace--about:not(.recipe-workspace--preview)
-  .recipe-workspace-about {
-  flex: 1 1 100%;
-  max-width: 100%;
-}
-
-.recipe-workspace--editor:not(.recipe-workspace--preview)
-  .recipe-workspace-editor,
-.recipe-workspace--preview:not(.recipe-workspace--editor)
-  .recipe-workspace-preview {
-  flex: 1 1 100%;
-  max-width: 100%;
-}
-
-.recipe-workspace--about.recipe-workspace--preview .recipe-workspace-preview,
-.recipe-workspace--editor.recipe-workspace--preview .recipe-workspace-preview {
   border: 1px solid #e0ddd7;
   border-radius: 0.75rem;
 }
 
+.recipe-workspace-pane--solo {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+/* The pane animates `flex-basis`/`max-width` - layout properties - so anything sized off the
+   pane re-lays-out on every frame of the transition: the code editor re-wraps its lines and
+   the chat widget re-wraps every bubble, ~17 times in 280ms. That reflow is what reads as
+   janky, not the slide. The rules below pin the content to the width it will settle at, so it
+   is laid out once and the pane's `overflow: hidden` simply reveals or wipes it. */
 .recipe-workspace-pane-content {
   width: 100%;
   height: 100%;
-  min-width: 0;
+  /* Was `min-width: 0`. A floor instead, for the moment a pane starts closing: React drops
+     the workspace class immediately, so the explicit width below stops applying while the
+     pane is still animating shut, and the content would reflow on the way out. Never wider
+     than a pane at rest - 40cqw is the narrowest any pane gets. */
+  min-width: var(--pane-minor-w);
   min-height: 0;
   overflow: auto;
+}
+
+/* Same role, so the width a pane's content is pinned to and the width the pane settles at
+   cannot disagree - they are two readings of one class. */
+.recipe-workspace-pane--major > .recipe-workspace-pane-content {
+  width: var(--pane-major-w);
+}
+
+.recipe-workspace-pane--minor > .recipe-workspace-pane-content {
+  width: var(--pane-minor-w);
+}
+
+.recipe-workspace-pane--solo > .recipe-workspace-pane-content {
+  width: 100cqw;
 }
 
 .recipe-workspace-preview .recipe-workspace-pane-content {
@@ -177,9 +198,7 @@
   }
 
   .v2-workspace-body:has(
-      .recipe-workspace--preview:not(.recipe-workspace--editor):not(
-          .recipe-workspace--about
-        )
+      .recipe-workspace-preview.recipe-workspace-pane--solo
     ) {
     padding: 0 !important;
   }
@@ -192,6 +211,13 @@
     flex-basis: 100% !important;
     max-width: 100% !important;
     margin-right: 0 !important;
+  }
+
+  /* Only one pane is ever on screen here, so it is always full width - the 60/40 pinning
+     above would size the content to a split that does not exist at this breakpoint. */
+  .recipe-workspace-pane > .recipe-workspace-pane-content {
+    width: 100%;
+    min-width: 0;
   }
 }
 

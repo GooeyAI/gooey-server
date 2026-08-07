@@ -12,6 +12,7 @@ import type { RecipeView } from "../RecipeWorkspace/paneState";
 import {
   paneVisibility,
   selectedWorkspaceView,
+  shownLayout,
   viewAfterRun,
   viewForLayout,
   workspaceTargetForView,
@@ -109,6 +110,7 @@ export function RecipeTopBar({
   views,
   storage_key,
   initial_view,
+  editor_full_width,
   workspace_href,
   workspace_active,
   immersive_on_mobile,
@@ -155,7 +157,9 @@ export function RecipeTopBar({
     storage_key,
     initial_view
   );
-  const activeView = viewForLayout(layout);
+  // The shown layout, not the stored one - the bar must name the arrangement that is on
+  // screen. A config pane holding the whole row makes that Edit even where a split is saved.
+  const activeView = viewForLayout(shownLayout(layout, editor_full_width));
   const selectedView = selectedWorkspaceView(activeView, workspace_active);
   const activeViewSpec = views.find((view) => view.slug === selectedView);
   const chooseView = (view: RecipeView) => {
@@ -215,10 +219,13 @@ export function RecipeTopBar({
       is_danger: false,
     });
   }
-  if (share_key) {
+  // Share sits in the Publish menu for both capabilities - opening the visibility dialog for
+  // someone who can change it, copying the link for everyone else. The server sets exactly one
+  // of the two, and neither on an unpublished run, which has no stable url to share.
+  if (share_key || share_copy_url) {
     publishEntries.push({
       key: SHARE_ITEM_KEY,
-      label: "Share",
+      label: shareCopied ? "Link copied" : "Share",
       icon: share_icon,
       href: null,
       is_danger: false,
@@ -278,7 +285,10 @@ export function RecipeTopBar({
     // these two are the component's own entries, not server-declared menu items, so they
     // go straight to their keys instead of round-tripping through menu_key
     if (item.key === PUBLISH_ITEM_KEY) return fire(publish_key);
-    if (item.key === SHARE_ITEM_KEY) return fire(share_key);
+    if (item.key === SHARE_ITEM_KEY) {
+      if (share_key) return fire(share_key);
+      return copyShareUrl();
+    }
     fire(menu_key, item.key);
   };
 
@@ -359,25 +369,6 @@ export function RecipeTopBar({
       )}
 
       <div className="gooey-topbar-right">
-        {/* Share for someone who cannot change who sees this. The owner's Share lives in the
-            Publish menu and opens the visibility dialog; this one only copies the link, so it
-            is a button of its own rather than an entry under a menu called "Publish". */}
-        {!!share_copy_url && !share_key && (
-          <button
-            type="button"
-            className="gooey-topbar-integration"
-            title={shareCopied ? "Link copied" : "Copy link"}
-            aria-label="Copy link to this workflow"
-            onClick={copyShareUrl}
-          >
-            {shareCopied ? (
-              <i className="fa-regular fa-check" />
-            ) : (
-              <Icon html={share_icon} />
-            )}
-          </button>
-        )}
-
         {!!overflowEntries.length && (
           <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
             <button

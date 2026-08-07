@@ -4,7 +4,9 @@ import {
   layoutAfterSelectingView,
   layoutForView,
   normalizePaneLayout,
+  paneRolesForLayout,
   paneVisibility,
+  shownLayout,
   selectedWorkspaceView,
   storedPaneLayout,
   viewAfterRun,
@@ -140,6 +142,61 @@ function main() {
   assertEqual(viewAfterRun("about", false), "split");
   assertEqual(viewAfterRun("preview", false), "preview");
   assertEqual(viewAfterRun("edit", true), "edit");
+
+  // About shares the row with the preview exactly as Split does, so it gets the same
+  // major/minor pair. Reading the preview as solo here is what clipped it: the pane held 40%
+  // of the row while its content was laid out at the full width of it.
+  assertDeepEqual(paneRolesForLayout(about), {
+    about: "major",
+    editor: "closed",
+    preview: "minor",
+  });
+  assertDeepEqual(paneRolesForLayout(split), {
+    about: "closed",
+    editor: "major",
+    preview: "minor",
+  });
+  assertDeepEqual(paneRolesForLayout(edit), {
+    about: "closed",
+    editor: "solo",
+    preview: "closed",
+  });
+  assertDeepEqual(paneRolesForLayout(preview), {
+    about: "closed",
+    editor: "closed",
+    preview: "solo",
+  });
+  // About keeps `editorOpen` set while the editor pane stays shut, so the role has to come
+  // from what is on screen rather than from the flag.
+  assertDeepEqual(paneRolesForLayout(collapsePane(about, "preview")), {
+    about: "solo",
+    editor: "closed",
+    preview: "closed",
+  });
+
+  // A config pane that has claimed the row drops the preview from what is shown, without
+  // touching the split stored behind it - leaving that pane brings the split straight back.
+  assertDeepEqual(shownLayout(split, true), layoutForView("edit"));
+  assertDeepEqual(shownLayout(split, false), split);
+  assertDeepEqual(paneRolesForLayout(shownLayout(split, true)), {
+    about: "closed",
+    editor: "solo",
+    preview: "closed",
+  });
+  assertDeepEqual(workspaceControlsForLayout(shownLayout(split, true), true), {
+    addEdit: false,
+    addPreview: false,
+    mergePreview: false,
+  });
+  // The claim only reaches the editor. About and a solo preview have no config pane open,
+  // so they are left exactly as they were.
+  assertDeepEqual(shownLayout(about, true), about);
+  assertDeepEqual(shownLayout(preview, true), preview);
+  assertDeepEqual(workspaceControlsForLayout(preview, true), {
+    addEdit: true,
+    addPreview: false,
+    mergePreview: false,
+  });
 
   assertEqual(paneVisibility(false), "hidden");
   assertEqual(paneVisibility(true), "visible");

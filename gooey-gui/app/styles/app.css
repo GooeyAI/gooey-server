@@ -347,6 +347,29 @@ button .gui-html-container,
   border-right: 1px solid #e0e0e0;
 }
 
+/* Default: fill whatever holds it - the standalone builder page has no panel around it. */
+#gooey-builder-embed {
+  width: 100%;
+}
+
+/* Inside a panel, pin the chat widget to the width that panel settles at, so the open/close
+   transition reveals it rather than reflowing it. `.gooey-sidebar` animates min/max/width -
+   layout properties - so a widget tracking its container re-wraps every message on every
+   frame of the 280ms slide. `--sidebar-settled-width` is published by Sidebar.tsx because a
+   resized panel's width only exists in JS; it falls back to the default open width.
+   A container unit would not work here: the animating element *is* the container, so `cqw`
+   would track it frame by frame exactly as `100%` does. */
+.gooey-sidebar #gooey-builder-embed {
+  width: var(--sidebar-settled-width, var(--sidebar_open_width));
+}
+
+@media (max-width: 1140px) {
+  /* full-screen takeover at this breakpoint, so the settled width is the viewport */
+  .gooey-sidebar #gooey-builder-embed {
+    width: var(--sidebar_mobile_width);
+  }
+}
+
 .gooey-sidebar-open {
   min-width: var(--sidebar_open_width);
   width: var(--sidebar_open_width);

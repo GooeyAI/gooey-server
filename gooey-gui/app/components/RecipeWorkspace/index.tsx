@@ -8,8 +8,11 @@ import { RenderedChildren } from "~/renderer";
 
 import { WorkspacePaneControl } from "../WorkspacePaneControl";
 import {
+  type PaneRole,
+  paneRolesForLayout,
   paneVisibility,
   type RecipeView,
+  shownLayout,
   workspaceControlsForLayout,
 } from "./paneState";
 import { usePaneLayout } from "./usePaneLayout";
@@ -20,33 +23,29 @@ export function RecipeWorkspace({
   state,
   storage_key,
   initial_view,
+  editor_full_width = false,
 }: CustomComponentProps & {
   storage_key: string;
   initial_view: RecipeView;
+  editor_full_width?: boolean;
 }) {
   const { layout, hydrated, selectView, collapse } = usePaneLayout(
     storage_key,
     initial_view
   );
   const [aboutPane, editorPane, previewPane] = children;
-  const aboutOpen = layout.mode === "about";
-  const editorOpen = layout.mode === "work" && layout.editorOpen;
-  const previewOpen =
-    layout.previewOpen && (layout.mode === "about" || layout.mode === "work");
-  const controls = workspaceControlsForLayout(layout);
+  // Roles and controls both come off the *shown* layout, never the stored one, so a pane
+  // that has taken the row cannot be handed a control that contradicts it.
+  const shown = shownLayout(layout, editor_full_width);
+  const roles = paneRolesForLayout(shown);
+  const controls = workspaceControlsForLayout(shown, editor_full_width);
 
   return (
     <div
       style={{ visibility: paneVisibility(hydrated) }}
-      className={clsx(
-        "recipe-workspace",
-        "container-xxl",
-        aboutOpen && "recipe-workspace--about",
-        editorOpen && "recipe-workspace--editor",
-        previewOpen && "recipe-workspace--preview"
-      )}
+      className="recipe-workspace container-xxl"
     >
-      {layout.mode === "work" && !layout.editorOpen && layout.previewOpen && (
+      {roles.preview === "solo" && (
         <button
           type="button"
           className="recipe-workspace-mobile-back d-lg-none"
@@ -58,14 +57,14 @@ export function RecipeWorkspace({
       )}
       <WorkspacePane
         className="recipe-workspace-about"
-        open={aboutOpen}
+        role={roles.about}
         node={aboutPane}
         onChange={onChange}
         state={state}
       />
       <WorkspacePane
         className="recipe-workspace-editor"
-        open={editorOpen}
+        role={roles.editor}
         node={editorPane}
         onChange={onChange}
         state={state}
@@ -91,7 +90,7 @@ export function RecipeWorkspace({
       />
       <WorkspacePane
         className="recipe-workspace-preview"
-        open={previewOpen}
+        role={roles.preview}
         node={previewPane}
         onChange={onChange}
         state={state}
@@ -145,7 +144,7 @@ export function RecipeWorkspaceTrigger({
 
 function WorkspacePane({
   className,
-  open,
+  role,
   node,
   onChange,
   state,
@@ -153,13 +152,14 @@ function WorkspacePane({
   rightControls,
 }: {
   className: string;
-  open: boolean;
+  role: PaneRole;
   node: CustomComponentProps["children"][number] | undefined;
   onChange: CustomComponentProps["onChange"];
   state: CustomComponentProps["state"];
   leftControls?: ReactNode;
   rightControls?: ReactNode;
 }) {
+  const open = role !== "closed";
   const paneRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (open) {
@@ -175,7 +175,8 @@ function WorkspacePane({
       className={clsx(
         "recipe-workspace-pane",
         className,
-        open ? "recipe-workspace-pane--open" : "recipe-workspace-pane--closed"
+        `recipe-workspace-pane--${role}`,
+        open && "recipe-workspace-pane--open"
       )}
       aria-hidden={!open}
     >

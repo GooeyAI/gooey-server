@@ -49,6 +49,7 @@ export interface RecipeTopBarProps {
   views: TopBarView[];
   storage_key: string;
   initial_view: "about" | "edit" | "preview" | "split";
+  editor_full_width: boolean;
   workspace_href: string;
   workspace_active: boolean;
   immersive_on_mobile: boolean;

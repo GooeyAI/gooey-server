@@ -547,6 +547,7 @@ class BasePage:
             "RecipeWorkspace",
             storage_key=self._workspace_storage_key(),
             initial_view=initial_view,
+            editor_full_width=self._editor_wants_full_width(),
         ):
             # mt-1 on the About card and the preview, not on the editor: those two are framed
             # surfaces that would otherwise sit flush against the top bar's rule, while the
@@ -566,6 +567,16 @@ class BasePage:
                     self.render_deleted_output()
                 else:
                     self._render_output_col(submitted=submitted)
+
+    def _editor_wants_full_width(self) -> bool:
+        """Hook: does the open config pane need the whole row to itself?
+
+        Most panes are happy beside the preview. One that carries a preview of its own is
+        not - see VideoBots' Deploy. Said here rather than in CSS because the answer depends
+        on server-side session state, and both the workspace and the top bar have to agree
+        on it: the bar names the arrangement that is actually on screen.
+        """
+        return False
 
     def _workspace_storage_key(self) -> str:
         return (
@@ -795,6 +806,8 @@ class BasePage:
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
         cost_label, cost_title = self._top_bar_cost()
         can_manage_sharing = self.can_manage_sharing()
+        # a root recipe has no published run behind it, so there is no published url to share
+        can_share = not pr.is_root()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -804,6 +817,7 @@ class BasePage:
                 author=self._top_bar_author(),
                 storage_key=self._workspace_storage_key(),
                 initial_view=self.entry_tab_slug(tabs),
+                editor_full_width=self._editor_wants_full_width(),
                 workspace_href=self.current_app_url(RecipeTabs.run),
                 workspace_active=self.tab in {RecipeTabs.run, RecipeTabs.preview},
                 views=[
@@ -819,11 +833,16 @@ class BasePage:
                 publish_label=self._top_bar_publish_label(),
                 publish_key=self.TOP_BAR_PUBLISH_KEY,
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
-                # Share is always offered, but means different things: change who can see
-                # this (owners) versus copy the link (everyone else). Exactly one is set.
-                share_key=(self.TOP_BAR_SHARE_KEY if can_manage_sharing else ""),
+                # Share means different things - change who can see this, or copy the link -
+                # so exactly one of these is set, and neither on a root recipe, which has no
+                # published run behind it and so nothing stable to share.
+                share_key=(
+                    self.TOP_BAR_SHARE_KEY if can_share and can_manage_sharing else ""
+                ),
                 share_copy_url=(
-                    "" if can_manage_sharing else self.current_app_url(self.tab)
+                    self.current_app_url(self.tab)
+                    if can_share and not can_manage_sharing
+                    else ""
                 ),
                 share_icon=icons.share,
                 has_unpublished_changes=self._has_request_changed()

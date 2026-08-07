@@ -120,5 +120,8 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
 
-  return <div className="w-100 h-100" id="gooey-builder-embed" />;
+  // No `w-100`: Bootstrap's width utilities are `!important`, so it would beat the rule in
+  // app.css that pins this to the panel's settled width during the open/close transition.
+  // Width is owned by CSS there - it defaults to 100% and is only overridden inside a panel.
+  return <div className="h-100" id="gooey-builder-embed" />;
 }

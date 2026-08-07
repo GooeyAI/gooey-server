@@ -1677,13 +1677,16 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
             )
 
-    def _render_split_tab(self):
-        """Split is two columns, except on Deploy.
-
-        Deploy is a wide configuration surface that carries its own web preview, so pairing
-        it with the chat preview leaves both cramped. It takes the full width instead.
+    def _editor_wants_full_width(self) -> bool:
+        """Deploy is a wide configuration surface that carries its own web preview, so
+        pairing it with the chat preview leaves both cramped. It takes the full width
+        instead, and the controls that would pair it back up go with it.
         """
-        if gui.session_state.get(self.CONFIG_PANE_KEY) == ConfigPane.deploy:
+        return gui.session_state.get(self.CONFIG_PANE_KEY) == ConfigPane.deploy
+
+    def _render_split_tab(self):
+        """Split is two columns, except where the open pane has claimed the row."""
+        if self._editor_wants_full_width():
             # one column of 12 rather than no column at all, so the full-width pane keeps
             # the same gutters as the two-column layout. No submit row here to redirect on.
             self._render_solo_input_col()
