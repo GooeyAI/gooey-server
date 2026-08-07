@@ -39,7 +39,7 @@ from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.exceptions import raise_for_status, UserError
 from daras_ai_v2.functional import flatten
 from daras_ai_v2.gpu_server import call_celery_task
-from daras_ai_v2.language_model_body import to_llm_body
+from daras_ai_v2.language_model_body import LLMMessageExtraContent, to_llm_body
 from daras_ai_v2.language_model_openai_audio import run_openai_audio
 from daras_ai_v2.redis_cache import redis_cache_decorator
 from daras_ai_v2.text_splitter import default_length_function, default_separators
@@ -122,6 +122,9 @@ class ConversationEntry(typing_extensions.TypedDict, total=False):
     tool_call_id: typing_extensions.NotRequired[str]
 
     run_url: typing_extensions.NotRequired[str]
+    extra_content: typing_extensions.NotRequired[
+        LLMMessageExtraContent | dict[str, typing.Any]
+    ]
 
 
 def remove_images_from_entry(entry: ConversationEntry) -> ConversationEntry | None:
