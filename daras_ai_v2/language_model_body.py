@@ -45,6 +45,19 @@ class LLMToolCall(pydantic.BaseModel):
         return v or {}
 
 
+class LLMMessageExtraContent(pydantic.BaseModel):
+    """
+    saved run data carried on a message so historic turns can be exported with
+    their originating run metadata. Never sent to the LLM.
+    """
+
+    model_config = pydantic.ConfigDict(extra="allow")
+
+    display_content: str | None = None
+    output_video: list[str] | None = None
+    output_audio: list[str] | None = None
+
+
 class LLMMessage(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="ignore")
 
@@ -52,6 +65,9 @@ class LLMMessage(pydantic.BaseModel):
     content: str | list[dict] | None = None
     tool_calls: list[LLMToolCall] | None = None
     tool_call_id: str | None = None
+
+    run_url: str | None = None
+    extra_content: LLMMessageExtraContent | None = None
 
     @pydantic.field_validator("role", mode="before")
     @classmethod
@@ -62,11 +78,10 @@ class LLMMessage(pydantic.BaseModel):
 def to_llm_body(
     messages: list[dict], *, model: AIModelSpec | None = None
 ) -> list[dict]:
-    """Whitelist outgoing message fields so internal keys (chunk, run_url, metrics, ...) don't cause HTTP 400s."""
-    if model and model.is_google_model():
-        exclude = None
-    else:
-        exclude = {"tool_calls": {"__all__": {"extra_content"}}}
+    """Whitelist outgoing message fields so internal keys (chunk, run_url, extra_content, metrics, ...) don't cause HTTP 400s."""
+    exclude = {"run_url": True, "extra_content": True}
+    if not (model and model.is_google_model()):
+        exclude["tool_calls"] = {"__all__": {"extra_content"}}
     return [
         LLMMessage.model_validate(entry).model_dump(
             exclude=exclude,

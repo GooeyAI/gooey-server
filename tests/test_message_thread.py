@@ -8,7 +8,10 @@ from bots.models import (
     get_default_published_run_workspace,
 )
 from bots.models.message_thread import MessageThread
-from daras_ai_v2.web_widget_embed import chat_widget_input_to_request_body
+from daras_ai_v2.web_widget_embed import (
+    chat_widget_input_to_request_body,
+    get_chat_widget_messages,
+)
 from recipes.VideoBots import VideoBotsPage
 from routers.api import create_new_run
 from workspaces.models import Workspace
@@ -94,6 +97,89 @@ def test_chat_widget_continues_thread_with_prior_media(db_fixtures):
     )
 
     assert message_thread == thread
+
+
+def test_chat_widget_moves_run_metadata_into_history(db_fixtures):
+    sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
+    request_body, _ = chat_widget_input_to_request_body(
+        sr,
+        {
+            "input_prompt": "hello",
+            "raw_input_text": "hello",
+            "raw_output_text": ["raw reply"],
+            "output_text": ["display reply"],
+            "output_video": ["https://example.com/video.mp4"],
+            "output_audio": ["https://example.com/audio.mp3"],
+        },
+        {"input_prompt": "follow up"},
+    )
+
+    assistant_msg = request_body["messages"][1]
+    assert assistant_msg["role"] == "assistant"
+    assert assistant_msg["content"] == "raw reply"
+    assert assistant_msg["run_url"] == sr.get_app_url()
+    assert assistant_msg["extra_content"] == {
+        "display_content": "display reply",
+        "output_video": ["https://example.com/video.mp4"],
+        "output_audio": ["https://example.com/audio.mp3"],
+    }
+
+
+def test_get_chat_widget_messages_exports_historical_run_metadata():
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {
+                    "role": "assistant",
+                    "content": "raw reply",
+                    "run_url": "https://example.com/run-123",
+                    "extra_content": {
+                        "display_content": "display reply",
+                        "output_video": ["https://example.com/video.mp4"],
+                        "output_audio": ["https://example.com/audio.mp3"],
+                    },
+                },
+            ]
+        }
+    )
+
+    assistant_msg = messages[1]
+    assert assistant_msg["role"] == "assistant"
+    assert assistant_msg["output_text"] == ["display reply"]
+    assert assistant_msg["text"] == "display reply"
+    assert assistant_msg["display_content"] == "display reply"
+    assert assistant_msg["run_url"] == "https://example.com/run-123"
+    assert assistant_msg["web_url"] == "https://example.com/run-123"
+    assert assistant_msg["output_video"] == ["https://example.com/video.mp4"]
+    assert assistant_msg["output_audio"] == ["https://example.com/audio.mp3"]
+
+
+def test_video_bots_messages_model_preserves_widget_metadata():
+    request = VideoBotsPage.RequestModel.model_validate(
+        {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "raw reply",
+                    "run_url": "https://example.com/run-123",
+                    "extra_content": {
+                        "display_content": "display reply",
+                        "output_video": ["https://example.com/video.mp4"],
+                        "output_audio": ["https://example.com/audio.mp3"],
+                    },
+                }
+            ]
+        }
+    )
+
+    assert isinstance(request.messages[0], dict)
+    assert request.messages[0]["run_url"] == "https://example.com/run-123"
+    assert request.messages[0]["extra_content"] == {
+        "display_content": "display reply",
+        "output_video": ["https://example.com/video.mp4"],
+        "output_audio": ["https://example.com/audio.mp3"],
+    }
 
 
 def test_create_new_run_creates_thread_and_sets_first_last(

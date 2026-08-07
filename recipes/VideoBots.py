@@ -1313,7 +1313,9 @@ Translation Glossary for LLM Language (English) -> User Langauge
             gui.session_state["final_search_query"] = ""
             gui.rerun()
 
-        messages = get_chat_widget_messages(gui.session_state)
+        messages = get_chat_widget_messages(
+            gui.session_state, web_url=self.current_app_url()
+        )
 
         # fill branding with bot integration data if available
         bot_integration = (
@@ -1343,6 +1345,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             enablePhotoUpload=True,
             enableConversations=True,
             showToolCalls=True,
+            showRunLink=True,
             branding=bot_branding,
             fillParent=True,
             enableSourcePreview=False,

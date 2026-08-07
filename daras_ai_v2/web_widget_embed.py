@@ -1,9 +1,8 @@
 from typing import Any
 
+import gooey_gui as gui
 from bots.models import SavedRun
 from bots.models.message_thread import MessageThread
-import gooey_gui as gui
-
 from daras_ai_v2 import settings
 from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.language_model import (
@@ -13,6 +12,7 @@ from daras_ai_v2.language_model import (
     get_entry_images,
     get_entry_text,
 )
+from daras_ai_v2.language_model_body import LLMMessageExtraContent
 from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 
 
@@ -61,20 +61,24 @@ def chat_widget_input_to_request_body(
     )
     prev_output = (state.get("raw_output_text") or [""])[0]
     if prev_chat_input and prev_output:
+        user_entry = format_chat_entry(
+            role=CHATML_ROLE_USER,
+            content_text=prev_input,
+            input_images=prev_input_images,
+            # input_audio=prev_input_audio,
+            input_documents=prev_input_documents,
+        )
+
+        assistant_entry = format_chat_entry(
+            role=CHATML_ROLE_ASSISTANT,
+            content_text=prev_output,
+        ) | {
+            "run_url": sr.get_app_url(),
+            "extra_content": _extra_content_from_state(state, prev_output),
+        }
+
         # append previous input to the history
-        ret["messages"] = state.get("messages", []) + [
-            format_chat_entry(
-                role=CHATML_ROLE_USER,
-                content_text=prev_input,
-                input_images=prev_input_images,
-                # input_audio=prev_input_audio,
-                input_documents=prev_input_documents,
-            ),
-            format_chat_entry(
-                role=CHATML_ROLE_ASSISTANT,
-                content_text=prev_output,
-            ),
-        ]
+        ret["messages"] = state.get("messages", []) + [user_entry, assistant_entry]
 
     any_prev_input = prev_chat_input or state.get("input_prompt")
     if any_prev_input and sr.message_thread and sr.message_thread.last_run_id == sr.id:
@@ -85,9 +89,23 @@ def chat_widget_input_to_request_body(
     return ret, message_thread
 
 
+def _extra_content_from_state(state: dict, raw_output_text: str) -> dict[str, Any]:
+    ret = {}
+    output_text = state.get("output_text")
+    if output_text and output_text != raw_output_text:
+        ret["display_content"] = output_text[0] or ""
+    output_video = state.get("output_video")
+    if output_video:
+        ret["output_video"] = output_video
+    output_audio = state.get("output_audio")
+    if output_audio:
+        ret["output_audio"] = output_audio
+    return ret
+
+
 def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[Any]:
-    from daras_ai_v2.bots import parse_bot_html
     from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+    from daras_ai_v2.bots import parse_bot_html
 
     messages = []  # chat widget internal mishmash format
     input_audio = state.get("input_audio") or ""
@@ -111,12 +129,26 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                 )
             )
         elif role == CHATML_ROLE_ASSISTANT:
+            extra_content = entry.get("extra_content") or {}
+            display_content = extra_content.get("display_content") or get_entry_text(
+                entry
+            )
+            buttons, text = parse_bot_html(display_content)[:2]
+            run_url = entry.get("run_url") or extra_content.get("run_url")
+            output_video = extra_content.get("output_video") or []
+            output_audio = extra_content.get("output_audio") or []
             messages.append(
                 dict(
                     role=role,
                     type="final_response",
                     status="completed",
-                    output_text=[parse_bot_html(get_entry_text(entry))[1]],
+                    output_text=[text],
+                    text=text,
+                    display_content=display_content,
+                    output_video=output_video,
+                    output_audio=output_audio,
+                    buttons=buttons,
+                    web_url=run_url,
                 )
             )
 
