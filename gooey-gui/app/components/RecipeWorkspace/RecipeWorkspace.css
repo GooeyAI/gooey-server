@@ -179,14 +179,30 @@
   top: 0.75rem;
   left: 0.75rem;
   z-index: 6;
+  /* `inline-flex`, not the button default of `inline-block` - `align-items` and `gap` below
+     were inert until this carried a portrait and a title beside the arrow. */
+  display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.625rem 1rem;
+  /* Bounded so the title has something to ellipsise against; the 1.5rem matches the `left`
+     offset, keeping an equal gutter on the far side. */
+  max-width: calc(100% - 1.5rem);
+  padding: 0.5rem 0.875rem;
   color: var(--bs-body-color);
   background: rgb(255 255 255 / 92%);
   border: 1px solid var(--bs-border-color);
   border-radius: 999px;
   box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+}
+
+/* Smaller than the bar's 36px portrait - this one sits in a pill, not a header row. Bootstrap
+   has no sizing utility this small, so the box is set here; the corner treatment is
+   `rounded-circle` / `rounded-1` on the element, matching the bar's circle rule. */
+.recipe-workspace-mobile-back-photo {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: cover;
+  flex: 0 0 auto;
 }
 .v2-workspace-body {
   background-color: #fbfaf8 !important;
@@ -213,10 +229,26 @@
     margin-right: 0 !important;
   }
 
-  /* Only one pane is ever on screen here, so it is always full width - the 60/40 pinning
-     above would size the content to a split that does not exist at this breakpoint. */
+  /* There is no room to pair anything at this width, so the minor half is not shown at all.
+     About is the only view that reaches here holding two panes - `keepLayoutOnScreen` already
+     folds a work-mode split down to the preview alone - and its preview was sitting just off
+     the content box, close enough that its rounded left edge showed through the container's
+     right padding, which `overflow: hidden` does not clip.
+     Done by role rather than by collapsing the layout: this is a fact about the width, not
+     about what the user picked, so widening the window brings the pane straight back. */
+  .recipe-workspace-pane--minor {
+    display: none;
+  }
+
+  /* One pane holds the screen here, so every pane's content settles at the full width - the
+     60/40 pinning above would size it to a split this breakpoint does not have. Still `cqw`
+     and not `100%`, for the same reason the pinning exists at all: `100%` is a percentage of
+     the *pane*, which animates its width, so the content re-lays-out on every frame of the
+     slide and the text re-wraps ~10 times in 280ms. `100cqw` measures the workspace, which
+     holds still, so the content is laid out once and the pane's `overflow: hidden` reveals
+     it. */
   .recipe-workspace-pane > .recipe-workspace-pane-content {
-    width: 100%;
+    width: 100cqw;
     min-width: 0;
   }
 }

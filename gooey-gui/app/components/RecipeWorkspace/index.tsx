@@ -24,10 +24,16 @@ export function RecipeWorkspace({
   storage_key,
   initial_view,
   editor_full_width = false,
+  title,
+  photo_url,
+  circle_photo = false,
 }: CustomComponentProps & {
   storage_key: string;
   initial_view: RecipeView;
   editor_full_width?: boolean;
+  title?: string;
+  photo_url?: string | null;
+  circle_photo?: boolean;
 }) {
   const { layout, hydrated, selectView, collapse } = usePaneLayout(
     storage_key,
@@ -46,13 +52,27 @@ export function RecipeWorkspace({
       className="recipe-workspace container-xxl"
     >
       {roles.preview === "solo" && (
+        // The immersive preview hides the top bar, so this link is also the only thing
+        // naming the workflow on that screen - hence the portrait and title rather than the
+        // bare "Back" it used to read.
         <button
           type="button"
           className="recipe-workspace-mobile-back d-lg-none"
           onClick={() => selectView("edit")}
+          aria-label={title ? `Back to ${title}` : "Back"}
         >
-          <i className="fa-regular fa-arrow-left" />
-          Back
+          <i className="fa-regular fa-arrow-left" aria-hidden="true" />
+          {!!photo_url && (
+            <img
+              src={photo_url}
+              alt=""
+              className={clsx(
+                "recipe-workspace-mobile-back-photo",
+                circle_photo ? "rounded-circle" : "rounded-1"
+              )}
+            />
+          )}
+          <span className="text-truncate">{title || "Back"}</span>
         </button>
       )}
       <WorkspacePane
