@@ -229,7 +229,14 @@ def classify_outcome(*, transcript: Transcript, error_msg: str, run_status: str)
 
 
 def build_funnel(rows: list[dict]) -> list[dict]:
-    """Drop-off across the builder's steps, widest first."""
+    """Drop-off across the builder's steps, widest first.
+
+    Each step counts prompts that got *at least* this far, so the funnel stays
+    monotonic: saving a workflow implies touching one, deploying implies saving.
+    Testing each step in isolation would let a prompt that saved without a
+    separate edit/run step make "Saved" wider than "Workflow touched", which
+    renders as an inverted funnel.
+    """
     total = len(rows)
     steps = [
         ("Prompts", lambda r: True),
@@ -237,11 +244,13 @@ def build_funnel(rows: list[dict]) -> list[dict]:
         (
             "Workflow touched",
             lambda r: (
-                r["transcript"].succeeded(EDIT_TOOLS | RUN_TOOLS)
+                r["transcript"].succeeded(
+                    EDIT_TOOLS | RUN_TOOLS | SAVE_TOOLS | DEPLOY_TOOLS
+                )
                 or bool(r["child_url"])
             ),
         ),
-        ("Saved", lambda r: r["transcript"].succeeded(SAVE_TOOLS)),
+        ("Saved", lambda r: r["transcript"].succeeded(SAVE_TOOLS | DEPLOY_TOOLS)),
         ("Deployed", lambda r: r["transcript"].succeeded(DEPLOY_TOOLS)),
     ]
     funnel = []
