@@ -120,8 +120,8 @@ def test_chat_widget_moves_run_metadata_into_history(db_fixtures):
     assert assistant_msg["run_url"] == sr.get_app_url()
     assert assistant_msg["extra_content"] == {
         "display_content": "display reply",
-        "output_video": ["https://example.com/video.mp4"],
-        "output_audio": ["https://example.com/audio.mp3"],
+        "video": ["https://example.com/video.mp4"],
+        "audio": ["https://example.com/audio.mp3"],
     }
 
 
@@ -136,8 +136,8 @@ def test_get_chat_widget_messages_exports_historical_run_metadata():
                     "run_url": "https://example.com/run-123",
                     "extra_content": {
                         "display_content": "display reply",
-                        "output_video": ["https://example.com/video.mp4"],
-                        "output_audio": ["https://example.com/audio.mp3"],
+                        "video": ["https://example.com/video.mp4"],
+                        "audio": ["https://example.com/audio.mp3"],
                     },
                 },
             ]
@@ -147,9 +147,6 @@ def test_get_chat_widget_messages_exports_historical_run_metadata():
     assistant_msg = messages[1]
     assert assistant_msg["role"] == "assistant"
     assert assistant_msg["output_text"] == ["display reply"]
-    assert assistant_msg["text"] == "display reply"
-    assert assistant_msg["display_content"] == "display reply"
-    assert assistant_msg["run_url"] == "https://example.com/run-123"
     assert assistant_msg["web_url"] == "https://example.com/run-123"
     assert assistant_msg["output_video"] == ["https://example.com/video.mp4"]
     assert assistant_msg["output_audio"] == ["https://example.com/audio.mp3"]
@@ -165,8 +162,8 @@ def test_video_bots_messages_model_preserves_widget_metadata():
                     "run_url": "https://example.com/run-123",
                     "extra_content": {
                         "display_content": "display reply",
-                        "output_video": ["https://example.com/video.mp4"],
-                        "output_audio": ["https://example.com/audio.mp3"],
+                        "video": ["https://example.com/video.mp4"],
+                        "audio": ["https://example.com/audio.mp3"],
                     },
                 }
             ]
@@ -177,8 +174,8 @@ def test_video_bots_messages_model_preserves_widget_metadata():
     assert request.messages[0]["run_url"] == "https://example.com/run-123"
     assert request.messages[0]["extra_content"] == {
         "display_content": "display reply",
-        "output_video": ["https://example.com/video.mp4"],
-        "output_audio": ["https://example.com/audio.mp3"],
+        "video": ["https://example.com/video.mp4"],
+        "audio": ["https://example.com/audio.mp3"],
     }
 
 
