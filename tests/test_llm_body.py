@@ -65,8 +65,8 @@ def test_to_llm_body_strips_message_extra_content():
                 "run_url": "https://gooey.ai/run/123",
                 "extra_content": {
                     "display_content": "hola",
-                    "output_video": ["https://gooey.ai/video.mp4"],
-                    "output_audio": ["https://gooey.ai/audio.mp3"],
+                    "video": ["https://gooey.ai/video.mp4"],
+                    "audio": ["https://gooey.ai/audio.mp3"],
                 },
             }
         ]
