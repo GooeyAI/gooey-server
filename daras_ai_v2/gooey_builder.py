@@ -132,6 +132,7 @@ def render_gooey_builder_embed(
     config["enableSourcePreview"] = False
     # conversations live in the navigation sidebar, not the builder widget
     config["enableConversations"] = False
+    config["theme"] = "builder"
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
 

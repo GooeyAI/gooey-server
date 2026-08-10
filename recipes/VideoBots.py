@@ -1337,6 +1337,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
             bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
 
+        # a copilot that is deployed to WhatsApp is previewed as WhatsApp renders it
+        has_whatsapp_deployed = BotIntegration.objects.filter(
+            published_run=self.current_pr,
+            platform=Platform.WHATSAPP,
+        ).exists()
+
         config = dict(
             integration_id="magic",
             target="#gooey-embed",
@@ -1346,20 +1352,31 @@ Translation Glossary for LLM Language (English) -> User Langauge
             enableConversations=True,
             showToolCalls=True,
             showRunLink=True,
+            showHeader=False,
             branding=bot_branding,
             fillParent=True,
             enableSourcePreview=False,
             secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
         )
+        if has_whatsapp_deployed:
+            config["theme"] = "whatsapp"
         if settings.DEBUG:
             from routers.bots_api import stream_create
 
             config["apiUrl"] = get_api_route_url(stream_create)
 
         gui.div(
-            className="border rounded py-1 mb-3 bg-white",
+            className="mb-3",
             style=dict(height="calc(100vh - 1rem)"),
             id="gooey-embed",
+        )
+        # Owns the widget's teardown when this preview disappears or a different workflow replaces
+        # it client-side. Keyed on the published run, not the saved run, so a Run keeps the mounted
+        # widget - the theme is read only at mount, so tearing down on every run would restart the
+        # conversation for nothing.
+        gui.component(
+            "GooeyEmbedTeardown",
+            embed_key=str(self.current_pr.published_run_id),
         )
         load_chat_widget_lib()
         gui.js(
@@ -1391,7 +1408,10 @@ const script = document.getElementById("gooey-embed-script");
 if (script) script.onload = loadGooeyEmbed;
 loadGooeyEmbed();
 window.addEventListener("hydrated", loadGooeyEmbed);
-// once the widget is already mounted, update the messages and branding to latest
+// once the widget is already mounted, update the messages and branding to latest.
+// theme is deliberately not sent here: the widget stamps data-gooey-theme from the config given
+// to mount(), above the state updateConfig writes to, so it would be silently ignored. A theme
+// change lands on the next mount, after GooeyEmbedTeardown drops the widget on a view change.
 if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
     GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
     GooeyEmbed.copilotPreviewControl.updateConfig?.({ branding: config.branding });
