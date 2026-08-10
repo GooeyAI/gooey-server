@@ -400,7 +400,6 @@ VERIFIED_EMAIL_USER_FREE_CREDITS = config(
 VERIFIED_EMAIL_DOMAINS = {
     "gmail.com",
     "googlemail.com",
-    "outlook.com",
     "hotmail.com",
     "live.com",
     "icloud.com",
