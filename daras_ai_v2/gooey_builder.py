@@ -135,6 +135,7 @@ def render_gooey_builder_embed(
     config["theme"] = "builder"
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
+    branding["inputPlaceholderText"] = "Ask Gooey"
 
     load_chat_widget_lib()
     gui.component(
