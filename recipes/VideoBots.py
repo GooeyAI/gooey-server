@@ -1365,61 +1365,19 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
             config["apiUrl"] = get_api_route_url(stream_create)
 
-        gui.div(
-            className="mb-3",
-            style=dict(height="calc(100vh - 1rem)"),
-            id="gooey-embed",
-        )
-        # Owns the widget's teardown when this preview disappears or a different workflow replaces
-        # it client-side. Keyed on the published run, not the saved run, so a Run keeps the mounted
-        # widget - the theme is read only at mount, so tearing down on every run would restart the
-        # conversation for nothing.
-        gui.component(
-            "GooeyEmbedTeardown",
-            embed_key=str(self.current_pr.published_run_id),
-        )
         load_chat_widget_lib()
-        gui.js(
-            """
-async function loadGooeyEmbed() {
-    await window.waitUntilHydrated;
-    let embedTarget = document.getElementById("gooey-embed");
-    if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
-        return;
-    }
-    let controller = {
-        messages,
-        onSendMessage: (payload) => {
-            let btn = document.getElementById("onSendMessage");
-            if (!btn) return;
-            btn.value = JSON.stringify(payload);
-            btn.click();
-        },
-        onNewConversation() {
-          document.getElementById("onNewConversation").click();
-        },
-        fetchConversations: () => gui.fetchServerAPI("/__/agent/fetch-conversations", { run_url }),
-    };
-    GooeyEmbed.copilotPreviewControl = controller;
-    GooeyEmbed.mount(config, controller);
-}
-
-const script = document.getElementById("gooey-embed-script");
-if (script) script.onload = loadGooeyEmbed;
-loadGooeyEmbed();
-window.addEventListener("hydrated", loadGooeyEmbed);
-// once the widget is already mounted, update the messages and branding to latest.
-// theme is deliberately not sent here: the widget stamps data-gooey-theme from the config given
-// to mount(), above the state updateConfig writes to, so it would be silently ignored. A theme
-// change lands on the next mount, after GooeyEmbedTeardown drops the widget on a view change.
-if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
-    GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
-    GooeyEmbed.copilotPreviewControl.updateConfig?.({ branding: config.branding });
-}
-            """,
+        # The component renders #gooey-embed and owns the widget's mount and teardown together, so
+        # neither can outlive the other. It remounts on embed_key or a theme change and on nothing
+        # else: the widget reads `theme` only at mount, while a plain Run must leave the mounted
+        # widget alone or it would restart the conversation for nothing.
+        gui.component(
+            "GooeyEmbedPreview",
+            embed_key=str(self.current_pr.published_run_id),
             config=config,
             messages=messages,
             run_url=str(self.request.url),
+            className="mb-3",
+            style=dict(height="calc(100vh - 1rem)"),
         )
 
     def on_send(self, input_data: dict):
