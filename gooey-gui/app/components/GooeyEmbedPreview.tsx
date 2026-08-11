@@ -11,10 +11,11 @@ declare global {
 type MountedEntry = { innerDiv: HTMLElement; root: { unmount(): void } };
 
 /**
- * Remounts on `embed_key` (the published run) or a theme change, and on nothing else. The widget
- * reads `theme` only at mount - it stamps `data-gooey-theme` from the config given to `mount()`,
- * above the state `updateConfig` writes to - so a theme change has to remount to land, while a
- * plain Run must not remount or it would restart the conversation for nothing.
+ * Mounts once per `embed_key` (the published run) and on nothing else - a Run must leave the
+ * mounted widget alone or it would restart the conversation for nothing.
+ *
+ * Theme and branding go through `updateConfig`, which reskins in place: the widget reads both
+ * from its own reactive config state, so neither needs a remount to land.
  */
 export function GooeyEmbedPreview(
   props: CustomComponentProps & {
@@ -95,17 +96,19 @@ export function GooeyEmbedPreview(
         if (idx >= 0) mounted.splice(idx, 1);
       }
     };
-    // config.theme, not config: the object is new every render, the theme is not
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embed_key, config.theme]);
+  }, [embed_key]);
 
   useEffect(() => {
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
 
   useEffect(() => {
-    controllerRef.current?.updateConfig?.({ branding: config.branding });
-  }, [config.branding]);
+    controllerRef.current?.updateConfig?.({
+      theme: config.theme,
+      branding: config.branding,
+    });
+  }, [config.theme, config.branding]);
 
   return <div id="gooey-embed" className={className} style={style} />;
 }
