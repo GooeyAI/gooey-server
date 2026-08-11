@@ -8,7 +8,7 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.azure_asr import azure_auth_header
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.enum_selector_widget import enum_selector
-from daras_ai_v2.exceptions import raise_for_status
+from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.language_filters import (
     filter_languages,
     filter_models_by_language,
@@ -44,6 +44,46 @@ class TextToSpeechProviders(TTSProvider, GooeyEnum):
     GHANA_NLP = TTSProvider(value="GhanaNLP Text-To-Speech", sample_rate=16000)
     MMS_TTS = TTSProvider(value="MMS TTS (Meta)", sample_rate=16000)
     SARVAM = TTSProvider(value="Bulbul v3 (Sarvam AI)", sample_rate=24000)
+
+
+# settings that must be configured for a provider to work at all.
+# providers not listed here handle their own credentials:
+# - GOOGLE_TTS uses application default credentials
+# - ELEVEN_LABS accepts a user provided api key
+TTS_PROVIDER_REQUIRED_SETTINGS: dict[TextToSpeechProviders, list[str]] = {
+    TextToSpeechProviders.UBERDUCK: ["UBERDUCK_KEY", "UBERDUCK_SECRET"],
+    TextToSpeechProviders.AZURE_TTS: ["AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"],
+    TextToSpeechProviders.OPEN_AI: ["OPENAI_API_KEY"],
+    TextToSpeechProviders.GHANA_NLP: ["GHANA_NLP_SUBKEY"],
+    TextToSpeechProviders.SARVAM: ["SARVAM_API_KEY"],
+    # these upload their output to a signed GCS url
+    TextToSpeechProviders.BARK: ["GS_BUCKET_NAME"],
+    TextToSpeechProviders.MMS_TTS: ["GS_BUCKET_NAME"],
+}
+
+
+def missing_tts_provider_settings(provider: TextToSpeechProviders) -> list[str]:
+    return [
+        name
+        for name in TTS_PROVIDER_REQUIRED_SETTINGS.get(provider, [])
+        if not getattr(settings, name, None)
+    ]
+
+
+def raise_if_tts_provider_unconfigured(provider: TextToSpeechProviders):
+    missing = missing_tts_provider_settings(provider)
+    if not missing:
+        return
+    raise UserError(unconfigured_tts_provider_msg(provider, missing))
+
+
+def unconfigured_tts_provider_msg(
+    provider: TextToSpeechProviders, missing: list[str]
+) -> str:
+    return (
+        f"{provider.value} is not configured on this server: "
+        f"missing {', '.join(missing)}"
+    )
 
 
 SARVAM_TTS_LANGUAGES = {
@@ -185,6 +225,9 @@ def text_to_speech_provider_selector(page, *, language_filter: str | None = None
             key="tts_provider",
             use_selectbox=True,
         )
+        provider = TextToSpeechProviders.get(tts_provider)
+        if provider and (missing := missing_tts_provider_settings(provider)):
+            gui.error(unconfigured_tts_provider_msg(provider, missing), icon="⚠️")
     with col2:
         match tts_provider:
             case TextToSpeechProviders.BARK.name:
@@ -575,6 +618,13 @@ Alternatively, you can use your own ElevenLabs API key by selecting the checkbox
         gui.session_state["elevenlabs_api_key"] = None
         if settings.ELEVEN_LABS_API_KEY:
             voices = fetch_elevenlabs_voices()
+        elif workspace:
+            gui.error(
+                f"{TextToSpeechProviders.ELEVEN_LABS.value} is not configured on this "
+                "server: missing ELEVEN_LABS_API_KEY. Use your own API key with the "
+                "checkbox above.",
+                icon="⚠️",
+            )
     if not voices:
         return
     gui.selectbox(

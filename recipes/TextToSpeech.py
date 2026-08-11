@@ -37,6 +37,7 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
     azure_tts_voices,
     elevenlabs_load_state,
+    raise_if_tts_provider_unconfigured,
     text_to_speech_provider_selector,
     text_to_speech_settings,
 )
@@ -179,6 +180,8 @@ class TextToSpeechPage(BasePage):
         text = unmarkdown(text)
 
         provider = self._get_tts_provider(state)
+        raise_if_tts_provider_unconfigured(provider)
+
         yield f"Generating audio using {provider.value} ..."
         match provider:
             case TextToSpeechProviders.BARK:
@@ -234,6 +237,7 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.GOOGLE_TTS:
                 import emoji
+                import google.auth.exceptions
                 from google.cloud import texttospeech
 
                 voice_name = (
@@ -266,7 +270,13 @@ class TextToSpeechPage(BasePage):
 
                 # Perform the text-to-speech request on the text input with the selected
                 # voice parameters and audio file type
-                client = texttospeech.TextToSpeechClient()
+                try:
+                    client = texttospeech.TextToSpeechClient()
+                except google.auth.exceptions.DefaultCredentialsError as e:
+                    raise UserError(
+                        f"{provider.value} is not configured on this server: "
+                        "missing Google application default credentials"
+                    ) from e
                 response = client.synthesize_speech(
                     input=synthesis_input, voice=voice, audio_config=audio_config
                 )
@@ -278,6 +288,12 @@ class TextToSpeechPage(BasePage):
 
             case TextToSpeechProviders.ELEVEN_LABS:
                 xi_api_key, is_custom_key = self._get_elevenlabs_api_key(state)
+                if not xi_api_key:
+                    raise UserError(
+                        f"{provider.value} is not configured on this server: "
+                        "missing ELEVEN_LABS_API_KEY. Please provide your own "
+                        "elevenlabs_api_key."
+                    )
                 if not (
                     is_custom_key
                     or self.is_current_user_paying()
@@ -430,11 +446,6 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = public_url
 
             case TextToSpeechProviders.SARVAM:
-                if not settings.SARVAM_API_KEY:
-                    raise UserError(
-                        "Sarvam AI TTS is not configured: missing SARVAM_API_KEY"
-                    )
-
                 if len(text) > BULBUL_V3_MAX_INPUT_CHARS:
                     raise UserError(
                         f"Bulbul v3 accepts at most {BULBUL_V3_MAX_INPUT_CHARS:,} "
