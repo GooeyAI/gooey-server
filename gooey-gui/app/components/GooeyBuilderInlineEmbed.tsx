@@ -12,10 +12,11 @@ declare global {
 export function GooeyBuilderInlineEmbed(
   props: CustomComponentProps & {
     config: Record<string, any>;
-    sidebar_key: string;
+    event_key: string;
     messages?: Record<string, any>[] | null;
     builder_run_url: string;
     workflow_state: Record<string, any>;
+    builder_only?: boolean;
   }
 ) {
   const { config, messages } = props;
@@ -37,11 +38,14 @@ export function GooeyBuilderInlineEmbed(
         return;
       }
 
-      config.onClose = function () {
-        window.dispatchEvent(
-          new CustomEvent(`${propsRef.current.sidebar_key}:close`)
-        );
-      };
+      // builder-only pages are standalone, so there's no sidebar to close
+      if (!propsRef.current.builder_only) {
+        config.onClose = function () {
+          window.dispatchEvent(
+            new CustomEvent(`${propsRef.current.event_key}:close`)
+          );
+        };
+      }
 
       controllerRef.current = {
         messages,
@@ -49,7 +53,10 @@ export function GooeyBuilderInlineEmbed(
           let redirectUrl = await fetchServerAPI<string | null>(
             "/__/gooey-builder/send-message",
             {
-              workflow_url: window.location.href,
+              // builder-only pages have no associated workflow to clone
+              workflow_url: propsRef.current.builder_only
+                ? null
+                : window.location.href,
               builder_run_url: propsRef.current.builder_run_url,
               workflow_state: propsRef.current.workflow_state,
               input_data,
@@ -70,15 +77,13 @@ export function GooeyBuilderInlineEmbed(
         onNewConversation: async () => {
           ctx.current.update_session_state({ builderOnNewConversation: true });
         },
-        fetchConversations: () =>
-          fetchServerAPI("/__/gooey-builder/fetch-conversations", {
-            run_url: propsRef.current.builder_run_url,
-          }),
         rerun: async (run_url: string) => {
           let redirectUrl = await fetchServerAPI<string | null>(
             "/__/gooey-builder/send-message",
             {
-              workflow_url: window.location.href,
+              workflow_url: propsRef.current.builder_only
+                ? null
+                : window.location.href,
               builder_run_url: run_url,
               workflow_state: propsRef.current.workflow_state,
             }

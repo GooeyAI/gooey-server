@@ -20,6 +20,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from handles.models import Handle, COMMON_EMAIL_DOMAINS
 from payments.models import SeatType
 from payments.plans import PricingPlan
+from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.models import Workspace, WorkspaceInvite, WorkspaceRole
 from workspaces.widgets import (
@@ -45,8 +46,7 @@ def create_workspace_route(
 ):
     """Render the workspace creation popup step 1."""
     if not request.user or request.user.is_anonymous:
-        redirect_url = furl("/login", query_params={"next": request.url})
-        return RedirectResponse(str(redirect_url))
+        return RedirectResponse(get_login_url(request))
 
     with gui.div(className="container mt-5"):
         render_create_workspace_form(
@@ -76,8 +76,7 @@ def workspace_invite_team_route(
     next: str | None = None,
 ):
     if not request.user or request.user.is_anonymous:
-        redirect_url = furl("/login", query_params={"next": request.url})
-        return RedirectResponse(str(redirect_url))
+        return RedirectResponse(get_login_url(request))
 
     workspace = get_current_workspace(request.user, request.session)
 

@@ -14,6 +14,12 @@ from daras_ai_v2.language_filters import (
     filter_models_by_language,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.tts_supported_languages import (
+    BARK_TTS_SUPPORTED_LANGUAGES,
+    ELEVEN_LABS_TTS_SUPPORTED_LANGUAGES,
+    MMS_TTS_SUPPORTED_LANGUAGES,
+    OPENAI_TTS_SUPPORTED_LANGUAGES,
+)
 from managed_secrets.models import ManagedSecret
 from managed_secrets.widgets import edit_secret_button_with_dialog
 from workspaces.models import Workspace
@@ -37,6 +43,32 @@ class TextToSpeechProviders(TTSProvider, GooeyEnum):
     OPEN_AI = TTSProvider(value="OpenAI", sample_rate=24000)
     GHANA_NLP = TTSProvider(value="GhanaNLP Text-To-Speech", sample_rate=16000)
     MMS_TTS = TTSProvider(value="MMS TTS (Meta)", sample_rate=16000)
+    SARVAM = TTSProvider(value="Bulbul v3 (Sarvam AI)", sample_rate=24000)
+
+
+SARVAM_TTS_LANGUAGES = {
+    "en-IN": "English",
+    "bn-IN": "Bengali",
+    "gu-IN": "Gujarati",
+    "hi-IN": "Hindi",
+    "kn-IN": "Kannada",
+    "ml-IN": "Malayalam",
+    "mr-IN": "Marathi",
+    "od-IN": "Odia",
+    "pa-IN": "Punjabi",
+    "ta-IN": "Tamil",
+    "te-IN": "Telugu",
+}
+
+SARVAM_TTS_SPEAKERS = {
+    "shubh": "Shubh", "aditya": "Aditya", "ritu": "Ritu", "priya": "Priya", "neha": "Neha", "rahul": "Rahul",
+    "pooja": "Pooja", "rohan": "Rohan", "simran": "Simran", "kavya": "Kavya", "amit": "Amit", "dev": "Dev",
+    "ishita": "Ishita", "shreya": "Shreya", "ratan": "Ratan", "varun": "Varun", "manan": "Manan", "sumit": "Sumit",
+    "roopa": "Roopa", "kabir": "Kabir", "aayan": "Aayan", "ashutosh": "Ashutosh", "advait": "Advait", "anand": "Anand",
+    "tanya": "Tanya", "tarun": "Tarun", "sunny": "Sunny", "mani": "Mani", "gokul": "Gokul", "vijay": "Vijay",
+    "shruti": "Shruti", "suhani": "Suhani", "mohit": "Mohit", "kavitha": "Kavitha", "rehan": "Rehan", "soham": "Soham",
+    "rupali": "Rupali",
+}  # fmt: skip
 
 
 UBERDUCK_VOICES = {
@@ -107,28 +139,6 @@ ELEVEN_LABS_MODELS = {
     "eleven_multilingual_v1": "Multilingual V1",
 }
 
-ELEVEN_LABS_TTS_SUPPORTED_LANGUAGES = [
-    ("English", "en"), ("Japanese", "ja"), ("Chinese", "zh"), ("German", "de"), ("Hindi", "hi"), ("French", "fr"),
-    ("Korean", "ko"), ("Portuguese", "pt"), ("Italian", "it"), ("Spanish", "es"), ("Indonesian", "id"),
-    ("Dutch", "nl"), ("Turkish", "tr"), ("Filipino", "fil"), ("Polish", "pl"), ("Swedish", "sv"),
-    ("Bulgarian", "bg"), ("Romanian", "ro"), ("Arabic", "ar"), ("Czech", "cs"), ("Greek", "el"),
-    ("Finnish", "fi"), ("Croatian", "hr"), ("Malay", "ms"), ("Slovak", "sk"), ("Danish", "da"),
-    ("Tamil", "ta"), ("Ukrainian", "uk"), ("Russian", "ru"),
-]  # fmt: skip
-
-# https://platform.openai.com/docs/guides/text-to-speech
-OPENAI_TTS_SUPPORTED_LANGUAGES: list[str] = [
-    "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",
-    "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
-    "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw", "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy",
-]  # fmt: skip
-
-BARK_TTS_SUPPORTED_LANGUAGES = [
-    ("English", "en"), ("German", "de"), ("Spanish", "es"), ("French", "fr"), ("Hindi", "hi"), ("Italian", "it"),
-    ("Japanese", "ja"), ("Korean", "ko"), ("Polish", "pl"), ("Portuguese", "pt"), ("Russian", "ru"), ("Turkish", "tr"),
-    ("Chinese", "zh"),
-]  # fmt: skip
-
 BARK_ALLOWED_PROMPTS = {
     None: "———",
     "announcer": "Announcer",
@@ -141,8 +151,6 @@ BARK_ALLOWED_PROMPTS = {
 
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def tts_supported_languages_by_provider() -> dict[TextToSpeechProviders, list[str]]:
-    from modal_functions.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
-
     return {
         TextToSpeechProviders.GOOGLE_TTS: google_tts_language_codes(),
         TextToSpeechProviders.AZURE_TTS: azure_tts_language_codes(),
@@ -154,6 +162,7 @@ def tts_supported_languages_by_provider() -> dict[TextToSpeechProviders, list[st
         TextToSpeechProviders.OPEN_AI: OPENAI_TTS_SUPPORTED_LANGUAGES,
         TextToSpeechProviders.UBERDUCK: ["en"],
         TextToSpeechProviders.GHANA_NLP: ["tw"],
+        TextToSpeechProviders.SARVAM: list(SARVAM_TTS_LANGUAGES),
     }
 
 
@@ -194,6 +203,8 @@ def text_to_speech_provider_selector(page, *, language_filter: str | None = None
                 ghana_nlp_tts_selector()
             case TextToSpeechProviders.MMS_TTS.name:
                 mms_tts_selector(language_filter=language_filter)
+            case TextToSpeechProviders.SARVAM.name:
+                sarvam_tts_selector(language_filter=language_filter)
     return tts_provider
 
 
@@ -211,6 +222,8 @@ def text_to_speech_settings(page, tts_provider):
             azure_tts_settings()
         case TextToSpeechProviders.OPEN_AI.name:
             openai_tts_settings()
+        case TextToSpeechProviders.SARVAM.name:
+            sarvam_tts_settings()
 
 
 def ghana_nlp_tts_selector():
@@ -237,10 +250,53 @@ def mms_tts_selector(*, language_filter: str = ""):
     )
 
 
+def sarvam_tts_selector(*, language_filter: str = ""):
+    options = {
+        code: f"{language} | {code}" for code, language in SARVAM_TTS_LANGUAGES.items()
+    }
+    language_options = list(options)
+    if language_filter:
+        language_options = filter_languages(language_filter, language_options)
+    gui.selectbox(
+        label="###### Sarvam Language",
+        key="sarvam_tts_language",
+        options=language_options,
+        format_func=options.__getitem__,
+    )
+
+
+def sarvam_tts_settings():
+    gui.write(f"##### 🗣️ {TextToSpeechProviders.SARVAM.value} Settings")
+    gui.selectbox(
+        label="###### Speaker",
+        key="sarvam_tts_speaker",
+        options=list(SARVAM_TTS_SPEAKERS),
+        format_func=SARVAM_TTS_SPEAKERS.__getitem__,
+    )
+    col1, col2 = gui.columns(2)
+    with col1:
+        gui.slider(
+            "###### Pace",
+            min_value=0.5,
+            max_value=2.0,
+            value=1.0,
+            step=0.1,
+            key="sarvam_tts_pace",
+        )
+    with col2:
+        gui.slider(
+            "###### Temperature",
+            min_value=0.01,
+            max_value=2.0,
+            value=0.6,
+            step=0.01,
+            key="sarvam_tts_temperature",
+        )
+
+
 @redis_cache_decorator(ex=settings.REDIS_MODELS_CACHE_EXPIRY)
 def mms_tts_language_options():
     import langcodes
-    from modal_functions.mms_tts import MMS_TTS_SUPPORTED_LANGUAGES
 
     result = {}
     for lang in MMS_TTS_SUPPORTED_LANGUAGES:

@@ -1,3 +1,5 @@
+import base64
+import binascii
 import json
 import time
 
@@ -18,6 +20,7 @@ from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task_outfile
 from daras_ai_v2.language_filters import (
     language_filter_selector,
+    normalised_lang_in_collection,
     tts_languages_without_dialects,
 )
 from daras_ai_v2.loom_video_widget import youtube_video
@@ -26,6 +29,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
     ELEVEN_LABS_MODELS,
     GHANA_NLP_TTS_LANGUAGES,
     OLD_ELEVEN_LABS_VOICES,
+    SARVAM_TTS_LANGUAGES,
+    SARVAM_TTS_SPEAKERS,
     UBERDUCK_VOICES,
     OpenAI_TTS_Models,
     OpenAI_TTS_Voices,
@@ -37,6 +42,8 @@ from daras_ai_v2.text_to_speech_settings_widgets import (
 )
 from managed_secrets.models import ManagedSecret
 from workspaces.models import Workspace
+
+BULBUL_V3_MAX_INPUT_CHARS = 2_500
 
 
 class TextToSpeechSettings(BaseModel):
@@ -69,6 +76,11 @@ class TextToSpeechSettings(BaseModel):
     ghana_nlp_tts_language: GHANA_NLP_TTS_LANGUAGES.api_choices | None = None
 
     mms_tts_language: str = "eng"
+
+    sarvam_tts_language: str = "en-IN"
+    sarvam_tts_speaker: str | None = None
+    sarvam_tts_pace: float | None = Field(None, ge=0.5, le=2.0)
+    sarvam_tts_temperature: float | None = Field(None, ge=0.01, le=2.0)
 
 
 class TextToSpeechPage(BasePage):
@@ -395,10 +407,10 @@ class TextToSpeechPage(BasePage):
                 state["audio_url"] = audio_url
 
             case TextToSpeechProviders.MMS_TTS:
-                from modal_functions.mms_tts import (
+                from daras_ai_v2.tts_supported_languages import (
                     MMS_TTS_SUPPORTED_LANGUAGES,
-                    app as modal_app,
                 )
+                from modal_functions.mms_tts import app as modal_app
 
                 language = state.get("mms_tts_language", "eng")
                 if language not in MMS_TTS_SUPPORTED_LANGUAGES:
@@ -416,6 +428,64 @@ class TextToSpeechPage(BasePage):
                         language=language, text=text, upload_url=upload_url
                     )
                 state["audio_url"] = public_url
+
+            case TextToSpeechProviders.SARVAM:
+                if not settings.SARVAM_API_KEY:
+                    raise UserError(
+                        "Sarvam AI TTS is not configured: missing SARVAM_API_KEY"
+                    )
+
+                if len(text) > BULBUL_V3_MAX_INPUT_CHARS:
+                    raise UserError(
+                        f"Bulbul v3 accepts at most {BULBUL_V3_MAX_INPUT_CHARS:,} "
+                        "characters per request."
+                    )
+
+                language = normalised_lang_in_collection(
+                    state.get("sarvam_tts_language", "en-IN"),
+                    SARVAM_TTS_LANGUAGES,
+                )
+                speaker = state.get("sarvam_tts_speaker")
+                if speaker is not None and speaker not in SARVAM_TTS_SPEAKERS:
+                    raise UserError(f"Unsupported Sarvam speaker: {speaker!r}")
+
+                sarvam_request = {
+                    "text": text,
+                    "target_language_code": language,
+                    "model": "bulbul:v3",
+                    "speech_sample_rate": 24_000,
+                    "output_audio_codec": "wav",
+                }
+                if speaker:
+                    sarvam_request["speaker"] = speaker
+                pace = state.get("sarvam_tts_pace")
+                if pace:
+                    sarvam_request["pace"] = pace
+                temperature = state.get("sarvam_tts_temperature")
+                if temperature:
+                    sarvam_request["temperature"] = temperature
+
+                response = requests.post(
+                    "https://api.sarvam.ai/text-to-speech",
+                    headers={"api-subscription-key": settings.SARVAM_API_KEY},
+                    json=sarvam_request,
+                )
+                raise_for_status(response)
+
+                audios = response.json().get("audios") or []
+                if not audios:
+                    raise ValueError("Sarvam AI returned no audio.")
+
+                try:
+                    audio = base64.b64decode(audios[0], validate=True)
+                except (binascii.Error, TypeError) as exc:
+                    raise ValueError("Sarvam AI returned invalid audio data.") from exc
+                if not audio:
+                    raise ValueError("Sarvam AI returned no audio.")
+
+                state["audio_url"] = upload_file_from_bytes(
+                    "sarvam_bulbul_v3.wav", audio, "audio/wav"
+                )
 
     def _get_elevenlabs_voice_model(self, state: dict[str, str]):
         default_voice_model = next(iter(ELEVEN_LABS_MODELS))

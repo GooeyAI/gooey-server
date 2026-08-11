@@ -18,7 +18,7 @@ from gooey_gui.types.history_page_props import (
 from gooey_gui.types.home_page_props import WorkflowCardData
 from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
-from routers.root import get_og_url_path, history_route, page_wrapper
+from routers.root import get_og_url_path, history_route, sidebar_page_wrapper
 from widgets.surface_filters import (
     DEFAULT_SURFACE,
     SURFACE_ICONS,
@@ -41,7 +41,7 @@ app = CustomAPIRouter()
 @gui.route(app, "/history/", "/history/{surface}/")
 def history_page(request: Request, surface: str | None = None):
     history_surface = parse_surface(surface)
-    with page_wrapper(request):
+    with sidebar_page_wrapper(request):
         render(request, history_surface)
 
     return {

@@ -45,8 +45,12 @@ def list_related_html_url(
     instance_id: int = None,
     show_add: bool = True,
     extra_label: str = None,
+    count: int | None = None,
 ) -> typing.Optional[str]:
-    num = manager.all().count()
+    if count is None:
+        num = manager.all().count()
+    else:
+        num = count
 
     if query_param is None:
         try:

@@ -41,6 +41,7 @@ class BaseLLMTool:
         properties: dict,
         required: list[str] | None = None,
         await_audio_completed: bool = False,
+        additional_properties: bool = False,
     ):
         self.name = name
         self.label = label
@@ -48,6 +49,7 @@ class BaseLLMTool:
         self.properties = properties
         self.required = required
         self.await_audio_completed = await_audio_completed
+        self.additional_properties = additional_properties
 
     # Yes openai really does have 2 ways to specify tools in their own APIs
     # https://platform.openai.com/docs/api-reference/chat/create
@@ -81,6 +83,8 @@ class BaseLLMTool:
         }
         if self.required:
             params["required"] = self.required
+        if self.additional_properties:
+            params["additionalProperties"] = True
         return params
 
     def call_json(self, arguments: str) -> str:

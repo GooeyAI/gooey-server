@@ -194,3 +194,6 @@ class AIModelSpec(models.Model):
 
     def is_anthropic_model(self):
         return self.creator and "anthropic" in self.creator.website_url
+
+    def is_google_model(self):
+        return self.creator and "google" in self.creator.website_url

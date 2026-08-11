@@ -44,6 +44,7 @@ from daras_ai_v2.language_filters import (
     sort_language_options,
 )
 from daras_ai_v2.redis_cache import redis_cache_decorator
+from daras_ai_v2.sarvam_asr import sarvam_saaras_v3_asr
 from daras_ai_v2.scraping_proxy import SCRAPING_PROXIES, get_scraping_proxy_cert_path
 from daras_ai_v2.text_splitter import text_splitter
 
@@ -52,6 +53,7 @@ if typing.TYPE_CHECKING:
     from google.auth.transport.requests import AuthorizedSession
 
 TRANSLATE_BATCH_SIZE = 8
+MAYURA_MAX_LEN = 1_000
 
 SHORT_FILE_CUTOFF = 5 * 1024 * 1024  # 1 MB
 
@@ -269,6 +271,10 @@ GHANA_NLP_ASR_V2_SUPPORTED = {
 # https://docs.lelapa.ai/getting-started/language-support
 LELAPA_ASR_SUPPORTED = {"eng", "afr", "zul", "sot", "fra"}
 LELAPA_MT_SUPPORTED = {"nso_Latn", "afr_Latn", "sot_Latn", "ssw_Latn", "tso_Latn", "tsn_Latn", "xho_Latn", "zul_Latn", "eng_Latn", "swh_Latn", "sna_Latn", "yor_Latn", "hau_Latn"}  # fmt: skip
+# https://docs.sarvam.ai/api-reference/text/translate-text
+MAYURA_SUPPORTED_LANGUAGES = {
+    "bn-IN", "en-IN", "gu-IN", "hi-IN", "kn-IN", "ml-IN", "mr-IN", "od-IN", "pa-IN", "ta-IN", "te-IN",
+}  # fmt: skip
 INTRON_SUPPORTED = {
     "af", "ak", "am", "ar", "bem", "bg", "cs", "da", "de", "el", "en", "es", "et", "ff", "fi", "fr", "gaa", "ha",
     "hr", "hu", "ig", "it", "lg", "lt", "lv", "mt", "nl", "nso", "nyn", "om", "pcm", "pl", "pt", "ro", "ru", "rw",
@@ -285,6 +291,11 @@ VOXTRAL_SUPPORTED = {
     "en", "zh", "hi", "es", "ar", "fr", "pt", "ru", "de", "ja", "ko", "it", "nl"
 }  # fmt: skip
 
+SAARAS_V3_SUPPORTED = {
+    "as-IN", "bn-IN", "brx-IN", "doi-IN", "en-IN", "gu-IN", "hi-IN", "kn-IN", "kok-IN", "ks-IN", "mai-IN",
+    "ml-IN", "mni-IN", "mr-IN", "ne-IN", "od-IN", "pa-IN", "sa-IN", "sat-IN", "sd-IN", "ta-IN", "te-IN", "ur-IN",
+}  # fmt: skip
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -296,6 +307,7 @@ class AsrModels(Enum):
     deepgram = "Deepgram"
     azure = "Azure Speech"
     elevenlabs = "ElevenLabs Scribe v1"
+    saaras_v3 = "Saaras v3 (Sarvam AI)"
     intron = "Intron Voice API"
     seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
@@ -350,6 +362,7 @@ class AsrModels(Enum):
 
     def supports_speech_translation(self) -> bool:
         return self in {
+            self.saaras_v3,
             self.seamless_m4t_v2,
             self.whisper_large_v2,
             self.whisper_large_v3,
@@ -393,6 +406,7 @@ forced_asr_languages = {
 }
 
 asr_supported_languages = {
+    AsrModels.saaras_v3: SAARAS_V3_SUPPORTED,
     AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
     AsrModels.gpt_4_o_audio: WHISPER_LARGE_V2_SUPPORTED,  # https://platform.openai.com/docs/guides/speech-to-text#supported-languages
     AsrModels.gpt_4_o_mini_audio: WHISPER_LARGE_V2_SUPPORTED,
@@ -455,6 +469,11 @@ class TranslationModels(TranslationModel, Enum):
     )
     ghana_nlp = TranslationModel(label="Ghana NLP Translate")
     lelapa = TranslationModel(label="Vulavula (Lelapa AI)")
+    sarvam_mayura_v1 = TranslationModel(
+        label="Mayura v1 (Sarvam AI)",
+        supports_auto_detect=True,
+    )
+    saaras_v3 = TranslationModel(label="Saaras v3 (Sarvam AI)", is_asr_model=True)
     whisper_large_v2 = TranslationModel(
         label="Whisper Large v2 (inbuilt)", is_asr_model=True
     )
@@ -490,6 +509,8 @@ class TranslationModels(TranslationModel, Enum):
                 return SEAMLESS_v2_ASR_SUPPORTED
             case self.lelapa:
                 return LELAPA_MT_SUPPORTED
+            case self.sarvam_mayura_v1:
+                return MAYURA_SUPPORTED_LANGUAGES
             case _:
                 return ["en"]
 
@@ -757,6 +778,12 @@ def run_translate(
             target_language=target_language,
             source_language=source_language,
         )
+    elif model == TranslationModels.sarvam_mayura_v1.name:
+        return run_sarvam_translate(
+            texts=texts,
+            target_language=target_language,
+            source_language=source_language,
+        )
     else:
         raise ValueError("Unsupported translation model: " + str(model))
 
@@ -831,6 +858,65 @@ def _call_lelapa_translate_raw(
     )
     raise_for_status(r)
     return r.json()["translation"][0]["translated_text"]  # yes
+
+
+def run_sarvam_translate(
+    texts: list[str], target_language: str, source_language: str | None = None
+) -> list[str]:
+    assert target_language, "Target language is required for Sarvam AI"
+    if source_language and source_language != "auto":
+        source_language = normalised_lang_in_collection(
+            source_language, MAYURA_SUPPORTED_LANGUAGES
+        )
+    else:
+        source_language = "auto"
+    target_language = normalised_lang_in_collection(
+        target_language, MAYURA_SUPPORTED_LANGUAGES
+    )
+    if source_language == target_language:
+        return texts
+    return map_parallel(
+        lambda text: _call_sarvam_translate_chunked(
+            text, source_language, target_language
+        ),
+        texts,
+        max_workers=TRANSLATE_BATCH_SIZE,
+    )
+
+
+def _call_sarvam_translate_chunked(
+    text: str, source_language: str, target_language: str
+) -> str:
+    return "\n".join(
+        map_parallel(
+            lambda doc: _call_sarvam_translate_raw(
+                doc.text, source_language, target_language
+            ),
+            text_splitter(
+                text,
+                chunk_size=MAYURA_MAX_LEN,
+                length_function=len,
+            ),
+            max_workers=TRANSLATE_BATCH_SIZE,
+        )
+    )
+
+
+def _call_sarvam_translate_raw(
+    text: str, source_language: str, target_language: str
+) -> str:
+    r = requests.post(
+        "https://api.sarvam.ai/translate",
+        headers={"api-subscription-key": settings.SARVAM_API_KEY},
+        json={
+            "input": text,
+            "source_language_code": source_language,
+            "target_language_code": target_language,
+            "model": "mayura:v1",
+        },
+    )
+    raise_for_status(r)
+    return r.json()["translated_text"]
 
 
 def run_google_translate(
@@ -1103,6 +1189,23 @@ def run_asr(
 
     if selected_model == AsrModels.azure:
         return azure_asr(audio_url, language)
+    elif selected_model == AsrModels.saaras_v3:
+        language_code = (
+            normalised_lang_in_collection(language, SAARAS_V3_SUPPORTED)
+            if language
+            else "unknown"
+        )
+        if speech_translation_target:
+            normalised_lang_in_collection(speech_translation_target, {"en"})
+            mode = "translate"
+        else:
+            mode = "transcribe"
+        data = sarvam_saaras_v3_asr(
+            audio_url=audio_url,
+            language_code=language_code,
+            mode=mode,
+            with_timestamps=output_format != AsrOutputFormat.text,
+        )
     elif selected_model == AsrModels.elevenlabs:
         result = elevenlabs_asr(audio_url, language)
         chunks = []

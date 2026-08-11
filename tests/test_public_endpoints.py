@@ -84,6 +84,22 @@ def test_integration_stats_route(db_fixtures, force_authentication, threadpool_s
         )
 
 
+def test_inbuilt_tool_page_get(db_fixtures):
+    from functions.inbuilt_tools import GooeyToolkit, UpdateConversationTitleLLMTool
+    from routers.root import tool_page
+
+    url = get_route_path(
+        tool_page,
+        path_params=dict(
+            toolkit_slug=GooeyToolkit.inbuilt.name,
+            tool_slug=UpdateConversationTitleLLMTool.name,
+        ),
+    )
+    r = client.get(url, follow_redirects=True)
+    assert r.is_success, r.content
+    assert UpdateConversationTitleLLMTool.label in r.text
+
+
 def test_all_post(db_fixtures, force_authentication, threadpool_subtest):
     for pr in PublishedRun.objects.all():
         for tab in RecipeTabs:
@@ -111,4 +127,6 @@ def _test_post_path(url, *test_content):
 
 
 def random_slug(page_cls: type[BasePage]) -> str:
-    return random.choice(page_cls.slug_versions)
+    # the "tools" slug collides with the /tools/{toolkit_slug}/{tool_slug} tool_page route
+    slug_versions = [slug for slug in page_cls.slug_versions if slug != "tools"]
+    return random.choice(slug_versions)

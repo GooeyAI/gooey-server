@@ -11,21 +11,21 @@ from twilio.twiml.voice_response import VoiceResponse
 
 from bots.models.bot_integration import validate_phonenumber
 from daras_ai_v2 import settings
-from functions.composio_tools import ComposioLLMTool
-from functions.memory_tools import (
-    GooeyMemoryLLMToolRead,
-    GooeyMemoryLLMToolWrite,
-    GooeyMemoryLLMToolDelete,
-)
-from functions.models import FunctionScopes
+from daras_ai_v2.custom_enum import GooeyEnum
 from functions.base_llm_tool import (
     BaseLLMTool,
     get_external_tool_slug_from_url,
 )
-
+from functions.composio_tools import ComposioLLMTool
+from functions.memory_tools import (
+    GooeyMemoryLLMToolDelete,
+    GooeyMemoryLLMToolRead,
+    GooeyMemoryLLMToolWrite,
+)
+from functions.models import FunctionScopes
 
 if typing.TYPE_CHECKING:
-    pass
+    from app_users.models import AppUser
 
 
 def get_inbuilt_tools(state: dict) -> typing.Iterable[BaseLLMTool]:
@@ -62,8 +62,8 @@ def get_inbuilt_tools(state: dict) -> typing.Iterable[BaseLLMTool]:
             continue
         scope = FunctionScopes.get(function.get("scope"))
         try:
-            tool_cls = INBUILT_TOOLKITS[tool_slug]
-            yield tool_cls(scope)
+            tool_cls = INBUILT_TOOL_MAP[tool_slug]
+            yield tool_cls(scope, variables)
         except KeyError:
             composio_tools[tool_slug] = scope
     if settings.COMPOSIO_API_KEY:
@@ -173,10 +173,10 @@ You can transfer the user's call to another phone number using this tool. Some e
         return self
 
     def call(self, phone_number: str) -> dict:
+        from bots.models import BotIntegration
         from daras_ai_v2.fastapi_tricks import get_api_route_url
         from routers.bots_api import api_hashids
         from routers.twilio_api import twilio_voice_call_status
-        from bots.models import BotIntegration
 
         try:
             self.call_sid, self.bi_id
@@ -345,9 +345,66 @@ class NewConversationLLMTool(BaseLLMTool):
         return {"success": True}
 
 
+class UpdateConversationTitleLLMTool(BaseLLMTool):
+    """In-Built tool for updating the conversation title."""
+
+    disable_dynamic_loader = True
+    name = "update_conversation_title"
+    label = "Update Conversation Title"
+
+    def __init__(self, scope: FunctionScopes | None, variables: dict):
+        self.web_url = variables.get("web_url") or ""
+        self.current_user = None
+        super().__init__(
+            name=self.name,
+            label=self.label,
+            description="Update the title of the current conversation",
+            properties={
+                "title": {
+                    "type": "string",
+                    "description": "A short, descriptive title for the conversation",
+                }
+            },
+            required=["title"],
+        )
+
+    def bind(self, *, current_user: AppUser | None):
+        self.current_user = current_user
+        return self
+
+    def call(self, title: str) -> dict:
+        from daras_ai_v2.workflow_url_input import url_to_runs
+
+        if not self.web_url:
+            return {"success": False, "error": "Unknown run URL"}
+
+        sr = url_to_runs(self.web_url)[1]
+        message_thread = sr.message_thread
+        if not message_thread:
+            return {"success": False, "error": "Unknown message thread"}
+
+        if self.current_user and sr.uid != self.current_user.uid:
+            return {
+                "success": False,
+                "error": "You don't have permission to update this conversation",
+            }
+
+        message_thread.title = title
+        message_thread.save(update_fields=["title"])
+
+        return {"success": True}
+
+
+class GooeyToolkit(GooeyEnum):
+    inbuilt = "Gooey.AI Inbuilt"
+    GOOEY_AI_MEMORY = "Gooey.AI Memory"
+
+
 MEMORY_TOOLS = (
     GooeyMemoryLLMToolRead,
     GooeyMemoryLLMToolWrite,
     GooeyMemoryLLMToolDelete,
 )
-INBUILT_TOOLKITS = {tool.name: tool for tool in MEMORY_TOOLS}
+INBUILT_TOOL_MAP = {tool.name: tool for tool in MEMORY_TOOLS} | {
+    UpdateConversationTitleLLMTool.name: UpdateConversationTitleLLMTool
+}

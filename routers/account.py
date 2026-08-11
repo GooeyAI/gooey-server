@@ -22,8 +22,9 @@ from daras_ai_v2.urls import paginate_queryset, paginate_button
 from managed_secrets.widgets import manage_secrets_table
 from memory.routers import memory_route
 from payments.webhooks import PaypalWebhookHandler
+from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
-from routers.root import explore_page, page_wrapper, get_og_url_path
+from routers.root import explore_page, sidebar_page_wrapper, get_og_url_path
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
@@ -57,7 +58,7 @@ def payment_processing_route(
                 "PayPal transactions take up to a minute to reflect in your account"
             )
 
-    with page_wrapper(
+    with sidebar_page_wrapper(
         request,
         className="flex-grow-1 d-flex flex-column justify-content-center align-items-center",
     ):
@@ -145,8 +146,7 @@ def explore_in_current_workspace(request: Request):
 
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
-        redirect_url = furl("/login", query_params={"next": next_url})
-        raise gui.RedirectException(str(redirect_url))
+        raise gui.RedirectException(get_login_url(request, next_url))
 
     current_workspace = get_current_workspace(request.user, request.session)
     search_filters = SearchFilters(
@@ -381,11 +381,10 @@ def api_keys_tab(request: Request):
 def account_page_wrapper(request: Request, current_tab: TabData):
     if not request.user or request.user.is_anonymous:
         next_url = request.query_params.get("next", "/account/")
-        redirect_url = furl("/login", query_params={"next": next_url})
-        raise gui.RedirectException(str(redirect_url))
+        raise gui.RedirectException(get_login_url(request, next_url))
 
-    with page_wrapper(request) as current_workspace:
-        gui.div(className="mt-5")
+    with sidebar_page_wrapper(request) as current_workspace:
+        gui.div(className="mt-2")
         with gui.nav_tabs():
             for tab in AccountTabs.get_tabs_for_user(request.user, current_workspace):
                 with gui.nav_item(tab.url_path, active=tab == current_tab):

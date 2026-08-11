@@ -36,6 +36,7 @@ from daras_ai_v2.slack_bot import (
     fetch_user_info,
     parse_slack_response,
 )
+from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
 from workspaces.widgets import get_current_workspace
 
@@ -83,8 +84,7 @@ def slack_connect_url(pr_id: int) -> str:
 @router.get("/__/slack/redirect/")
 def slack_connect_redirect(request: Request):
     if not request.user or request.user.is_anonymous:
-        redirect_url = furl("/login", query_params={"next": request.url})
-        return RedirectResponse(str(redirect_url))
+        return RedirectResponse(get_login_url(request))
 
     pr = load_published_run_from_state(request)
     retry_button = f'<a href="{slack_connect_url(pr.id)}">Retry</a>'
