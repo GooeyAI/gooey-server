@@ -68,6 +68,22 @@ Gooey Server is multi-provider by design. No single AI vendor is mandatory. Each
 ### LLMs
 Any server exposing an OpenAI-compatible `/v1/chat/completions` endpoint works — **Ollama, vLLM, LocalAI, LM Studio, llama.cpp** — by setting `base_url`/`api_key`/`model_id` on an `AIModelSpec` in the Django admin ([daras_ai_v2/language_model.py](daras_ai_v2/language_model.py)). No code changes required; this is runtime configuration.
 
+##### **How to Add Local AI Models**
+
+Go to **AI Models > AI Model Specs > Add** or http://localhost:8000/ai_models/aimodelspec/add/
+Choose the Category from dropdown as `LLM`
+
+Add the following details: 
+- **Name**: internal id used in API calls (e.g. `qwen3_5_4b`), don't change after use
+- **Label**: UI display name (e.g. `qwen3.5 4b`)
+- **Creator**: select or add (e.g. `Qwen`)
+- **Model id**: provider/huggingface id (e.g. `qwen3.5:4b`). Please name this exactly as the provider id 
+- **Priority**: sort order within creator group
+- **Under Provider Settings**: set Provider to OpenAI (Ollama uses an OpenAI-compatible API)
+- **Under Model Settings**: set Context Window, Max Output Tokens, check Chat Model / Thinking Model / Supports Temperature as applicable
+- **Under API Settings**: set **API Key** to `ollama` (placeholder, not validated), **Base URL** to `http://localhost:11434/v1` (wherever you are hosting your model)
+- Click **Save**
+
 ### Embeddings
 Open-weight models (`intfloat/e5-*`, `thenlper/gte-*`) run on the self-hosted GPU Celery worker ([daras_ai_v2/embedding_model.py](daras_ai_v2/embedding_model.py)). Cloud embedding APIs are optional alternatives, not requirements.
 
