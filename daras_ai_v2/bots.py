@@ -37,6 +37,7 @@ from daras_ai_v2.language_model import (
     ConversationEntry,
 )
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
+from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
@@ -468,8 +469,6 @@ def msg_handler_raw(bot: BotInterface):
         bot.send_msg(text=RESET_MSG)
     else:
         _process_and_send_msg(
-            workspace=bot.workspace,
-            current_user=bot.current_user,
             bot=bot,
             input_images=input_images,
             input_documents=input_documents,
@@ -481,8 +480,6 @@ def msg_handler_raw(bot: BotInterface):
 
 def _process_and_send_msg(
     *,
-    workspace: Workspace,
-    current_user: AppUser,
     bot: BotInterface,
     input_images: list[str] | None,
     input_audio: str | None,
@@ -519,25 +516,18 @@ def _process_and_send_msg(
         bot_conversation=bot.convo,
         defaults=dict(title=input_text),
     )[0]
-    result, sr = submit_api_call(
-        page_cls=bot.page_cls,
-        query_params=bot.query_params,
-        workspace=workspace,
-        current_user=current_user,
+    run = _submit_bot_run(
+        bot=bot,
         request_body=body,
-        surface=SavedRun.Surface.deployment,
         message_thread=message_thread,
     )
+    if not run:
+        return
+    result, sr = run
     bot.on_run_created(sr)
 
-    try:
-        sr.platform = bot.platform
-        sr.user_message_id = bot.user_msg_id
-        sr.save(update_fields=["platform", "user_message_id"])
-    except IntegrityError as e:
-        # Likely duplicate (platform, user_message_id). Log and proceed.
-        traceback.print_exc()
-        capture_exception(e)
+    if bot.platform != Platform.WHATSAPP:
+        _save_run_message_id(bot, sr)
 
     send_feedback_buttons = bot.show_feedback_buttons
 
@@ -550,6 +540,10 @@ def _process_and_send_msg(
         channel = bot.page_cls.realtime_channel_name(sr.run_id, sr.uid)
         with gui.realtime_subscribe(channel) as realtime_gen:
             for state in realtime_gen:
+                if bot.platform == Platform.WHATSAPP:
+                    sr.refresh_from_db(fields=["is_cancelled"])
+                    if sr.is_cancelled:
+                        return
                 bot.recipe_run_state = bot.page_cls.get_run_state(state)
                 bot.run_status = state.get(StateKeys.run_status) or ""
                 # check for errors
@@ -604,6 +598,10 @@ def _process_and_send_msg(
 
     # wait for the celery task to finish
     sr.wait_for_celery_result(result)
+    if bot.platform == Platform.WHATSAPP:
+        sr.refresh_from_db(fields=["is_cancelled"])
+        if sr.is_cancelled:
+            return
     # get the final state from db
     state = sr.to_dict()
     bot.recipe_run_state = bot.page_cls.get_run_state(state)
@@ -639,8 +637,8 @@ def _process_and_send_msg(
     # save msgs to db
     save_msg_pair_to_db(
         convo=bot.convo,
-        input_images=input_images,
-        input_documents=input_documents,
+        input_images=state.get("input_images"),
+        input_documents=state.get("input_documents"),
         saved_run=sr,
         received_time=recieved_time,
         user_msg_id=bot.user_msg_id,
@@ -654,6 +652,82 @@ def _process_and_send_msg(
         # bot output for human
         bot_msg_display_content=state.get("output_text") and state["output_text"][0],
     )
+
+
+def _submit_bot_run(
+    *, bot: BotInterface, request_body: dict, message_thread: MessageThread
+):
+    kwargs = dict(
+        page_cls=bot.page_cls,
+        query_params=bot.query_params,
+        workspace=bot.workspace,
+        current_user=bot.current_user,
+        request_body=request_body,
+        surface=SavedRun.Surface.deployment,
+        message_thread=message_thread,
+    )
+    if bot.platform != Platform.WHATSAPP:
+        return submit_api_call(**kwargs)
+
+    with redis_lock(f"gooey/whatsapp-message-thread/{message_thread.pk}"):
+        message_thread.refresh_from_db()
+        if (
+            bot.user_msg_id
+            and SavedRun.objects.filter(
+                platform=bot.platform,
+                user_message_id=bot.user_msg_id,
+            ).exists()
+        ):
+            return None
+        kwargs["message_thread"] = message_thread
+        kwargs["request_body"] = _cancel_active_run_and_merge_inputs(
+            message_thread, request_body
+        )
+        result, sr = submit_api_call(**kwargs)
+        _save_run_message_id(bot, sr)
+        return result, sr
+
+
+def _save_run_message_id(bot: BotInterface, sr: SavedRun):
+    try:
+        sr.platform = bot.platform
+        sr.user_message_id = bot.user_msg_id
+        sr.save(update_fields=["platform", "user_message_id"])
+    except IntegrityError as e:
+        # Likely duplicate (platform, user_message_id). Log and proceed.
+        traceback.print_exc()
+        capture_exception(e)
+
+
+def _cancel_active_run_and_merge_inputs(
+    message_thread: MessageThread,
+    request_body: dict,
+) -> dict:
+    last_run = message_thread.last_run
+    if not last_run or not last_run.run_status or last_run.is_cancelled:
+        return request_body
+
+    request_body = _merge_run_inputs(last_run.state, request_body)
+    last_run.is_cancelled = True
+    last_run.save(update_fields=["is_cancelled", "updated_at"])
+    return request_body
+
+
+def _merge_run_inputs(previous: dict, current: dict) -> dict:
+    merged = previous | current
+
+    previous_prompt = previous.get("input_prompt") or ""
+    current_prompt = current.get("input_prompt") or ""
+    merged["input_prompt"] = "\n".join(
+        prompt for prompt in (previous_prompt, current_prompt) if prompt
+    )
+
+    for field in ("input_images", "input_documents"):
+        values = [*(previous.get(field) or []), *(current.get(field) or [])]
+        merged[field] = values or None
+
+    merged["input_audio"] = current.get("input_audio") or previous.get("input_audio")
+    return merged
 
 
 def compute_prompt_delta(
