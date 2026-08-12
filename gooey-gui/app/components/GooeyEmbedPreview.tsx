@@ -8,18 +8,17 @@ declare global {
   }
 }
 
-type MountedEntry = { innerDiv: HTMLElement; root: { unmount(): void } };
-
 /**
- * Mounts once per `embed_key` (the published run) and on nothing else - a Run must leave the
- * mounted widget alone or it would restart the conversation for nothing.
+ * Mounts the copilot chat preview once, and never remounts it.
  *
- * Theme and branding go through `updateConfig`, which reskins in place: the widget reads both
- * from its own reactive config state, so neither needs a remount to land.
+ * Everything that varies between agents reaches the widget without one: theme and branding
+ * through `updateConfig`, the conversation through `setMessages`, and `run_url` off `propsRef`
+ * when a callback fires. The rest of the config is the same for every agent, so there is nothing
+ * left that only a mount could deliver - and a remount would throw away the conversation and the
+ * composer draft to deliver it.
  */
 export function GooeyEmbedPreview(
   props: CustomComponentProps & {
-    embed_key: string;
     config: Record<string, any>;
     messages?: Array<Record<string, any>> | null;
     run_url: string;
@@ -27,12 +26,12 @@ export function GooeyEmbedPreview(
     style?: Record<string, string | number>;
   }
 ) {
-  const { embed_key, config, messages, className, style } = props;
+  const { config, messages, className, style } = props;
   const propsRef = useRef(props);
   propsRef.current = props;
 
   const controllerRef = useRef<any>(null);
-  const mountedRef = useRef<MountedEntry | null>(null);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     const loadEmbed = () => {
@@ -62,12 +61,7 @@ export function GooeyEmbedPreview(
       };
 
       GooeyEmbed.mount(propsRef.current.config, controllerRef.current);
-
-      // mount() appends its {innerDiv, root} to _mounted; that entry is what this component owns
-      const mounted = GooeyEmbed._mounted;
-      mountedRef.current = Array.isArray(mounted)
-        ? (mounted[mounted.length - 1] ?? null)
-        : null;
+      mountedRef.current = true;
     };
 
     // the lib is a plain <script> tag, so it may not have run yet on a cold load
@@ -77,27 +71,11 @@ export function GooeyEmbedPreview(
 
     return () => {
       script?.removeEventListener("load", loadEmbed);
-
-      const entry = mountedRef.current;
-      mountedRef.current = null;
+      mountedRef.current = false;
       controllerRef.current = null;
-      if (!entry) return;
-
-      try {
-        entry.root.unmount();
-      } catch {
-        // already torn down - detaching the node is all that is left to do
-      }
-      entry.innerDiv.remove();
-
-      const mounted = window.GooeyEmbed?._mounted;
-      if (Array.isArray(mounted)) {
-        const idx = mounted.indexOf(entry);
-        if (idx >= 0) mounted.splice(idx, 1);
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embed_key]);
+  }, []);
 
   useEffect(() => {
     controllerRef.current?.setMessages?.(messages);

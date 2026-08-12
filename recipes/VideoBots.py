@@ -1366,13 +1366,11 @@ Translation Glossary for LLM Language (English) -> User Langauge
             config["apiUrl"] = get_api_route_url(stream_create)
 
         load_chat_widget_lib()
-        # The component renders #gooey-embed and owns the widget's mount and teardown together, so
-        # neither can outlive the other. It remounts on embed_key or a theme change and on nothing
-        # else: the widget reads `theme` only at mount, while a plain Run must leave the mounted
-        # widget alone or it would restart the conversation for nothing.
+        # The component renders #gooey-embed and mounts the widget into it once. theme, branding
+        # and messages all reach it through the controller afterwards, so nothing here needs a
+        # remount to take effect.
         gui.component(
             "GooeyEmbedPreview",
-            embed_key=str(self.current_pr.published_run_id),
             config=config,
             messages=messages,
             run_url=str(self.request.url),
