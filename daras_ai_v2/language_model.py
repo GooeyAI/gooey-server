@@ -16,12 +16,6 @@ import typing_extensions
 from aifail import retry_if, vertex_ai_should_retry, try_all
 from django.conf import settings
 from furl import furl
-from litellm.types.llms.openai import (
-    ResponseAPIUsage as LiteLLMResponseUsage,
-    ResponseCompletedEvent as LiteLLMResponseCompletedEvent,
-    ResponsesAPIResponse as LiteLLMResponse,
-    ResponsesAPIStreamingResponse as LiteLLMStreamEvent,
-)
 from loguru import logger
 from openai.types.chat import (
     ChatCompletionContentPartParam,
@@ -29,12 +23,7 @@ from openai.types.chat import (
     ChatCompletion,
 )
 from openai.types.completion_usage import CompletionUsage
-from openai.types.responses import (
-    Response,
-    ResponseCompletedEvent,
-    ResponseStreamEvent,
-    ResponseUsage,
-)
+from openai.types.responses import Response, ResponseStreamEvent
 
 from ai_models.models import AIModelSpec, ModelProvider
 from bots.models import Platform
@@ -1137,7 +1126,7 @@ def _stream_openai_chunked(
 
 
 def _stream_openai_responses(
-    r: typing.Iterable[ResponseStreamEvent | LiteLLMStreamEvent],
+    r: typing.Iterable[ResponseStreamEvent],
     used_model: str,
     messages: list[ConversationEntry],
     *,
@@ -1206,10 +1195,7 @@ def _stream_openai_responses(
                 tool_calls.append(new_tc)
             yield ret
 
-        if isinstance(
-            event,
-            (ResponseCompletedEvent, LiteLLMResponseCompletedEvent),
-        ):
+        if event.type == "response.completed":
             record_openai_llm_usage(used_model, event.response, messages, ret)
 
     # add the leftover chunks
@@ -1258,7 +1244,7 @@ def is_llm_chunk_large_enough(entry: dict, chunk_size: int) -> bool:
 
 def record_openai_llm_usage(
     model: str,
-    completion: ChatCompletion | ChatCompletionChunk | Response | LiteLLMResponse,
+    completion: ChatCompletion | ChatCompletionChunk | Response,
     messages: list[ConversationEntry],
     choices: list[ConversationEntry],
 ):
@@ -1271,10 +1257,7 @@ def record_openai_llm_usage(
             completion.usage.completion_tokens_details
             and completion.usage.completion_tokens_details.reasoning_tokens
         )
-    elif isinstance(
-        completion.usage,
-        (ResponseUsage, LiteLLMResponseUsage),
-    ):
+    elif completion.usage is not None:
         prompt_tokens = completion.usage.input_tokens
         completion_tokens = completion.usage.output_tokens
     else:
