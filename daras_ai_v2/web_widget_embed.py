@@ -194,23 +194,31 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                 event_type = "final_response"
                 status = "completed"
 
-        messages.append(
-            dict(
-                role=CHATML_ROLE_ASSISTANT,
-                type=event_type,
-                status=status,
-                detail=state.get(StateKeys.run_status) or "",
-                raw_output_text=raw_output_text,
-                output_text=[text],
-                text=text,
-                output_video=output_video,
-                output_audio=output_audio,
-                references=state.get("references") or [],
-                buttons=buttons,
-                final_prompt=state.get("final_prompt"),
-                web_url=web_url,
+        # An unsettled run is always sent: starting/running has no output yet but its message is
+        # what draws the widget's progress state, and failed carries the error text appended
+        # above. A settled run with nothing to show is not sent - the builder clears every
+        # ResponseModel field when it edits a workflow, since the old answer may no longer apply,
+        # while input_prompt is a request field and survives. That pairing left the widget
+        # rendering an empty assistant bubble under an input it had already answered.
+        run_settled = run_status in (RecipeRunState.completed, RecipeRunState.standby)
+        if text or output_video or output_audio or not run_settled:
+            messages.append(
+                dict(
+                    role=CHATML_ROLE_ASSISTANT,
+                    type=event_type,
+                    status=status,
+                    detail=state.get(StateKeys.run_status) or "",
+                    raw_output_text=raw_output_text,
+                    output_text=[text],
+                    text=text,
+                    output_video=output_video,
+                    output_audio=output_audio,
+                    references=state.get("references") or [],
+                    buttons=buttons,
+                    final_prompt=state.get("final_prompt"),
+                    web_url=web_url,
+                )
             )
-        )
     return messages
 
 

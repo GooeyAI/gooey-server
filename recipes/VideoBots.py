@@ -1137,6 +1137,12 @@ Translation Glossary for LLM Language (English) -> User Langauge
             bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
 
+        # a copilot that is deployed to WhatsApp is previewed as WhatsApp renders it
+        has_whatsapp_deployed = BotIntegration.objects.filter(
+            published_run=self.current_pr,
+            platform=Platform.WHATSAPP,
+        ).exists()
+
         config = dict(
             integration_id="magic",
             target="#gooey-embed",
@@ -1146,60 +1152,30 @@ Translation Glossary for LLM Language (English) -> User Langauge
             enableConversations=True,
             showToolCalls=True,
             showRunLink=True,
+            showHeader=False,
             branding=bot_branding,
             fillParent=True,
             enableSourcePreview=False,
             secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
         )
+        if has_whatsapp_deployed:
+            config["theme"] = "whatsapp"
         if settings.DEBUG:
             from routers.bots_api import stream_create
 
             config["apiUrl"] = get_api_route_url(stream_create)
 
-        gui.div(
-            className="border rounded py-1 mb-3 bg-white",
-            style=dict(height="calc(100vh - 1rem)"),
-            id="gooey-embed",
-        )
         load_chat_widget_lib()
-        gui.js(
-            """
-async function loadGooeyEmbed() {
-    await window.waitUntilHydrated;
-    let embedTarget = document.getElementById("gooey-embed");
-    if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
-        return;
-    }
-    let controller = {
-        messages,
-        onSendMessage: (payload) => {
-            let btn = document.getElementById("onSendMessage");
-            if (!btn) return;
-            btn.value = JSON.stringify(payload);
-            btn.click();
-        },
-        onNewConversation() {
-          document.getElementById("onNewConversation").click();
-        },
-        fetchConversations: () => gui.fetchServerAPI("/__/agent/fetch-conversations", { run_url }),
-    };
-    GooeyEmbed.copilotPreviewControl = controller;
-    GooeyEmbed.mount(config, controller);
-}
-
-const script = document.getElementById("gooey-embed-script");
-if (script) script.onload = loadGooeyEmbed;
-loadGooeyEmbed();
-window.addEventListener("hydrated", loadGooeyEmbed);
-// once the widget is already mounted, update the messages and branding to latest
-if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
-    GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
-    GooeyEmbed.copilotPreviewControl.updateConfig?.({ branding: config.branding });
-}
-            """,
+        # The component renders #gooey-embed and mounts the widget into it once. theme, branding
+        # and messages all reach it through the controller afterwards, so nothing here needs a
+        # remount to take effect.
+        gui.component(
+            "GooeyEmbedPreview",
             config=config,
             messages=messages,
             run_url=str(self.request.url),
+            className="mb-3",
+            style=dict(height="calc(100vh - 1rem)"),
         )
 
     def on_send(self, input_data: dict):

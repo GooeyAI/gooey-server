@@ -152,6 +152,49 @@ def test_get_chat_widget_messages_exports_historical_run_metadata():
     assert assistant_msg["output_audio"] == ["https://example.com/audio.mp3"]
 
 
+def test_get_chat_widget_messages_skips_output_cleared_by_builder():
+    """The builder clears every ResponseModel field when it edits a workflow, but input_prompt is
+    a request field and survives. The orphaned input must not get an empty assistant bubble."""
+    messages = get_chat_widget_messages(
+        {"input_prompt": "hello", "__run_time": 1.5},
+    )
+
+    assert [msg["role"] for msg in messages] == ["user"]
+
+
+def test_get_chat_widget_messages_keeps_running_run_without_output():
+    """A run with no output yet still needs its message - that is what draws the progress state."""
+    messages = get_chat_widget_messages(
+        {"input_prompt": "hello", "__run_status": "Running..."},
+    )
+
+    assert [msg["role"] for msg in messages] == ["user", "assistant"]
+    assert messages[1]["type"] == "message_part"
+
+
+def test_get_chat_widget_messages_keeps_failed_run_without_output():
+    messages = get_chat_widget_messages(
+        {"input_prompt": "hello", "__error_msg": "it broke"},
+    )
+
+    assert [msg["role"] for msg in messages] == ["user", "assistant"]
+    assert "it broke" in messages[1]["text"]
+
+
+def test_get_chat_widget_messages_keeps_media_only_output():
+    """Text can be empty on a completed run that answered with audio or video."""
+    messages = get_chat_widget_messages(
+        {
+            "input_prompt": "read this",
+            "__run_time": 1.5,
+            "output_audio": ["https://example.com/audio.mp3"],
+        },
+    )
+
+    assert [msg["role"] for msg in messages] == ["user", "assistant"]
+    assert messages[1]["output_audio"] == ["https://example.com/audio.mp3"]
+
+
 def test_video_bots_messages_model_preserves_widget_metadata():
     request = VideoBotsPage.RequestModel.model_validate(
         {
