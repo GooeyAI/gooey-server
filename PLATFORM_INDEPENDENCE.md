@@ -20,6 +20,7 @@ Gooey Server itself is licensed under [Apache License 2.0](LICENSE).
 | Google Cloud Storage | File storage | Local filesystem storage | Feature flag (`GS_BUCKET_NAME`, default **unset**) | ✅ Abstracted |
 | Cloud LLM APIs (OpenAI, Anthropic, Google, etc.) | AI models | Any OpenAI-compatible server (Ollama, vLLM, LocalAI, llama.cpp) | Abstraction layer (`AIModelSpec.base_url`) | ✅ Abstracted |
 | Cloud STT / TTS / embeddings | AI models | Self-hosted Whisper, Seamless, MMS, Bark, E5/GTE on GPU worker | Abstraction layer (provider enums + GPU Celery worker) | ✅ Abstracted |
+| Azure Document Intelligence / Mistral OCR | Document OCR | Standard text extraction (no OCR) | Feature flag + graceful degradation (default **unset**) | ✅ Abstracted |
 | Stripe / PayPal | Payments | Not required — billing gracefully disabled when keys unset (default) | Feature flag with graceful UI fallback | ✅ Abstracted |
 | Azure Content Moderator | Image safety checker | Not required — check skipped when endpoint unset (default) | Feature flag (`AZURE_IMAGE_MODERATION_ENDPOINT`, default **unset**) | ✅ Optional |
 | Azure Key Vault | Managed secrets | Not required — pass API keys as plain environment variables to functions instead | Optional (`AZURE_KEY_VAULT_ENDPOINT` unset ⇒ disabled) | ✅ Optional |
@@ -67,6 +68,22 @@ Gooey Server is multi-provider by design. No single AI vendor is mandatory. Each
 ### LLMs
 Any server exposing an OpenAI-compatible `/v1/chat/completions` endpoint works — **Ollama, vLLM, LocalAI, LM Studio, llama.cpp** — by setting `base_url`/`api_key`/`model_id` on an `AIModelSpec` in the Django admin ([daras_ai_v2/language_model.py](daras_ai_v2/language_model.py)). No code changes required; this is runtime configuration.
 
+##### **How to Add Local AI Models**
+
+Go to **AI Models > AI Model Specs > Add** or http://localhost:8000/ai_models/aimodelspec/add/
+Choose the Category from dropdown as `LLM`
+
+Add the following details: 
+- **Name**: internal id used in API calls (e.g. `qwen3_5_4b`), don't change after use
+- **Label**: UI display name (e.g. `qwen3.5 4b`)
+- **Creator**: select or add (e.g. `Qwen`)
+- **Model id**: provider/huggingface id (e.g. `qwen3.5:4b`). Please name this exactly as the provider id 
+- **Priority**: sort order within creator group
+- **Under Provider Settings**: set Provider to OpenAI (Ollama uses an OpenAI-compatible API)
+- **Under Model Settings**: set Context Window, Max Output Tokens, check Chat Model / Thinking Model / Supports Temperature as applicable
+- **Under API Settings**: set **API Key** to `ollama` (placeholder, not validated), **Base URL** to `http://localhost:11434/v1` (wherever you are hosting your model)
+- Click **Save**
+
 ### Embeddings
 Open-weight models (`intfloat/e5-*`, `thenlper/gte-*`) run on the self-hosted GPU Celery worker ([daras_ai_v2/embedding_model.py](daras_ai_v2/embedding_model.py)). Cloud embedding APIs are optional alternatives, not requirements.
 
@@ -75,6 +92,15 @@ Self-hosted **Whisper**, **Seamless M4T**, and **MMS** run on the GPU worker ([d
 
 ### Text-to-speech
 Self-hosted **Bark** runs on the GPU worker; cloud TTS providers are optional alternatives behind the `TextToSpeechProviders` enum ([daras_ai_v2/text_to_speech_settings_widgets.py](daras_ai_v2/text_to_speech_settings_widgets.py)).
+
+### Document Intelligence / OCR
+Document extraction workflows support multiple OCR providers through a unified abstraction ([recipes/DocExtract.py#L606-L631](recipes/DocExtract.py#L606)):
+
+- **Azure Document Intelligence** (proprietary) — enabled when `AZURE_FORM_RECOGNIZER_KEY` is set ([daras_ai_v2/azure_doc_extract.py](daras_ai_v2/azure_doc_extract.py))
+- **Mistral OCR** (cloud API, self-hostable models) — enabled when `MISTRAL_API_KEY` is set ([daras_ai_v2/mistral_ocr.py](daras_ai_v2/mistral_ocr.py))
+- **Fallback to standard text extraction** — when no OCR provider is configured (the default), documents use standard text extraction methods without OCR capabilities
+
+The UI gracefully degrades when OCR providers are unavailable, displaying a warning and falling back to basic text extraction. Both providers are optional; neither is required for core document processing functionality.
 
 ### Modal-hosted models
 Two models (MMS TTS, Omnilingual ASR) are deployed on [Modal](https://modal.com). These are **optional features**: TTS and ASR each have multiple self-hosted and provider alternatives, and the platform functions fully without Modal credentials.
