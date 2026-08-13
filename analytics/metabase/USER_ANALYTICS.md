@@ -3,6 +3,10 @@
 Four headline numbers plus one combined line chart, all driven by a single
 time-range dropdown.
 
+**Building it for the first time?** Follow `SETUP_GUIDE.md` — it's the
+click-by-click walkthrough. This file is the reference for what the metrics
+mean and how the dropdown works.
+
 | Card | Query | Visualization |
 |---|---|---|
 | New users | `10_user_analytics_scorecards.sql` #1 | Number |
