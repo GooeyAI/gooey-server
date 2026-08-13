@@ -1,78 +1,150 @@
--- USER ANALYTICS - the four scorecards.
+-- USER ANALYTICS - the four headline cards, as Trend (Smart Scalar) cards.
 --
--- This file holds FOUR separate queries. Metabase's "Number" visualization shows
--- only the first cell of a result, so each one goes in its own question/card.
--- Paste one query per question and set the visualization to Number.
+-- Each query returns TWO rows: the previous period and the current one, e.g.
 --
--- Every query uses the same {{range}} variable, so a single dashboard filter
--- drives all four. Set it up as:
---   Variable type : Text
---   Widget label  : Time range
---   Widget type   : Search box -> change to "Dropdown"
---   How to filter : "Custom list" with one value per line:
---       24 hours
---       3 days
---       7 days
---       14 days
---       30 days
---       90 days
---   Default       : 7 days     <- required, or the card errors when unfiltered
+--     period_start              | new_users
+--     2026-07-30 12:00:00+00    | 812        <- previous 7 days
+--     2026-08-06 12:00:00+00    | 907        <- current 7 days
 --
--- The strings are fed straight to Postgres as an interval, which is why they
--- read "3 days" rather than "Past 3 days". If you want prettier labels, see the
--- README section "Time range dropdown".
+-- That shape is what Metabase's Trend visualization needs to render the big
+-- number with "↑ 11.7% vs. previous period" underneath. A single-row scalar
+-- query cannot show a comparison - there is nothing to compare against.
+--
+--   Visualization : Trend
+--   X / dimension : period_start
+--   Y / metric    : the count column
+--
+-- The comparison window always equals the selected range: pick "7 days" and it
+-- compares against the 7 days before that; pick "24 hours" and it compares
+-- against the previous 24 hours.
+--
+-- Want a plain number with no comparison instead? Delete the first branch of
+-- the `periods` UNION and switch the visualization to Number.
+--
+-- This file holds FOUR separate queries - one per card. See SETUP_GUIDE.md for
+-- the {{range}} variable setup.
 
 
 -- ===========================================================================
 -- 1. New users
--- Registered signups only - anonymous sessions are counted separately below
--- and are not what anyone means by "new users".
+-- Registered signups only; anonymous sessions and banned accounts excluded.
 -- ===========================================================================
-select count(*) as new_users
-from app_users_appuser u
-where u.created_at >= now() - cast({{range}} as interval)
-  and u.is_anonymous = false
-  and u.is_disabled = false;
+with params as (
+    select cast({{range}} as interval) as window_len
+),
+periods as (
+    select now() - p.window_len * 2 as period_start,
+           now() - p.window_len * 2 as from_at,
+           now() - p.window_len     as to_at
+    from params p
+    union all
+    select now() - p.window_len, now() - p.window_len, now()
+    from params p
+)
+select
+    pr.period_start,
+    (
+        select count(*)
+        from app_users_appuser u
+        where u.created_at >= pr.from_at
+          and u.created_at <  pr.to_at
+          and u.is_anonymous = false
+          and u.is_disabled = false
+    ) as new_users
+from periods pr
+order by pr.period_start;
 
 
 -- ===========================================================================
 -- 2. New paid users
--- Billing entities whose FIRST-EVER charged transaction lands in the window -
--- not "everyone who paid", which would count existing subscribers renewing.
---
--- Keyed on workspace because that is the billing entity: a team with 5 members
--- that starts paying is one new paid customer, not five. Swap workspace_id for
--- user_id below if you want it keyed on the individual instead.
+-- Billing entities whose FIRST-EVER charged transaction lands in the period,
+-- so existing subscribers renewing are not counted. Keyed on workspace because
+-- that is the billing entity - swap to t.user_id for per-individual.
 -- ===========================================================================
-with first_payment as (
-    select
-        t.workspace_id,
-        min(t.created_at) as first_paid_at
+with params as (
+    select cast({{range}} as interval) as window_len
+),
+periods as (
+    select now() - p.window_len * 2 as period_start,
+           now() - p.window_len * 2 as from_at,
+           now() - p.window_len     as to_at
+    from params p
+    union all
+    select now() - p.window_len, now() - p.window_len, now()
+    from params p
+),
+first_payment as (
+    select t.workspace_id, min(t.created_at) as first_paid_at
     from app_users_appusertransaction t
     where t.charged_amount > 0
     group by t.workspace_id
 )
-select count(*) as new_paid_users
-from first_payment
-where first_paid_at >= now() - cast({{range}} as interval);
+select
+    pr.period_start,
+    (
+        select count(*)
+        from first_payment fp
+        where fp.first_paid_at >= pr.from_at
+          and fp.first_paid_at <  pr.to_at
+    ) as new_paid_users
+from periods pr
+order by pr.period_start;
 
 
 -- ===========================================================================
 -- 3. Ask Gooey queries
 -- Prompts submitted to the Gooey Builder (SavedRun.Surface.builder_prompt = 3,
--- labelled "Ask Prompt" in the admin).
+-- shown as "Ask Prompt" in the admin). Counts prompts, not conversations.
 -- ===========================================================================
-select count(*) as ask_gooey_queries
-from bots_savedrun sr
-where sr.created_at >= now() - cast({{range}} as interval)
-  and sr.surface = 3;
+with params as (
+    select cast({{range}} as interval) as window_len
+),
+periods as (
+    select now() - p.window_len * 2 as period_start,
+           now() - p.window_len * 2 as from_at,
+           now() - p.window_len     as to_at
+    from params p
+    union all
+    select now() - p.window_len, now() - p.window_len, now()
+    from params p
+)
+select
+    pr.period_start,
+    (
+        select count(*)
+        from bots_savedrun sr
+        where sr.created_at >= pr.from_at
+          and sr.created_at <  pr.to_at
+          and sr.surface = 3
+    ) as ask_gooey_queries
+from periods pr
+order by pr.period_start;
 
 
 -- ===========================================================================
 -- 4. New deployments
--- A deployment is a BotIntegration - one row per bot connected to a channel
+-- One row per BotIntegration created - a bot connected to a channel
 -- (WhatsApp / Slack / Web / Telegram / ...).
 -- ===========================================================================
-select count(*) as new_deployments
-from bots_botintegration bi
-where bi.created_at >= now() - cast({{range}} as interval);
+with params as (
+    select cast({{range}} as interval) as window_len
+),
+periods as (
+    select now() - p.window_len * 2 as period_start,
+           now() - p.window_len * 2 as from_at,
+           now() - p.window_len     as to_at
+    from params p
+    union all
+    select now() - p.window_len, now() - p.window_len, now()
+    from params p
+)
+select
+    pr.period_start,
+    (
+        select count(*)
+        from bots_botintegration bi
+        where bi.created_at >= pr.from_at
+          and bi.created_at <  pr.to_at
+    ) as new_deployments
+from periods pr
+order by pr.period_start;

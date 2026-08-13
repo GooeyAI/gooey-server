@@ -1,24 +1,31 @@
--- USER ANALYTICS - all four metrics as one line chart.
+-- USER ANALYTICS - all four metrics over time, wide format.
 --
--- Returns long format (bucket_start, metric, value), which is what Metabase's
--- multi-series line chart wants:
---   Visualization : Line
+-- Returns one row per time bucket with one column per metric:
+--
+--     bucket_start | new_users | new_paid_users | ask_gooey_queries | new_deployments
+--
+-- Wide format (rather than long) is what makes a COMBO chart possible: each
+-- column is its own series, so you can set bars vs line and left vs right axis
+-- per metric. A long-format result forces every series to share one display
+-- type and one axis.
+--
+--   Visualization : Combo   (or Line/Bar if you want them all the same)
 --   X axis        : bucket_start
---   Y axis        : value
---   Series        : metric
+--   Y axis        : select all four count columns
+--   Then per series, under Settings -> Series:
+--     ask_gooey_queries -> Line, RIGHT axis
+--     everything else   -> Bar,  LEFT axis
 --
--- Uses the same {{range}} variable as the scorecards, so one dashboard filter
--- drives the whole tab. See 10_user_analytics_scorecards.sql for the variable
--- setup.
+-- The right axis matters: Ask Gooey queries run one to two orders of magnitude
+-- above new paid users, so on a shared axis the small series flatten to zero.
 --
--- The bucket is derived from the range rather than being a second dropdown:
--- hourly up to 3 days, daily beyond that. A 90-day range in hourly buckets is
--- 2,160 points of noise. To make it an explicit control instead, replace the
--- `bucket` expression in `params` with a {{bucket}} variable ('hour'/'day'/'week').
+-- Bucket size is derived from the range - hourly up to 3 days, daily beyond -
+-- because 90 days of hourly buckets is 2,160 points of noise. To make it an
+-- explicit control, replace the `bucket` expression with a {{bucket}} variable
+-- offering 'hour' / 'day' / 'week'.
 --
--- Buckets are zero-filled via generate_series so the lines don't break across
--- quiet periods - without it, a metric with no rows in an hour simply has no
--- point there and Metabase draws a straight line over the gap.
+-- Buckets are zero-filled with generate_series so quiet periods read as zero
+-- rather than having the line drawn straight over the gap.
 
 with params as (
     select
@@ -47,9 +54,7 @@ buckets as (
 ),
 
 new_users as (
-    select
-        date_trunc(b.bucket, u.created_at) as bucket_start,
-        count(*) as value
+    select date_trunc(b.bucket, u.created_at) as bucket_start, count(*) as value
     from app_users_appuser u
     cross join bounds b
     where u.created_at >= b.start_at
@@ -59,9 +64,7 @@ new_users as (
 ),
 
 new_paid_users as (
-    select
-        date_trunc(b.bucket, fp.first_paid_at) as bucket_start,
-        count(*) as value
+    select date_trunc(b.bucket, fp.first_paid_at) as bucket_start, count(*) as value
     from (
         select t.workspace_id, min(t.created_at) as first_paid_at
         from app_users_appusertransaction t
@@ -74,9 +77,7 @@ new_paid_users as (
 ),
 
 ask_gooey_queries as (
-    select
-        date_trunc(b.bucket, sr.created_at) as bucket_start,
-        count(*) as value
+    select date_trunc(b.bucket, sr.created_at) as bucket_start, count(*) as value
     from bots_savedrun sr
     cross join bounds b
     where sr.created_at >= b.start_at
@@ -85,42 +86,22 @@ ask_gooey_queries as (
 ),
 
 new_deployments as (
-    select
-        date_trunc(b.bucket, bi.created_at) as bucket_start,
-        count(*) as value
+    select date_trunc(b.bucket, bi.created_at) as bucket_start, count(*) as value
     from bots_botintegration bi
     cross join bounds b
     where bi.created_at >= b.start_at
     group by 1
-),
-
-metrics as (
-    select 'New users'         as metric, bucket_start, value from new_users
-    union all
-    select 'New paid users',    bucket_start, value from new_paid_users
-    union all
-    select 'Ask Gooey queries', bucket_start, value from ask_gooey_queries
-    union all
-    select 'New deployments',   bucket_start, value from new_deployments
-),
-
-grid as (
-    select bk.bucket_start, m.metric
-    from buckets bk
-    cross join (values
-        ('New users'),
-        ('New paid users'),
-        ('Ask Gooey queries'),
-        ('New deployments')
-    ) m(metric)
 )
 
 select
-    g.bucket_start,
-    g.metric,
-    coalesce(mt.value, 0) as value
-from grid g
-left join metrics mt
-    on mt.bucket_start = g.bucket_start
-   and mt.metric = g.metric
-order by g.bucket_start, g.metric
+    bk.bucket_start,
+    coalesce(nu.value, 0) as new_users,
+    coalesce(np.value, 0) as new_paid_users,
+    coalesce(ag.value, 0) as ask_gooey_queries,
+    coalesce(nd.value, 0) as new_deployments
+from buckets bk
+left join new_users         nu on nu.bucket_start = bk.bucket_start
+left join new_paid_users    np on np.bucket_start = bk.bucket_start
+left join ask_gooey_queries ag on ag.bucket_start = bk.bucket_start
+left join new_deployments   nd on nd.bucket_start = bk.bucket_start
+order by bk.bucket_start

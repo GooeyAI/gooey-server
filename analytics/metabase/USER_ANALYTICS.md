@@ -9,14 +9,28 @@ mean and how the dropdown works.
 
 | Card | Query | Visualization |
 |---|---|---|
-| New users | `10_user_analytics_scorecards.sql` #1 | Number |
-| New paid users | `10_user_analytics_scorecards.sql` #2 | Number |
-| Ask Gooey queries | `10_user_analytics_scorecards.sql` #3 | Number |
-| New deployments | `10_user_analytics_scorecards.sql` #4 | Number |
-| Trend over time | `11_user_analytics_timeseries.sql` | Line (X=`bucket_start`, Y=`value`, Series=`metric`) |
+| New users | `10_user_analytics_scorecards.sql` #1 | Trend |
+| New paid users | `10_user_analytics_scorecards.sql` #2 | Trend |
+| Ask Gooey queries | `10_user_analytics_scorecards.sql` #3 | Trend |
+| New deployments | `10_user_analytics_scorecards.sql` #4 | Trend |
+| Growth over time | `11_user_analytics_timeseries.sql` | Combo (X=`bucket_start`, Y=all four counts) |
+| Monthly goal | `12_user_analytics_goal.sql` | Progress |
 
-`10_...` holds four separate queries because Metabase's Number visualization
-renders only the first cell of a result — each needs its own card.
+`10_...` holds four separate queries because a scorecard renders one metric —
+each needs its own card.
+
+**Why the scorecards return two rows.** Metabase's Trend visualization computes
+the "▲ 11.7% vs. previous period" line from the last two rows of a time series.
+A single-row scalar query has nothing to compare against and can only render a
+plain Number. So each scorecard query returns the previous period and the
+current one, where the comparison window always equals the selected range.
+
+**Why the time series is wide, not long.** One column per metric means each is
+its own series, so display type (bar vs line) and axis (left vs right) can be
+set per metric — which is what a combo chart needs. Long format forces every
+series to share one display type and one axis, and Ask Gooey queries run one to
+two orders of magnitude above new paid users, so a shared axis flattens the
+small series onto zero.
 
 ## The time range dropdown
 
