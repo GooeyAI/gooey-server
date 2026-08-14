@@ -15,13 +15,20 @@
     <script>
         window.addEventListener("DOMContentLoaded", async function () {
             if (typeof google === "undefined") return;
+            var useRedirect = window.shouldUseRedirectSignIn
+                ? window.shouldUseRedirectSignIn()
+                : /iP(hone|ad|od)/.test(navigator.userAgent || "");
+            var loginUri = window.getGsiLoginUri
+                ? window.getGsiLoginUri()
+                : window.location.origin + "/login/";
             google.accounts.id.initialize({
                 client_id: window.GOOGLE_CLIENT_ID,
                 callback: handleCredentialResponse,
+                login_uri: loginUri,
                 auto_select: false,
                 cancel_on_tap_outside: true,
                 itp_support: true,
-                ux_mode: "popup",
+                ux_mode: useRedirect ? "redirect" : "popup",
                 use_fedcm_for_button: false,
                 context: "signin",
             });

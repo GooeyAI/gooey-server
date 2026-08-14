@@ -6,28 +6,35 @@
 
   // As httpOnly cookies are to be used, do not persist any state client side.
   firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
+
+  window.getGsiLoginUri = getGsiLoginUri;
+  window.shouldUseRedirectSignIn = shouldUseRedirectSignIn;
+  window.startGoogleRedirectSignIn = startGoogleRedirectSignIn;
+  await completeRedirectSignIn();
 })();
 
 async function initFirebaseUi(containerSelector, signInOptions) {
   await window.waitUntilHydrated;
-  // Drop leftover redirect / GIS state from a previous session. After logout
-  // this is what makes the next Google button click send a malformed request
-  // to accounts.google.com (400).
-  clearStaleFirebaseRedirectState();
+  // Finish a redirect-based Google sign-in before creating a new anonymous
+  // user. On iOS the popup flow becomes a full-page visit whose return URL
+  // is storagerelay:// — Google then 400s after the user picks an account.
+  if (await completeRedirectSignIn()) return;
+  stashLoginNext();
   // load anonymous user before initializing FirebaseUI
   await loadAnonymousUser();
   // Initialize the FirebaseUI Widget using Firebase.
   let uiConfig = {
     // Do not let FirebaseUI initialize Google Identity Services. A second
-    // GSI initialize() (or GIS after a stale logout) resets the client and
-    // produces accounts.google.com 400s on iOS.
+    // GSI initialize() resets the client and can 400 the account-picker
+    // return on iOS.
     credentialHelper: firebaseui.auth.CredentialHelper.NONE,
     // Whether to upgrade anonymous users should be explicitly provided.
     // The user must already be signed in anonymously before FirebaseUI is
     // rendered.
     autoUpgradeAnonymousUsers: true,
-    // Will use popup for IDP Providers sign-in flow instead of the default, redirect.
-    signInFlow: "popup",
+    // iOS cannot complete a Google popup (storagerelay://). Use redirect
+    // so Google returns to a real https handler instead of 400.
+    signInFlow: shouldUseRedirectSignIn() ? "redirect" : "popup",
     // signInSuccessUrl: '/',
     callbacks: {
       signInSuccessWithAuthResult: function(authResult, redirectUrl) {
@@ -62,23 +69,77 @@ async function initFirebaseUi(containerSelector, signInOptions) {
   ui.start(containerSelector, uiConfig);
 }
 
-function clearStaleFirebaseRedirectState() {
+let redirectCompletion = null;
+
+function completeRedirectSignIn() {
+  if (!redirectCompletion) {
+    redirectCompletion = completeRedirectSignInOnce();
+  }
+  return redirectCompletion;
+}
+
+async function completeRedirectSignInOnce() {
   try {
-    const keys = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (
-        key &&
-        (key.startsWith("firebase:pendingRedirect") ||
-          key.startsWith("firebaseui::"))
-      ) {
-        keys.push(key);
-      }
+    const result = await firebase.auth().getRedirectResult();
+    if (result && result.user) {
+      await handleAuthResult(result);
+      return true;
     }
-    for (const key of keys) {
-      sessionStorage.removeItem(key);
+  } catch (error) {
+    if (error && error.credential) {
+      await handleCredential(error.credential);
+      return true;
+    }
+  }
+  return false;
+}
+
+function shouldUseRedirectSignIn() {
+  const ua = navigator.userAgent || "";
+  return /iP(hone|ad|od)/.test(ua);
+}
+
+function getGsiLoginUri() {
+  // Must be a stable URL (no query string). Google matches it exactly
+  // against Authorized redirect URIs. After account selection GSI POSTs
+  // the ID token here instead of navigating to storagerelay://.
+  return window.location.origin + "/login/";
+}
+
+async function startGoogleRedirectSignIn() {
+  showLoginProgress();
+  stashLoginNext();
+  await loadAnonymousUser();
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  const user = firebase.auth().currentUser;
+  if (user) {
+    try {
+      await user.linkWithRedirect(provider);
+      return;
+    } catch (e) {}
+  }
+  await firebase.auth().signInWithRedirect(provider);
+}
+
+function stashLoginNext() {
+  try {
+    const path =
+      window.location.pathname + window.location.search + window.location.hash;
+    if (path && path !== "/login/" && !path.startsWith("/login/")) {
+      sessionStorage.setItem("gooey_login_next", path);
     }
   } catch (e) {}
+}
+
+function takeLoginNext() {
+  try {
+    const next = sessionStorage.getItem("gooey_login_next");
+    sessionStorage.removeItem("gooey_login_next");
+    return next;
+  } catch (e) {
+    return null;
+  }
 }
 
 async function handleCredentialResponse(response) {
@@ -119,7 +180,7 @@ async function handleAuthResult({ user }) {
 
   const windowUrl = new URL(window.location.href);
   // redirect back to the page that sent the user here
-  let next = windowUrl.searchParams.get("next");
+  let next = windowUrl.searchParams.get("next") || takeLoginNext();
   // if no next param, redirect to the current page (but not the login page)
   if (!next && windowUrl.pathname !== action) {
     if (document.querySelector("[data-submitafterlogin]")) {

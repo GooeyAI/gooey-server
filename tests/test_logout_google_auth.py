@@ -54,3 +54,43 @@ def test_login_options_uses_firebase_popup_not_gsi_client_id():
     text = Path("static/js/login_options.js").read_text()
     assert "clientId:" not in text
     assert 'prompt: "select_account"' in text
+
+
+def test_auth_js_uses_redirect_on_ios_to_avoid_storagerelay_400():
+    text = Path("static/js/auth.js").read_text()
+    assert "function shouldUseRedirectSignIn()" in text
+    assert 'signInFlow: shouldUseRedirectSignIn() ? "redirect" : "popup"' in text
+    assert "function getGsiLoginUri()" in text
+    assert "async function startGoogleRedirectSignIn()" in text
+    assert "signInWithRedirect" in text
+    assert 'return window.location.origin + "/login/"' in text
+
+
+@pytest.mark.skipif(
+    not settings.ENABLE_FIREBASE_AUTH, reason="Firebase auth is not enabled"
+)
+def test_gsi_callback_requires_matching_csrf():
+    r = client.post("/login/", data={"credential": "aaa.bbb.ccc"})
+    assert r.status_code == 400
+    assert "CSRF" in r.text
+
+    r = client.post(
+        "/login/",
+        data={"credential": "aaa.bbb.ccc", "g_csrf_token": "a"},
+        cookies={"g_csrf_token": "b"},
+    )
+    assert r.status_code == 400
+
+
+@pytest.mark.skipif(
+    not settings.ENABLE_FIREBASE_AUTH, reason="Firebase auth is not enabled"
+)
+def test_gsi_callback_renders_completion_page():
+    r = client.post(
+        "/login/",
+        data={"credential": "aaa.bbb.ccc", "g_csrf_token": "tok"},
+        cookies={"g_csrf_token": "tok"},
+    )
+    assert r.status_code == 200, r.text
+    assert "aaa.bbb.ccc" in r.text
+    assert "handleCredentialResponse" in r.text
