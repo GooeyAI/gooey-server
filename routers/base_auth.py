@@ -6,7 +6,6 @@ from urllib.parse import urlparse
 import fastapi
 from django.utils.http import url_has_allowed_host_and_scheme
 from furl import furl
-from starlette.responses import RedirectResponse
 
 from daras_ai_v2 import settings
 from routers.custom_api_router import CustomAPIRouter
@@ -23,9 +22,21 @@ DEFAULT_LOGOUT_REDIRECT = "/"
 @app.get("/logout/")
 async def logout(request: fastapi.Request):
     request.session.clear()
-    return RedirectResponse(
-        safe_next_url(request.query_params, default=DEFAULT_LOGOUT_REDIRECT)
+    # Return a small page that clears leftover Google / Firebase client state
+    # before navigating away. A 302 alone cannot touch sessionStorage, and
+    # stale GSI / FirebaseUI redirect state is what produces Google's
+    # accounts.google.com 400 after the next Sign in with Google click.
+    response = settings.templates.TemplateResponse(
+        "logout.html",
+        context={
+            "request": request,
+            "next_url": safe_next_url(
+                request.query_params, default=DEFAULT_LOGOUT_REDIRECT
+            ),
+        },
     )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def get_login_url(

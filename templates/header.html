@@ -19,8 +19,8 @@
                         <a class="pe-2" href="/login/?next={{ request.path }}">
                             Sign in
                         </a>
+                        {% include 'google_one_tap_button.html' %}
                     {% endif %}
-                    {% include 'google_one_tap_button.html' %}
                 {% endif %}
             </div>
         </div>

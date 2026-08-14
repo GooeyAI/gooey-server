@@ -1,14 +1,13 @@
 initFirebaseUi("#firebaseui-auth-container", [
   // Leave the lines as is for the providers you want to offer your users.
   {
-    // Google provider must be enabled in Firebase Console to support one-tap
-    // sign-up.
+    // Use the classic Firebase Google popup (not GIS / One Tap). Passing
+    // clientId here makes FirebaseUI initialize GSI a second time, which
+    // after logout sends a malformed request to accounts.google.com on iOS.
     provider: firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-    // Required to enable ID token credentials for this provider.
-    // This can be obtained from the Credentials page of the Google APIs
-    // console. Use the same OAuth client ID used for the Google provider
-    // configured with GCIP or Firebase Auth.
-    clientId: window.GOOGLE_CLIENT_ID,
+    customParameters: {
+      prompt: "select_account",
+    },
   },
   {
     provider: "apple.com",

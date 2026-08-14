@@ -18,7 +18,14 @@
             google.accounts.id.initialize({
                 client_id: window.GOOGLE_CLIENT_ID,
                 callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: true,
+                itp_support: true,
+                ux_mode: "popup",
+                use_fedcm_for_button: false,
+                context: "signin",
             });
+            google.accounts.id.disableAutoSelect();
             oneTapSignin();
             window.addEventListener("hydrated", oneTapSignin);
         });

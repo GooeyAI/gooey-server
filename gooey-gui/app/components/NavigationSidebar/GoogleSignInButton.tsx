@@ -14,9 +14,17 @@ type GsiId = {
   initialize: (config: {
     client_id: string;
     callback: (response: GsiCredentialResponse) => void;
+    auto_select?: boolean;
+    cancel_on_tap_outside?: boolean;
+    itp_support?: boolean;
+    ux_mode?: "popup" | "redirect";
+    use_fedcm_for_button?: boolean;
+    context?: string;
+    error_callback?: (error: { type?: string; message?: string }) => void;
   }) => void;
   renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
   prompt: () => void;
+  disableAutoSelect: () => void;
 };
 
 declare global {
@@ -93,10 +101,25 @@ function initGsi(): boolean {
   if (!gsiInitialized) {
     // Resolve the callback lazily so init doesn't race auth.js loading; by the
     // time a user completes sign-in, handleCredentialResponse is defined.
+    //
+    // After logout, GSI still has a signed-in g_state cookie. Without
+    // disableAutoSelect / auto_select:false, the next button click (especially
+    // on iOS Safari) navigates to accounts.google.com with a stale session and
+    // Google returns 400 "request is malformed".
     gsiId.initialize({
       client_id: clientId,
       callback: (response) => window.handleCredentialResponse?.(response),
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      itp_support: true,
+      ux_mode: "popup",
+      use_fedcm_for_button: false,
+      context: "signin",
+      error_callback: (error) => {
+        console.warn("Google sign-in error", error);
+      },
     });
+    gsiId.disableAutoSelect();
     gsiInitialized = true;
   }
   return true;

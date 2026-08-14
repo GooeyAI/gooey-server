@@ -10,10 +10,18 @@
 
 async function initFirebaseUi(containerSelector, signInOptions) {
   await window.waitUntilHydrated;
+  // Drop leftover redirect / GIS state from a previous session. After logout
+  // this is what makes the next Google button click send a malformed request
+  // to accounts.google.com (400).
+  clearStaleFirebaseRedirectState();
   // load anonymous user before initializing FirebaseUI
   await loadAnonymousUser();
   // Initialize the FirebaseUI Widget using Firebase.
   let uiConfig = {
+    // Do not let FirebaseUI initialize Google Identity Services. A second
+    // GSI initialize() (or GIS after a stale logout) resets the client and
+    // produces accounts.google.com 400s on iOS.
+    credentialHelper: firebaseui.auth.CredentialHelper.NONE,
     // Whether to upgrade anonymous users should be explicitly provided.
     // The user must already be signed in anonymously before FirebaseUI is
     // rendered.
@@ -53,6 +61,26 @@ async function initFirebaseUi(containerSelector, signInOptions) {
   let ui = new firebaseui.auth.AuthUI(firebase.auth());
   ui.start(containerSelector, uiConfig);
 }
+
+function clearStaleFirebaseRedirectState() {
+  try {
+    const keys = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (
+        key &&
+        (key.startsWith("firebase:pendingRedirect") ||
+          key.startsWith("firebaseui::"))
+      ) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) {
+      sessionStorage.removeItem(key);
+    }
+  } catch (e) {}
+}
+
 async function handleCredentialResponse(response) {
   showLoginProgress();
   await loadAnonymousUser();

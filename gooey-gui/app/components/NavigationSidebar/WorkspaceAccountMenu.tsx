@@ -119,6 +119,7 @@ export function WorkspaceAccountMenu({
           <AccountMenuItem
             href={account.logout_href}
             icon="fa-regular fa-arrow-right-from-bracket"
+            className="g_id_signout"
             onClick={closeMenu}
           >
             Log out
@@ -283,12 +284,14 @@ function AccountMenuItem({
   href,
   target,
   icon,
+  className,
   onClick,
   children,
 }: {
   href?: string;
   target?: string;
   icon?: string | null;
+  className?: string;
   onClick?: (event: MouseEvent<HTMLElement>) => void;
   children: ReactNode;
 }) {
@@ -305,7 +308,7 @@ function AccountMenuItem({
         href={href}
         target={target}
         rel={target === "_blank" ? "noopener" : undefined}
-        className={MENU_ROW_ACTION_CLASS}
+        className={clsx(MENU_ROW_ACTION_CLASS, className)}
         onClick={onClick}
       >
         {content}
