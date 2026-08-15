@@ -24,7 +24,7 @@ Gooey Server itself is licensed under [Apache License 2.0](LICENSE).
 | Stripe / PayPal | Payments | Not required — billing gracefully disabled when keys unset (default) | Feature flag with graceful UI fallback | ✅ Abstracted |
 | Azure Content Moderator | Image safety checker | Not required — check skipped when endpoint unset (default) | Feature flag (`AZURE_IMAGE_MODERATION_ENDPOINT`, default **unset**) | ✅ Optional |
 | Azure Key Vault | Managed secrets | Not required — pass API keys as plain environment variables to functions instead | Optional (`AZURE_KEY_VAULT_ENDPOINT` unset ⇒ disabled) | ✅ Optional |
-| Modal (MMS TTS, Omnilingual ASR) | AI model hosting | Optional feature; core TTS/ASR works via GPU worker or other providers | Optional integration | ✅ Optional |
+| Modal (MMS TTS, Omnilingual ASR, SraVaani ASR) | AI model hosting | Optional feature; core TTS/ASR works via GPU worker or other providers | Optional integration | ✅ Optional |
 | Font Awesome Pro | UI icons | Font Awesome Free (self-hosted) | Asset swap for self-hosted builds | 🔧 In progress |
 | Google Tag Manager | Analytics | Not required for operation | Env-gated script (unset ⇒ not rendered) | 🔧 In progress |
 | WhatsApp / Slack / Facebook / Twilio integrations | Messaging connectors | Optional integrations; core product functions without them | Optional (keys unset ⇒ disabled) | ✅ Optional |
@@ -103,7 +103,7 @@ Document extraction workflows support multiple OCR providers through a unified a
 The UI gracefully degrades when OCR providers are unavailable, displaying a warning and falling back to basic text extraction. Both providers are optional; neither is required for core document processing functionality.
 
 ### Modal-hosted models
-Two models (MMS TTS, Omnilingual ASR) are deployed on [Modal](https://modal.com). These are **optional features**: TTS and ASR each have multiple self-hosted and provider alternatives, and the platform functions fully without Modal credentials.
+Three models (MMS TTS, Omnilingual ASR, SraVaani ASR) are deployed on [Modal](https://modal.com). These are **optional features**: TTS and ASR each have multiple self-hosted and provider alternatives, and the platform functions fully without Modal credentials.
 
 ## 5. Payments — feature flag with graceful degradation (Path 2)
 
