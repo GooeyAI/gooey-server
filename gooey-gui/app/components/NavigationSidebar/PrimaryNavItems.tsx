@@ -156,10 +156,25 @@ function NavItemChildren({
     );
   }
 
-  // React 17 throws NotFoundError ("removeChild") when a component root
-  // switches between null, a single host node, and a Fragment. History
-  // fetching and rail collapse used to do exactly that (GOOEY-UI-2XB).
-  return <div className="d-flex flex-column gap-1">{body}</div>;
+  // React 17 throws NotFoundError ("removeChild") when it tries to detach a
+  // node that a translator/extension has reparented. History fetching and
+  // rail collapse used to switch this component's root between null, a
+  // single node, and a Fragment (GOOEY-UI-2XB). Keep a stable outer host,
+  // and remount the inner host when the phase changes so React drops the
+  // whole subtree instead of surgically removing mutated children.
+  let phase = "empty";
+  if (collapsed) {
+    phase = "collapsed";
+  } else if (hasRows) {
+    phase = "rows";
+  }
+  return (
+    <div>
+      <div key={phase} className="d-flex flex-column gap-1">
+        {body}
+      </div>
+    </div>
+  );
 }
 
 function NavItem({
