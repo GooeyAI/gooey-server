@@ -27,12 +27,13 @@ export function PrimaryNavItems({
       <div className="nav-scroll-region d-flex flex-column gap-1 mt-1">
         {nav_items.map((item) => {
           const hasChildren = item.items.length > 0 || !!item.items_url;
-          if (hasChildren && !railCollapsed) {
+          if (hasChildren) {
             return (
               <NavItemChildren
                 key={item.key}
                 item={item}
                 isActive={item.key === active_key}
+                collapsed={railCollapsed}
               />
             );
           }
@@ -79,6 +80,88 @@ export function PrimaryNavItems({
   );
 }
 
+function NavItemChildren({
+  item,
+  isActive,
+  collapsed,
+}: {
+  item: NavItemData;
+  isActive: boolean;
+  collapsed: boolean;
+}) {
+  const [open, setOpen] = useState(true);
+  const { items, isFetching } = useNavItemChildren(item);
+  const showSkeleton = isFetching && items.length === 0;
+  const hasRows = items.length > 0 || showSkeleton;
+
+  let body: ReactNode = null;
+  if (collapsed) {
+    body = (
+      <NavItem item={item} isActive={isActive} collapsed dense={item.dense} />
+    );
+  } else if (!hasRows) {
+    // A fetched section has no href of its own, so an empty result means
+    // there's nothing to link to — drop the label instead of a dead row.
+    if (!item.items_url) {
+      body = (
+        <NavItem
+          item={item}
+          isActive={isActive}
+          collapsed={false}
+          dense={item.dense}
+        />
+      );
+    }
+  } else {
+    // Non-collapsible sections (e.g. History) drop the chevron and stay expanded.
+    const showItems = !item.collapsible || open;
+    let rows: ReactNode = null;
+    if (showItems) {
+      if (showSkeleton) {
+        rows = <WorkflowListSkeleton rows={3} indent={!item.dense} />;
+      } else {
+        rows = <WorkflowList items={items} indent={!item.dense} />;
+      }
+    }
+    body = (
+      <Fragment>
+        <NavItem
+          item={item}
+          isActive={isActive}
+          collapsed={false}
+          dense={item.dense}
+        >
+          {/* the chevron after the label toggles the nested items open/closed */}
+          {item.collapsible && (
+            <span
+              className="flex-grow-1 d-flex align-items-center justify-content-end flex-grow-1"
+              onClick={(e) => {
+                e.preventDefault();
+                setOpen((isOpen) => !isOpen);
+              }}
+            >
+              <i
+                className={clsx(
+                  "nav-chevron-icon fa-regular",
+                  open ? "fa-chevron-down" : "fa-chevron-right"
+                )}
+              />
+            </span>
+          )}
+        </NavItem>
+        {showItems && (
+          <div className={clsx(!item.dense && "saved-tree")}>{rows}</div>
+        )}
+      </Fragment>
+    );
+  }
+
+  // React 17 throws NotFoundError ("removeChild") when a component root
+  // switches between null, a single host node, and a Fragment. History
+  // fetching and rail collapse used to do exactly that (GOOEY-UI-2XB).
+  return <div className="d-flex flex-column gap-1">{body}</div>;
+}
+
 function NavItem({
   item,
   isActive,
@@ -116,7 +199,7 @@ function NavItem({
             !isActive && "text-muted",
             item.dense && !collapsed && "small"
           )}
-          dangerouslySetInnerHTML={{ __html: item.icon }}
+          dangerouslySetInnerHTML={{ __html: item.icon || "" }}
         />
         {!collapsed && <span>{item.label}</span>}
       </span>
@@ -141,74 +224,6 @@ function NavItem({
     >
       {content}
     </Link>
-  );
-}
-
-function NavItemChildren({
-  item,
-  isActive,
-}: {
-  item: NavItemData;
-  isActive: boolean;
-}) {
-  const [open, setOpen] = useState(true);
-  const { items, isFetching } = useNavItemChildren(item);
-  const showSkeleton = isFetching && items.length === 0;
-
-  if (items.length === 0 && !showSkeleton) {
-    // A fetched section has no href of its own, so an empty result means there's
-    // nothing to link to — drop the whole section instead of a dead label.
-    if (item.items_url) return null;
-    // No children → behaves like a plain nav item (label links to href).
-    return (
-      <NavItem
-        item={item}
-        isActive={isActive}
-        collapsed={false}
-        dense={item.dense}
-      />
-    );
-  }
-
-  // Non-collapsible sections (e.g. History) drop the chevron and stay expanded.
-  const showItems = !item.collapsible || open;
-
-  return (
-    <Fragment>
-      <NavItem
-        item={item}
-        isActive={isActive}
-        collapsed={false}
-        dense={item.dense}
-      >
-        {/* the chevron after the label toggles the nested items open/closed */}
-        {item.collapsible && (
-          <span
-            className="flex-grow-1 d-flex align-items-center justify-content-end flex-grow-1"
-            onClick={(e) => {
-              e.preventDefault();
-              setOpen((isOpen) => !isOpen);
-            }}
-          >
-            <i
-              className={clsx(
-                "nav-chevron-icon fa-regular",
-                open ? "fa-chevron-down" : "fa-chevron-right"
-              )}
-            />
-          </span>
-        )}
-      </NavItem>
-      {showItems && (
-        <div className={clsx(!item.dense && "saved-tree")}>
-          {showSkeleton ? (
-            <WorkflowListSkeleton rows={3} indent={!item.dense} />
-          ) : (
-            <WorkflowList items={items} indent={!item.dense} />
-          )}
-        </div>
-      )}
-    </Fragment>
   );
 }
 
