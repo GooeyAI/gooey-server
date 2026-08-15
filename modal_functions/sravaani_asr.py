@@ -27,13 +27,13 @@ model_cache = modal.Volume.from_name("hf-model-cache", create_if_missing=True)
 
 image = (
     modal.Image.debian_slim()
-    .apt_install("libsndfile1", "ffmpeg")  # Required for audio processing
+    .apt_install("libsndfile1")  # Required for audio processing
     .pip_install(
-        "transformers~=4.44",
-        "huggingface_hub[hf_transfer]~=0.34.4",
-        "torch~=2.5.1",
+        "transformers~=5.15",
+        "huggingface_hub[hf_transfer]",
+        "torch~=2.13",
         "soundfile~=0.12",
-        "librosa~=0.10",
+        "sentencepiece~=0.2",
         "requests~=2.31",
     )
     .env(
@@ -91,12 +91,8 @@ class SraVaani:
 
         try:
             # Run transcription (language is auto-detected by the model)
-            hyps = self.model.transcribe([audio_path], return_hypotheses=True)
-            # hybrid TDT-CTC models may return (best_hyps, all_hyps)
-            if isinstance(hyps, tuple):
-                hyps = hyps[0]
-            hyp = hyps[0]
-            transcription = getattr(hyp, "text", hyp)
+            transcriptions = self.model.transcribe([audio_path])
+            transcription = transcriptions[0]
             print(f"Transcription: {transcription}")
 
             return transcription
