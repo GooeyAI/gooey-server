@@ -218,6 +218,9 @@ def fb_webhook(
             case "whatsapp_business_account":
                 value = glom.glom(entry, "changes.0.value", default={})
                 for message in value.get("messages", []):
+                    # ignore unsupported events without sending an error reply, e.g. albums
+                    if message.get("type") == "unsupported":
+                        continue
                     try:
                         bot = WhatsappBot(message, value["metadata"])
                     except BotIntegrationLookupFailed:
