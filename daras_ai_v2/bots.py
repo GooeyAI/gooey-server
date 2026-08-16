@@ -522,13 +522,12 @@ def _process_and_send_msg(
         request_body=body,
         message_thread=message_thread,
     )
-    if not run:
+
+    # Duplicate WhatsApp deliveries are ignored before starting another run.
+    if run is None:
         return
     result, sr = run
     bot.on_run_created(sr)
-
-    if bot.platform != Platform.WHATSAPP:
-        _save_run_message_id(bot, sr)
 
     send_feedback_buttons = bot.show_feedback_buttons
     should_strip_thinking = bot.platform != Platform.WEB
@@ -545,6 +544,7 @@ def _process_and_send_msg(
                 if bot.platform == Platform.WHATSAPP:
                     sr.refresh_from_db(fields=["is_cancelled"])
                     if sr.is_cancelled:
+                        # stop streaming if a newer WhatsApp event replaced this run
                         return
                 bot.recipe_run_state = bot.page_cls.get_run_state(state)
                 bot.run_status = state.get(StateKeys.run_status) or ""
@@ -640,11 +640,16 @@ def _process_and_send_msg(
             update_msg_id=update_msg_id,
         )
 
+    # use the merged WhatsApp inputs when saving the message
+    if bot.platform == Platform.WHATSAPP:
+        input_images = state.get("input_images")
+        input_documents = state.get("input_documents")
+
     # save msgs to db
     save_msg_pair_to_db(
         convo=bot.convo,
-        input_images=state.get("input_images"),
-        input_documents=state.get("input_documents"),
+        input_images=input_images,
+        input_documents=input_documents,
         saved_run=sr,
         received_time=recieved_time,
         user_msg_id=bot.user_msg_id,
@@ -690,10 +695,13 @@ def _submit_bot_run(
         message_thread=message_thread,
     )
     if bot.platform != Platform.WHATSAPP:
-        return submit_api_call(**kwargs)
+        result, sr = submit_api_call(**kwargs)
+        _save_run_message_id(bot, sr)
+        return result, sr
 
     with redis_lock(f"gooey/whatsapp-message-thread/{message_thread.pk}"):
         message_thread.refresh_from_db()
+        # Ignore duplicate webhook deliveries that already started a run.
         if (
             bot.user_msg_id
             and SavedRun.objects.filter(
@@ -727,6 +735,7 @@ def _cancel_active_run_and_merge_inputs(
     request_body: dict,
 ) -> dict:
     last_run = message_thread.last_run
+    # Only merge when there is an active, uncancelled run to replace.
     if not last_run or not last_run.run_status or last_run.is_cancelled:
         return request_body
 
