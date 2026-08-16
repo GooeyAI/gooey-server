@@ -20,10 +20,12 @@ from decouple import config
 
 app = modal.App("gooey-sravaani-asr")
 
-MODEL_ID = "ARTPARK-IISc/SraVaani-1.0"
+SRAVAANI_MODEL_ID = "ARTPARK-IISc/SraVaani-1.0"
+SRAVAANI_MODEL_REVISION = "39c6add757f46af212d583ed765894ae78b2ebad"
 
 cache_dir = "/cache"
 model_cache = modal.Volume.from_name("hf-model-cache", create_if_missing=True)
+hf_secret = modal.Secret.from_dict({"HF_TOKEN": config("HF_TOKEN", "")})
 
 image = (
     modal.Image.debian_slim()
@@ -35,27 +37,40 @@ image = (
         "soundfile~=0.12",
         "sentencepiece~=0.2",
         "requests~=2.31",
+        "python-decouple",
     )
     .env(
         {
             "HF_HUB_CACHE": cache_dir,
-            "HF_TOKEN": config("HF_TOKEN", ""),
             "HF_XET_HIGH_PERFORMANCE": "1",
         }
     )
 )
 
 
-def load_model(model_id: str):
-    """Load the SraVaani ASR model via transformers remote code."""
+def load_model(model_id: str, revision: str):
+    """Download and eagerly load a pinned SraVaani model snapshot."""
     import torch
+    from huggingface_hub import snapshot_download
     from transformers import AutoModel
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Loading model: {model_id} on {device}")
-    model = (
-        AutoModel.from_pretrained(model_id, trust_remote_code=True).to(device).eval()
+    print(f"Loading model: {model_id}@{revision} on {device}")
+    model_path = snapshot_download(
+        repo_id=model_id,
+        revision=revision,
+        cache_dir=cache_dir,
     )
+    model = (
+        AutoModel.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True,
+        )
+        .to(device)
+        .eval()
+    )
+    model._ensure_loaded()
     print("Model loaded successfully")
 
     return model
@@ -64,6 +79,7 @@ def load_model(model_id: str):
 @app.cls(
     image=image,
     gpu="a10g",
+    secrets=[hf_secret],
     volumes={cache_dir: model_cache},
     timeout=30 * 60,
     scaledown_window=60 * 60,  # 1 hour
@@ -74,10 +90,10 @@ def load_model(model_id: str):
 class SraVaani:
     @modal.enter(snap=True)
     def load(self):
-        self.model = load_model(MODEL_ID)
+        self.model = load_model(SRAVAANI_MODEL_ID, SRAVAANI_MODEL_REVISION)
 
     @modal.method()
-    def run(self, audio_url: str) -> str:
+    def run(self, audio_url: str, return_timestamps: bool = False) -> dict:
         """Run transcription on the given audio file.
 
         SraVaani identifies the spoken language automatically, so no language
@@ -91,9 +107,13 @@ class SraVaani:
 
         try:
             # Run transcription (language is auto-detected by the model)
-            transcriptions = self.model.transcribe([audio_path])
-            transcription = transcriptions[0]
-            print(f"Transcription: {transcription}")
+            transcriptions = self.model.transcribe(
+                [audio_path], timestamps=return_timestamps
+            )
+            transcription = _sravaani_transcription_to_output(
+                transcriptions[0], return_timestamps=return_timestamps
+            )
+            print(f"Transcription: {transcription['text']}")
 
             return transcription
 
@@ -101,6 +121,25 @@ class SraVaani:
             # Clean up temporary file
             if os.path.exists(audio_path):
                 os.remove(audio_path)
+
+
+def _sravaani_transcription_to_output(
+    transcription, *, return_timestamps: bool
+) -> dict:
+    if not return_timestamps:
+        return {"text": transcription}
+
+    return {
+        "text": transcription.text,
+        "chunks": [
+            {
+                "timestamp": (word["start"], word["end"]),
+                "text": word["word"],
+                "speaker": None,
+            }
+            for word in transcription.timestamp["word"]
+        ],
+    }
 
 
 def download_audio(url: str) -> str:

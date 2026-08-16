@@ -1446,8 +1446,10 @@ def run_asr(
 
         SraVaani = modal.Cls.from_name(modal_app.name, "SraVaani")
         with modal.enable_output():
-            transcription = SraVaani().run.remote(audio_url=audio_url)
-        return transcription
+            data = SraVaani().run.remote(
+                audio_url=audio_url,
+                return_timestamps=output_format != AsrOutputFormat.text,
+            )
     elif selected_model in {AsrModels.gpt_4_o_audio, AsrModels.gpt_4_o_mini_audio}:
         from daras_ai_v2.language_model import get_openai_client
 
