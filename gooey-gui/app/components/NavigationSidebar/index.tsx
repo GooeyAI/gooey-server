@@ -196,10 +196,6 @@ function NavigationFooter({
           onSwitchWorkspace={onSwitchWorkspace}
           compact={railCollapsed}
           placement="top-start"
-          // The mobile drawer uses CSS transform. GSI's iframe button inside a
-          // transformed ancestor navigates to a malformed accounts.google.com
-          // URL on iOS (400). Send those users to /login/ instead.
-          mobile={isMobile}
         />
       </div>
     </div>

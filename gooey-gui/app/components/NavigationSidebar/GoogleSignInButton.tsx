@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 // Google Identity Services (GSI) sign-in button for anonymous users, mirroring
 // the old templates/google_one_tap_button.html behaviour that lived in the
@@ -14,18 +14,9 @@ type GsiId = {
   initialize: (config: {
     client_id: string;
     callback: (response: GsiCredentialResponse) => void;
-    login_uri?: string;
-    auto_select?: boolean;
-    cancel_on_tap_outside?: boolean;
-    itp_support?: boolean;
-    ux_mode?: "popup" | "redirect";
-    use_fedcm_for_button?: boolean;
-    context?: string;
-    error_callback?: (error: { type?: string; message?: string }) => void;
   }) => void;
   renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
   prompt: () => void;
-  disableAutoSelect: () => void;
 };
 
 declare global {
@@ -34,9 +25,6 @@ declare global {
     GOOGLE_CLIENT_ID?: string;
     handleCredentialResponse?: (response: GsiCredentialResponse) => void;
     waitUntilHydrated?: Promise<void>;
-    getGsiLoginUri?: () => string;
-    shouldUseRedirectSignIn?: () => boolean;
-    startGoogleRedirectSignIn?: () => Promise<void>;
   }
 }
 
@@ -49,16 +37,8 @@ let oneTapPrompted = false;
 
 export function GoogleSignInButton({ compact }: { compact: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [useRedirectButton, setUseRedirectButton] = useState(false);
 
   useEffect(() => {
-    // iOS cannot finish a GSI/Firebase popup: after the user clicks their
-    // account, Google tries to return via storagerelay:// and shows 400.
-    // Use Firebase's https redirect handler instead of the GSI iframe.
-    if (isIosUserAgent()) {
-      setUseRedirectButton(true);
-      return;
-    }
     let cancelled = false;
     const setup = async () => {
       // Wait for hydration so the inline login scripts (which set
@@ -74,25 +54,6 @@ export function GoogleSignInButton({ compact }: { compact: boolean }) {
       cancelled = true;
     };
   }, [compact]);
-
-  if (useRedirectButton) {
-    return (
-      <button
-        type="button"
-        data-replace-login-spinner
-        data-submit-disabled
-        className={clsx(
-          "nav-google-signin btn btn-light border d-flex align-items-center justify-content-center gap-2",
-          compact ? "p-2" : "w-100"
-        )}
-        onClick={() => window.startGoogleRedirectSignIn?.()}
-        title="Continue with Google"
-      >
-        <i className="fa-brands fa-google" aria-hidden="true" />
-        {!compact && <span>Continue with Google</span>}
-      </button>
-    );
-  }
 
   return (
     <div
@@ -132,47 +93,13 @@ function initGsi(): boolean {
   if (!gsiInitialized) {
     // Resolve the callback lazily so init doesn't race auth.js loading; by the
     // time a user completes sign-in, handleCredentialResponse is defined.
-    //
-    // iOS turns the GSI popup into a full-page Google visit. Completing
-    // that with storagerelay:// (popup default) 400s after the user clicks
-    // their account. Redirect POSTs the ID token to /login/ instead.
-    stashLoginNext();
-    const useRedirect =
-      window.shouldUseRedirectSignIn?.() || isIosUserAgent();
     gsiId.initialize({
       client_id: clientId,
       callback: (response) => window.handleCredentialResponse?.(response),
-      login_uri: window.getGsiLoginUri?.() || `${window.location.origin}/login/`,
-      auto_select: false,
-      cancel_on_tap_outside: true,
-      itp_support: true,
-      ux_mode: useRedirect ? "redirect" : "popup",
-      use_fedcm_for_button: false,
-      context: "signin",
-      error_callback: (error) => {
-        console.warn("Google sign-in error", error);
-      },
     });
-    gsiId.disableAutoSelect();
     gsiInitialized = true;
   }
   return true;
-}
-
-function isIosUserAgent() {
-  return /iP(hone|ad|od)/.test(navigator.userAgent || "");
-}
-
-function stashLoginNext() {
-  try {
-    const path =
-      window.location.pathname + window.location.search + window.location.hash;
-    if (path && path !== "/login/" && !path.startsWith("/login/")) {
-      sessionStorage.setItem("gooey_login_next", path);
-    }
-  } catch {
-    return;
-  }
 }
 
 function loadGsiClient(): Promise<void> {

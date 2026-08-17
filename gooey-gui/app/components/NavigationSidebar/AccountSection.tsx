@@ -42,9 +42,7 @@ export function SignedOutAccount({
   compact: boolean;
   mobile: boolean;
 }) {
-  // Mobile top bar and the off-canvas drawer: send users to /login/ instead of
-  // rendering GSI's iframe button. The drawer is CSS-transformed, which makes
-  // that iframe navigate to a malformed accounts.google.com URL on iOS (400).
+  // Keep the mobile top bar focused on the regular sign-in action.
   if (mobile) {
     return <SignInLink href={account.login_href} />;
   }

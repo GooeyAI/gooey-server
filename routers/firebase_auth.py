@@ -78,19 +78,15 @@ def login_sso(request: fastapi.Request):
     return templates.TemplateResponse("login_sso.html", context=context)
 
 
-async def form_login(request: fastapi.Request):
-    return await request.form()
+async def form_id_token(request: fastapi.Request):
+    form = await request.form()
+    return form.get("idToken", "")
 
 
 @app.post("/login/")
-def authentication(request: fastapi.Request, form=fastapi.Depends(form_login)):
-    # GSI redirect / iOS ITP POSTs the Google ID token here after the user
-    # picks an account. Handle that before the Firebase session-cookie path.
-    gsi_page = _gsi_callback_response(request, form)
-    if gsi_page is not None:
-        return gsi_page
-
-    id_token = form.get("idToken") or ""
+def authentication(
+    request: fastapi.Request, id_token: bytes = fastapi.Depends(form_id_token)
+):
     ## Taken from https://firebase.google.com/docs/auth/admin/manage-cookies#create_session_cookie
 
     # To ensure that cookies are set only on recently signed in users, check auth_time in
@@ -129,26 +125,6 @@ def authentication(request: fastapi.Request, form=fastapi.Depends(form_login)):
         return PlainTextResponse(
             status_code=401, content="Failed to create a session cookie"
         )
-
-
-def _gsi_callback_response(request: fastapi.Request, form):
-    credential = form.get("credential") or ""
-    if not credential:
-        return None
-    if not _gsi_csrf_ok(request, form):
-        return PlainTextResponse(status_code=400, content="Invalid CSRF token")
-    return templates.TemplateResponse(
-        "google_signin_callback.html",
-        context={"request": request, "credential": credential},
-    )
-
-
-def _gsi_csrf_ok(request: fastapi.Request, form) -> bool:
-    body_token = form.get("g_csrf_token") or ""
-    cookie_token = request.cookies.get("g_csrf_token") or ""
-    if not body_token or not cookie_token:
-        return False
-    return body_token == cookie_token
 
 
 def authenticate_session(session: dict) -> AppUser | None:

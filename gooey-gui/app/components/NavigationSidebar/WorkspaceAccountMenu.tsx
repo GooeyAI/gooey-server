@@ -116,14 +116,10 @@ export function WorkspaceAccountMenu({
       {account.logout_href && (
         <>
           <hr className="my-1" />
-          <AccountMenuItem
-            href={account.logout_href}
-            icon="fa-regular fa-arrow-right-from-bracket"
-            className="g_id_signout"
-            onClick={closeMenu}
-          >
-            Log out
-          </AccountMenuItem>
+          <a href={account.logout_href} className={MENU_ROW_ACTION_CLASS}>
+            <MenuIcon icon="fa-regular fa-arrow-right-from-bracket" />
+            <span className="flex-grow-1 text-truncate min-w-0">Log out</span>
+          </a>
         </>
       )}
     </div>
@@ -284,14 +280,12 @@ function AccountMenuItem({
   href,
   target,
   icon,
-  className,
   onClick,
   children,
 }: {
   href?: string;
   target?: string;
   icon?: string | null;
-  className?: string;
   onClick?: (event: MouseEvent<HTMLElement>) => void;
   children: ReactNode;
 }) {
@@ -308,7 +302,7 @@ function AccountMenuItem({
         href={href}
         target={target}
         rel={target === "_blank" ? "noopener" : undefined}
-        className={clsx(MENU_ROW_ACTION_CLASS, className)}
+        className={MENU_ROW_ACTION_CLASS}
         onClick={onClick}
       >
         {content}
