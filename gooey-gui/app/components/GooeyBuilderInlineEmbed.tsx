@@ -66,13 +66,14 @@ export function GooeyBuilderInlineEmbed(
           let url = new URL(redirectUrl);
           ctx.current.navigate(url.pathname + url.search);
         },
-        editQuery: (_messageId: string, input_data: any) => {
-          const payload = createEditedMessagePayload(
-            propsRef.current.messages,
-            input_data
-          );
-          if (!payload) return;
-          controllerRef.current?.onSendMessage(payload);
+        onEditQuery: (_messageId: string, input_data: any, webUrl?: string) => {
+          // webUrl identifies the run that produced the edited turn, so the
+          // server re-runs that turn rather than always the latest one
+          if (!webUrl) return;
+          controllerRef.current?.onSendMessage({
+            ...input_data,
+            edit_run_url: webUrl,
+          });
         },
         onNewConversation: async () => {
           ctx.current.update_session_state({ builderOnNewConversation: true });
@@ -111,14 +112,4 @@ export function GooeyBuilderInlineEmbed(
   }, [messages]);
 
   return <div className="w-100 h-100" id="gooey-builder-embed" />;
-}
-
-function createEditedMessagePayload(
-  messages: Record<string, any>[] | null | undefined,
-  inputData: Record<string, any>
-) {
-  if (!messages?.length) return;
-  const response = messages[messages.length - 1];
-  if (!response.web_url) return;
-  return { ...inputData, edit_run_url: response.web_url };
 }
