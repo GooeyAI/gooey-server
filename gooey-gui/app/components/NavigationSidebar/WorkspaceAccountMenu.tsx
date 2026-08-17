@@ -116,13 +116,10 @@ export function WorkspaceAccountMenu({
       {account.logout_href && (
         <>
           <hr className="my-1" />
-          <AccountMenuItem
-            href={account.logout_href}
-            icon="fa-regular fa-arrow-right-from-bracket"
-            onClick={closeMenu}
-          >
-            Log out
-          </AccountMenuItem>
+          <a href={account.logout_href} className={MENU_ROW_ACTION_CLASS}>
+            <MenuIcon icon="fa-regular fa-arrow-right-from-bracket" />
+            <span className="flex-grow-1 text-truncate min-w-0">Log out</span>
+          </a>
         </>
       )}
     </div>
