@@ -184,6 +184,94 @@ class ModalBackend(BaseBackend):
                 logger.exception("failed to terminate modal sandbox")
 
 
+class LocalBackend(BaseBackend):
+    """
+    Runs the same ComfyUI-per-workspace setup as ModalBackend, but as local
+    subprocesses instead of Modal sandboxes (COMFY_BACKEND=local). Uses the
+    local GPU when one is visible, else falls back to CPU. Needs comfy-cli
+    with ComfyUI installed (`pip install comfy-cli && comfy install`).
+
+    Billing is off by default (it's the operator's own hardware); flip
+    COMFY_LOCAL_BILLING=1 to meter it like the static backend.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._procs: dict[int, asyncio.subprocess.Process] = {}
+        self._next_port = settings.COMFY_LOCAL_PORT_START
+
+    async def _launch(self, instance: ComfyInstance):
+        import shutil
+        from pathlib import Path
+
+        if not shutil.which("comfy"):
+            raise RuntimeError(
+                "COMFY_BACKEND=local needs comfy-cli on PATH: "
+                "`pip install comfy-cli && comfy --skip-prompt install`"
+            )
+
+        port = self._next_port
+        self._next_port += 1
+        base_dir = (
+            Path(settings.COMFY_LOCAL_DATA_DIR).expanduser()
+            / f"workspace-{instance.workspace_id}"
+        )
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            "comfy",
+            "launch",
+            "--",
+            "--listen",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--base-directory",
+            str(base_dir),
+        ]
+        if not await _has_local_gpu():
+            cmd.append("--cpu")
+
+        proc = await asyncio.create_subprocess_exec(*cmd)
+        self._procs[instance.workspace_id] = proc
+        instance.instance_id = f"local-{instance.workspace_id}-{int(time.time())}"
+        instance.url = f"http://127.0.0.1:{port}"
+        logger.info(
+            f"launched local comfy for workspace {instance.workspace_id} "
+            f"on port {port} (pid {proc.pid}): {' '.join(cmd)}"
+        )
+
+    async def _terminate(self, instance: ComfyInstance):
+        proc = self._procs.pop(instance.workspace_id, None)
+        if not proc or proc.returncode is not None:
+            return
+        proc.terminate()
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=15)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+
+    def _is_billable(self, instance: ComfyInstance) -> bool:
+        return (
+            settings.COMFY_LOCAL_BILLING
+            and instance.ready
+            and time.time() - instance.last_active < BILLING_INTERVAL * 2
+        )
+
+
+async def _has_local_gpu() -> bool:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "nvidia-smi",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        return await proc.wait() == 0
+    except FileNotFoundError:
+        return False
+
+
 class StaticBackend(BaseBackend):
     """
     A single fixed upstream ComfyUI shared by all workspaces (local dev, or a
@@ -206,6 +294,11 @@ class StaticBackend(BaseBackend):
 
 
 def make_backend() -> BaseBackend:
-    if settings.COMFY_BACKEND == "modal":
-        return ModalBackend()
-    return StaticBackend()
+    match settings.COMFY_BACKEND:
+        case "modal":
+            return ModalBackend()
+        case "local":
+            return LocalBackend()
+        case "static":
+            return StaticBackend()
+    raise ValueError(f"unknown COMFY_BACKEND: {settings.COMFY_BACKEND!r}")

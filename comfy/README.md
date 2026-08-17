@@ -92,9 +92,18 @@ robust against changes to ComfyUI's markup.
   pre-baked image in `comfy_modal.py` (comfy-cli + pinned ComfyUI, NVIDIA
   deps), exposed through a Modal tunnel. GPU type via `MODAL_GPU`
   (default `L4`).
+- **`local`**: same per-workspace isolation, but each instance is a local
+  `comfy launch` subprocess instead of a Modal sandbox — for local installs
+  that want to use their own machine (and GPU, if `nvidia-smi` finds one;
+  otherwise ComfyUI runs with `--cpu`). Per-workspace data lives under
+  `COMFY_LOCAL_DATA_DIR` (default `~/.gooey-comfy`), ports are allocated
+  from `COMFY_LOCAL_PORT_START` (default 8190). Credits are **not**
+  deducted unless `COMFY_LOCAL_BILLING=1`, since it's your own hardware.
+  Requires comfy-cli: `pip install comfy-cli && comfy --skip-prompt install`.
 - **`static`**: one fixed upstream ComfyUI (`STATIC_COMFY_URL`) shared by
-  everyone — for local dev, or a self-managed GPU box / RunPod pod. Billed
-  only for *active* minutes since the GPU isn't dedicated.
+  everyone — for pointing at an already-running ComfyUI or a self-managed
+  GPU box / RunPod pod. Billed only for *active* minutes since the GPU
+  isn't dedicated.
 
 Other managed ComfyUI providers can be added as small `BaseBackend`
 subclasses (launch + terminate + url).
@@ -146,10 +155,11 @@ the session cookie is `Secure` on https).
 
 ```bash
 # terminal 1: gooey-server as usual (localhost:8080 / :3000)
-# terminal 2: any local ComfyUI on :8188
-# terminal 3:
+# terminal 2:
 cd comfy
-COMFY_BACKEND=static STATIC_COMFY_URL=http://localhost:8188 \
+pip install -r requirements.txt comfy-cli
+comfy --skip-prompt install   # one-time; picks up your GPU if you have one
+COMFY_BACKEND=local \
   SECRET_KEY=dev COMFY_SERVICE_TOKEN=dev \
   GOOEY_APP_BASE_URL=http://localhost:3000 \
   GOOEY_API_BASE_URL=http://localhost:8080 \
@@ -158,6 +168,11 @@ COMFY_BACKEND=static STATIC_COMFY_URL=http://localhost:8188 \
 ```
 
 (set `COMFY_SERVICE_TOKEN=dev` on the gooey-server side too.)
+
+`COMFY_BACKEND=local` gives you the full production behavior — per-workspace
+instances, launch/idle lifecycle, header — but everything runs on your own
+machine and no credits are deducted. If you already have a ComfyUI running,
+use `COMFY_BACKEND=static STATIC_COMFY_URL=http://localhost:8188` instead.
 
 ## Endpoint reference
 
