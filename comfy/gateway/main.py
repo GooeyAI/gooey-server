@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 from fastapi import FastAPI, Request, WebSocket
 from pydantic import BaseModel
-from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from gateway import backends, gooey_client, header, proxy, sessions, settings
 
@@ -36,7 +36,9 @@ async def lifespan(app: FastAPI):
     await backend.shutdown()
 
 
-app = FastAPI(title="Gooey ComfyUI Gateway", docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(
+    title="Gooey ComfyUI Gateway", docs_url=None, redoc_url=None, lifespan=lifespan
+)
 
 
 def sso_redirect(next_path: str = "/") -> RedirectResponse:

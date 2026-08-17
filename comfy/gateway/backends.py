@@ -48,9 +48,7 @@ class BaseBackend:
             if instance and not instance.stopped:
                 return instance
 
-            balance = await gooey_client.get_balance(
-                uid=uid, workspace_id=workspace_id
-            )
+            balance = await gooey_client.get_balance(uid=uid, workspace_id=workspace_id)
             if balance < settings.MIN_CREDITS_TO_LAUNCH:
                 raise gooey_client.InsufficientCredits(
                     f"This workspace needs at least "
@@ -288,8 +286,7 @@ class StaticBackend(BaseBackend):
 
     def _is_billable(self, instance: ComfyInstance) -> bool:
         return (
-            instance.ready
-            and time.time() - instance.last_active < BILLING_INTERVAL * 2
+            instance.ready and time.time() - instance.last_active < BILLING_INTERVAL * 2
         )
 
 

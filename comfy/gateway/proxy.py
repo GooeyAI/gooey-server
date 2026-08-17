@@ -32,9 +32,7 @@ _client = httpx.AsyncClient(timeout=httpx.Timeout(60, read=600), follow_redirect
 
 
 def _clean_headers(headers) -> dict:
-    return {
-        k: v for k, v in headers.items() if k.lower() not in HOP_BY_HOP_HEADERS
-    }
+    return {k: v for k, v in headers.items() if k.lower() not in HOP_BY_HOP_HEADERS}
 
 
 async def proxy_http(
