@@ -346,6 +346,12 @@ HEADER_ICONS = {
     DOCS_URL: "fa-regular fa-book",
 }
 
+# ComfyUI cloud (comfy.gooey.ai) — see comfy/README.md
+COMFY_BASE_URL = config("COMFY_BASE_URL", "http://localhost:8501")
+# shared bearer token that authenticates the comfy gateway to the internal comfy API
+COMFY_SERVICE_TOKEN = config("COMFY_SERVICE_TOKEN", None)
+COMFY_CREDITS_PER_GPU_MINUTE = config("COMFY_CREDITS_PER_GPU_MINUTE", 10, cast=int)
+
 SERPER_API_KEY = config("SERPER_API_KEY", None)
 GOOGLE_GEOCODING_API_KEY = config("GOOGLE_GEOCODING_API_KEY", default="")
 GOOGLE_MAPS_API_KEY = config("GOOGLE_MAPS_API_KEY", default="")

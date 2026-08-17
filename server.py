@@ -45,6 +45,7 @@ from routers import (
     static_pages,
     onedrive_api,
     workspace,
+    comfy_api,
 )
 from routers import live_transcribe_api, twilio_ws_api
 from daras_ai_v2.openapi_tricks import patch_custom_schema_fastapi
@@ -93,6 +94,7 @@ app_routers = [
     onedrive_api.app,
     slack_api.router,
     workspace.app,
+    comfy_api.app,
     url_shortener.app,
     paypal.router,
     stripe.router,
