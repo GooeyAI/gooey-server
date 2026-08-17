@@ -19,7 +19,11 @@ SESSION_MAX_AGE = 14 * 24 * 60 * 60
 # "local"  — per-workspace local ComfyUI subprocesses via comfy-cli, using the
 #            local GPU if present (local installs that don't want Modal)
 # "static" — one fixed upstream ComfyUI shared by everyone
-COMFY_BACKEND = config("COMFY_BACKEND", "modal")
+# gooey-server's global MODAL_RUN_LOCALLY flag flips the default to "local"
+COMFY_BACKEND = config(
+    "COMFY_BACKEND",
+    "local" if config("MODAL_RUN_LOCALLY", False, cast=bool) else "modal",
+)
 STATIC_COMFY_URL = config("STATIC_COMFY_URL", "http://localhost:8188")
 MODAL_GPU = config("MODAL_GPU", "L4")
 

@@ -1423,13 +1423,14 @@ def run_asr(
         return r.json()["transcription_text"]
     elif selected_model == AsrModels.meta_omnilingual_asr_llm_7b:
         import modal
-        from modal_functions.meta_omnilingual_asr import app as modal_app
+        from modal_functions import meta_omnilingual_asr
+        from daras_ai_v2.modal_utils import get_modal_cls
 
         # Ensure language is in the correct format (e.g., "eng_Latn")
         if language and language not in OMNILINGUAL_ASR_SUPPORTED:
             raise UserError(f"Unsupported language: {language}")
 
-        Omnilingual = modal.Cls.from_name(modal_app.name, "Omnilingual")
+        Omnilingual = get_modal_cls(meta_omnilingual_asr, "Omnilingual")
         with modal.enable_output():
             transcription = Omnilingual().run.remote(
                 audio_url=audio_url, language=language
@@ -1437,14 +1438,15 @@ def run_asr(
         return transcription
     elif selected_model == AsrModels.sravaani_v1:
         import modal
-        from modal_functions.sravaani_asr import app as modal_app
+        from modal_functions import sravaani_asr
+        from daras_ai_v2.modal_utils import get_modal_cls
 
         # SraVaani identifies the spoken language automatically, so the
         # selected language is only validated, not passed to the model
         if language:
             normalised_lang_in_collection(language, SRAVAANI_SUPPORTED)
 
-        SraVaani = modal.Cls.from_name(modal_app.name, "SraVaani")
+        SraVaani = get_modal_cls(sravaani_asr, "SraVaani")
         with modal.enable_output():
             data = SraVaani().run.remote(
                 audio_url=audio_url,

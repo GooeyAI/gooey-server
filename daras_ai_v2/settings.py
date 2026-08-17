@@ -567,6 +567,15 @@ if MODAL_TOKEN_ID and MODAL_TOKEN_SECRET:
 
 MODAL_VLLM_API_KEY = config("MODAL_VLLM_API_KEY", "")
 
+# run all Modal workloads (modal_functions/*) in-process on this machine
+# instead of on Modal's cloud, using the local GPU if available.
+# see daras_ai_v2/modal_utils.py
+MODAL_RUN_LOCALLY = config("MODAL_RUN_LOCALLY", False, cast=bool)
+# modal web endpoints (the agri_llm vLLM server) can't run in-process; when
+# MODAL_RUN_LOCALLY is on they resolve to this URL instead — run the
+# equivalent server yourself (e.g. `vllm serve ... --port 8000`)
+MODAL_LOCAL_WEB_URL = config("MODAL_LOCAL_WEB_URL", "http://localhost:8000")
+
 HF_TOKEN = config("HF_TOKEN", "")
 
 os.environ["LIVEKIT_API_KEY"] = config("LIVEKIT_API_KEY", "")

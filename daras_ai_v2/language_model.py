@@ -1370,14 +1370,13 @@ def get_openai_client(
             default_headers={"User-Agent": "gooey/openai-sdk"},
         )
     elif model.startswith("AI71ai/"):
-        import modal
-        from modal_functions.agri_llm import app
+        from modal_functions import agri_llm
+        from daras_ai_v2.modal_utils import get_modal_web_url
 
-        modal_fn = modal.Function.from_name(app.name, "serve")
         client = openai.OpenAI(
             api_key=settings.MODAL_VLLM_API_KEY,
             max_retries=0,
-            base_url=str(furl(modal_fn.get_web_url()) / "v1"),
+            base_url=str(furl(get_modal_web_url(agri_llm, "serve")) / "v1"),
         )
     elif model.startswith("mistral-"):
         client = openai.OpenAI(
