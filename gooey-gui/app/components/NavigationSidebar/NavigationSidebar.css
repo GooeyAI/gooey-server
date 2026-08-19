@@ -93,6 +93,15 @@ a.nav-brand {
   scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
+/* Keyboard focus: the browser paints its focus ring *outside* an element's box
+   (outline-offset: 1px), but rows here stretch to the full width of this
+   scroll region -- which clips overflow -- so the ring's right edge (and both
+   edges for un-indented rows) got sliced off. Pull the ring inside the row
+   instead of loosening the clipping, which the sticky rail depends on. */
+.nav-scroll-region :focus-visible {
+  outline-offset: -3px;
+}
+
 .nav-scroll-region::-webkit-scrollbar {
   width: 4px;
 }
@@ -194,7 +203,8 @@ a.nav-brand {
 .nav-item-link {
   transition: background-color 100ms ease;
   text-decoration: none;
-  min-height: 40px;
+  min-height: 36px;
+  font-size: 14px;
 }
 
 .nav-item-link.dense {
@@ -251,11 +261,12 @@ a.nav-brand {
 }
 
 .account-menu-panel {
-  min-width: 300px;
+  min-width: 250px;
   max-width: 300px;
   max-height: 70vh;
   overflow-y: auto;
   overscroll-behavior: contain;
+  font-size: 14px;
 }
 
 /* Circular workspace icon slot; sizes the FontAwesome fallback glyph. */
