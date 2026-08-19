@@ -1,5 +1,6 @@
 import mimetypes
 import random
+import re
 import traceback
 import typing
 from datetime import datetime
@@ -63,6 +64,14 @@ DEFAULT_RESPONSE = (
 INVALID_INPUT_FORMAT = (
     "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
 )
+
+THINKING_HIDDEN_PLATFORMS = {
+    Platform.WHATSAPP,
+    Platform.SLACK,
+    Platform.TELEGRAM,
+    Platform.TWILIO,
+}
+THINK_TAG_RE = re.compile(r"(<think\b[^>]*>|</think\s*>)", re.IGNORECASE)
 
 
 ERROR_MSG = """
@@ -545,6 +554,7 @@ def _process_and_send_msg(
     sent_msg_id = None  # this is the message id to record in the db
     last_idx = 0  # this is the last index of the text sent to the user
     prev_final_prompt = []  # this is the last final_prompt sent to the user
+    thinking_filter = ThinkingFilter(enabled=bot.platform in THINKING_HIDDEN_PLATFORMS)
     if bot.streaming_enabled:
         # subscribe to the realtime channel for updates
         channel = bot.page_cls.realtime_channel_name(sr.run_id, sr.uid)
@@ -570,6 +580,7 @@ def _process_and_send_msg(
                 prev_final_prompt = final_prompt
 
                 text = state.get("output_text") and state.get("output_text")[0]
+                text = thinking_filter.filter(text)
                 if not text:
                     # if no text, send the run status as text
                     update_msg_id = bot.send_run_status(
@@ -615,6 +626,7 @@ def _process_and_send_msg(
         return
 
     text = state.get("output_text") and state.get("output_text")[0]
+    text = thinking_filter.filter(text)
     audio = state.get("output_audio")
     video = state.get("output_video")
     documents = state.get("output_documents")
@@ -654,6 +666,35 @@ def _process_and_send_msg(
         # bot output for human
         bot_msg_display_content=state.get("output_text") and state["output_text"][0],
     )
+
+
+def remove_thinking(text: str | None) -> str | None:
+    return ThinkingFilter(enabled=True).filter(text)
+
+
+class ThinkingFilter:
+    def __init__(self, *, enabled: bool):
+        self.enabled = enabled
+        self.source_text = ""
+        self.visible_text = ""
+        self.inside_thinking = False
+
+    def filter(self, text: str | None) -> str | None:
+        if not self.enabled or text is None:
+            return text
+
+        if not text.startswith(self.source_text):
+            self.source_text = ""
+            self.visible_text = ""
+            self.inside_thinking = False
+
+        for i, chunk in enumerate(THINK_TAG_RE.split(text[len(self.source_text) :])):
+            if i % 2:
+                self.inside_thinking = not chunk.startswith("</")
+            elif not self.inside_thinking:
+                self.visible_text += chunk
+        self.source_text = text
+        return self.visible_text if self.visible_text.strip() else ""
 
 
 def compute_prompt_delta(
