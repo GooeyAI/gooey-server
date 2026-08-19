@@ -1,3 +1,4 @@
+import "~/styles/gooey-orbit-border.css";
 import "./NavigationSidebar.css";
 
 import clsx from "clsx";
