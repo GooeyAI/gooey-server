@@ -142,7 +142,8 @@ def test_chat_widget_stamps_run_url_on_both_entries(db_fixtures):
 
     user_msg, assistant_msg = request_body["messages"]
     assert user_msg["role"] == "user"
-    assert user_msg["run_url"] == sr.get_app_url()
+    # outgoing turns keep it in extra_content, which to_llm_body drops wholesale
+    assert user_msg["extra_content"]["run_url"] == sr.get_app_url()
     assert assistant_msg["run_url"] == sr.get_app_url()
 
 
@@ -153,7 +154,7 @@ def test_get_chat_widget_messages_exports_user_web_url():
                 {
                     "role": "user",
                     "content": "hello",
-                    "run_url": "https://example.com/run-123",
+                    "extra_content": {"run_url": "https://example.com/run-123"},
                 },
                 {"role": "user", "content": "from before the change"},
             ]
@@ -209,7 +210,7 @@ def test_chat_widget_edit_truncates_history_at_edited_turn(db_fixtures):
         current_sr, state, {"input_prompt": "new question"}, edit_sr=edit_sr
     )
 
-    # editing forks a fresh conversation
+    # this fixture's edit_sr has no thread, so there is none to hand over
     assert message_thread is None
     assert request_body["input_prompt"] == "new question"
     # the edited turn and everything after it are dropped
@@ -373,8 +374,8 @@ def test_chat_widget_stamps_created_at_on_the_user_entry(db_fixtures):
     )
 
     user_msg, assistant_msg = request_body["messages"]
-    assert user_msg["created_at"] == sr.created_at.isoformat()
-    assert "created_at" not in assistant_msg
+    assert user_msg["extra_content"]["created_at"] == sr.created_at.isoformat()
+    assert "created_at" not in assistant_msg.get("extra_content", {})
 
 
 def test_get_chat_widget_messages_exports_created_at_on_user_messages():
@@ -384,7 +385,7 @@ def test_get_chat_widget_messages_exports_created_at_on_user_messages():
                 {
                     "role": "user",
                     "content": "hello",
-                    "created_at": "2026-08-13T10:30:00+00:00",
+                    "extra_content": {"created_at": "2026-08-13T10:30:00+00:00"},
                 },
                 {"role": "assistant", "content": "reply"},
             ],

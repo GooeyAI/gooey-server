@@ -89,18 +89,15 @@ def chat_widget_input_to_request_body(
             input_images=prev_input_images,
             # input_audio=prev_input_audio,
             input_documents=prev_input_documents,
-        ) | {
-            "run_url": run_url,
-            # isoformat because this is persisted into the run's json state.
-            # only outgoing messages render a timestamp, so the assistant half
-            # of the turn doesn't carry one
-            "created_at": sr.created_at.isoformat(),
-        }
-        extra_content = user_extra_content(
-            state, get_entry_text(user_entry), prev_input_audio, prev_input_documents
         )
-        if extra_content:
-            user_entry["extra_content"] = extra_content
+        user_entry["extra_content"] = user_extra_content(
+            state,
+            get_entry_text(user_entry),
+            prev_input_audio,
+            prev_input_documents,
+            run_url=run_url,
+            created_at=sr.created_at.isoformat(),
+        )
 
         assistant_entry = format_chat_entry(
             role=CHATML_ROLE_ASSISTANT,
@@ -156,7 +153,9 @@ def _editable_run_refs(current_sr: SavedRun, state: dict) -> set[tuple[str, str]
     """
     refs = {(current_sr.run_id, current_sr.uid)}
     for entry in state.get("messages") or []:
-        run_url = entry.get("run_url")
+        run_url = entry.get("run_url") or (entry.get("extra_content") or {}).get(
+            "run_url"
+        )
         if not run_url:
             continue
         _, run_id, uid = extract_query_params(yarl.URL(run_url).query)
@@ -170,8 +169,19 @@ def user_extra_content(
     raw_input_text: str,
     input_audio: str | None,
     input_documents: list[str] | None,
+    *,
+    run_url: str,
+    created_at: str,
 ) -> dict[str, Any]:
-    ret = {}
+    """
+    Widget-only metadata for an outgoing message. to_llm_body drops
+    extra_content wholesale, so nothing in here can reach the model.
+
+    created_at is an isoformat string because this is persisted into the run's
+    json state. Only outgoing messages render a timestamp, so the assistant
+    half of the turn doesn't carry one.
+    """
+    ret = {"run_url": run_url, "created_at": created_at}
     input_prompt = state.get("input_prompt")
     if input_prompt is not None and input_prompt != raw_input_text:
         ret["display_content"] = input_prompt
@@ -303,8 +313,10 @@ def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
     for entry in entries:
         role = entry.get("role")
 
-        run_url = entry.get("run_url")
         extra_content = entry.get("extra_content") or {}
+        # assistant turns carry run_url at the top level, outgoing ones keep it
+        # in extra_content alongside the rest of their widget-only metadata
+        run_url = entry.get("run_url") or extra_content.get("run_url")
         text = extra_content.get("display_content", get_entry_text(entry)) or ""
         audio = extra_content.get("audio")
         video = extra_content.get("video")
@@ -319,7 +331,7 @@ def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
             if run_url:
                 # the widget only offers to edit a message it can point at a run
                 msg["web_url"] = run_url
-            if created_at := entry.get("created_at"):
+            if created_at := extra_content.get("created_at"):
                 msg["created_at"] = created_at
             if audio:
                 msg["input_audio"] = audio
