@@ -12,7 +12,6 @@ from daras_ai_v2.language_model import (
     get_entry_images,
     get_entry_text,
 )
-from daras_ai_v2.language_model_body import LLMMessageExtraContent
 from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 
 
