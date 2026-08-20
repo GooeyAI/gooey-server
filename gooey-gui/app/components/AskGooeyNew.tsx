@@ -24,7 +24,7 @@ type Attachment = {
 export function AskGooeyNew({
   title = "What will you build today?",
   highlight = "",
-  placeholder = "Ask Gooey to build an agent for farmers in Kenya",
+  placeholder = "Build an agent for farmers in Kenya",
 }: AskGooeyNewProps) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -82,7 +82,8 @@ export function AskGooeyNew({
 
   const checkScroll = () => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setShowScrollArrow(scrollLeft + clientWidth < scrollWidth - 1);
     }
   };
@@ -236,7 +237,9 @@ export function AskGooeyNew({
                           }
                         />
                       )}
-                      <span className="ask-gooey-attachment-name">{a.name}</span>
+                      <span className="ask-gooey-attachment-name">
+                        {a.name}
+                      </span>
                       <button
                         type="button"
                         onClick={() => removeAttachment(a.id)}
