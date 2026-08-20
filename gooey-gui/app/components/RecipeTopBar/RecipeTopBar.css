@@ -416,7 +416,9 @@ a.gooey-topbar-cost:hover {
     position: fixed;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 14px;
+    /* clear of the home indicator on a phone that has one; `env()` is 0 where there is none,
+       so this is plain 14px everywhere else */
+    bottom: calc(14px + env(safe-area-inset-bottom));
     z-index: 1030;
     width: auto;
     max-width: calc(100% - 24px);

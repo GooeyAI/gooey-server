@@ -79,11 +79,21 @@ export function NavigationSidebar({
     const onClose = () => {
       setBuilderOpen(false);
     };
+    // The panel's settled state, which outranks the commands above: a command says what should
+    // happen and can be dispatched before the panel is listening, while this says what the
+    // panel actually is. Without it the rail could sit on a stale `true` - the panel closed,
+    // its button still withheld - until a reload reset this state from the server's.
+    const onChanged = (e: Event) => {
+      const open = (e as CustomEvent<{ open?: boolean }>).detail?.open;
+      if (typeof open === "boolean") setBuilderOpen(open);
+    };
     window.addEventListener(`${builderEventKey}:open`, onOpen);
     window.addEventListener(`${builderEventKey}:close`, onClose);
+    window.addEventListener(`${builderEventKey}:changed`, onChanged);
     return () => {
       window.removeEventListener(`${builderEventKey}:open`, onOpen);
       window.removeEventListener(`${builderEventKey}:close`, onClose);
+      window.removeEventListener(`${builderEventKey}:changed`, onChanged);
     };
   }, [builderEventKey]);
 

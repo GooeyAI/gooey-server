@@ -65,6 +65,22 @@ export function Sidebar({
     }
   }, [isOpen, name]);
 
+  // This panel is the one authority on whether it is open, and says so on every settled
+  // value. The rail keeps its own copy of that fact to decide whether to offer its open
+  // button, and the `:open` / `:close` commands are not enough to keep the two agreeing:
+  // a command is fire-and-forget, so one dispatched before this component's listener exists
+  // - which is what a Builder-chat navigation intent does - is simply lost, and the storage
+  // restore below changes `isOpen` without commanding anything at all. Either way the rail
+  // went on believing the panel was open and withheld the button until a reload reset it.
+  // Announcing the value rather than the command covers both: a late listener gets the truth
+  // on its next render, and a restore is a change like any other.
+  useEffect(() => {
+    if (disabled) return;
+    window.dispatchEvent(
+      new CustomEvent(name + ":changed", { detail: { open: isOpen } })
+    );
+  }, [disabled, isOpen, name]);
+
   useEffect(() => {
     if (!clientOnly) {
       return;

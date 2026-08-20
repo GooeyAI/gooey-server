@@ -530,8 +530,11 @@ class BasePage:
                     # block, so there is no flex context left to grow into.
                     # px-lg-3 rather than px-4: the working column adds no gutter of its own,
                     # so the page's padding is the whole left margin the panes get.
+                    # no `pb-*` below lg: the tab pills float over the bottom of the viewport
+                    # there, and clearing them needs `env(safe-area-inset-bottom)`, which no
+                    # utility can express - RecipeWorkspace.css owns that edge instead
                     "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
-                    "px-2 px-lg-3 pt-2 pt-lg-1 pb-1 pb-lg-2"
+                    "px-2 px-lg-3 pt-2 pt-lg-1 pb-lg-2"
                 ),
                 # without this a flex child refuses to shrink below its content, and the
                 # overflow lands on the page instead of here
@@ -3392,35 +3395,40 @@ PANE_STRIP_CSS = """
 """
 
 SPLIT_PANES_CSS = """
-/* App-shell panes, desktop only. The row fills the body exactly, so the body never
-   overflows and therefore never scrolls; the left pane scrolls inside itself and the right
-   pane (the preview) stays put.
+/* App-shell panes. The row fills the body exactly, so the body never overflows and therefore
+   never scrolls; the left pane scrolls inside itself and the right pane (the preview) stays
+   put.
 
-   Below lg the columns stack (col-12), so this is deliberately not applied - there the row
-   grows and the body scrolls normally, which is the right behaviour on a phone. */
+   This used to stop at lg, on the reasoning that a stacked phone layout may as well scroll
+   the page. But the shell is the frame at every width, and cutting the height chain here cut
+   it for everything below: with no definite height on the column, the `h-100` inside it
+   resolves to `auto`, the working column's `flex-grow-1 overflow-auto` pane never gets a
+   bound to scroll against, and it grows to fit its content instead - so a short pane like
+   Knowledge or Tools still scrolled the whole section, and the strip and submit row went with
+   it. Bounded at every width, `overflow: auto` does what it says: nothing scrolls until the
+   content is actually taller than the pane. */
 & {
     margin: 0;
     padding-top: 0;
+    height: 100%;
+    min-height: 0;
+}
+
+/* Neither column scrolls as a whole. The left column is a flex stack whose *pane* scrolls,
+   so its strip and submit row stay put; the right column is the preview, which manages its
+   own scrolling. */
+& > div {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 @media (min-width: 992px) {
-    & {
-        height: 100%;
-        min-height: 0;
-    }
     & > div {
-        height: 100%;
-        min-height: 0;
         /* the working column starts at the page's own padding, with no gutter on top of it -
            on the row's children, because a wrapper div around `with input_col:` would mount
            beside the row, not around the columns */
         padding-left: 0px;
-    }
-    /* Neither column scrolls as a whole. The left column is a flex stack whose *pane*
-       scrolls, so its strip and submit row stay put; the right column is the preview,
-       which manages its own scrolling. */
-    & > div {
-        overflow: hidden;
     }
     /* The preview sits flush against the page's right edge: it is a framed surface of its
        own, so a gutter between the frame and the edge just wastes width the chat could use.

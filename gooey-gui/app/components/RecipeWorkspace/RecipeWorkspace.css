@@ -219,6 +219,15 @@
     padding: 0 !important;
   }
 
+  /* Room for the pill strip, which floats over the bottom of the viewport at this width
+     rather than sitting in the bar - without it the pane ran to the viewport edge and the
+     bottom of the working column sat underneath the pills. The `env()` term is the home
+     indicator on a phone that has one, and resolves to 0 everywhere else; no Bootstrap
+     spacing utility can express it, which is why the markup carries no `pb-*` here. */
+  .v2-workspace-body {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+
   .recipe-workspace {
     position: relative;
   }
