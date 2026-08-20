@@ -110,7 +110,7 @@ function NavItem({
         )}
       >
         <span
-          className={clsx("nav-item-icon")}
+          className="nav-item-icon"
           dangerouslySetInnerHTML={{ __html: item.icon }}
         />
         {!collapsed && <span>{item.label}</span>}
