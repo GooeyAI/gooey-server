@@ -122,5 +122,17 @@ def clear_pytest_outbox():
 
 @pytest.fixture(scope="session", autouse=True)
 def patch_django_supports_color():
-    with patch("django.core.management.color.supports_color", return_value=False):
+    from django.core.management.base import OutputWrapper
+
+    with (
+        patch("django.core.management.color.supports_color", return_value=False),
+        patch.object(OutputWrapper, "isatty", _safe_django_output_isatty),
+    ):
         yield
+
+
+def _safe_django_output_isatty(self):
+    try:
+        return hasattr(self._out, "isatty") and self._out.isatty()
+    except ValueError:
+        return False

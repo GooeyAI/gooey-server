@@ -1,0 +1,90 @@
+/* Shared cyan brand-color light that travels around a border. A conic-gradient
+   "comet" rotates and is masked down to just the border ring, so the bright
+   arc sweeps left→right and around the perimeter.
+   #03dac5 is the Gooey brand cyan (see the spinner accent in custom.css). */
+@property --gooey-orbit-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.gooey-orbit-border {
+  position: relative;
+}
+
+.gooey-orbit-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px; /* ring thickness */
+  background: conic-gradient(
+    from var(--gooey-orbit-angle),
+    rgba(3, 218, 197, 0.35) 0deg,
+    rgba(3, 218, 197, 0.35) 70deg,
+    rgba(3, 218, 197, 0.9) 130deg,
+    #a5ffee 160deg,
+    rgba(3, 218, 197, 0.9) 190deg,
+    rgba(3, 218, 197, 0.35) 250deg,
+    rgba(3, 218, 197, 0.35) 360deg
+  );
+  /* Mask out the center, leaving only the padding-width border ring. */
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  /* Two sweeps, then fade the entire ring out and keep it hidden (forwards). */
+  animation:
+    gooey-orbit-spin 2.8s linear 2,
+    gooey-orbit-fade 5.6s ease-out forwards;
+}
+
+/* Larger surfaces (e.g. the Ask Gooey input): a tighter, brighter comet with
+   a transparent trail so the traveling light reads against a pastel border. */
+.gooey-orbit-border--strong::before {
+  padding: 2.5px;
+  background: conic-gradient(
+    from var(--gooey-orbit-angle),
+    transparent 0deg,
+    transparent 105deg,
+    rgba(3, 218, 197, 0.55) 135deg,
+    #03dac5 150deg,
+    #ffffff 160deg,
+    #03dac5 170deg,
+    rgba(3, 218, 197, 0.55) 185deg,
+    transparent 215deg,
+    transparent 360deg
+  );
+  filter:
+    drop-shadow(0 0 4px #03dac5)
+    drop-shadow(0 0 10px rgba(3, 218, 197, 0.9));
+}
+
+@keyframes gooey-orbit-spin {
+  to {
+    --gooey-orbit-angle: 360deg;
+  }
+}
+
+@keyframes gooey-orbit-fade {
+  0%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Respect reduced-motion: park the light as a static cyan rim (no sweep, no
+   fade-out). */
+@media (prefers-reduced-motion: reduce) {
+  .gooey-orbit-border::before {
+    animation: none;
+  }
+}

@@ -296,6 +296,19 @@ SAARAS_V3_SUPPORTED = {
     "ml-IN", "mni-IN", "mr-IN", "ne-IN", "od-IN", "pa-IN", "sa-IN", "sat-IN", "sd-IN", "ta-IN", "te-IN", "ur-IN",
 }  # fmt: skip
 
+# SraVaani 1.0 (ARTPARK, IISc) - 65 Indian languages & dialects (ISO 639-3), auto language identification
+# https://huggingface.co/ARTPARK-IISc/SraVaani-1.0
+# (a few supported dialects have no ISO 639-3 code and are omitted here: Bearybashe, Chakhesang, Khariboli, Khortha, Malvani)
+SRAVAANI_SUPPORTED = {
+    # scheduled languages
+    "asm", "ben", "brx", "doi", "guj", "hin", "kan", "kok", "mai", "mal", "mni", "mar", "nep", "ori", "pan", "san",
+    "sat", "snd", "tam", "tel",
+    # non-scheduled languages & dialects
+    "eng", "njm", "njo", "awa", "vjk", "bgw", "bhb", "bho", "bns", "ccp", "hne", "gbm", "grt", "hlb", "bgc", "clk",
+    "dhd", "mjw", "khn", "trp", "kfy", "kyw", "lmn", "mag", "mwr", "lus", "nag", "sck", "pwr", "raj", "nre", "spv",
+    "swv", "nsm", "sgj", "sjp", "tcy", "nnp",
+}  # fmt: skip
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
@@ -312,6 +325,7 @@ class AsrModels(Enum):
     seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
     meta_omnilingual_asr_llm_7b = "Omnilingual ASR LLM (Meta)"
+    sravaani_v1 = "SraVaani 1.0 (ARTPARK, IISc)"
     voxtral_mini = "Voxtral Mini Transcribe 2"
 
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
@@ -387,6 +401,7 @@ asr_model_ids = {
     AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
     AsrModels.meta_omnilingual_asr_llm_7b: "omniASR_LLM_7B",
+    AsrModels.sravaani_v1: "ARTPARK-IISc/SraVaani-1.0",
     AsrModels.voxtral_mini: "voxtral-mini-2602",
     AsrModels.lelapa: "lelapa-vulavula",
     AsrModels.elevenlabs: "elevenlabs-scribe-v1",
@@ -426,6 +441,7 @@ asr_supported_languages = {
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
     AsrModels.meta_omnilingual_asr_llm_7b: OMNILINGUAL_ASR_SUPPORTED,
+    AsrModels.sravaani_v1: SRAVAANI_SUPPORTED,
     AsrModels.voxtral_mini: VOXTRAL_SUPPORTED,
     AsrModels.ghana_nlp_asr_v2: GHANA_NLP_ASR_V2_SUPPORTED,
     AsrModels.lelapa: LELAPA_ASR_SUPPORTED,
@@ -1419,6 +1435,21 @@ def run_asr(
                 audio_url=audio_url, language=language
             )
         return transcription
+    elif selected_model == AsrModels.sravaani_v1:
+        import modal
+        from modal_functions.sravaani_asr import app as modal_app
+
+        # SraVaani identifies the spoken language automatically, so the
+        # selected language is only validated, not passed to the model
+        if language:
+            normalised_lang_in_collection(language, SRAVAANI_SUPPORTED)
+
+        SraVaani = modal.Cls.from_name(modal_app.name, "SraVaani")
+        with modal.enable_output():
+            data = SraVaani().run.remote(
+                audio_url=audio_url,
+                return_timestamps=output_format != AsrOutputFormat.text,
+            )
     elif selected_model in {AsrModels.gpt_4_o_audio, AsrModels.gpt_4_o_mini_audio}:
         from daras_ai_v2.language_model import get_openai_client
 

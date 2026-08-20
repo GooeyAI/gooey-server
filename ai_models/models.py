@@ -32,6 +32,7 @@ class ModelProvider(models.IntegerChoices):
     openai = 1, "OpenAI"
     openai_audio = 16, "Openai Audio"
     openai_responses = 17, "OpenAI Responses"
+    litellm_responses = 18, "LiteLLM Responses"
     azure_openai = 4, "Azure OpenAI"
     google = 2, "Google"
     together_ai = 3, "TogetherAI"
@@ -194,3 +195,6 @@ class AIModelSpec(models.Model):
 
     def is_anthropic_model(self):
         return self.creator and "anthropic" in self.creator.website_url
+
+    def is_google_model(self):
+        return self.creator and "google" in self.creator.website_url

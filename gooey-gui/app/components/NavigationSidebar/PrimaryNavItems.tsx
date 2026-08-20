@@ -94,7 +94,7 @@ function NavItem({
   // section's own heading still reads like every other one, so History and Saved sit at the
   // same weight and size in the rail instead of History looking like a caption.
   const className = clsx(
-    "nav-item-link d-flex align-items-center rounded px-2 py-2",
+    "nav-item-link d-flex align-items-center rounded px-2 py-1",
     collapsed && "justify-content-center px-0",
     isActive ? "fw-bold nav-item-link--active text-body" : "text-body",
     collapsed && "position-relative",
@@ -105,7 +105,7 @@ function NavItem({
     <Fragment>
       <span
         className={clsx(
-          "d-flex align-items-center flex-grow-1 gap-2",
+          "d-flex align-items-center flex-grow-1 gap-1",
           collapsed && "justify-content-center",
           collapsed && !item.href && "d-none" // hide when no href and collapsed
         )}
@@ -194,7 +194,7 @@ function NavItemChildren({
         )}
       </NavItem>
       {showItems && (
-        <div className={clsx(!item.dense && "saved-tree")}>
+        <div className={clsx(!item.dense && "saved-tree mb-2")}>
           {showSkeleton ? (
             <WorkflowListSkeleton rows={3} indent={!item.dense} />
           ) : (

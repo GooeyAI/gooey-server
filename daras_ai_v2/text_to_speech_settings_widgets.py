@@ -428,7 +428,9 @@ def google_tts_selector(*, language_filter: str | None = None):
     try:
         voices = google_tts_voices()
     except google.auth.exceptions.DefaultCredentialsError:
-        gui.error("Error fetching Google TTS voices. Please check your credentials.")
+        gui.error(
+            "Google TTS unavailable. You can choose an open source TTS provider like Bark or MMS TTS by adding your [own API key](https://github.com/GooeyAI/gooey-server/blob/master/configuration.md)."
+        )
         return
     voice_options = list(voices.keys())
     if language_filter:

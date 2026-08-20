@@ -607,7 +607,19 @@ def document_intelligence_settings(title: str, help: str | None = None):
     document_models = {}
     if settings.AZURE_FORM_RECOGNIZER_KEY:
         document_models |= azure_document_intelligence_models()
-    document_models |= {"mistral-ocr": "Mistral OCR"}
+    if settings.MISTRAL_API_KEY:
+        document_models |= {"mistral-ocr": "Mistral OCR"}
+    if not document_models:
+        gui.session_state["document_model"] = None
+        gui.error(
+            "OCR is unavailable, so documents will use standard text extraction. "
+            "To extract text from scanned PDFs or images, configure "
+            "`AZURE_FORM_RECOGNIZER_KEY` or `MISTRAL_API_KEY` by adding your "
+            "[own API key](https://github.com/GooeyAI/gooey-server/blob/master/configuration.md).",
+            icon="⚠️",
+            color="#ffe8b2",
+        )
+        return
     gui.selectbox(
         title,
         key="document_model",
