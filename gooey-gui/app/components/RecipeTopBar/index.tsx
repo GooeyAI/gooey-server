@@ -251,9 +251,20 @@ export function RecipeTopBar({
   // makes it the root by definition rather than a second guess at it.
   // A tab that is not the workspace is never the root: API and Deploy are levels above the
   // editor, so they always offer a way back, whatever the panel happens to be doing.
+  //
+  // Until the layout has hydrated, assume the root. Before then `layout` is whatever
+  // `initial_view` says, and for an owner that is Split - so the crumb rendered "Split" for a
+  // frame, until sessionStorage loaded, `keepLayoutOnScreen` folded Split away at this width,
+  // and the panel announced itself. Naming a view the user never chose, and one that does not
+  // exist on a phone, is worse than naming none: the root is the safe assumption, because
+  // Ask Gooey is what a workflow opens on here. The pill group guards the same frame with
+  // `paneVisibility(hydrated)`; this is that guard for the rest of the bar - it also keeps the
+  // run bar from flashing in and the back arrow from appearing before there is a level to
+  // leave.
   const atRoot =
     workspace_active &&
-    (builder_event_key ? builderOpen : selectedView === initial_view);
+    (!hydrated ||
+      (builder_event_key ? builderOpen : selectedView === initial_view));
   // What the crumb reads. The server names a non-workspace tab; on the workspace it is
   // whichever view is on screen.
   const crumb = crumb_label || activeViewSpec?.label || "";
