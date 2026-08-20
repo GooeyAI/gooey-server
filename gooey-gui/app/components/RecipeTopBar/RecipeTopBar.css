@@ -426,10 +426,15 @@ a.gooey-topbar-cost:hover {
   }
 
   /* A level down the stack - Edit, Preview - which the design draws 4px shorter and rules with
-     the softer line. Kept as two distinct states rather than normalised to one, on request. */
+     the softer line.
+
+     The design also insets it 8px on the left rather than 12px, and that part is not kept: the
+     left slot is the one control on the row that is always there, so 4px of horizontal travel
+     every time you enter or leave a view reads as the header twitching. The height difference
+     costs nothing, because nothing is anchored to the bottom edge. */
   .gooey-topbar-stacked {
     padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
-      var(--gooey-space-2);
+      var(--gooey-space-3);
     border-bottom-color: var(--gooey-line-soft);
   }
 
@@ -440,6 +445,10 @@ a.gooey-topbar-cost:hover {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /* A fixed box, because the two glyphs it holds are not the same width - `fa-bars` is
+       square, `fa-chevron-left` about half that - and the row would otherwise shift by the
+       difference every time the header changed state. The box is what holds still; the glyph
+       centres inside it. */
     width: 24px;
     height: 24px;
     padding: 0;
@@ -447,6 +456,14 @@ a.gooey-topbar-cost:hover {
     background: none;
     color: var(--gooey-ink);
     font-size: 1rem;
+    line-height: 1;
+  }
+
+  /* Both glyphs centre in the same box rather than sizing to their own ink. */
+  .gooey-topbar-nav > i {
+    display: block;
+    width: 100%;
+    text-align: center;
   }
 
   /* 32px and always round here. The square-with-rounded-corners treatment and the
@@ -642,11 +659,25 @@ a.gooey-topbar-cost:hover {
     border-left: 0;
   }
 
-  .v2-app-shell .gooey-sidebar-open ~ div {
-    /* `!important` because that sibling carries Bootstrap's `d-flex`, which is
-       `display: flex !important` and wins otherwise. Without it the workspace was not hidden
-       at all - it was squeezed into a sliver down the right-hand edge, beside a panel that had
-       taken the rest of the row, which is the exact failure this rule exists to prevent. */
+  /* ...and the surface behind it steps aside - but only where that surface is the workspace.
+     `:has()` rather than a bare descendant match because API, Deploy and History are not panes:
+     the sibling there is the tab's own body, and hiding it left the panel covering a page the
+     user had just navigated to, with nothing on screen to say so.
+
+     `!important` because that sibling carries Bootstrap's `d-flex`, which is
+     `display: flex !important` and wins otherwise. Without it the workspace was not hidden at
+     all - it was squeezed into a sliver down the right-hand edge, beside a panel that had taken
+     the rest of the row, which is the exact failure this rule exists to prevent. */
+  .v2-app-shell:has(.recipe-workspace) .gooey-sidebar-open ~ div {
+    display: none !important;
+  }
+
+  /* On one of those tabs the panel is not shown at all. Ask Gooey is the root of the *workspace*
+     stack; API and Deploy sit above the editor, so a full-screen chat over them has nothing
+     behind it to close back to - the header's back arrow goes to Edit, not here. Closing it on
+     the way out of the sheet covers the navigation; this covers arriving with it already open,
+     which Back, a reload or a deep link all do. */
+  .v2-app-shell:not(:has(.recipe-workspace)) .gooey-sidebar-open {
     display: none !important;
   }
 
@@ -815,6 +846,21 @@ a.gooey-topbar-cost:hover {
   color: var(--gooey-ink);
 }
 
+/* Names the group below it, and takes no click. Indented to the labels rather than to the
+   icons: it is not one of them, and lining it up with the glyph column made it read as a row
+   whose icon had failed to load. */
+.gooey-sheet-heading {
+  width: 100%;
+  padding: var(--gooey-space-3) var(--gooey-space-2) var(--gooey-space-1)
+    var(--gooey-space-3);
+  color: var(--gooey-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
 /* A fixed box so every label starts on the same x, whatever the glyph's own width. */
 .gooey-sheet-icon {
   flex: 0 0 auto;
@@ -823,4 +869,35 @@ a.gooey-topbar-cost:hover {
   justify-content: center;
   width: 20px;
   font-size: 1rem;
+}
+
+/* ------------------------------------------------- no motion below lg
+
+   The layout animations are desktop affordances: the pane slide reads as one surface making
+   room for another beside it, and the panel slide as a rail coming in from the edge. On a phone
+   there is no "beside" - one surface replaces another outright - so the same transitions play as
+   the whole screen sliding about, and they animate layout properties (width, transform on a
+   full-width element), which is the expensive kind.
+
+   Scoped to the surfaces that move. Not a blanket `* { transition: none }`: the loading shimmer
+   and the hover tints are not what makes this feel unsteady, and switching them all off to fix
+   two is how a stylesheet stops being explicable. */
+@media (max-width: 991.98px) {
+  /* The panes only slide because one is making room for another beside it. Below lg one pane
+     holds the screen, so the same transition plays as the whole view sliding about. Cut at lg,
+     not at the panel's 1140: between the two the layout is still two columns, and About
+     sliding in is the affordance that says the surface changed. */
+  .recipe-workspace-pane {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 1140px) {
+  /* The panel's own breakpoint - where it stops being a rail beside the content and becomes
+     the content. There is nothing for a slide to reveal once it fills the shell. */
+  .nav-sidebar,
+  .gooey-sidebar,
+  .gooey-sidebar #gooey-builder-embed {
+    transition: none !important;
+  }
 }

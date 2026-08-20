@@ -47,6 +47,7 @@ type MenuEntry = TopBarMenuItem & { mobileOnly?: boolean; heading?: boolean };
 const PUBLISH_ITEM_KEY = "--topbar-item-publish";
 const SHARE_ITEM_KEY = "--topbar-item-share";
 const API_ITEM_KEY = "--topbar-item-api";
+const DEPLOY_ITEM_KEY = "--topbar-item-deploy";
 
 function Menu({
   items,
@@ -134,6 +135,9 @@ export function RecipeTopBar({
   cost_label,
   cost_href,
   cost_title,
+  view_only,
+  crumb_label,
+  deploy_href,
   builder_event_key,
   builder_new_event,
   history_href,
@@ -219,6 +223,13 @@ export function RecipeTopBar({
   // window from whatever is already there.
   useEffect(() => {
     if (!builder_event_key) return;
+    // Only on the workspace. On API or Deploy the panel is not this page's root - the editor
+    // is, one level down - and opening it there would bury a page the user navigated to.
+    if (!workspace_active) return;
+    // A visitor lands on About, not on a chat: the first question is what this workflow is,
+    // and Remix is how they opt into building one. Opening the panel over that answers a
+    // question they have not asked yet.
+    if (view_only) return;
     if (window.innerWidth >= 1140) return;
     let chosen: string | null = null;
     try {
@@ -238,7 +249,14 @@ export function RecipeTopBar({
   // Where there is no Builder at all there is no panel to be the root, so the entry view takes
   // the job. `initial_view` is the server's answer to "where does this workflow open", which
   // makes it the root by definition rather than a second guess at it.
-  const atRoot = builder_event_key ? builderOpen : selectedView === initial_view;
+  // A tab that is not the workspace is never the root: API and Deploy are levels above the
+  // editor, so they always offer a way back, whatever the panel happens to be doing.
+  const atRoot =
+    workspace_active &&
+    (builder_event_key ? builderOpen : selectedView === initial_view);
+  // What the crumb reads. The server names a non-workspace tab; on the workspace it is
+  // whichever view is on screen.
+  const crumb = crumb_label || activeViewSpec?.label || "";
   const previewable = views.some((view) => view.slug === "preview");
 
   const openNavDrawer = () =>
@@ -251,8 +269,12 @@ export function RecipeTopBar({
     );
   };
 
-  // Back out of a view: to Ask Gooey where there is one, otherwise to the entry view.
+  // Back out of a view. From API or Deploy that means leaving the tab for the workspace and
+  // landing on Edit, which is the level they sit above - `chooseView` navigates on its own when
+  // the workspace is not the current tab. On the workspace it is Ask Gooey where there is one,
+  // and the entry view otherwise.
   const goBack = () => {
+    if (!workspace_active) return chooseView("edit");
     if (builder_event_key) return setBuilder(true);
     chooseView(initial_view);
   };
@@ -261,7 +283,12 @@ export function RecipeTopBar({
   // selects renders behind a panel that is covering the whole shell.
   const showView = (view: RecipeView) => {
     setBuilder(false);
-    chooseView(view);
+    // Split is two columns, and there is room for one below lg - `keepLayoutOnScreen` folds it
+    // to the preview alone. For "How it works", which is Split, that drops the configuration
+    // the entry exists to show and lands on the bot instead, so the pick reads as opening the
+    // wrong view and needing a second go. Ask for the editor directly at this width.
+    const narrow = typeof window !== "undefined" && window.innerWidth < 992;
+    chooseView(narrow && view === "split" ? "edit" : view);
   };
 
   const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
@@ -331,6 +358,18 @@ export function RecipeTopBar({
     });
   }
 
+  // Deploy is the fourth way to ship this workflow, beside saving, sharing and the API - and
+  // like the API it is a route now rather than a pane, so it needs no key round-trip either.
+  if (deploy_href) {
+    publishEntries.push({
+      key: DEPLOY_ITEM_KEY,
+      label: "Deploy",
+      icon: '<i class="fa-regular fa-rocket"></i>',
+      href: deploy_href,
+      is_danger: false,
+    });
+  }
+
   // Below lg the chips and the title compete for one row and the title always loses, so
   // the chips move into the overflow menu. Both lists are rendered and CSS picks one - no
   // media-query JS, and the chip count stops mattering. Publish folds in the same way:
@@ -383,41 +422,85 @@ export function RecipeTopBar({
     ];
   };
 
-  const sheetEntries: SheetEntry[] = [
-    // Listed in the design's order, which is not the order the view selector uses - so each
-    // entry is placed by name rather than swept up from `views`. Usage has no destination in
-    // the app yet, so it is left out rather than rendered as a row that does nothing.
-    ...viewEntry("about"),
-    ...(builder_new_event
-      ? [
-          {
-            key: "--sheet-new-chat",
-            label: "New Chat",
-            iconClass: "fa-regular fa-pen-to-square",
-            onPick: () =>
-              window.dispatchEvent(new CustomEvent(builder_new_event)),
-          },
-        ]
-      : []),
-    ...viewEntry("edit"),
-    ...(history_href
-      ? [
-          {
-            key: "--sheet-history",
-            label: "Version History",
-            iconClass: "fa-regular fa-clock-rotate-left",
-            href: history_href,
-          },
-        ]
-      : []),
-    ...overflowEntries.map((item) => ({
-      key: item.key,
-      label: item.label,
-      iconHtml: item.icon,
-      href: item.href ?? undefined,
-      onPick: item.href ? undefined : () => pickMenuItem(item),
-    })),
-  ];
+  // The sheet carries whichever of Edit and Preview the header does not already reach in one
+  // tap. At the root that is Edit, because the eye button is Preview; inside Edit it is Preview,
+  // because the action button has become Update. Listing the view you are already looking at
+  // was the alternative, and it is a row that does nothing.
+  const otherWorkView: RecipeView =
+    !atRoot && selectedView === "edit" ? "preview" : "edit";
+
+  const sheetEntries: SheetEntry[] = view_only
+    ? [
+        // Read it, see how it is built, make your own. Everything else in this bar acts on a
+        // run the visitor does not own, so none of it is offered rather than offered and
+        // refused: no Update, no Share, no API, no Deploy, no version history.
+        ...views.map((view) => ({
+          key: `--sheet-view-${view.slug}`,
+          label: view.label,
+          iconHtml: view.icon,
+          onPick: () => showView(view.slug as RecipeView),
+        })),
+        ...(builder_event_key
+          ? [
+              {
+                key: "--sheet-remix",
+                label: "Remix",
+                iconClass: "fa-regular fa-shuffle",
+                // Remix is not a save - there is nothing of the visitor's to save yet. It
+                // opens Ask Gooey, which is where a workflow of their own starts.
+                onPick: () => setBuilder(true),
+              },
+            ]
+          : []),
+      ]
+    : [
+        // Listed in the design's order, which is not the order the view selector uses - so each
+        // entry is placed by name rather than swept up from `views`. Usage has no destination in
+        // the app yet, so it is left out rather than rendered as a row that does nothing.
+        ...viewEntry("about"),
+        // Only while Ask Gooey is the surface on screen. A fresh thread is an action on the chat,
+        // so offering it from Edit or Preview means starting one somewhere you cannot see it.
+        ...(builder_new_event && atRoot
+          ? [
+              {
+                key: "--sheet-new-chat",
+                label: "New Chat",
+                iconClass: "fa-regular fa-pen-to-square",
+                onPick: () =>
+                  window.dispatchEvent(new CustomEvent(builder_new_event)),
+              },
+            ]
+          : []),
+        ...viewEntry(otherWorkView),
+        ...(history_href
+          ? [
+              {
+                key: "--sheet-history",
+                label: "Version History",
+                iconClass: "fa-regular fa-clock-rotate-left",
+                href: history_href,
+                onPick: () => setBuilder(false),
+              },
+            ]
+          : []),
+        // Update is dropped: it is the outlined button in the header on every view that has one,
+        // and a menu row for the control sitting two inches above it is just a second way to miss.
+        // Share, API and Deploy stay - they have no button of their own at this width.
+        ...overflowEntries
+          .filter((item) => item.key !== PUBLISH_ITEM_KEY)
+          .map((item) => ({
+            key: item.key,
+            label: item.label,
+            iconHtml: item.icon,
+            href: item.href ?? undefined,
+            heading: item.heading,
+            // A link navigates, so its only job here is to put Ask Gooey away first -
+            // otherwise the panel is still open when the next page mounts, on top of it.
+            onPick: item.href
+              ? () => setBuilder(false)
+              : () => pickMenuItem(item),
+          })),
+      ];
 
   const pickMenuItem = (item: TopBarMenuItem) => {
     setTitleMenuOpen(false);
@@ -454,7 +537,7 @@ export function RecipeTopBar({
         >
           <i
             className={
-              atRoot ? "fa-regular fa-sidebar" : "fa-regular fa-chevron-left"
+              atRoot ? "fa-regular fa-bars" : "fa-regular fa-chevron-left"
             }
           />
         </button>
@@ -485,13 +568,13 @@ export function RecipeTopBar({
                 pill already says so. Inside the title button rather than beside it: the two
                 read as one heading, and the author line that shares this block is hidden at
                 this width, so there is nothing else on the row to disturb. */}
-            {!atRoot && !!activeViewSpec && (
+            {!atRoot && !!crumb && (
               <span className="gooey-topbar-crumb d-lg-none">
                 <i
                   className="fa-regular fa-chevron-right gooey-topbar-crumb-sep"
                   aria-hidden="true"
                 />
-                {activeViewSpec.label}
+                {crumb}
               </span>
             )}
           </button>

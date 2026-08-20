@@ -8,7 +8,6 @@ export interface TopBarView {
   label: string;
   icon: string;
   desktop_only: boolean;
-  immersive_on_mobile: boolean;
 }
 /**
  * The "by <someone>" line under the title.
@@ -52,7 +51,6 @@ export interface RecipeTopBarProps {
   editor_full_width: boolean;
   workspace_href: string;
   workspace_active: boolean;
-  immersive_on_mobile: boolean;
   overflow_items: TopBarMenuItem[];
   title_menu_items: TopBarMenuItem[];
   integrations: TopBarIntegration[];
@@ -66,6 +64,9 @@ export interface RecipeTopBarProps {
   menu_key: string;
   run_key: string;
   viewport_wide_key: string;
+  view_only: boolean;
+  crumb_label: string;
+  deploy_href: string;
   builder_event_key: string;
   builder_new_event: string;
   history_href: string;
