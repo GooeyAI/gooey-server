@@ -171,7 +171,11 @@ class BasePageRequest:
 class WorkflowIdentity(typing.NamedTuple):
     """How a run names and pictures itself: the pair the top bar leads with."""
 
+    # With the tab's prefix, as the bar shows it on the workspace: "Run: Farmer.AI".
     title: str
+    # Without it. A tab that is not the workspace puts its own name in the crumb instead, and
+    # "API: Farmer.AI > API" would say it twice.
+    name: str
     photo_url: str | None
     circle_photo: bool
 
@@ -498,8 +502,7 @@ class BasePage:
                 # v2-topbar-container makes this a CSS query container, so the bar's chips size
                 # themselves against the bar's own width rather than the viewport's - the two
                 # differ whenever the Builder is open or the rail is expanded
-                "v2-topbar-container flex-shrink-0 w-100 border-bottom "
-                "px-2 px-lg-4 py-2"
+                "v2-topbar-container flex-shrink-0 w-100 px-2 px-lg-4 py-2"
             )
         )
 
@@ -578,20 +581,24 @@ class BasePage:
                 else:
                     submitted = self._render_solo_input_col()
 
-            with gui.div(className="mt-1"):
+            # mt-lg-1, not mt-1: below lg the preview meets the header's rule directly, so
+            # this margin was 4px of page background between the two.
+            with gui.div(className="mt-lg-1"):
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                 else:
                     self._render_output_col(submitted=submitted)
 
     def _workflow_identity(self) -> WorkflowIdentity:
-        """Derived once, so the bar's heading and the mobile back link cannot drift apart."""
+        """Derived once, so every part of the bar's heading agrees on the same run."""
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
         sr, pr = self.current_sr_pr
         tbreadcrumbs = get_title_breadcrumbs(self, sr, pr, tab=self.tab)
+        fallback = self.get_run_title(sr, pr)
         return WorkflowIdentity(
-            title=tbreadcrumbs.title_with_prefix() or self.get_run_title(sr, pr),
+            title=tbreadcrumbs.title_with_prefix() or fallback,
+            name=(tbreadcrumbs.h1_title and tbreadcrumbs.h1_title.title) or fallback,
             photo_url=pr.photo_url or None,
             circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
         )
@@ -832,12 +839,17 @@ class BasePage:
         identity = self._workflow_identity()
         cost_label, cost_title = self._top_bar_cost()
         can_manage_sharing = self.can_manage_sharing()
+        workspace_active = self.tab in {RecipeTabs.run, RecipeTabs.preview}
         # a root recipe has no published run behind it, so there is no published url to share
         can_share = not pr.is_root()
 
         gui.model_component(
             RecipeTopBarProps(
-                title=identity.title,
+                # The prefixed name on the workspace, the bare one elsewhere: off the workspace
+                # the tab's label becomes the crumb, and the prefix *is* that label.
+                title=identity.title if workspace_active else identity.name,
+                crumb_label="" if workspace_active else (self.tab.label or ""),
+                view_only=self.is_unowned_example(),
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
@@ -845,7 +857,7 @@ class BasePage:
                 initial_view=self.entry_tab_slug(tabs),
                 editor_full_width=self._editor_wants_full_width(),
                 workspace_href=self.current_app_url(RecipeTabs.run),
-                workspace_active=self.tab in {RecipeTabs.run, RecipeTabs.preview},
+                workspace_active=workspace_active,
                 views=[
                     TopBarView(
                         slug=tab.slug,
@@ -858,6 +870,7 @@ class BasePage:
                 publish_label=self._top_bar_publish_label(),
                 publish_key=self.TOP_BAR_PUBLISH_KEY,
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
+                deploy_href=self.current_app_url(RecipeTabs.integrations),
                 # Share means different things - change who can see this, or copy the link -
                 # so exactly one of these is set, and neither on a root recipe, which has no
                 # published run behind it and so nothing stable to share.
@@ -957,7 +970,7 @@ class BasePage:
         elif gui.session_state.get(key) not in by_id:
             gui.session_state[key] = panes[0].id
 
-        with gui.styled(PANE_STRIP_CSS), gui.div(className="my-1"):
+        with gui.styled(PANE_STRIP_CSS), gui.div(className="mb-1"):
             for pane in panes:
                 is_active = pane.id == gui.session_state[key]
                 if gui.button(
@@ -1649,6 +1662,7 @@ class BasePage:
                 with gui.div(className="container-margin-reset v2-about-notes"):
                     gui.write(pr.notes)
             self._render_about_meta()
+            self._render_about_deployments()
 
     def _render_about_photo(self, pr: PublishedRun):
         """The workflow's portrait, centred at the top of the card.
@@ -1672,6 +1686,42 @@ class BasePage:
         What "put together" means is per-recipe - an agent has a model, a knowledge base and
         tools; a media-gen recipe has none of those - so the base renders nothing.
         """
+
+    def _render_about_deployments(self):
+        """The channels this workflow is already live on.
+
+        The same list the bar carries as chips, but a different claim: in the bar they are
+        shortcuts, here they answer "can I use this where I already am", which is a fact about
+        the workflow like its model is. So they read as cards beside Model and Tools rather
+        than as actions - and unlike the bar's chips they always carry their label, since
+        About has the width for it and no pill group to stay clear of.
+
+        Its own `.v2-about-groups` row rather than a group inside `_render_about_meta`'s: that
+        one is a per-recipe override, and a base surface cannot reach into it.
+        """
+        integrations = self._top_bar_integrations()
+        if not integrations:
+            return
+        with (
+            gui.div(className="v2-about-groups"),
+            gui.div(className="v2-about-group"),
+        ):
+            gui.html('<div class="v2-about-section-title">Deployments</div>')
+            with gui.div(className="v2-about-meta"):
+                for it in integrations:
+                    body = (
+                        f'<span class="v2-about-meta-icon">{it.icon}</span>'
+                        f'<span class="v2-about-meta-label">{html.escape(it.label)}</span>'
+                    )
+                    # A channel with no url opens a dialog from the bar; there is nothing for
+                    # About to link to, so it states the fact and takes no click.
+                    if it.href:
+                        gui.html(
+                            f'<a class="v2-about-meta-card"'
+                            f' href="{html.escape(it.href)}">{body}</a>'
+                        )
+                    else:
+                        gui.html(f'<div class="v2-about-meta-card">{body}</div>')
 
     def _render_solo_input_col(self) -> bool:
         """The working column on its own, in the same row/column wrapper Split uses.
@@ -3395,6 +3445,16 @@ PANE_STRIP_CSS = """
     border-radius: 50%;
     background: #111;
 }
+
+/* Below lg the strip is the first thing under the app header, and the editor's surface starts
+   at the header's rule - so `my-1`'s top margin was the last 4px of page background showing
+   through between the two. The bottom half stays: that is what holds the strip's own rule off
+   the pills, and leaves room for the active pill's shadow. `!important` to beat the utility. */
+@media (max-width: 991.98px) {
+    & {
+        margin-top: 0 !important;
+    }
+}
 """
 
 SPLIT_PANES_CSS = """
@@ -3455,9 +3515,6 @@ INPUT_OUTPUT_COLS_CSS = """
 }
 
 @media (min-width: 768px) {
-    & {
-        background-color: #FBFAF8;
-    }
     /* set col padding in mobile */
     & > div {
         padding-left: calc(var(--bs-gutter-x) * .5);

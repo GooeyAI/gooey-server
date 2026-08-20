@@ -309,12 +309,37 @@ a.nav-brand {
 
 /* ── Mobile: rail becomes an off-canvas drawer below lg (992px) ────────── */
 
-/* Slim top bar (hamburger + logo); hidden on desktop via d-lg-none. */
+/* Slim top bar (hamburger + logo); hidden on desktop via d-lg-none.
+   56px and a 12px inset, matching `.gooey-topbar` exactly - a v2 page swaps this bar for that
+   one, and any difference in height or gutter reads as the page jolting on navigation. The
+   markup's `px-2` is overridden here rather than changed there, because the same 12px is not
+   expressible on Bootstrap's 4/8/16/24 scale. */
 .nav-mobile-topbar {
   height: 56px;
   width: 100vw;
   top: 0;
   z-index: 1030;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* The menu button, sized to RecipeTopBar's `.gooey-topbar-nav`: a 24px box holding a 1rem
+   glyph, no padding of its own. `fs-5` and `p-2` had it a third larger and 8px further in. */
+.nav-mobile-menu {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--gooey-ink);
+}
+
+.nav-mobile-menu > i {
+  display: block;
+  width: 100%;
+  text-align: center;
 }
 
 /* Except on a v2 page, which brings its own header - RecipeTopBar, which carries the

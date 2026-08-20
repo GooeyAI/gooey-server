@@ -99,6 +99,19 @@ class RecipeTopBarProps(pydantic.BaseModel):
     # constant in navDrawer.ts, shared by the two client components that use it, because
     # nothing server-side changes when the drawer opens.
 
+    # A visitor looking at somebody else's run: nothing here is theirs to edit, publish or
+    # deploy. The bar drops all of it and offers the three things that do apply - read it, see
+    # how it works, make one of your own.
+    view_only: bool = False
+    # What the header's crumb reads on a tab that is not the workspace - API, Deploy. Those
+    # are levels above the editor rather than arrangements of it, so the client cannot name them
+    # from `views`; and their name already exists as the tab's own label. Empty on the
+    # workspace, where the active view is the crumb.
+    crumb_label: str = ""
+    # Deploy, which is a route rather than a pane: `/integrations/` renders the same surface,
+    # and a config pane that needed the whole row was competing with the preview for it.
+    deploy_href: str = ""
+
     # The Builder panel's event key, so the bar can tell whether Ask Gooey is on screen and
     # put it back. Below lg the panel is the root of a navigation stack, which makes its open
     # state the difference between the header showing a menu button and showing a back arrow -

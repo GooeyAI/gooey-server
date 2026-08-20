@@ -10,6 +10,8 @@ export type SheetEntry = {
   iconClass?: string;
   href?: string;
   onPick?: () => void;
+  /** A group label rather than a row you can press - it names the entries under it. */
+  heading?: boolean;
 };
 
 /** The mobile view switcher and action list, as a bottom sheet.
@@ -64,6 +66,15 @@ export function MobileActionSheet({
         </div>
 
         {entries.map((entry) => {
+          // A label, so it takes no icon slot and no click. Rendered as a heading rather than
+          // skipped: it is what stops a long list of channels reading as more actions.
+          if (entry.heading) {
+            return (
+              <div key={entry.key} className="gooey-sheet-heading">
+                {entry.label}
+              </div>
+            );
+          }
           const inner = (
             <>
               <span className="gooey-sheet-icon">
@@ -82,7 +93,13 @@ export function MobileActionSheet({
               to={entry.href}
               className="gooey-sheet-item"
               role="menuitem"
-              onClick={onDismiss}
+              // A link entry may still have side effects to run before it navigates - putting
+              // Ask Gooey away, in every current case - so `onPick` fires here too rather than
+              // being treated as the alternative to `href`.
+              onClick={() => {
+                entry.onPick?.();
+                onDismiss();
+              }}
             >
               {inner}
             </Link>

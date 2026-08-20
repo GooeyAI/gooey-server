@@ -80,13 +80,16 @@ export function NavigationHeaderMobile({
     <Fragment>
       <div className="nav-mobile-topbar d-lg-none d-flex align-items-center px-2 border-bottom bg-body">
         <div className="d-flex align-items-center gap-1">
+          {/* Same box, glyph size and inset as RecipeTopBar's, so moving between a v2 page and
+              any other one does not move the control. `nav-mobile-menu` carries the geometry;
+              see NavigationSidebar.css. */}
           <button
             type="button"
-            className="btn p-2 d-flex align-items-center m-0"
+            className="btn nav-mobile-menu d-flex align-items-center justify-content-center m-0"
             title="Open menu"
             onClick={onDrawerOpen}
           >
-            <i className="fa-regular fa-sidebar fs-5"></i>
+            <i className="fa-regular fa-bars"></i>
           </button>
           <a
             href={logo_href}

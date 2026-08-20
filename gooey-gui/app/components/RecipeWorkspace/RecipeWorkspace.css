@@ -109,7 +109,7 @@
 
 .recipe-workspace-controls {
   position: absolute;
-  top: 0.3rem;
+  top: 13px;
   z-index: 5;
   display: flex;
   gap: 0.375rem;
@@ -142,8 +142,75 @@
   background: var(--bs-white);
 }
 
+/* A labelled control is a pill, not the 2rem square above - it carries a portrait and a name,
+   so it has to size to them. These three classes were emitted by WorkspacePaneControl.tsx and
+   styled nowhere, which left "Ask Gooey" inheriting the square: the name wrapped onto two lines
+   inside a 32px box and the portrait pushed out through the side. `base_v2` already documents
+   this class as the owner of the button's padding - now it is. */
+.v2-pane-control-labelled {
+  width: auto;
+  height: auto;
+  gap: 0.375rem;
+  /* anchored to the panel's top-left corner, so it is bounded rather than allowed to run past
+     the far edge */
+  max-width: calc(100% - 1rem);
+  padding: 0.25rem 0.625rem 0.25rem 0.375rem;
+  color: var(--bs-body-color);
+  font-size: 0.875rem;
+  font-weight: 500;
+  /* One line. The control sits over the content below it, so growing downwards would cover the
+     first thing it is meant to be labelling. */
+  white-space: nowrap;
+}
+
+.v2-pane-control-photo {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.v2-pane-control-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .v2-workspace-body {
   background-color: #fbfaf8 !important;
+}
+
+/* A document tab - History, API, Deploy - scrolls in one direction, in one place.
+   `overflow-auto` on the body gives it both axes, and History overflows sideways: its run cards
+   put an author and a timestamp in a two-column row, and a long title or an unbroken url pushes
+   that row wider than the phone. The result was a page you could drag off-centre, with the
+   header staying put while the content slid under it.
+   `min-width: 0` is what makes the cap stick - a flex child defaults to `min-width: auto`, so
+   it can refuse to shrink below its content and overflow anyway - and `overflow-wrap` gives
+   long unbroken strings somewhere to break instead of forcing that width in the first place. */
+.v2-workspace-body:not(:has(.recipe-workspace)) {
+  overflow-x: hidden;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The editor is a surface of its own, framed the same way the preview is - white, hairline,
+   12px - so the two read as siblings rather than as one card and one bare column. Set on the
+   pane's content box rather than the pane itself: the pane animates its width, and a border on
+   something mid-transition shifts by a subpixel every frame.
+
+   Deliberately no `overflow: hidden`, unlike the preview's frame: the model selector's menu has
+   to be able to leave this box, which is what `6f8fe413` was about. */
+.recipe-workspace-editor > .recipe-workspace-pane-content {
+  background: #fff;
+  border: 1px solid #e0ddd7;
+  border-radius: 12px;
+  /* The surface needs its own inset now that it has an edge: the pane strip and the editor were
+     laid out against a bare column, so against a border they sat flush on it. The working
+     column adds `pe-lg-3` inside this, which keeps the scrollbar off the content - that is on
+     top of this, not instead of it. */
+  padding: 0.75rem;
 }
 
 /* Frames the preview where it shares the view with something else - Split, About - so the two
@@ -165,10 +232,43 @@
      a dead strip under Ask Gooey's composer and under the preview. The `env()` term is the home
      indicator on a phone that has one, 0 elsewhere; no Bootstrap spacing utility can express
      it, which is why the markup carries no `pb-*` at this width. */
+  /* Both work views start at the header's rule, so the page's own top gutter was 8px of page
+     background showing between the two. `!important` because `pt-2` is a Bootstrap utility and
+     carries its own. About keeps the gutter: it is a card, and a card needs to sit off the rule
+     rather than grow out of it. */
+  .v2-workspace-body:has(.recipe-workspace-editor.recipe-workspace-pane--solo),
+  .v2-workspace-body:has(.recipe-workspace-preview.recipe-workspace-pane--solo) {
+    padding-top: 0 !important;
+  }
+
+  /* Only the editor has a run bar under it to clear. */
   .v2-workspace-body:has(
       .recipe-workspace-editor.recipe-workspace-pane--solo
     ) {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* The chat widget frames itself with rounded corners, which is right where the preview is a
+     card beside the editor and wrong where it is the whole screen - the top corners curved away
+     from the header's rule with page background showing through the gap.
+
+     Two levels deep and no further, deliberately: the radius belongs to the widget's outer
+     container, and the message bubbles inside it are rounded on purpose. A descendant reset
+     would square those too. */
+  .recipe-workspace-preview.recipe-workspace-pane--solo
+    > .recipe-workspace-pane-content,
+  .recipe-workspace-preview.recipe-workspace-pane--solo
+    > .recipe-workspace-pane-content
+    > div {
+    border-radius: 0 !important;
+  }
+
+  /* A tab body that is not the workspace - API, Deploy, History - is a document, not a pane, so
+     it keeps a gutter. The markup carries `px-0` at this width for the workspace views, which
+     do run edge to edge; without this the API tab's text sat flush against both edges. */
+  .v2-workspace-body:not(:has(.recipe-workspace)) {
+    padding-left: var(--gooey-space-3);
+    padding-right: var(--gooey-space-3);
   }
 
   .recipe-workspace {
@@ -189,6 +289,21 @@
   .v2-preview-frame {
     border: 0;
     border-radius: 0;
+  }
+
+  /* The editor is a plain white field at this width - no border, no corners, no inset. Every
+     edge of the frame is either off-screen or under something: the sides run past the viewport,
+     the bottom under the run bar, and the top corners were curving away from a header rule
+     sitting directly above them, which read as the content having come loose from the header
+     rather than as a sheet. What is left doing any work is the white itself. */
+  .recipe-workspace-editor > .recipe-workspace-pane-content {
+    border: 0;
+    border-radius: 0;
+    /* One source for the gap above the pane strip, and it is here: the page's top gutter and
+       the strip's own margin are both zeroed at this width, so this is the only thing between
+       the header's rule and the pills. Flush against the rule read as a mistake; 8px reads as
+       a margin. */
+    padding: 0.5rem 0 0;
   }
 
   .recipe-workspace-pane--open {
