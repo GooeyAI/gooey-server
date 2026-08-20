@@ -261,12 +261,20 @@ a.nav-brand {
   z-index: 1030;
 }
 
-/* Scrim behind the open drawer. */
+/* Scrim behind the open drawer, split in two on purpose.
+
+   This half is colourless -- it exists only to catch the tap that closes the
+   drawer. Safari on iOS tints the strips it draws outside the page (status bar,
+   bottom toolbar) from whatever is composited into a `position: fixed` layer
+   touching that edge, and it does not re-sample when the layer disappears. A
+   grey fixed layer spanning the viewport therefore stained both strips and left
+   them stained after the drawer closed. Keeping every colour out of this layer
+   is what avoids that; the dimming is done by .gooey-app-shell::after below,
+   which lives in the document instead. */
 .nav-scrim {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  z-index: 1044;
+  z-index: 1045;
 }
 
 @media (max-width: 991.98px) {
@@ -296,5 +304,23 @@ a.nav-brand {
   html:has(.nav-sidebar--drawer-open) body {
     overflow: hidden;
     overscroll-behavior: none;
+  }
+
+  /* The other half of the scrim: the dimming. It hangs off the in-flow app
+     shell, so it spans the whole document and covers the viewport at any scroll
+     offset without being `position: fixed` -- which is what keeps Safari from
+     tinting its strips (see .nav-scrim). The shell is only made a containing
+     block while the drawer is open, to keep that off everything else. The
+     drawer itself (z-index 9999) stays above this. */
+  html:has(.nav-sidebar--drawer-open) .gooey-app-shell {
+    position: relative;
+  }
+
+  html:has(.nav-sidebar--drawer-open) .gooey-app-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 1044;
   }
 }
