@@ -66,6 +66,9 @@ export interface RecipeTopBarProps {
   menu_key: string;
   run_key: string;
   viewport_wide_key: string;
+  builder_event_key: string;
+  builder_new_event: string;
+  history_href: string;
   run_label: string;
   run_disabled: boolean;
   is_running: boolean;

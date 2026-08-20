@@ -1594,8 +1594,11 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
                 slug=RecipeView.preview,
                 label="Preview",
                 icon=icons.preview,
-                # one full-bleed surface; on a phone it takes the whole screen
-                immersive_on_mobile=True,
+                # Not immersive on a phone any more. It used to take the whole screen, which
+                # meant hiding the top bar and giving the pane a floating back pill of its own
+                # to make up for it. The bar is the app's only header now, and the design keeps
+                # it on every screen - so the pane keeps the header, and the header's back
+                # arrow is the way out. One piece of chrome instead of two.
             ),
             TabSpec(
                 slug=RecipeView.split,

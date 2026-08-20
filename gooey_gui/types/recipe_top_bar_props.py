@@ -12,7 +12,6 @@ class TopBarView(pydantic.BaseModel):
     label: str
     icon: str = ""  # raw FontAwesome html, like NavItemData.icon
     desktop_only: bool = False  # hidden below lg; see TabSpec.desktop_only
-    immersive_on_mobile: bool = False
 
 
 class TopBarAuthor(pydantic.BaseModel):
@@ -63,8 +62,6 @@ class RecipeTopBarProps(pydantic.BaseModel):
     editor_full_width: bool = False
     workspace_href: str
     workspace_active: bool
-    # An immersive view owns the screen below lg, so the bar steps out of the way.
-    immersive_on_mobile: bool = False
     overflow_items: list[TopBarMenuItem] = []  # the "..." beside the pill group
     title_menu_items: list[TopBarMenuItem] = []  # the chevron beside the title
 
@@ -94,6 +91,27 @@ class RecipeTopBarProps(pydantic.BaseModel):
     # cannot see the viewport, but it has to know whether the desktop-only tabs are on
     # screen before it redirects anyone to one. See `BasePage.TOP_BAR_WIDE_KEY`.
     viewport_wide_key: str = ""
+
+    # ---------------------------------------------------------------- mobile only
+    # Below lg this bar is the app's ONLY header: the sidebar's own mobile bar is hidden and
+    # the floating pill strip is gone, so the bar inherits the controls both used to carry.
+    # Both are inert above lg. The nav drawer's own open command is not here - it is a
+    # constant in navDrawer.ts, shared by the two client components that use it, because
+    # nothing server-side changes when the drawer opens.
+
+    # The Builder panel's event key, so the bar can tell whether Ask Gooey is on screen and
+    # put it back. Below lg the panel is the root of a navigation stack, which makes its open
+    # state the difference between the header showing a menu button and showing a back arrow -
+    # the bar cannot infer that from the pane layout, because the panel is not a pane.
+    # Empty when this page has no Builder, in which case the entry view is the root instead.
+    builder_event_key: str = ""
+    # Starts a fresh Ask Gooey thread. Empty when there is no Builder on this page, or when
+    # its thread has not started yet - "New Chat" is a no-op on an empty chat, the same
+    # condition the panel's own control uses.
+    builder_new_event: str = ""
+    # Version History, offered in the mobile action sheet. A plain url, so it needs no key
+    # round-trip. Empty hides the entry.
+    history_href: str = ""
 
     run_label: str = "Run"
     run_disabled: bool = False

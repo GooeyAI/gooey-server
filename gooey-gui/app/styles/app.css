@@ -314,6 +314,38 @@ button .gui-html-container,
   background-color: var(--bs-gray-200) !important;
 }
 
+/* Design-system tokens, from the Figma file's "🎨 Design System" page.
+   Prefixed because the design's own names - ink, white, line-soft - are far too generic to
+   own globally. The comment on each line is the Figma token it comes from, so a value can be
+   traced back without opening the file.
+
+   This is a deliberate subset: only what the mobile header, its drawer and the pane pills
+   actually use. The rest of the scale is real but unused, and a token nothing references is
+   just a claim that the codebase has adopted a system it has not. Extend as surfaces land.
+
+   The corollary, accepted knowingly: these do not match the v2 desktop bar, which runs an
+   older ad-hoc palette (#111, #e0ddd7, #fbfaf8). Mobile and desktop will disagree on colour
+   until desktop is converted too. */
+:root {
+  --gooey-ink: #0a1021;             /* ink - titles, pill and drawer labels */
+  --gooey-line-default: #d9d9d9;    /* line - root header rule, outline button border */
+  --gooey-line-soft: #e6e6e6;       /* line-soft - sub-view rule, pill border, grab handle */
+  --gooey-surface-100: #f7f5f2;     /* surface-100 - selected pill fill */
+  --gooey-bg-page: #fffefd;         /* bg - outline button fill */
+  --gooey-icon-chrome: #dadce0;     /* icon-chrome - avatar placeholder */
+  --gooey-scrim: rgb(10 16 33 / 30%); /* the drawer's backdrop */
+
+  --gooey-space-1: 4px;             /* space/1 */
+  --gooey-space-2: 8px;             /* space/2 */
+  --gooey-space-3: 12px;            /* space/3 */
+  --gooey-space-4: 16px;            /* space/4 */
+
+  --gooey-radius-xs: 8px;           /* radius/xs - buttons */
+  --gooey-radius-sm: 12px;          /* radius/sm - pills */
+  --gooey-radius-pill: 32px;        /* radius/pill - the drawer's top corners */
+  --gooey-radius-full: 99px;        /* radius/full - avatars, grab handle */
+}
+
 :root {
   --sidebar_open_width: 460px;
   --sidebar_closed_width: 0;

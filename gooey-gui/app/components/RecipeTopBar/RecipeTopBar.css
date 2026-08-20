@@ -401,85 +401,134 @@ a.gooey-topbar-cost:hover {
 /* -------------------------------------------------------------- mobile */
 
 @media (max-width: 991.98px) {
-  /* the pill group leaves the row entirely for a floating bottom bar, so there is nothing left
-     to centre - one flex row of title + actions */
+  /* With the pills gone there is nothing left to centre, so the three-track grid collapses to
+     one row of nav + title + actions.
+
+     The bar owns its own padding here, and the wrapper's is zeroed: the design asks for 12px,
+     which Bootstrap's 4/8/16/24 scale cannot express, and the two header states want different
+     insets - which a class on a wrapper rendered by python, that knows nothing about the view,
+     could not vary anyway. Same reason the wrapper's rule is dropped and drawn here: only the
+     bar knows which of the two line colours applies. */
+  .v2-topbar-container {
+    padding: 0 !important;
+    border-bottom: 0 !important;
+  }
+
   .gooey-topbar {
     display: flex;
     flex-wrap: nowrap;
-    gap: 8px;
+    align-items: center;
+    gap: var(--gooey-space-2);
+    padding: var(--gooey-space-3);
+    /* 0.33px, not 1px: a hairline at device pixel ratio 3, which is what the design is drawn
+       at. It rounds up to a solid line on a 1x display, which is the right fallback. */
+    border-bottom: 0.33px solid var(--gooey-line-default);
   }
 
-  /* The pill group floats at the bottom of the viewport, keeping its desktop shape - same
-     pills, radius and border - just larger tap targets and a shadow so it reads as sitting
-     above the content it now overlaps. The page reserves room with `pb-5 pb-lg-2`. */
-  .gooey-topbar-tabs {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    /* clear of the home indicator on a phone that has one; `env()` is 0 where there is none,
-       so this is plain 14px everywhere else */
-    bottom: calc(14px + env(safe-area-inset-bottom));
-    z-index: 1030;
-    width: auto;
-    max-width: calc(100% - 24px);
-    margin: 0;
-    padding: 3px;
-    background: #f1f2f4;
-    border-color: #e0ddd7;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  /* A level down the stack - Edit, Preview - which the design draws 4px shorter and rules with
+     the softer line. Kept as two distinct states rather than normalised to one, on request. */
+  .gooey-topbar-stacked {
+    padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
+      var(--gooey-space-2);
+    border-bottom-color: var(--gooey-line-soft);
   }
 
-  /* Bigger than the desktop pill, but not by as much as it was: floating over the content it
-     overlaps, the old 11px/16px pill read as a slab. This keeps the row around 36px, which is
-     still a comfortable tap target, and lets three pills sit well inside a narrow screen. */
-  .gooey-topbar-tab {
-    padding: 7px 12px;
-    font-size: 0.875rem;
-  }
-
-  /* a tab whose layout needs the width - Split is two columns side by side */
-  .gooey-topbar-tab-desktop-only {
-    display: none;
-  }
-
-  /* An immersive tab owns the screen: the whole header goes, including its wrapper (whose
-     padding would otherwise leave a gap where the bar was). The tab supplies a floating
-     back link as the only chrome. */
-  .gooey-topbar-immersive,
-  .v2-immersive-topbar {
-    display: none;
-  }
-
-  .v2-immersive-mobile {
-    padding: 0 !important;
-    /* the back link anchors to this, so it needs no guess at the app header's height */
-    position: relative;
-  }
-
-  .v2-back-link {
-    /* absolute inside the immersive container rather than fixed to the viewport: the
-       container already starts below the app header, so there is no offset to hardcode */
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    z-index: 1031;
+  /* Back, or the drawer at the root. A bare 24px icon box, no chip behind it: it is the one
+     control on the row that is pure navigation, and the design leaves it unadorned. */
+  .gooey-topbar-nav {
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 11px 18px;
-    border: 1px solid #e0ddd7;
-    border-radius: 999px;
-    background: #fff;
-    color: #111;
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-decoration: none;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--gooey-ink);
+    font-size: 1rem;
   }
 
-  .v2-back-link:hover {
-    color: #111;
-    background: #fbfaf8;
+  /* 32px and always round here. The square-with-rounded-corners treatment and the
+     `circle_photo` opt-out are both desktop-only: at this size, beside a 14px title, the
+     circle is what reads as an avatar rather than as a thumbnail. */
+  .gooey-topbar-avatar,
+  .gooey-topbar-avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--gooey-radius-full);
+  }
+
+  .gooey-topbar-title {
+    gap: var(--gooey-space-1);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--gooey-ink);
+  }
+
+  /* The trailing crumb holds its width and the workflow name gives way, because the name is
+     the part with somewhere to go - it ellipsises. Reversed, a long name would push the level
+     you are actually on off the row. */
+  .gooey-topbar-crumb {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gooey-space-1);
+    color: var(--gooey-ink);
+  }
+
+  /* Only the separator is dimmed; both text segments stay full ink, as drawn. */
+  .gooey-topbar-crumb-sep {
+    font-size: 0.7em;
+    opacity: 0.45;
+  }
+
+  /* Ghost and Outline from the design system's Button set, at SM. */
+  .gooey-topbar-menu-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px var(--gooey-space-2);
+    border: 0;
+    border-radius: var(--gooey-radius-xs);
+    background: none;
+    color: var(--gooey-ink);
+    font-size: 1rem;
+  }
+
+  .gooey-topbar-action {
+    position: relative;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--gooey-space-2);
+    border: 1px solid var(--gooey-line-default);
+    border-radius: var(--gooey-radius-xs);
+    background: var(--gooey-bg-page);
+    color: var(--gooey-ink);
+    font-size: 1rem;
+  }
+
+  /* The desktop cluster. Cost and Run are no loss: `render_submit_row` already pins both to
+     the bottom of the editor, which is where the design puts them. The chips and Publish keep
+     their full labels in the sheet. */
+  .gooey-topbar-overflow-wrap,
+  .gooey-topbar-cost,
+  .gooey-topbar-sep,
+  .gooey-topbar-run {
+    display: none !important;
+  }
+
+  /* The pill group is gone at this width. It used to float over the bottom of the viewport,
+     which cost it a shadow to sit above the content it overlapped, a `max-width` to stay on a
+     narrow screen, and `env(safe-area-inset-bottom)` to clear the home indicator - all of it
+     to work around covering the thing it switched. The design replaces it with the action
+     sheet, which is a list, so it also carries the entries a strip of pills never could. */
+  .gooey-topbar-tabs {
+    display: none;
   }
 
   /* Icon-only actions below lg - the labels are what crowd the title out. Square, so they
@@ -564,4 +613,214 @@ a.gooey-topbar-cost:hover {
    v1's full-height sidebar is untouched. */
 .v2-app-shell .gooey-sidebar {
   height: 100%;
+}
+
+/* Ask Gooey is a surface *below* the header in v2, not a takeover of it.
+
+   `.gooey-sidebar-open` goes `position: fixed; width: 100vw; z-index: 1035` at this width, and
+   its own comment says why: it had to sit above `.nav-mobile-topbar`, the sidebar's slim mobile
+   bar, because the panel was meant to cover the whole app. That bar no longer exists - this bar
+   is the app's only header now - so the takeover covers the one piece of chrome the design
+   keeps on screen, and with it the way back out of the panel.
+
+   So the panel goes back in flow and fills the shell it is already mounted in, which starts
+   below the header. The pane behind it is dropped rather than left to share the row: `Sidebar`
+   lays its two children out as a flex row, so a full-width panel would otherwise squeeze the
+   workspace to nothing beside it instead of replacing it. Selecting a view from the sheet
+   closes the panel, which brings that pane straight back.
+
+   1140px, not lg: this mirrors `--sidebar_desktop_breakpoint`, which is what decides the
+   takeover in the first place. Scoped to `.v2-app-shell`, so v1 keeps the behaviour. */
+@media (max-width: 1140px) {
+  .v2-app-shell .gooey-sidebar-open {
+    position: static;
+    z-index: auto;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    border-left: 0;
+  }
+
+  .v2-app-shell .gooey-sidebar-open ~ div {
+    /* `!important` because that sibling carries Bootstrap's `d-flex`, which is
+       `display: flex !important` and wins otherwise. Without it the workspace was not hidden
+       at all - it was squeezed into a sliver down the right-hand edge, beside a panel that had
+       taken the rest of the row, which is the exact failure this rule exists to prevent. */
+    display: none !important;
+  }
+
+  /* The chat widget is pinned to `--sidebar_mobile_width` (100vw) at this breakpoint, which was
+     the panel's width back when the panel was the viewport. In the shell it is the width of a
+     box that sits inside the body's padding, so 100vw overruns it on both sides - which is what
+     pushed the widget's own title off the left edge and its composer off the right. Fill the
+     panel instead. */
+  .v2-app-shell .gooey-sidebar #gooey-builder-embed {
+    width: 100%;
+  }
+
+  /* Both of the panel's own floating controls go at this width, because the header above it
+     already does their jobs: it names the surface, and "New Chat" is an entry in the sheet.
+     Left in, they float over the first line of the chat - and the labelled one is wide enough
+     that it wrapped and ran off the panel's left edge.
+
+     No way out of Ask Gooey either, by design: it is the root of the mobile stack, so there is
+     nothing behind it to close back to. The header's back arrow is what leaves a view, and at
+     the root there is no view to leave. */
+  .v2-builder-new {
+    display: none !important;
+  }
+
+  .v2-builder-close {
+    /* `!important` for the same reason the nav bar's hide needs it: the control renders with
+       Bootstrap display utilities, which carry their own `!important`. */
+    display: none !important;
+  }
+}
+
+/* ---------------------------------------------------- editor bottom run bar
+
+   Fixed to the bottom edge rather than sticky inside the column: `VideoBots_v2` overrides
+   `_render_input_col` and returns without calling `render_submit_row` - "the top bar owns Run" -
+   so there is no submit row in the flow to make sticky. The action still goes through the bar's
+   own `handleRun`, so this is a second place to press it, not a second way to do it. */
+.gooey-topbar-runbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* under the nav drawer and its scrim (1044 / 9999) and under the action sheet (1050), so
+     anything that covers the screen also covers this */
+  z-index: 1029;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gooey-space-2);
+  padding: var(--gooey-space-2) var(--gooey-space-3);
+  /* clears the home indicator where there is one; `env()` is 0 elsewhere */
+  padding-bottom: calc(var(--gooey-space-2) + env(safe-area-inset-bottom));
+  background: var(--gooey-bg-page);
+  border-top: 0.33px solid var(--gooey-line-default);
+}
+
+/* Green-tinted, because it reads as a quantity rather than a control - the only thing on this
+   bar that is not a button. */
+.gooey-topbar-runbar-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gooey-space-1);
+  padding: 6px var(--gooey-space-2);
+  border-radius: var(--gooey-radius-xs);
+  background: #eaf6ee;
+  color: var(--gooey-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* "Est." is a qualifier on the number, not part of it, so it steps back a weight. */
+.gooey-topbar-runbar-est {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.gooey-topbar-runbar-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--gooey-radius-xs);
+  background: var(--gooey-ink);
+  color: #fff;
+  font-size: 1rem;
+}
+
+.gooey-topbar-runbar-run:disabled {
+  opacity: 0.5;
+}
+
+.gooey-topbar-runbar-run-stop {
+  background: #c0392b;
+}
+
+/* ------------------------------------------------------- mobile action sheet
+
+   Only ever opened from a `d-lg-none` control, but hidden above lg regardless: a viewport that
+   crosses the breakpoint while the sheet is up would otherwise leave it stranded over a layout
+   that has the pills back. */
+.gooey-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  /* the sheet comes up from the bottom edge and takes only the height it needs */
+  justify-content: flex-end;
+  background: var(--gooey-scrim);
+}
+
+@media (min-width: 992px) {
+  .gooey-sheet-scrim {
+    display: none;
+  }
+}
+
+.gooey-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: #fff;
+  border-radius: var(--gooey-radius-pill) var(--gooey-radius-pill) 0 0;
+  /* the home indicator sits under the last row, so the bottom inset carries `env()`; it is 0
+     on a phone without one, leaving the design's plain 16px */
+  padding: var(--gooey-space-2) var(--gooey-space-3)
+    calc(var(--gooey-space-4) + env(safe-area-inset-bottom));
+}
+
+.gooey-sheet-handle-wrap {
+  padding-bottom: var(--gooey-space-2);
+}
+
+.gooey-sheet-handle {
+  width: 60px;
+  height: 6px;
+  border-radius: var(--gooey-radius-full);
+  background: var(--gooey-line-soft);
+}
+
+.gooey-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: var(--gooey-space-2) var(--gooey-space-2) var(--gooey-space-2)
+    var(--gooey-space-3);
+  border: 0;
+  border-radius: var(--gooey-radius-xs);
+  background: none;
+  color: var(--gooey-ink);
+  font-size: 1rem;
+  line-height: 1.5;
+  text-align: left;
+  text-decoration: none;
+}
+
+.gooey-sheet-item:hover {
+  background: var(--gooey-surface-100);
+  color: var(--gooey-ink);
+}
+
+/* A fixed box so every label starts on the same x, whatever the glyph's own width. */
+.gooey-sheet-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  font-size: 1rem;
 }

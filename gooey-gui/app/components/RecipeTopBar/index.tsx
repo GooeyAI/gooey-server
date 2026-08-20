@@ -18,6 +18,8 @@ import {
   workspaceTargetForView,
 } from "../RecipeWorkspace/paneState";
 import { usePaneLayout } from "../RecipeWorkspace/usePaneLayout";
+import { NAV_DRAWER_OPEN_EVENT } from "../NavigationSidebar/navDrawer";
+import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
 
 /** Raw FontAwesome html arrives from python, the same way NavItemData.icon does. */
 function Icon({ html, className }: { html?: string; className?: string }) {
@@ -113,7 +115,6 @@ export function RecipeTopBar({
   editor_full_width,
   workspace_href,
   workspace_active,
-  immersive_on_mobile,
   overflow_items,
   title_menu_items,
   integrations,
@@ -133,6 +134,9 @@ export function RecipeTopBar({
   cost_label,
   cost_href,
   cost_title,
+  builder_event_key,
+  builder_new_event,
+  history_href,
   onChange,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
@@ -149,6 +153,14 @@ export function RecipeTopBar({
       .catch(() => window.prompt("Copy this link", share_copy_url));
   };
 
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Mirrors the Builder panel's own state. Seeded from the server's copy, then kept in step by
+  // the panel's `:changed` announcement - which is the authority, because a `:open` / `:close`
+  // command can be dispatched before a listener exists, and the panel also restores itself
+  // from storage without commanding anything at all.
+  const [builderOpen, setBuilderOpen] = useState(
+    Boolean(builder_event_key && state[builder_event_key])
+  );
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
@@ -174,6 +186,82 @@ export function RecipeTopBar({
       selectView(viewAfterRun(activeView, is_running));
     }
     fire(run_key);
+  };
+
+  useEffect(() => {
+    if (!builder_event_key) return;
+    const onOpen = () => setBuilderOpen(true);
+    const onClose = () => setBuilderOpen(false);
+    const onChanged = (e: Event) => {
+      const open = (e as CustomEvent<{ open?: boolean }>).detail?.open;
+      if (typeof open === "boolean") setBuilderOpen(open);
+    };
+    window.addEventListener(`${builder_event_key}:open`, onOpen);
+    window.addEventListener(`${builder_event_key}:close`, onClose);
+    window.addEventListener(`${builder_event_key}:changed`, onChanged);
+    return () => {
+      window.removeEventListener(`${builder_event_key}:open`, onOpen);
+      window.removeEventListener(`${builder_event_key}:close`, onClose);
+      window.removeEventListener(`${builder_event_key}:changed`, onChanged);
+    };
+  }, [builder_event_key]);
+
+  // Ask Gooey is where a workflow opens on a phone, so the panel is shown unasked - the design
+  // has no way to close it, because there is nothing behind it to close back to.
+  //
+  // "Unasked" only until the user picks a view, which is what the stored pane layout records:
+  // `usePaneLayout` writes it on every selection, so its absence means this session has not
+  // chosen anything yet. Keying off that rather than a flag of our own keeps one fact in one
+  // place, and stops the panel reopening over a pane the user just asked for.
+  //
+  // 1140px is the panel's own breakpoint (`--sidebar_desktop_breakpoint`), not lg: above it the
+  // panel is a side rail that shares the screen, and opening it uninvited would take half the
+  // window from whatever is already there.
+  useEffect(() => {
+    if (!builder_event_key) return;
+    if (window.innerWidth >= 1140) return;
+    let chosen: string | null = null;
+    try {
+      chosen = window.sessionStorage.getItem(storage_key);
+    } catch {
+      // Storage can be unavailable in private browsing; treat that as "nothing chosen yet",
+      // which is the state a first visit is in anyway.
+    }
+    if (chosen) return;
+    window.dispatchEvent(new CustomEvent(`${builder_event_key}:open`));
+  }, [builder_event_key, storage_key]);
+
+  // Below lg the bar is a navigation stack, not a set of tabs, and Ask Gooey is its root: the
+  // panel covers the shell below the header, so while it is open there is no view on screen to
+  // go back from - the left slot opens the nav drawer instead.
+  //
+  // Where there is no Builder at all there is no panel to be the root, so the entry view takes
+  // the job. `initial_view` is the server's answer to "where does this workflow open", which
+  // makes it the root by definition rather than a second guess at it.
+  const atRoot = builder_event_key ? builderOpen : selectedView === initial_view;
+  const previewable = views.some((view) => view.slug === "preview");
+
+  const openNavDrawer = () =>
+    window.dispatchEvent(new CustomEvent(NAV_DRAWER_OPEN_EVENT));
+
+  const setBuilder = (open: boolean) => {
+    if (!builder_event_key) return;
+    window.dispatchEvent(
+      new CustomEvent(`${builder_event_key}:${open ? "open" : "close"}`)
+    );
+  };
+
+  // Back out of a view: to Ask Gooey where there is one, otherwise to the entry view.
+  const goBack = () => {
+    if (builder_event_key) return setBuilder(true);
+    chooseView(initial_view);
+  };
+
+  // Choosing a view from the sheet or the eye has to put Ask Gooey away, or the pane it
+  // selects renders behind a panel that is covering the whole shell.
+  const showView = (view: RecipeView) => {
+    setBuilder(false);
+    chooseView(view);
   };
 
   const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
@@ -278,6 +366,59 @@ export function RecipeTopBar({
   // with nothing but mobile-only entries the button itself has no desktop purpose
   const overflowDesktopOnly = overflow_items.length === 0;
 
+  // The mobile sheet. The design's five entries first, then whatever the desktop bar keeps in
+  // its own menus - Publish, Share, API, the deployed channels. Those are appended rather than
+  // dropped because the sheet is the *only* menu below lg: the design simply never drew a
+  // workflow that had any of them. Preview is absent on purpose - it is the eye button.
+  const viewEntry = (slug: RecipeView): SheetEntry[] => {
+    const view = views.find((v) => v.slug === slug);
+    if (!view) return [];
+    return [
+      {
+        key: `--sheet-view-${view.slug}`,
+        label: view.label,
+        iconHtml: view.icon,
+        onPick: () => showView(view.slug as RecipeView),
+      },
+    ];
+  };
+
+  const sheetEntries: SheetEntry[] = [
+    // Listed in the design's order, which is not the order the view selector uses - so each
+    // entry is placed by name rather than swept up from `views`. Usage has no destination in
+    // the app yet, so it is left out rather than rendered as a row that does nothing.
+    ...viewEntry("about"),
+    ...(builder_new_event
+      ? [
+          {
+            key: "--sheet-new-chat",
+            label: "New Chat",
+            iconClass: "fa-regular fa-pen-to-square",
+            onPick: () =>
+              window.dispatchEvent(new CustomEvent(builder_new_event)),
+          },
+        ]
+      : []),
+    ...viewEntry("edit"),
+    ...(history_href
+      ? [
+          {
+            key: "--sheet-history",
+            label: "Version History",
+            iconClass: "fa-regular fa-clock-rotate-left",
+            href: history_href,
+          },
+        ]
+      : []),
+    ...overflowEntries.map((item) => ({
+      key: item.key,
+      label: item.label,
+      iconHtml: item.icon,
+      href: item.href ?? undefined,
+      onPick: item.href ? undefined : () => pickMenuItem(item),
+    })),
+  ];
+
   const pickMenuItem = (item: TopBarMenuItem) => {
     setTitleMenuOpen(false);
     setOverflowOpen(false);
@@ -296,11 +437,28 @@ export function RecipeTopBar({
     <div
       className={clsx(
         "gooey-topbar",
-        (activeViewSpec?.immersive_on_mobile || immersive_on_mobile) &&
-          "gooey-topbar-immersive"
+        // a level down the mobile stack, which the design gives a shorter bar and a softer rule
+        !atRoot && "gooey-topbar-stacked"
       )}
     >
       <div className="gooey-topbar-left">
+        {/* The app's only header below lg, so it owns the way back: the drawer at the root of
+            the stack, the previous level anywhere else. Above lg the rail is always on screen
+            and the pills do the switching, so this has no job and is not rendered. */}
+        <button
+          type="button"
+          className="gooey-topbar-nav d-lg-none"
+          onClick={atRoot ? openNavDrawer : goBack}
+          title={atRoot ? "Open menu" : "Back"}
+          aria-label={atRoot ? "Open menu" : "Back"}
+        >
+          <i
+            className={
+              atRoot ? "fa-regular fa-sidebar" : "fa-regular fa-chevron-left"
+            }
+          />
+        </button>
+
         {photo_url && (
           <img
             src={photo_url}
@@ -322,6 +480,19 @@ export function RecipeTopBar({
             <span className="gooey-topbar-title-text">{title}</span>
             {!!title_menu_items.length && (
               <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+            )}
+            {/* Which level of the stack is on screen, below lg only - above it the active
+                pill already says so. Inside the title button rather than beside it: the two
+                read as one heading, and the author line that shares this block is hidden at
+                this width, so there is nothing else on the row to disturb. */}
+            {!atRoot && !!activeViewSpec && (
+              <span className="gooey-topbar-crumb d-lg-none">
+                <i
+                  className="fa-regular fa-chevron-right gooey-topbar-crumb-sep"
+                  aria-hidden="true"
+                />
+                {activeViewSpec.label}
+              </span>
             )}
           </button>
           {author &&
@@ -369,6 +540,61 @@ export function RecipeTopBar({
       )}
 
       <div className="gooey-topbar-right">
+        {/* Two controls below lg, per the design: everything listable goes in the sheet, and
+            the one action worth a tap of its own sits beside it. The desktop cluster below -
+            chips, Publish, cost, Run - is hidden at this width by CSS; cost and Run come back
+            as the editor's own bottom bar, which is where the design puts them. */}
+        {!!sheetEntries.length && (
+          <button
+            type="button"
+            className="gooey-topbar-menu-btn d-lg-none"
+            onClick={() => setSheetOpen(true)}
+            title="More actions"
+            aria-label="More actions"
+            aria-haspopup="menu"
+            aria-expanded={sheetOpen}
+          >
+            <i className="fa-solid fa-ellipsis-vertical" />
+          </button>
+        )}
+
+        {/* Preview at the root of the stack, Update below it. ASSUMPTION: the design shows an
+            eye on the Ask screens and a floppy on Preview/Edit, and Preview is the one pane
+            the sheet never lists - so the eye is how you reach it. Flagged for review. */}
+        {atRoot
+          ? previewable && (
+              <button
+                type="button"
+                className="gooey-topbar-action d-lg-none"
+                onClick={() => showView("preview")}
+                title="Preview"
+                aria-label="Preview"
+              >
+                <i className="fa-regular fa-eye" />
+              </button>
+            )
+          : !!publish_label && (
+              <button
+                type="button"
+                className="gooey-topbar-action d-lg-none"
+                onClick={() => fire(publish_key)}
+                title={
+                  has_unpublished_changes
+                    ? `${publish_label} (unpublished changes)`
+                    : publish_label
+                }
+                aria-label={publish_label}
+              >
+                <i className="fa-regular fa-floppy-disk" />
+                {has_unpublished_changes && (
+                  <span
+                    className="gooey-topbar-dot"
+                    title="Unpublished changes"
+                  />
+                )}
+              </button>
+            )}
+
         {!!overflowEntries.length && (
           <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
             <button
@@ -546,6 +772,83 @@ export function RecipeTopBar({
           </button>
         )}
       </div>
+
+      {/* The editor's bottom bar: what a run will cost on the left, the run itself on the
+          right. Below lg only - above it both sit in this bar's right cluster.
+
+          Scoped to the editor because that is the only view with anything to submit. The design
+          gives Preview the bot's own composer at this edge and Ask Gooey the chat's, so a run
+          bar there would be a second thing competing for the same strip of screen.
+
+          `!atRoot` as well as the view, because the two are independent: Ask Gooey covers the
+          workspace without changing which view is selected behind it, so checking the view
+          alone put this bar over the chat's composer whenever the editor was what you had left.
+
+          Same `handleRun` as the desktop button rather than a second path to the server: this
+          is the same action in a different place, and a run that lands on a different view
+          depending on which control started it would be a bug waiting to happen. */}
+      {!atRoot && selectedView === "edit" && (!!cost_label || !!run_key) && (
+        <div className="gooey-topbar-runbar d-lg-none">
+          {!!cost_label &&
+            (() => {
+              const costName = `Run cost: ${cost_label}`;
+              const costTip = cost_title
+                ? `${costName} (${cost_title})`
+                : costName;
+              const inner = (
+                <>
+                  <span className="gooey-topbar-runbar-est">Est.</span>
+                  {cost_label}
+                </>
+              );
+              return cost_href ? (
+                <a
+                  className="gooey-topbar-runbar-cost"
+                  href={cost_href}
+                  title={costTip}
+                  aria-label={costTip}
+                >
+                  {inner}
+                </a>
+              ) : (
+                <span
+                  className="gooey-topbar-runbar-cost"
+                  title={costTip}
+                  aria-label={costTip}
+                >
+                  {inner}
+                </span>
+              );
+            })()}
+
+          {!!run_key && (
+            <button
+              type="button"
+              className={clsx(
+                "gooey-topbar-runbar-run",
+                is_running && "gooey-topbar-runbar-run-stop"
+              )}
+              disabled={run_disabled}
+              onClick={handleRun}
+              title={is_running ? "Stop this run" : run_label}
+              aria-label={is_running ? "Stop this run" : run_label}
+            >
+              {is_running ? (
+                <i className="fa-regular fa-xmark-large" />
+              ) : (
+                <i className="fa-solid fa-play" />
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
+      {sheetOpen && (
+        <MobileActionSheet
+          entries={sheetEntries}
+          onDismiss={() => setSheetOpen(false)}
+        />
+      )}
     </div>
   );
 }

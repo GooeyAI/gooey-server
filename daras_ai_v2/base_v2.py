@@ -128,7 +128,7 @@ STARTING_STATE = "Starting..."
 
 # Reading width for the working column when it has the row to itself (the Config tab). Split
 # needs none - the preview column caps it there.
-SOLO_COL_MAX_WIDTH = "56rem"
+SOLO_COL_MAX_WIDTH = "1420px"
 
 
 def format_credits_as_dollars(credits: int) -> str:
@@ -169,11 +169,7 @@ class BasePageRequest:
 
 
 class WorkflowIdentity(typing.NamedTuple):
-    """How a run names and pictures itself: the pair the top bar leads with.
-
-    Below lg the bar is gone from an immersive preview, so the back link out of it carries
-    the same pair - it is the only thing naming the workflow on that screen.
-    """
+    """How a run names and pictures itself: the pair the top bar leads with."""
 
     title: str
     photo_url: str | None
@@ -530,11 +526,15 @@ class BasePage:
                     # block, so there is no flex context left to grow into.
                     # px-lg-3 rather than px-4: the working column adds no gutter of its own,
                     # so the page's padding is the whole left margin the panes get.
+                    # px-0 below lg: the panes run edge to edge on a phone. Three gutters
+                    # stacked up there - this padding, `.container-xxl`'s on the workspace, and
+                    # the preview's own framed card - which left every view inset by 20px on
+                    # both sides, reading as a card floating on a background.
                     # no `pb-*` below lg: the tab pills float over the bottom of the viewport
                     # there, and clearing them needs `env(safe-area-inset-bottom)`, which no
                     # utility can express - RecipeWorkspace.css owns that edge instead
                     "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
-                    "px-2 px-lg-3 pt-2 pt-lg-1 pb-lg-2"
+                    "px-0 px-lg-3 pt-2 pt-lg-1 pb-lg-2"
                 ),
                 # without this a flex child refuses to shrink below its content, and the
                 # overflow lands on the page instead of here
@@ -564,11 +564,6 @@ class BasePage:
             storage_key=self._workspace_storage_key(),
             initial_view=initial_view,
             editor_full_width=self._editor_wants_full_width(),
-            # names the workflow on the back link out of an immersive preview, where the top
-            # bar that usually carries this is hidden
-            title=identity.title,
-            photo_url=identity.photo_url,
-            circle_photo=identity.circle_photo,
         ):
             # mt-1 on the About card and the preview, not on the editor: those two are framed
             # surfaces that would otherwise sit flush against the top bar's rule, while the
@@ -857,7 +852,6 @@ class BasePage:
                         label=tab.label,
                         icon=tab.icon,
                         desktop_only=tab.desktop_only,
-                        immersive_on_mobile=tab.immersive_on_mobile,
                     )
                     for tab in tabs
                 ],
@@ -886,6 +880,20 @@ class BasePage:
                 cost_label=cost_label,
                 cost_href=self.get_credits_click_url(),
                 cost_title=cost_title,
+                builder_event_key=(
+                    GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else ""
+                ),
+                # Below lg the bar is the app's only header, so it carries the entries that
+                # had nowhere else to go once the sidebar's own mobile bar went away. Both are
+                # inert above lg.
+                # Same condition the panel's own control uses: "New Chat" is a no-op on a
+                # thread that has not started, and the widget draws its own splash there.
+                builder_new_event=(
+                    f"{GOOEY_BUILDER_EVENT_KEY}:new"
+                    if self._can_show_builder() and not builder_thread_is_empty(self)
+                    else ""
+                ),
+                history_href=self.current_app_url(RecipeTabs.history),
             )
         )
 
@@ -1683,7 +1691,7 @@ class BasePage:
                 # `d-flex flex-column` + `minHeight: 0` because everything below depends on the
                 # app shell's definite-height chain - a plain block here would break it.
                 gui.div(
-                    className="mx-auto w-100 h-100 d-flex flex-column",
+                    className="mx-auto w-100 h-100 d-flex flex-column px-2 px-lg-0",
                     style=dict(maxWidth=SOLO_COL_MAX_WIDTH, minHeight=0),
                 ),
             ):
@@ -1696,15 +1704,10 @@ class BasePage:
         two. Preview is the whole view, so it needs no frame - a border there would just
         outline the viewport.
         """
-        return gui.div(
-            className="h-100",
-            style=dict(
-                border="1px solid #e0ddd7",
-                borderRadius="12px",
-                overflow="hidden",
-                minHeight=0,
-            ),
-        )
+        # Styled by class rather than inline, so the frame can be dropped below lg where the
+        # preview runs edge to edge: an inline style can only be overridden with `!important`,
+        # and a border tracing the viewport is not a frame, just an outline.
+        return gui.div(className="h-100 v2-preview-frame")
 
     def _render_split_tab(self):
         """Both columns side by side - v1's Run tab.

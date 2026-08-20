@@ -49,5 +49,4 @@ class TabSpec(pydantic.BaseModel):
     """Hidden from the strip below `lg`. For tabs whose layout needs the width - Split is
     two columns side by side, which a phone cannot show."""
 
-    immersive_on_mobile: bool = False
     """Below `lg`, this view fills the workspace below the app header."""

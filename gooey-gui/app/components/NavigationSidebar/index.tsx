@@ -13,6 +13,7 @@ import { builderOpenEventName } from "./builderNavigation";
 import { clearBuilderIntent, readBuilderIntent } from "./builderIntent";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
+import { NAV_DRAWER_OPEN_EVENT } from "./navDrawer";
 import { PrimaryNavItems } from "./PrimaryNavItems";
 
 // Below this width the rail becomes an off-canvas drawer (matches the CSS
@@ -109,6 +110,15 @@ export function NavigationSidebar({
     clearBuilderIntent();
     window.dispatchEvent(new CustomEvent(builderOpenEvent));
   }, [builderOpenEvent, location.key]);
+
+  // The control that opens the drawer lives in RecipeTopBar now, which is a sibling with no
+  // common ancestor to lift this state into - hence an event rather than a prop. Open only:
+  // closing is the scrim's and the header's job, both of which are inside this component.
+  useEffect(() => {
+    const onOpen = () => setCollapsed(false);
+    window.addEventListener(NAV_DRAWER_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(NAV_DRAWER_OPEN_EVENT, onOpen);
+  }, []);
 
   const expandRail = (e?: React.MouseEvent) => {
     e?.preventDefault();
