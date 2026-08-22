@@ -327,6 +327,7 @@ SRAVAANI_SUPPORTED = {
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
+    gpt_transcribe = "GPT Transcribe (openai)"
     gpt_4_o_audio = "GPT-4o (openai)"
     gpt_4_o_mini_audio = "GPT-4o mini (openai)"
     gcp_v1 = "Google Cloud V1"
@@ -399,11 +400,16 @@ class AsrModels(Enum):
         }
 
     def supports_input_prompt(self) -> bool:
-        return self in {self.gpt_4_o_audio, self.gpt_4_o_mini_audio}
+        return self in {
+            self.gpt_transcribe,
+            self.gpt_4_o_audio,
+            self.gpt_4_o_mini_audio,
+        }
 
 
 asr_model_ids = {
     AsrModels.whisper_akera_large_v3: "akera/whisper-large-v3-kik-full_v2",
+    AsrModels.gpt_transcribe: "gpt-transcribe",
     AsrModels.gpt_4_o_audio: "gpt-4o-transcribe",
     AsrModels.gpt_4_o_mini_audio: "gpt-4o-mini-transcribe",
     AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
@@ -439,6 +445,7 @@ forced_asr_languages = {
 asr_supported_languages = {
     AsrModels.saaras_v3: SAARAS_V3_SUPPORTED,
     AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
+    AsrModels.gpt_transcribe: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.gpt_4_o_audio: WHISPER_LARGE_V2_SUPPORTED,  # https://platform.openai.com/docs/guides/speech-to-text#supported-languages
     AsrModels.gpt_4_o_mini_audio: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_LARGE_V2_SUPPORTED,
@@ -1486,7 +1493,11 @@ def run_asr(
                 audio_url=audio_url,
                 return_timestamps=output_format != AsrOutputFormat.text,
             )
-    elif selected_model in {AsrModels.gpt_4_o_audio, AsrModels.gpt_4_o_mini_audio}:
+    elif selected_model in {
+        AsrModels.gpt_transcribe,
+        AsrModels.gpt_4_o_audio,
+        AsrModels.gpt_4_o_mini_audio,
+    }:
         from daras_ai_v2.language_model import get_openai_client
 
         audio_r = requests.get(audio_url)
