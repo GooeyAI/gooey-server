@@ -89,6 +89,20 @@ CHIRP_SUPPORTED = {
     'pl-PL', 'hr-HR', 'lv-LV', 'ln-CD', 'ne-NP', 'lb-LU'
 }  # fmt: skip
 
+# https://docs.cloud.google.com/speech-to-text/docs/models/chirp-3
+CHIRP_3_SUPPORTED = {
+    'ca-ES', 'cmn-Hans-CN', 'hr-HR', 'da-DK', 'nl-NL', 'en-AU', 'en-IN', 'en-GB', 'en-US', 'fi-FI', 'fr-CA', 'fr-FR',
+    'de-DE', 'el-GR', 'hi-IN', 'it-IT', 'ja-JP', 'ko-KR', 'pl-PL', 'pt-BR', 'pt-PT', 'ro-RO', 'ru-RU', 'es-ES',
+    'es-US', 'sv-SE', 'tr-TR', 'uk-UA', 'vi-VN', 'af-ZA', 'sq-AL', 'am-ET', 'ar-DZ', 'ar-BH', 'ar-EG', 'ar-IL',
+    'ar-JO', 'ar-KW', 'ar-LB', 'ar-MR', 'ar-MA', 'ar-OM', 'ar-QA', 'ar-SA', 'ar-PS', 'ar-SY', 'ar-TN', 'ar-AE',
+    'ar-YE', 'ar-XA', 'hy-AM', 'as-IN', 'ast-ES', 'az-AZ', 'eu-ES', 'bn-BD', 'bn-IN', 'bg-BG', 'my-MM', 'ar-IQ',
+    'yue-Hant-HK', 'cmn-Hant-TW', 'cs-CZ', 'en-PH', 'et-EE', 'fil-PH', 'gl-ES', 'ka-GE', 'gu-IN', 'ha-NG', 'iw-IL',
+    'hu-HU', 'is-IS', 'id-ID', 'jv-ID', 'kn-IN', 'kk-KZ', 'km-KH', 'ky-KG', 'lo-LA', 'lv-LV', 'lt-LT', 'lb-LU',
+    'mk-MK', 'ms-MY', 'ml-IN', 'mt-MT', 'mi-NZ', 'mr-IN', 'mn-MN', 'ne-NP', 'nso-ZA', 'no-NO', 'or-IN', 'fa-IR',
+    'pa-Guru-IN', 'sr-RS', 'sk-SK', 'sl-SI', 'es-MX', 'sw-KE', 'sw', 'ta-IN', 'te-IN', 'th-TH', 'uz-UZ', 'cy-GB',
+    'wo-SN', 'xh-ZA', 'yo-NG', 'zu-ZA',
+}  # fmt: skip
+
 WHISPER_LARGE_V2_SUPPORTED = {
     "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",
     "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
@@ -316,7 +330,8 @@ class AsrModels(Enum):
     gpt_4_o_audio = "GPT-4o (openai)"
     gpt_4_o_mini_audio = "GPT-4o mini (openai)"
     gcp_v1 = "Google Cloud V1"
-    usm = "Chirp / USM (Google V2)"
+    usm = "Chirp / USM [Deprecated] (Google V2)"
+    chirp_3 = "Chirp 3 (Google V2)"
     deepgram = "Deepgram"
     azure = "Azure Speech"
     elevenlabs = "ElevenLabs Scribe v1"
@@ -358,6 +373,7 @@ class AsrModels(Enum):
     @classmethod
     def _deprecated(cls):
         return {
+            cls.usm,
             cls.seamless_m4t,
             cls.whisper_chichewa_large_v3,
             cls.nemo_english,
@@ -434,6 +450,7 @@ asr_supported_languages = {
     AsrModels.nemo_hindi: {"hi"},
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
+    AsrModels.chirp_3: CHIRP_3_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
     AsrModels.elevenlabs: ELEVENLABS_SUPPORTED,
     AsrModels.intron: INTRON_SUPPORTED,
@@ -705,9 +722,13 @@ def asr_model_selector(
     **kwargs,
 ) -> AsrModels | None:
     if language_filter:
-        supported_models = filter_models_by_language(
-            language_filter, asr_supported_languages
-        )
+        supported_models = [
+            model
+            for model in filter_models_by_language(
+                language_filter, asr_supported_languages
+            )
+            if model not in AsrModels._deprecated()
+        ]
     else:
         supported_models = AsrModels
     model = enum_selector(
@@ -1311,8 +1332,8 @@ def run_asr(
         )
     elif selected_model == AsrModels.gcp_v1:
         return gcp_asr_v1(audio_url, language)
-    elif selected_model == AsrModels.usm:
-        location = settings.GCP_REGION
+    elif selected_model == AsrModels.chirp_3:
+        location = "us"
 
         # Create a client
         options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
@@ -1325,7 +1346,7 @@ def run_asr(
             language = lobj.to_tag()
             if language == "en":
                 language = "en-US"
-            assert language in CHIRP_SUPPORTED, f"Unsupported language: {language!r}"
+            assert language in CHIRP_3_SUPPORTED, f"Unsupported language: {language!r}"
         else:
             language = None
 
@@ -1336,8 +1357,8 @@ def run_asr(
         if language:
             config.language_codes = [language]
         else:
-            config.language_codes = CHIRP_SUPPORTED  # pick from supported langauges
-            config.model = "chirp"  # use chirp model
+            config.language_codes = ["auto"]
+            config.model = "chirp_3"
         config.explicit_decoding_config = cloud_speech.ExplicitDecodingConfig(
             encoding=AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
@@ -1534,14 +1555,16 @@ def run_asr(
 
 
 def _get_or_create_recognizer(
-    client: "google.cloud.speech_v2.SpeechClient", language: str | None, location: str
+    client: "google.cloud.speech_v2.SpeechClient",
+    language: str | None,
+    location: str,
 ) -> str:
     import google.api_core.exceptions
     import google.cloud.speech_v2 as cloud_speech
 
     _, project = get_google_auth_session()
     if language:
-        recognizer_id = f"chirp-api--{language.lower()}"
+        recognizer_id = f"chirp-3-api--{language.lower()}"
         try:
             # check if recognizer already exists
             recognizer = client.get_recognizer(
@@ -1554,7 +1577,7 @@ def _get_or_create_recognizer(
                     parent=f"projects/{project}/locations/{location}",
                     recognizer_id=recognizer_id,
                     recognizer=cloud_speech.Recognizer(
-                        language_codes=[language], model="chirp"
+                        language_codes=[language], model="chirp_3"
                     ),
                 )
                 .result()

@@ -1446,7 +1446,7 @@ def infer_asr_model_and_language(
     asr_lang = None
     user_lang = user_language.lower()
     if "am" in user_lang:
-        asr_model = AsrModels.usm
+        asr_model = AsrModels.chirp_3
         asr_lang = "am-et"
     elif "hi" in user_lang:
         asr_model = AsrModels.nemo_hindi
