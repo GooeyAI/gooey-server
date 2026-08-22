@@ -1,3 +1,4 @@
+import "~/styles/gooey-orbit-border.css";
 import "./NavigationSidebar.css";
 
 import clsx from "clsx";
@@ -70,6 +71,14 @@ export function NavigationSidebar({
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
+
+  // The mobile drawer covers the page, so navigating out of it has to close it:
+  // a nav item, a history row, a link in the account menu. Taps that navigate
+  // nowhere -- opening the account menu, switching workspace, toggling a section
+  // open -- leave the drawer where it is.
+  useEffect(() => {
+    if (isMobile) setCollapsed(true);
+  }, [isMobile, location.key]);
 
   useEffect(() => {
     if (!builderEventKey) return;

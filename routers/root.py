@@ -767,7 +767,9 @@ def sidebar_page_wrapper(
 
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
     # row on desktop (rail beside content).
-    with gui.div(className="d-flex flex-column flex-lg-row min-vh-100 w-100"):
+    with gui.div(
+        className="gooey-app-shell d-flex flex-column flex-lg-row min-vh-100 w-100"
+    ):
         navigation_sidebar.render(
             request, default_collapsed=default_collapsed, page=page
         )

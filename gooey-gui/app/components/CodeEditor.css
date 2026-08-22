@@ -1,0 +1,11 @@
+/* Mobile: the global `input, select, textarea` bump in custom.css can't reach
+   CodeMirror -- its editable surface is a contenteditable div -- so the editor
+   would still trip Safari's zoom-on-focus at the theme's 14px. Size the whole
+   editor (content and gutters together, so line numbers stay in proportion)
+   instead of just the content. The extra class beats the theme's own
+   `.cm-editor` rule whichever order the stylesheets land in. */
+@media (max-width: 991.98px) {
+  .gui-input.code-editor-wrapper .cm-editor {
+    font-size: 16px;
+  }
+}

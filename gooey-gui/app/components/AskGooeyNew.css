@@ -1,11 +1,308 @@
+.ask-gooey-page {
+  width: 100%;
+  min-height: 100dvh;
+  padding: 48px 24px;
+  background: #fbfaf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.ask-gooey-column {
+  max-width: 840px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.ask-gooey-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #1f1f1f;
+}
+
 .ask-gooey-title {
+  margin: 0;
+  text-align: center;
   font-size: 2rem;
+  font-weight: 400;
+  font-family: Georgia, serif;
+  color: #111;
+  letter-spacing: -0.02em;
+}
+
+.ask-gooey-title-highlight {
+  background-color: #a5ffee;
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 .ask-gooey-logo {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
+}
+
+.ask-gooey-composer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  width: 100%;
+}
+
+.ask-gooey-error {
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* Desktop: input first, chips below (DOM is chips then input). */
+.ask-gooey-suggestions {
+  order: 2;
+  position: relative;
+  width: 100%;
+}
+
+.ask-gooey-input-bar {
+  order: 1;
+  width: 100%;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(135deg, #5ee6d0 0%, #b7c8fe 50%, #e3e0f9 100%);
+  box-shadow: 0 0 6px rgba(94, 230, 208, 0.3);
+  transition: box-shadow 0.15s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.ask-gooey-input-bar--focused {
+  box-shadow: 0 0 10px rgba(94, 230, 208, 0.5);
+}
+
+.ask-gooey-input-bar-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.99);
+  border-radius: 15.5px;
+  padding: 16px 8px 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ask-gooey-input-bar.gooey-orbit-border::before {
+  padding: 4px;
+}
+
+.ask-gooey-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ask-gooey-attachment {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f4f5f7;
+  border: 1px solid #eaeaea;
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #333;
+  max-width: 260px;
+}
+
+.ask-gooey-attachment i {
+  font-size: 12px;
+}
+
+.ask-gooey-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-gooey-attachment-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #888;
+  display: flex;
+  align-items: center;
+}
+
+.ask-gooey-textarea {
+  width: 100%;
+  min-height: 24px;
+  max-height: 240px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #4b587a;
+  font-size: 14px;
+  line-height: 20px;
+  resize: none;
+  padding: 0;
+  font-family: Inter, sans-serif;
+  overflow: hidden;
+}
+
+.ask-gooey-textarea:not(:placeholder-shown) {
+  color: #000;
+}
+
+.ask-gooey-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 36px;
+}
+
+.ask-gooey-file-input {
+  display: none;
+}
+
+.ask-gooey-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ask-gooey-attach-btn,
+.ask-gooey-mic-btn,
+.ask-gooey-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+}
+
+.ask-gooey-attach-btn {
+  background: none;
+  padding: 5px;
+  color: #000;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+}
+
+.ask-gooey-attach-btn i {
+  font-size: 14px;
+}
+
+.ask-gooey-mic-btn {
+  background: none;
+  padding: 0;
+  color: #0a1021;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.ask-gooey-mic-btn i,
+.ask-gooey-send-btn i {
+  font-size: 16px;
+}
+
+.ask-gooey-mic-btn--recording {
+  background: #fdecec;
+  color: #dc3545;
+}
+
+.ask-gooey-mic-btn--connecting {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ask-gooey-send-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: none;
+  color: #8994b1;
+  cursor: not-allowed;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.ask-gooey-send-btn--active {
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ask-gooey-suggestions-scroll {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  align-items: center;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ask-gooey-suggestions-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.ask-gooey-suggestion-chip {
+  background: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #000;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ask-gooey-suggestion-chip:hover {
+  background: #f9f9f9;
+}
+
+.ask-gooey-suggestions-fade {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 4px;
+  width: 80px;
+  background: linear-gradient(
+    to right,
+    rgba(251, 250, 248, 0) 0%,
+    rgba(251, 250, 248, 1) 60%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.ask-gooey-suggestions-arrow {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 4px 8px 16px;
+  color: #000;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ask-gooey-suggestions-arrow i {
+  font-size: 14px;
 }
 
 @media (min-width: 768px) {
@@ -16,5 +313,103 @@
   .ask-gooey-logo {
     width: 64px;
     height: 64px;
+  }
+}
+
+/* Matches the nav rail → drawer breakpoint (56px mobile top bar).
+   Bootstrap's `.min-vh-100` is `min-height: 100vh !important`, so a
+   full viewport was stacking under the top bar and creating the extra
+   scroll. Override that and size this page to the leftover column. */
+@media (max-width: 991.98px) {
+  .min-vh-100:has(.ask-gooey-page) {
+    min-height: 0 !important;
+  }
+
+  .d-flex.flex-column.flex-lg-row.min-vh-100.w-100:has(.ask-gooey-page) {
+    height: 100dvh;
+    min-height: 100dvh !important;
+  }
+
+  .d-flex.flex-column.flex-lg-row.min-vh-100.w-100:has(.ask-gooey-page)
+    > :first-child {
+    flex-shrink: 0;
+  }
+
+  .d-flex.flex-column.flex-grow-1.min-w-0:has(.ask-gooey-page) {
+    min-height: 0 !important;
+    flex: 1 1 auto;
+  }
+
+  .d-flex.flex-column.min-vh-100.w-100:has(.ask-gooey-page):not(.flex-lg-row) {
+    min-height: 0 !important;
+    height: 100%;
+  }
+
+  .d-flex.flex-column.min-vh-100.w-100:has(#main-content .ask-gooey-page):not(
+      .flex-lg-row
+    )
+    > :has(#main-content) {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #main-content:has(.ask-gooey-page) {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ask-gooey-page {
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    padding: 16px 16px 12px;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .ask-gooey-column {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    gap: 16px;
+    justify-content: space-between;
+  }
+
+  .ask-gooey-header {
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  .ask-gooey-title {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 100%;
+  }
+
+  .ask-gooey-composer {
+    flex: 0 0 auto;
+    margin-top: auto;
+    gap: 12px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: #fbfaf8;
+  }
+
+  .ask-gooey-suggestions {
+    order: 1;
+  }
+
+  .ask-gooey-input-bar {
+    order: 2;
   }
 }

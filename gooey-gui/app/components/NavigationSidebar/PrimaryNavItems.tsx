@@ -98,24 +98,19 @@ function NavItem({
     collapsed && "position-relative",
     children && "nav-section-toggle",
     !!item.href && "bg-hover-light",
-    item.dense ? "dense px-2 py-1 small" : "px-2 py-2"
+    item.dense ? "dense px-2 py-1 small" : "px-2 py-1"
   );
   const content = (
     <Fragment>
       <span
         className={clsx(
-          "d-flex align-items-center flex-grow-1",
+          "d-flex align-items-center flex-grow-1 gap-1",
           collapsed && "justify-content-center",
-          collapsed && !item.href && "d-none", // hide when no href and collapsed
-          item.dense ? "gap-1" : "gap-2"
+          collapsed && !item.href && "d-none" // hide when no href and collapsed
         )}
       >
         <span
-          className={clsx(
-            "nav-item-icon",
-            !isActive && "text-muted",
-            item.dense && !collapsed && "small"
-          )}
+          className="nav-item-icon"
           dangerouslySetInnerHTML={{ __html: item.icon }}
         />
         {!collapsed && <span>{item.label}</span>}
@@ -200,7 +195,7 @@ function NavItemChildren({
         )}
       </NavItem>
       {showItems && (
-        <div className={clsx(!item.dense && "saved-tree")}>
+        <div className={clsx(!item.dense && "saved-tree mb-2")}>
           {showSkeleton ? (
             <WorkflowListSkeleton rows={3} indent={!item.dense} />
           ) : (
