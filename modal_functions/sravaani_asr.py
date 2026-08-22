@@ -15,6 +15,8 @@ Note: the HuggingFace repo is gated, so a valid HF_TOKEN (with access granted to
 ARTPARK-IISc/SraVaani-1.0) must be set in the environment when deploying.
 """
 
+import os
+
 import modal
 from decouple import config
 
@@ -23,7 +25,9 @@ app = modal.App("gooey-sravaani-asr")
 SRAVAANI_MODEL_ID = "ARTPARK-IISc/SraVaani-1.0"
 SRAVAANI_MODEL_REVISION = "39c6add757f46af212d583ed765894ae78b2ebad"
 
-cache_dir = "/cache"
+# leave MODAL_LOCAL_CACHE_DIR unset when deploying — "/cache" is the modal
+# volume mount; the override is for MODAL_RUN_LOCALLY runs on a dev machine
+cache_dir = os.path.expanduser(config("MODAL_LOCAL_CACHE_DIR", "/cache"))
 model_cache = modal.Volume.from_name("hf-model-cache", create_if_missing=True)
 hf_secret = modal.Secret.from_dict({"HF_TOKEN": config("HF_TOKEN", "")})
 
