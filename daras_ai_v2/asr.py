@@ -1483,6 +1483,11 @@ def run_asr(
         AsrModels.gpt_4_o_audio,
         AsrModels.gpt_4_o_mini_audio,
     }:
+        if output_format in {AsrOutputFormat.srt, AsrOutputFormat.vtt}:
+            raise UserError(
+                f"{selected_model.value} can't generate {output_format.value}"
+            )
+
         from daras_ai_v2.language_model import get_openai_client
 
         audio_r = requests.get(audio_url)
@@ -1491,12 +1496,13 @@ def run_asr(
         model_id = asr_model_ids[selected_model]
 
         client = get_openai_client(model_id)
-        return client.audio.transcriptions.create(
+        transcription = client.audio.transcriptions.create(
             model=model_id,
             file=(audio_url, audio_r.content),
             prompt=input_prompt,
-            response_format="text",
+            response_format="json",
         )
+        data = {"text": transcription.text}
     elif selected_model in {AsrModels.voxtral_mini}:
         from daras_ai_v2.language_model import get_openai_client
 
