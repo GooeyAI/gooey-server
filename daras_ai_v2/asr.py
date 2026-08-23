@@ -1213,6 +1213,8 @@ def run_asr(
         str: Transcribed text.
     """
     import google.cloud.speech_v2 as cloud_speech
+    from google.api_core import exceptions as google_exceptions
+    from google.api_core import retry as google_retry
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
     import langcodes
@@ -1382,7 +1384,20 @@ def run_asr(
         # Make the request
         operation = client.batch_recognize(request=request)
         # Wait for operation to complete
-        response = operation.result()  # BatchRecognizeFileResult
+        response = operation.result(
+            timeout=600,
+            retry=google_retry.Retry(
+                predicate=google_retry.if_exception_type(
+                    google_exceptions.ResourceExhausted,
+                    google_exceptions.TooManyRequests,
+                    google_exceptions.InternalServerError,
+                    google_exceptions.ServiceUnavailable,
+                ),
+                initial=2,
+                maximum=30,
+                timeout=60,
+            )
+        )  # BatchRecognizeFileResult
         # Handle the response
         return "\n\n".join(
             result.alternatives[0].transcript
