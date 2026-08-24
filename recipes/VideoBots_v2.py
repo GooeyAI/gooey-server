@@ -986,7 +986,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
                     key="asr_model",
                     language_filter=selected_filter_language,
                     label=f"###### {field_title(self.RequestModel, 'asr_model')}",
-                    format_func=lambda x: (AsrModels[x].value if x else "Auto Select"),
+                    format_func=lambda x: AsrModels[x].value if x else "Auto Select",
                 )
             with col2:
                 if asr_model:

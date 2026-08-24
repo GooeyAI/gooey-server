@@ -1,35 +1,43 @@
+import { describe, expect, it } from "vitest";
+
 import {
   builderOpenEventName,
   navigationStateWithoutBuilderIntent,
 } from "./builderNavigation";
 
-function main() {
-  assertEqual(
-    builderOpenEventName("builder-sidebar", "open"),
-    "builder-sidebar:open"
-  );
-  assertEqual(builderOpenEventName("builder-sidebar", null), null);
-  assertDeepEqual(
-    navigationStateWithoutBuilderIntent({
-      builderIntent: "open",
-      recipeView: "split",
-    }),
-    { recipeView: "split" }
-  );
-}
+describe("builderOpenEventName", () => {
+  it("names the panel's open command", () => {
+    expect(builderOpenEventName("builder-sidebar", "open")).toBe(
+      "builder-sidebar:open"
+    );
+  });
 
-function assertEqual(actual: unknown, expected: unknown) {
-  if (actual !== expected) {
-    throw new Error(`Expected ${String(expected)}, received ${String(actual)}`);
-  }
-}
+  it("names nothing without an intent", () => {
+    expect(builderOpenEventName("builder-sidebar", null)).toBeNull();
+  });
 
-function assertDeepEqual(actual: unknown, expected: unknown) {
-  const actualJson = JSON.stringify(actual);
-  const expectedJson = JSON.stringify(expected);
-  if (actualJson !== expectedJson) {
-    throw new Error(`Expected ${expectedJson}, received ${actualJson}`);
-  }
-}
+  it("names nothing without an event key", () => {
+    expect(builderOpenEventName("", "open")).toBeNull();
+    expect(builderOpenEventName(undefined, "open")).toBeNull();
+  });
+});
 
-main();
+describe("navigationStateWithoutBuilderIntent", () => {
+  // The intent is consumed on arrival, but layout-v2's own navigation state travels in the
+  // same slot and has to survive - clearing `usr` wholesale dropped it.
+  it("removes only the consumed intent", () => {
+    expect(
+      navigationStateWithoutBuilderIntent({
+        builderIntent: "open",
+        recipeView: "split",
+      })
+    ).toEqual({ recipeView: "split" });
+  });
+
+  it("returns null once nothing is left", () => {
+    expect(
+      navigationStateWithoutBuilderIntent({ builderIntent: "open" })
+    ).toBeNull();
+    expect(navigationStateWithoutBuilderIntent(null)).toBeNull();
+  });
+});

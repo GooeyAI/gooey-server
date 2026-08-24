@@ -63,7 +63,6 @@ export interface RecipeTopBarProps {
   share_copy_url: string;
   menu_key: string;
   run_key: string;
-  viewport_wide_key: string;
   view_only: boolean;
   crumb_label: string;
   deploy_href: string;

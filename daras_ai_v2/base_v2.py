@@ -533,9 +533,10 @@ class BasePage:
                     # stacked up there - this padding, `.container-xxl`'s on the workspace, and
                     # the preview's own framed card - which left every view inset by 20px on
                     # both sides, reading as a card floating on a background.
-                    # no `pb-*` below lg: the tab pills float over the bottom of the viewport
-                    # there, and clearing them needs `env(safe-area-inset-bottom)`, which no
-                    # utility can express - RecipeWorkspace.css owns that edge instead
+                    # no `pb-*` below lg: the editor's run bar is fixed to the bottom of the
+                    # viewport there, and clearing it needs `env(safe-area-inset-bottom)`,
+                    # which no utility can express - RecipeWorkspace.css owns that edge, and
+                    # only under the editor, which is the one view with a bar to clear
                     "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
                     "px-0 px-lg-3 pt-2 pt-lg-1 pb-lg-2"
                 ),
@@ -561,7 +562,6 @@ class BasePage:
     def _render_workspace(self, tabs: list[TabSpec]):
         """Render each reusable work surface once; React controls their arrangement."""
         initial_view = self.entry_tab_slug(tabs)
-        identity = self._workflow_identity()
         with gui.component(
             "RecipeWorkspace",
             storage_key=self._workspace_storage_key(),
@@ -800,11 +800,6 @@ class BasePage:
             gui.session_state[self.TOP_BAR_SHARE_KEY] = True
             gui.rerun()
 
-    # Not popped: unlike the others this is a standing fact about the client, not an
-    # action. The bar keeps it current and `submit_and_redirect` reads it to decide
-    # whether Split is on screen at all.
-    TOP_BAR_WIDE_KEY = "--topbar-wide"
-
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars.
 
@@ -888,7 +883,6 @@ class BasePage:
                 menu_key=self.TOP_BAR_MENU_KEY,
                 integrations=self._top_bar_integrations(),
                 run_key=self.TOP_BAR_RUN_KEY,
-                viewport_wide_key=self.TOP_BAR_WIDE_KEY,
                 is_running=self._is_run_in_progress(),
                 cost_label=cost_label,
                 cost_href=self.get_credits_click_url(),
@@ -942,16 +936,15 @@ class BasePage:
         else:
             return "Save as New"
 
-    PANE_QUERY_PARAM = "pane"
-
     def _render_pane_strip(
         self, panes: list[PaneSpec], *, key: str
     ) -> typing.Callable[[], None]:
         """Render an in-page strip of panes and return the one to draw.
 
         Panes are panels inside a single view, so - unlike tabs - they have no url: just an
-        ordered list of specs and a session-state key. Session state and deep links carry
-        `PaneSpec.id`, never the label, so relabelling a pane cannot break a link to it.
+        ordered list of specs and a session-state key. Session state and the
+        `RecipeWorkspaceTrigger` deep links carry `PaneSpec.id`, never the label, so
+        relabelling a pane cannot break a link to it.
 
         Only the active pane renders. That is safe because the server round-trips the whole
         `session_state` regardless of what was drawn, so widgets on the panes that did not
@@ -960,14 +953,10 @@ class BasePage:
         """
         by_id = {pane.id: pane for pane in panes}
 
-        # A link from another view (About's meta cards) names its pane in the url, because
-        # session state does not survive a navigation. Honour it once: `seen_key` stops it
-        # overriding the strip on every later render, which would pin the pane forever.
-        seen_key = key + ":from-url"
-        requested = self.request.query_params.get(self.PANE_QUERY_PARAM)
-        if requested in by_id and gui.session_state.get(seen_key) != requested:
-            gui.session_state[key] = gui.session_state[seen_key] = requested
-        elif gui.session_state.get(key) not in by_id:
+        # A deep link from another view (About's meta cards) names its pane by writing this
+        # key directly - see `RecipeWorkspaceTrigger`'s `state_key` - so the only thing to
+        # settle here is an absent or stale value.
+        if gui.session_state.get(key) not in by_id:
             gui.session_state[key] = panes[0].id
 
         with gui.styled(PANE_STRIP_CSS), gui.div(className="mb-1"):
@@ -2530,7 +2519,6 @@ class BasePage:
                 self.render_output()
 
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
-                self.click_preview_tab()
                 self._render_running_output()
             elif not is_deleted:
                 self._render_after_output()
@@ -2560,18 +2548,6 @@ class BasePage:
         if self.request.user:
             ret.update({"current_workspace": self.current_workspace})
         return ret
-
-    def click_preview_tab(self):
-        # show the preview tab when running
-        gui.html(
-            """
-            <script>
-            window.addEventListener("hydrated", function() {
-                document.getElementById("tabs--tab--0")?.click();
-            });
-            </script>
-            """
-        )
 
     scroll_into_view = True
 

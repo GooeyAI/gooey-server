@@ -87,11 +87,6 @@ class RecipeTopBarProps(pydantic.BaseModel):
     menu_key: str = ""
     run_key: str = ""
 
-    # Written by the client whenever the viewport crosses lg, and never popped: the server
-    # cannot see the viewport, but it has to know whether the desktop-only tabs are on
-    # screen before it redirects anyone to one. See `BasePage.TOP_BAR_WIDE_KEY`.
-    viewport_wide_key: str = ""
-
     # ---------------------------------------------------------------- mobile only
     # Below lg this bar is the app's ONLY header: the sidebar's own mobile bar is hidden and
     # the floating pill strip is gone, so the bar inherits the controls both used to carry.

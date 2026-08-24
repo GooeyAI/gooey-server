@@ -128,7 +128,6 @@ export function RecipeTopBar({
   share_copy_url,
   menu_key,
   run_key,
-  viewport_wide_key,
   run_label,
   run_disabled,
   is_running,
@@ -314,23 +313,6 @@ export function RecipeTopBar({
     state[key] = value;
     onChange();
   };
-
-  // Where a run lands is the server's call, but Split - the only tab showing output beside
-  // the inputs - exists on wide screens only, and the server cannot see the viewport. So
-  // report which side of the line we are on. Deliberately no onChange(): this is not an
-  // action, and the value rides along with the next post, which every run is.
-  useEffect(() => {
-    if (!viewport_wide_key) return;
-    // the counterpart of the `max-width: 991.98px` block in RecipeTopBar.css, which is
-    // what actually hides .gooey-topbar-tab-desktop-only
-    const mq = window.matchMedia("(min-width: 992px)");
-    const sync = () => {
-      state[viewport_wide_key] = mq.matches;
-    };
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, [viewport_wide_key, state]);
 
   // What the Publish control offers. `publish_label` is permission-derived (Update / Save
   // and Run / Save as New); Share only appears when the user may change visibility, and
