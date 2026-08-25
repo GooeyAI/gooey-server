@@ -22,7 +22,7 @@ from daras_ai_v2.bot_integration_connect import (
     connect_bot_to_published_run,
     load_published_run_from_state,
 )
-from daras_ai_v2.bots import msg_handler, remove_thinking
+from daras_ai_v2.bots import msg_handler, parse_bot_html
 from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.fastapi_tricks import (
     fastapi_request_urlencoded_body,
@@ -417,4 +417,4 @@ def slack_get_response_for_msg_id(
     if not output_text:
         return {"status": "no_output"}
 
-    return {"status": "ok", "content": remove_thinking(output_text[0])}
+    return {"status": "ok", "content": parse_bot_html(output_text[0])[1]}
