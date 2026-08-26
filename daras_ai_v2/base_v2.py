@@ -2957,13 +2957,13 @@ class BasePage:
         if not self.is_current_user_admin():
             qs = qs.exclude(surface=SavedRun.Surface.builder_prompt)
 
-        # Apply user filter if specified
+        # Apply user filter if specified. A personal workspace gets the same
+        # treatment even though it has no "All" toggle to switch back with: it's
+        # still charged for every run its copilots serve over an integration or
+        # the API, and those aren't the owner's own runs. The Usage tab is where
+        # they belong.
         for_param = self.request.query_params.get("for", "me")
-        if (
-            for_param != "all"
-            and self.request.user
-            and not self.current_workspace.is_personal
-        ):
+        if for_param != "all" and self.request.user:
             qs = qs.filter(uid=self.request.user.uid).exclude(
                 surface=SavedRun.Surface.deployment
             )
@@ -3030,9 +3030,7 @@ class BasePage:
             return published_run.workspace
         return self.current_workspace
 
-    def _usage_load_more_href(
-        self, next_cursor: dict[str, str] | None
-    ) -> str | None:
+    def _usage_load_more_href(self, next_cursor: dict[str, str] | None) -> str | None:
         if not next_cursor:
             return None
         url = furl(self.request.url).set(origin=None)
