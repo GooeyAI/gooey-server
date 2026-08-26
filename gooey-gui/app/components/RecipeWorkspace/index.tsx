@@ -5,6 +5,10 @@ import clsx from "clsx";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { CustomComponentProps } from "~/components";
+import type {
+  RecipeWorkspaceProps,
+  RecipeWorkspaceTriggerProps,
+} from "@gooey-types/recipe_workspace_props";
 import { RenderedChildren } from "~/renderer";
 
 import { WorkspacePaneControl } from "../WorkspacePaneControl";
@@ -12,7 +16,6 @@ import {
   type PaneRole,
   paneRolesForLayout,
   paneVisibility,
-  type RecipeView,
   shownLayout,
   workspaceControlsForLayout,
 } from "./paneState";
@@ -24,12 +27,8 @@ export function RecipeWorkspace({
   state,
   storage_key,
   initial_view,
-  editor_full_width = false,
-}: CustomComponentProps & {
-  storage_key: string;
-  initial_view: RecipeView;
-  editor_full_width?: boolean;
-}) {
+  editor_full_width,
+}: CustomComponentProps & RecipeWorkspaceProps) {
   const { layout, hydrated, selectView, collapse } = usePaneLayout(
     storage_key,
     initial_view
@@ -107,17 +106,10 @@ export function RecipeWorkspaceTrigger({
   storage_key,
   initial_view,
   view,
-  state_key = "",
+  state_key,
   state_value,
   className,
-}: CustomComponentProps & {
-  storage_key: string;
-  initial_view: RecipeView;
-  view: RecipeView;
-  state_key?: string;
-  state_value?: unknown;
-  className?: string;
-}) {
+}: CustomComponentProps & RecipeWorkspaceTriggerProps) {
   const { selectView } = usePaneLayout(storage_key, initial_view);
   const handleClick = () => {
     selectView(view);

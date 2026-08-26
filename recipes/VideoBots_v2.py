@@ -100,6 +100,10 @@ from daras_ai_v2.search_ref import (
 )
 from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
 from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
+from gooey_gui.types.recipe_workspace_props import (
+    GooeyEmbedTeardownProps,
+    RecipeWorkspaceTriggerProps,
+)
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
@@ -1344,9 +1348,10 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
         # Owns the widget's teardown when this preview disappears or a different workflow
         # replaces it client-side.
-        gui.component(
-            "GooeyEmbedTeardown",
-            embed_key=str(self.current_pr.published_run_id),
+        gui.model_component(
+            GooeyEmbedTeardownProps(
+                embed_key=str(self.current_pr.published_run_id),
+            )
         )
         load_chat_widget_lib()
         gui.js(
@@ -1663,14 +1668,15 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         return (spec.creator and spec.creator.html_icon()) or icons.sparkles, spec.label
 
     def _render_about_meta_card(self, *, icon: str, label: str, pane: ConfigPane):
-        with gui.component(
-            "RecipeWorkspaceTrigger",
-            storage_key=self._workspace_storage_key(),
-            initial_view=self.entry_tab_slug(self.get_tab_spec()),
-            view=RecipeView.edit,
-            state_key=self.CONFIG_PANE_KEY,
-            state_value=pane,
-            className="v2-about-meta-card",
+        with gui.model_component(
+            RecipeWorkspaceTriggerProps(
+                storage_key=self._workspace_storage_key(),
+                initial_view=self.entry_tab_slug(self.get_tab_spec()),
+                view=RecipeView.edit,
+                state_key=self.CONFIG_PANE_KEY,
+                state_value=pane,
+                className="v2-about-meta-card",
+            )
         ):
             # icon over label, and no chevron: the whole card is the link, so an affordance
             # arrow only competed with the icon for the eye

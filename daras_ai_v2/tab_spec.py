@@ -1,23 +1,13 @@
 import typing
-from enum import Enum
 
 import pydantic
 
+from gooey_gui.types.recipe_workspace_props import RecipeView
 
-# `(str, Enum)` rather than `enum.StrEnum`: this runs on 3.10, where StrEnum does not exist.
-class RecipeView(str, Enum):
-    """The client-side views of the layout-v2 workspace.
-
-    These ids cross into TypeScript: they must stay in step with the `RecipeView` union in
-    `gooey-gui/app/components/RecipeWorkspace/paneState.ts`, which the compiler cannot check
-    from here. Naming them once on this side at least makes the pairing greppable, instead
-    of leaving eight bare string literals spread across two recipes.
-    """
-
-    about = "about"
-    edit = "edit"
-    preview = "preview"
-    split = "split"
+# Re-exported: `RecipeView` is defined next to the props that carry it into TypeScript, so
+# the generator can emit it as a named union. Recipes still import it from here, where the
+# rest of the tab vocabulary lives.
+__all__ = ["PaneSpec", "RecipeView", "TabSpec"]
 
 
 class PaneSpec(typing.NamedTuple):
@@ -48,5 +38,3 @@ class TabSpec(pydantic.BaseModel):
     desktop_only: bool = False
     """Hidden from the strip below `lg`. For tabs whose layout needs the width - Split is
     two columns side by side, which a phone cannot show."""
-
-    """Below `lg`, this view fills the workspace below the app header."""

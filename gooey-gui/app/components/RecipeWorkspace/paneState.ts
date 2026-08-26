@@ -1,6 +1,27 @@
-export type WorkView = "edit" | "preview" | "split";
-export type RecipeView = "about" | WorkView;
+import type { RecipeView } from "@gooey-types/recipe_workspace_props";
+
+export type { RecipeView };
+
+/** Which of the two work surfaces, as opposed to which view. Not a `RecipeView`: "editor"
+ * and "preview" name panes, and only the preview is both. */
 export type WorkPane = "editor" | "preview";
+
+/** Every view, as a value rather than a type.
+ *
+ * `Record<RecipeView, true>` is the point: the generated union is the only definition of
+ * what a view is, and this fails to compile if a view is added to the python enum without
+ * being acknowledged here. A bare array would silently stay stale.
+ */
+const RECIPE_VIEWS: Record<RecipeView, true> = {
+  about: true,
+  edit: true,
+  preview: true,
+  split: true,
+};
+
+function isRecipeView(value: unknown): value is RecipeView {
+  return typeof value === "string" && value in RECIPE_VIEWS;
+}
 
 export type PaneLayout = {
   mode: "about" | "work";
@@ -103,15 +124,7 @@ export function recipeViewFromNavigationState(
     return null;
   }
   const { recipeView } = state as { recipeView?: unknown };
-  if (
-    recipeView === "about" ||
-    recipeView === "edit" ||
-    recipeView === "preview" ||
-    recipeView === "split"
-  ) {
-    return recipeView;
-  }
-  return null;
+  return isRecipeView(recipeView) ? recipeView : null;
 }
 
 export function clearRecipeViewNavigationState() {

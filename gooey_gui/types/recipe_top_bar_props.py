@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import typing
-
 import pydantic
+
+from gooey_gui.types.recipe_workspace_props import RecipeView
 
 
 class TopBarView(pydantic.BaseModel):
     """One client-side workspace arrangement in the bar's view selector."""
 
-    slug: typing.Literal["about", "edit", "preview", "split"]
+    slug: RecipeView
     label: str
     icon: str = ""  # raw FontAwesome html, like NavItemData.icon
     desktop_only: bool = False  # hidden below lg; see TabSpec.desktop_only
@@ -56,7 +56,7 @@ class RecipeTopBarProps(pydantic.BaseModel):
 
     views: list[TopBarView] = []
     storage_key: str
-    initial_view: typing.Literal["about", "edit", "preview", "split"]
+    initial_view: RecipeView
     # The open config pane has taken the whole row, so the bar names the arrangement on
     # screen rather than the split still saved behind it.
     editor_full_width: bool = False

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { CustomComponentProps } from "~/components";
+import type { GooeyEmbedTeardownProps } from "@gooey-types/recipe_workspace_props";
 
 /**
  * Removes the chat preview when its tab goes away.
@@ -21,7 +22,7 @@ import type { CustomComponentProps } from "~/components";
  */
 export function GooeyEmbedTeardown({
   embed_key,
-}: CustomComponentProps & { embed_key: string }) {
+}: CustomComponentProps & GooeyEmbedTeardownProps) {
   useEffect(() => {
     return () => {
       document.querySelectorAll("div").forEach((el) => {

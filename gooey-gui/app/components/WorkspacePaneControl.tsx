@@ -1,8 +1,17 @@
 import "./RecipeWorkspace/RecipeWorkspace.css";
 
 import clsx from "clsx";
+import type { WorkspacePaneControlProps } from "@gooey-types/recipe_workspace_props";
 import { GooeyTooltip } from "./GooeyTooltip";
 
+/** Field docs live on the python model this is generated from - see
+ * `gooey_gui/types/recipe_workspace_props.py`.
+ *
+ * `Partial` because this control has two callers with different needs: python sends the
+ * full prop set through the render tree, while RecipeWorkspace renders its own pane-pairing
+ * controls in React and passes a handler plus a label and nothing else. Every field name is
+ * still checked against the model, so renaming one there breaks the build here.
+ */
 export function WorkspacePaneControl({
   label,
   tooltip,
@@ -12,23 +21,11 @@ export function WorkspacePaneControl({
   onClick,
   event_name,
   className,
-}: {
+}: Partial<WorkspacePaneControlProps> & {
   label: string;
-  /**
-   * Hover text, when it says something the label does not. A labelled control names a
-   * surface ("Ask Gooey"); its tooltip can name the action ("New Chat"). Defaults to
-   * `label`, which is all an icon-only control needs.
-   */
-  tooltip?: string;
-  /** FontAwesome class. Ignored when `photo_url` is set - the logo takes its place. */
-  icon?: string;
-  /** Renders a logo instead of an icon, for a control that identifies a surface. */
-  photo_url?: string;
-  /** Show `label` beside the icon/logo, turning the square button into a pill. */
-  show_label?: boolean;
+  /** React call sites dispatch nothing - they act directly. Python call sites pass
+   * `event_name` instead, because they have no handler to hand across the boundary. */
   onClick?: () => void;
-  event_name?: string;
-  className?: string;
 }) {
   const handleClick = () => {
     if (onClick) {

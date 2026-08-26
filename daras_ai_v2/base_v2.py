@@ -66,12 +66,16 @@ from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_rate_limits
 from daras_ai_v2.send_email import send_reported_run_email
 from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
 
-# a leaf module - pydantic models only - so there is no cycle to dodge with a lazy import
+# leaf modules - pydantic models only - so there is no cycle to dodge with a lazy import
 from gooey_gui.types.recipe_top_bar_props import (
     RecipeTopBarProps,
     TopBarAuthor,
     TopBarIntegration,
     TopBarView,
+)
+from gooey_gui.types.recipe_workspace_props import (
+    RecipeWorkspaceProps,
+    WorkspacePaneControlProps,
 )
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
@@ -561,12 +565,12 @@ class BasePage:
 
     def _render_workspace(self, tabs: list[TabSpec]):
         """Render each reusable work surface once; React controls their arrangement."""
-        initial_view = self.entry_tab_slug(tabs)
-        with gui.component(
-            "RecipeWorkspace",
-            storage_key=self._workspace_storage_key(),
-            initial_view=initial_view,
-            editor_full_width=self._editor_wants_full_width(),
+        with gui.model_component(
+            RecipeWorkspaceProps(
+                storage_key=self._workspace_storage_key(),
+                initial_view=self.entry_tab_slug(tabs),
+                editor_full_width=self._editor_wants_full_width(),
+            )
         ):
             # mt-1 on the About card and the preview, not on the editor: those two are framed
             # surfaces that would otherwise sit flush against the top bar's rule, while the
@@ -649,12 +653,13 @@ class BasePage:
         # (sticky on desktop, fixed below the sidebar breakpoint), so there is no app-header
         # offset to hardcode. The shared React control supplies the same icon, dimensions,
         # and HTML tooltip as the editor and preview controls.
-        gui.component(
-            "WorkspacePaneControl",
-            label="Close Ask gooey",
-            icon=icons.cls.cancel,
-            event_name=f"{GOOEY_BUILDER_EVENT_KEY}:close",
-            className="v2-builder-close",
+        gui.model_component(
+            WorkspacePaneControlProps(
+                label="Close Ask gooey",
+                icon=icons.cls.cancel,
+                event_name=f"{GOOEY_BUILDER_EVENT_KEY}:close",
+                className="v2-builder-close",
+            )
         )
         # The panel's title, opposite the close button. v2 hides the widget's own header, so
         # without this the panel is unnamed and there is no way to start a fresh conversation
@@ -664,18 +669,19 @@ class BasePage:
         # this would be a second copy of the same name - and "New Chat" is a no-op on a chat
         # that has not started.
         if not builder_thread_is_empty(self):
-            gui.component(
-                "WorkspacePaneControl",
-                label=GOOEY_BUILDER_TITLE,
-                # the label names the panel; the tooltip says what clicking it does
-                tooltip="New Chat",
-                photo_url=get_gooey_builder_photo_url(),
-                show_label=True,
-                event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new",
-                # no Bootstrap padding utility here: `.v2-pane-control-labelled` owns this
-                # button's padding, and `p-2` competed with it on equal specificity, so which
-                # one won came down to stylesheet order
-                className="v2-builder-new",
+            gui.model_component(
+                WorkspacePaneControlProps(
+                    label=GOOEY_BUILDER_TITLE,
+                    # the label names the panel; the tooltip says what clicking it does
+                    tooltip="New Chat",
+                    photo_url=get_gooey_builder_photo_url(),
+                    show_label=True,
+                    event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new",
+                    # no Bootstrap padding utility here: `.v2-pane-control-labelled` owns
+                    # this button's padding, and `p-2` competed with it on equal
+                    # specificity, so which one won came down to stylesheet order
+                    className="v2-builder-new",
+                )
             )
         render_gooey_builder(
             event_key=GOOEY_BUILDER_EVENT_KEY, request=self.request, page=self
