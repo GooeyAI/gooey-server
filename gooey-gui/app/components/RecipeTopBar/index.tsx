@@ -10,6 +10,7 @@ import type {
 import { Link, useNavigate } from "@remix-run/react";
 import type { RecipeView } from "../RecipeWorkspace/paneState";
 import {
+  activeTabView,
   paneVisibility,
   selectedWorkspaceView,
   shownLayout,
@@ -114,6 +115,7 @@ export function RecipeTopBar({
   storage_key,
   initial_view,
   editor_full_width,
+  narrow_pane,
   workspace_href,
   workspace_active,
   overflow_items,
@@ -168,15 +170,23 @@ export function RecipeTopBar({
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { layout, hydrated, selectView } = usePaneLayout(
+  const { layout, storedLayout, hydrated, selectView } = usePaneLayout(
     storage_key,
-    initial_view
+    initial_view,
+    narrow_pane
   );
   // The shown layout, not the stored one - the bar must name the arrangement that is on
   // screen. A config pane holding the whole row makes that Edit even where a split is saved.
   const activeView = viewForLayout(shownLayout(layout, editor_full_width));
   const selectedView = selectedWorkspaceView(activeView, workspace_active);
-  const activeViewSpec = views.find((view) => view.slug === selectedView);
+  // Which pill is lit, and what the crumb reads - see `activeTabView` for why this is not
+  // simply the view on screen.
+  const activeSlug = activeTabView(
+    views.map((view) => view.slug),
+    selectedView,
+    workspace_active ? viewForLayout(storedLayout) : null
+  );
+  const activeViewSpec = views.find((view) => view.slug === activeSlug);
   const chooseView = (view: RecipeView) => {
     selectView(view);
     const target = workspaceTargetForView(workspace_active, workspace_href);
@@ -253,8 +263,8 @@ export function RecipeTopBar({
   //
   // Until the layout has hydrated, assume the root. Before then `layout` is whatever
   // `initial_view` says, and for an owner that is Split - so the crumb rendered "Split" for a
-  // frame, until sessionStorage loaded, `keepLayoutOnScreen` folded Split away at this width,
-  // and the panel announced itself. Naming a view the user never chose, and one that does not
+  // frame, until sessionStorage loaded, `foldForNarrowViewport` folded Split away at this
+  // width, and the panel announced itself. Naming a view the user never chose, and one that does not
   // exist on a phone, is worse than naming none: the root is the safe assumption, because
   // Ask Gooey is what a workflow opens on here. The pill group guards the same frame with
   // `paneVisibility(hydrated)`; this is that guard for the rest of the bar - it also keeps the
@@ -291,14 +301,13 @@ export function RecipeTopBar({
 
   // Choosing a view from the sheet or the eye has to put Ask Gooey away, or the pane it
   // selects renders behind a panel that is covering the whole shell.
+  //
+  // No special case for Split at this width any more: the fold is derived from
+  // `narrow_pane`, which the recipe declares, so asking for a two-pane view on a phone
+  // already lands on the half that recipe wants.
   const showView = (view: RecipeView) => {
     setBuilder(false);
-    // Split is two columns, and there is room for one below lg - `keepLayoutOnScreen` folds it
-    // to the preview alone. For "How it works", which is Split, that drops the configuration
-    // the entry exists to show and lands on the bot instead, so the pick reads as opening the
-    // wrong view and needing a second go. Ask for the editor directly at this width.
-    const narrow = typeof window !== "undefined" && window.innerWidth < 992;
-    chooseView(narrow && view === "split" ? "edit" : view);
+    chooseView(view);
   };
 
   const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
@@ -599,14 +608,14 @@ export function RecipeTopBar({
               key={view.slug}
               className={clsx(
                 "gooey-topbar-tab",
-                view.slug === selectedView && "gooey-topbar-tab-active",
+                view.slug === activeViewSpec?.slug && "gooey-topbar-tab-active",
                 view.desktop_only && "gooey-topbar-tab-desktop-only"
               )}
               onClick={() => chooseView(view.slug as RecipeView)}
               // no title: these carry a visible label, so a tooltip repeating it is noise.
               // `aria-pressed` conveys that these controls change the workspace layout rather
               // than navigate to another page.
-              aria-pressed={view.slug === selectedView}
+              aria-pressed={view.slug === activeViewSpec?.slug}
             >
               <Icon html={view.icon} className="gooey-topbar-tab-icon" />
               {view.label}

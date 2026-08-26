@@ -75,6 +75,7 @@ from gooey_gui.types.recipe_top_bar_props import (
 )
 from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspaceProps,
+    WorkPane,
     WorkspacePaneControlProps,
 )
 from daras_ai_v2.urls import paginate_button, paginate_queryset
@@ -570,6 +571,7 @@ class BasePage:
                 storage_key=self._workspace_storage_key(),
                 initial_view=self.entry_tab_slug(tabs),
                 editor_full_width=self._editor_wants_full_width(),
+                narrow_pane=self.narrow_pane(),
             )
         ):
             # mt-1 on the About card and the preview, not on the editor: those two are framed
@@ -616,6 +618,24 @@ class BasePage:
         on it: the bar names the arrangement that is actually on screen.
         """
         return False
+
+    def narrow_pane(self) -> WorkPane:
+        """Which half of a two-pane view a phone shows.
+
+        There is room for one below lg, and which one survives is not a layout question but
+        an editorial one: a chat recipe keeps the bot, because talking to it *is* the output.
+        A media recipe would keep the form, because there the player is the result rather
+        than the work.
+
+        Said here rather than in the client, for the same reason `_editor_wants_full_width`
+        is: only the recipe knows, and both the workspace and the top bar have to fold the
+        same way or the bar names an arrangement that is not on screen.
+        """
+        if self.is_unowned_example():
+            # A visitor's one work tab is "How it works", which exists to show the
+            # configuration. Folding it to the bot drops the thing they tapped for.
+            return WorkPane.editor
+        return WorkPane.preview
 
     def _workspace_storage_key(self) -> str:
         return (
@@ -857,6 +877,7 @@ class BasePage:
                 storage_key=self._workspace_storage_key(),
                 initial_view=self.entry_tab_slug(tabs),
                 editor_full_width=self._editor_wants_full_width(),
+                narrow_pane=self.narrow_pane(),
                 workspace_href=self.current_app_url(RecipeTabs.run),
                 workspace_active=workspace_active,
                 views=[

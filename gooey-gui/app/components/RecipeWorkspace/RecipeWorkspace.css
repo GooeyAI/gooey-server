@@ -313,8 +313,9 @@
   }
 
   /* There is no room to pair anything at this width, so the minor half is not shown at all.
-     About is the only view that reaches here holding two panes - `keepLayoutOnScreen` already
-     folds a work-mode split down to the preview alone - and its preview was sitting just off
+     About is the only view that reaches here holding two panes - `foldForNarrowViewport`
+     already folds a work-mode split down to whichever half the recipe declared, and leaves
+     About alone - and its preview was sitting just off
      the content box, close enough that its rounded left edge showed through the container's
      right padding, which `overflow: hidden` does not clip.
      Done by role rather than by collapsing the layout: this is a fact about the width, not

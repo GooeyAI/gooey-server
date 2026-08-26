@@ -28,10 +28,12 @@ export function RecipeWorkspace({
   storage_key,
   initial_view,
   editor_full_width,
+  narrow_pane,
 }: CustomComponentProps & RecipeWorkspaceProps) {
   const { layout, hydrated, selectView, collapse } = usePaneLayout(
     storage_key,
-    initial_view
+    initial_view,
+    narrow_pane
   );
   const [aboutPane, editorPane, previewPane] = children;
   // Roles and controls both come off the *shown* layout, never the stored one, so a pane

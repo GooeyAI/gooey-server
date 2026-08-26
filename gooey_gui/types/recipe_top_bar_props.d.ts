@@ -11,6 +11,14 @@
  * `daras_ai_v2.tab_spec` re-exports this, so recipes keep importing it from there.
  */
 export type RecipeView = "about" | "edit" | "preview" | "split";
+/**
+ * One of the two work surfaces, as opposed to one of the views.
+ *
+ * Not a `RecipeView`: these name panes, and only the preview is both. Defined here for
+ * the same reason - `RecipeWorkspace/paneState.ts` imports the generated union rather
+ * than declaring its own.
+ */
+export type WorkPane = "editor" | "preview";
 
 /**
  * One client-side workspace arrangement in the bar's view selector.
@@ -61,6 +69,7 @@ export interface RecipeTopBarProps {
   storage_key: string;
   initial_view: RecipeView;
   editor_full_width: boolean;
+  narrow_pane: WorkPane;
   workspace_href: string;
   workspace_active: boolean;
   overflow_items: TopBarMenuItem[];

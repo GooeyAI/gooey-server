@@ -1,4 +1,5 @@
 from bots.models import SavedRun, Workflow
+from gooey_gui.types.recipe_workspace_props import WorkPane
 from recipes.VideoBots import VideoBotsPage
 from recipes.VideoBots_v2 import VideoBotsPageV2
 from routers.root import RecipeTabs
@@ -25,3 +26,15 @@ def test_history_workflow_filter_uses_global_history_url():
 def test_history_workflow_filter_parses_canonical_slug():
     assert parse_workflow("agent") == Workflow.VIDEO_BOTS
     assert parse_workflow("missing") is None
+
+
+def test_narrow_pane_keeps_the_editor_for_a_visitor(monkeypatch):
+    """A visitor's one work tab is "How it works", which exists to show the configuration -
+    so a phone keeps the editor. An owner on Split keeps the bot."""
+    page = object.__new__(VideoBotsPageV2)
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
+    assert page.narrow_pane() == WorkPane.editor
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: False)
+    assert page.narrow_pane() == WorkPane.preview

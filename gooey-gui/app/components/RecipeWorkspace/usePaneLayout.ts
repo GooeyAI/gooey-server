@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import {
   clearRecipeViewNavigationState,
   collapsePane,
+  foldForNarrowViewport,
   initialPaneLayout,
   layoutAfterSelectingView,
   layoutForView,
@@ -15,10 +16,16 @@ import {
 } from "./paneState";
 
 const EVENT_PREFIX = "gooey:recipe-layout:";
+/** The counterpart of the `max-width: 991.98px` blocks in the stylesheets. */
+const WIDE_QUERY = "(min-width: 992px)";
 const useHydrationEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-export function usePaneLayout(storageKey: string, initialView: RecipeView) {
+export function usePaneLayout(
+  storageKey: string,
+  initialView: RecipeView,
+  narrowPane: WorkPane = "preview"
+) {
   const location = useLocation();
   const [layout, setLayout] = useState<PaneLayout>(() =>
     layoutForView(initialView)
@@ -26,6 +33,7 @@ export function usePaneLayout(storageKey: string, initialView: RecipeView) {
   const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(
     null
   );
+  const [isNarrow, setIsNarrow] = useState(false);
 
   const updateLayout = useCallback(
     (next: PaneLayout) => {
@@ -54,6 +62,10 @@ export function usePaneLayout(storageKey: string, initialView: RecipeView) {
       location.state
     );
     setLayout(nextLayout);
+    // Read before paint, in the same commit as `hydrated`: the panes stay hidden until then,
+    // so learning the viewport a frame later would show a two-pane arrangement for one
+    // frame on a phone.
+    setIsNarrow(!window.matchMedia(WIDE_QUERY).matches);
     if (navigationView) {
       try {
         window.sessionStorage.setItem(storageKey, JSON.stringify(nextLayout));
@@ -74,22 +86,14 @@ export function usePaneLayout(storageKey: string, initialView: RecipeView) {
   }, [initialView, location.key, location.state, storageKey]);
 
   useEffect(() => {
-    const wide = window.matchMedia("(min-width: 992px)");
-    const keepLayoutOnScreen = () => {
-      if (
-        !wide.matches &&
-        layout.mode === "work" &&
-        layout.editorOpen &&
-        layout.previewOpen
-      ) {
-        updateLayout(layoutForView("preview"));
-      }
-    };
-    keepLayoutOnScreen();
-    wide.addEventListener("change", keepLayoutOnScreen);
-    return () => wide.removeEventListener("change", keepLayoutOnScreen);
-  }, [layout, updateLayout]);
+    const wide = window.matchMedia(WIDE_QUERY);
+    const sync = () => setIsNarrow(!wide.matches);
+    wide.addEventListener("change", sync);
+    return () => wide.removeEventListener("change", sync);
+  }, []);
 
+  // `layout` stays the layout the user asked for, so selecting and collapsing act on that
+  // rather than on whatever the current viewport happens to allow.
   const selectView = useCallback(
     (view: RecipeView) => {
       updateLayout(layoutAfterSelectingView(layout, view));
@@ -103,8 +107,15 @@ export function usePaneLayout(storageKey: string, initialView: RecipeView) {
   );
 
   return {
-    layout,
+    // What can be shown here. Consumers compose `shownLayout` on top for the full-width
+    // case; both are readings of the stored layout, never writes to it.
+    layout: foldForNarrowViewport(layout, narrowPane, isNarrow),
+    // What the user actually picked. The top bar needs both: it names the arrangement on
+    // screen, but the *pill* has to stay lit on the tab that was chosen even when the fold
+    // lands on a view this recipe does not offer as a tab.
+    storedLayout: layout,
     hydrated: hydratedStorageKey === storageKey,
+    isNarrow,
     selectView,
     collapse,
   };

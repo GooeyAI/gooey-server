@@ -1,10 +1,9 @@
-import type { RecipeView } from "@gooey-types/recipe_workspace_props";
+import type {
+  RecipeView,
+  WorkPane,
+} from "@gooey-types/recipe_workspace_props";
 
-export type { RecipeView };
-
-/** Which of the two work surfaces, as opposed to which view. Not a `RecipeView`: "editor"
- * and "preview" name panes, and only the preview is both. */
-export type WorkPane = "editor" | "preview";
+export type { RecipeView, WorkPane };
 
 /** Every view, as a value rather than a type.
  *
@@ -43,6 +42,30 @@ export function shownLayout(
     return layout;
   }
   return { ...layout, previewOpen: false };
+}
+
+/** The layout a narrow viewport can actually show.
+ *
+ * A two-pane arrangement has room for one below lg. Which one survives is the recipe's call
+ * - see `BasePage.narrow_pane` - because it is an editorial question, not a layout one.
+ *
+ * Derived, not stored, and that is the point: this used to write `preview` into
+ * sessionStorage, so a phone held sideways folded the split away permanently and turning
+ * back never restored it. Composed with `shownLayout` for the same reason - the stored
+ * layout is what the user asked for, and both of these are readings of it.
+ */
+export function foldForNarrowViewport(
+  layout: PaneLayout,
+  narrowPane: WorkPane,
+  isNarrow: boolean
+): PaneLayout {
+  if (!isNarrow) {
+    return layout;
+  }
+  if (layout.mode !== "work" || !layout.editorOpen || !layout.previewOpen) {
+    return layout;
+  }
+  return layoutForView(narrowPane === "editor" ? "edit" : "preview");
 }
 
 /** A pane's share of the row: the whole of it, the larger half, the smaller half, or none. */
@@ -193,6 +216,29 @@ export function selectedWorkspaceView(
     return null;
   }
   return activeView;
+}
+
+/** Which tab reads as active, given what is on screen and what the user picked.
+ *
+ * Normally the view on screen. But a narrow viewport folds a two-pane view down, and the
+ * result need not be a view this recipe offers as a tab: a recipe whose only work tab is
+ * two-pane - About plus a "How it works", or About plus a "Generate" - folds to a view that
+ * is not in its tab set on every phone. Nothing matched, so no pill rendered active and the
+ * crumb went blank. Falling back to what the user picked keeps the pill on the tab they are
+ * on, whatever the width did to the arrangement behind it.
+ */
+export function activeTabView(
+  tabSlugs: readonly RecipeView[],
+  shownView: RecipeView | null,
+  pickedView: RecipeView | null
+): RecipeView | null {
+  if (shownView && tabSlugs.includes(shownView)) {
+    return shownView;
+  }
+  if (pickedView && tabSlugs.includes(pickedView)) {
+    return pickedView;
+  }
+  return null;
 }
 
 export function viewAfterRun(

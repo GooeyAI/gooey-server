@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pydantic
 
-from gooey_gui.types.recipe_workspace_props import RecipeView
+from gooey_gui.types.recipe_workspace_props import RecipeView, WorkPane
 
 
 class TopBarView(pydantic.BaseModel):
@@ -60,6 +60,9 @@ class RecipeTopBarProps(pydantic.BaseModel):
     # The open config pane has taken the whole row, so the bar names the arrangement on
     # screen rather than the split still saved behind it.
     editor_full_width: bool = False
+    # Must match RecipeWorkspaceProps.narrow_pane: the bar names the arrangement that is on
+    # screen, so it has to fold a two-pane view the same way the workspace does.
+    narrow_pane: WorkPane = WorkPane.preview
     workspace_href: str
     workspace_active: bool
     overflow_items: list[TopBarMenuItem] = []  # the "..." beside the pill group

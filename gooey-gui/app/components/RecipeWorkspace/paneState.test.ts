@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeTabView,
   collapsePane,
+  foldForNarrowViewport,
   initialPaneLayout,
   layoutAfterSelectingView,
   layoutForView,
@@ -254,6 +256,73 @@ describe("shownLayout", () => {
       addPreview: false,
       mergePreview: false,
     });
+  });
+});
+
+describe("foldForNarrowViewport", () => {
+  it("keeps the half the recipe declared", () => {
+    expect(foldForNarrowViewport(split, "preview", true)).toEqual(preview);
+    expect(foldForNarrowViewport(split, "editor", true)).toEqual(edit);
+  });
+
+  // The bug this replaced: the fold was hardcoded to `preview`, so a recipe whose tabs are
+  // About and a two-pane "Generate" - no Preview tab at all - folded to a view it does not
+  // declare. No pill matched it, so none rendered active and the crumb went blank.
+  it("can fold to the editor, for a recipe with no preview tab", () => {
+    const folded = foldForNarrowViewport(split, "editor", true);
+    expect(viewForLayout(folded)).toBe("edit");
+    expect(paneRolesForLayout(folded)).toEqual({
+      about: "closed",
+      editor: "solo",
+      preview: "closed",
+    });
+  });
+
+  it("leaves a wide viewport alone", () => {
+    expect(foldForNarrowViewport(split, "editor", false)).toEqual(split);
+  });
+
+  it("has nothing to fold in a one-pane view", () => {
+    expect(foldForNarrowViewport(edit, "preview", true)).toEqual(edit);
+    expect(foldForNarrowViewport(preview, "editor", true)).toEqual(preview);
+  });
+
+  // About pairs with the preview, but it is not a two-pane *work* view - the editor is shut.
+  // Folding it would swap the surface the user is reading for one they did not ask for.
+  it("leaves About alone", () => {
+    expect(foldForNarrowViewport(about, "editor", true)).toEqual(about);
+  });
+
+  // The other half of the old bug: folding used to write the result to sessionStorage, so a
+  // phone turned sideways lost the split for good. Deriving it leaves the stored layout be.
+  it("is a derivation, so turning the phone back restores the pair", () => {
+    const stored = split;
+    expect(foldForNarrowViewport(stored, "preview", true)).toEqual(preview);
+    expect(foldForNarrowViewport(stored, "preview", false)).toEqual(split);
+  });
+});
+
+describe("activeTabView", () => {
+  const VIEWER_TABS = ["about", "split"] as const;   // About + "How it works"
+  const OWNER_TABS = ["about", "edit", "preview", "split"] as const;
+
+  it("names the view on screen when the recipe offers it as a tab", () => {
+    expect(activeTabView(OWNER_TABS, "preview", "split")).toBe("preview");
+  });
+
+  // The bug: a phone folds "How it works" (split) down to one pane, and neither half is a
+  // tab this recipe declares - so no pill was active and the crumb went blank.
+  it("falls back to the picked view when the fold lands outside the tab set", () => {
+    expect(activeTabView(VIEWER_TABS, "preview", "split")).toBe("split");
+    expect(activeTabView(VIEWER_TABS, "edit", "split")).toBe("split");
+  });
+
+  it("names nothing off the workspace, where no pill belongs", () => {
+    expect(activeTabView(OWNER_TABS, null, null)).toBeNull();
+  });
+
+  it("names nothing when neither view is a tab", () => {
+    expect(activeTabView(VIEWER_TABS, "edit", "preview")).toBeNull();
   });
 });
 

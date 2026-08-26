@@ -23,6 +23,18 @@ class RecipeView(str, Enum):
     split = "split"
 
 
+class WorkPane(str, Enum):
+    """One of the two work surfaces, as opposed to one of the views.
+
+    Not a `RecipeView`: these name panes, and only the preview is both. Defined here for
+    the same reason - `RecipeWorkspace/paneState.ts` imports the generated union rather
+    than declaring its own.
+    """
+
+    editor = "editor"
+    preview = "preview"
+
+
 class RecipeWorkspaceProps(pydantic.BaseModel):
     """The workspace shell: three server-rendered surfaces, arranged by the client.
 
@@ -42,6 +54,9 @@ class RecipeWorkspaceProps(pydantic.BaseModel):
     # An open config pane has asked for the whole row, so the preview is dropped from what
     # is shown without touching the layout stored behind it. See `shownLayout`.
     editor_full_width: bool = False
+    # Which half of a two-pane view a phone shows. There is room for one below lg, and which
+    # one is the recipe's call - see `BasePage.narrow_pane`.
+    narrow_pane: WorkPane = WorkPane.preview
 
 
 class RecipeWorkspaceTriggerProps(pydantic.BaseModel):
