@@ -117,7 +117,10 @@ def _load_history(
 ) -> tuple[list[WorkflowCardData], str | None]:
     # uses the ["workspace", "surface", "-updated_at"] index on SavedRun
     qs = SavedRun.objects.filter(workspace=workspace, surface=surface).select_related(
-        "parent_version__published_run", "workflow_metadata", "created_by"
+        "parent_version__published_run",
+        "workflow_metadata",
+        "created_by",
+        "message_thread__bot_conversation",
     )
     if workflow is not None:
         qs = qs.filter(workflow=workflow)

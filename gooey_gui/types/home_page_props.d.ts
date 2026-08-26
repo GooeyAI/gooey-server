@@ -24,12 +24,21 @@ export interface AuthorData {
   name: string;
   photo_url: string | null;
 }
+/**
+ * Who a deployment run was for, as opposed to who owns the integration.
+ */
+export interface SenderData {
+  icon: string;
+  label: string;
+  title: string | null;
+}
 export interface WorkflowCardData {
   title: string;
   href: string;
   workflow_icon: string | null;
   description: string | null;
   author: AuthorData | null;
+  sender: SenderData | null;
   preview: (ChatPreview | MediaPreview | IconPreview) | null;
   updated_at: string | null;
   run_count: number | null;

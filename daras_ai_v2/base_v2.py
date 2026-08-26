@@ -2991,6 +2991,7 @@ class BasePage:
                 "parent_version__published_run",
                 "workflow_metadata",
                 "created_by",
+                "message_thread__bot_conversation",
             )
         )
         runs, next_cursor = paginate_queryset(

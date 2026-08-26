@@ -39,12 +39,23 @@ class AuthorData(pydantic.BaseModel):
     photo_url: str | None = None
 
 
+class SenderData(pydantic.BaseModel):
+    """Who a deployment run was for, as opposed to who owns the integration."""
+
+    icon: str
+    label: str
+    title: str | None = None
+
+
 class WorkflowCardData(pydantic.BaseModel):
     title: str
     href: str
     workflow_icon: str | None = None
     description: str | None = None
     author: AuthorData | None = None
+    # a deployment run has no meaningful author - the integration's owner isn't
+    # who sent the message - so the card shows this in the author's place
+    sender: SenderData | None = None
     preview: CardPreview | None = None
     updated_at: str | None = None
     run_count: int | None = None

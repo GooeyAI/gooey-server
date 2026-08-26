@@ -4,7 +4,8 @@ import mimetypes
 from typing import TYPE_CHECKING
 
 from app_users.models import AppUser
-from bots.models import PublishedRun, SavedRun, Workflow
+from bots.models import Conversation, PublishedRun, SavedRun, Workflow
+from bots.models.bot_integration import Platform
 from bots.models.workflow import WorkflowMetadata
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.preview_img import media_preview_img
@@ -15,6 +16,7 @@ from gooey_gui.types.home_page_props import (
     ChatPreview,
     IconPreview,
     MediaPreview,
+    SenderData,
     WorkflowCardData,
 )
 from workspaces.models import Workspace
@@ -24,6 +26,11 @@ if TYPE_CHECKING:
 
 CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
+
+# An id is masked to first-3 + last-4. Anything shorter would leak most of
+# itself to the mask, so it's shown whole instead - a display name like @seanb
+# is meant to be read anyway.
+MASK_MIN_LEN = len("123") + len("1233") + 1
 
 
 def author_from_user(
@@ -79,14 +86,67 @@ def sr_to_card(
     parent_pr = sr.parent_published_run()
     workflow = Workflow(sr.workflow)
     metadata = sr.get_workflow_metadata()
+    sender = sender_from_run(sr)
     return WorkflowCardData(
         title=(parent_pr and parent_pr.title) or workflow.label,
         href=sr.get_app_url(),
         workflow_icon=(metadata and (metadata.fa_icon or metadata.emoji)) or "",
         description=(parent_pr and parent_pr.notes) or None,
         preview=_sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata),
-        author=author,
+        # whoever owns the integration didn't send the message, so the sender
+        # takes the author's place rather than sitting next to it
+        author=None if sender else author,
+        sender=sender,
     )
+
+
+def sender_from_run(sr: SavedRun) -> SenderData | None:
+    """Who this run was for, when it came in over a bot integration.
+
+    Needs `message_thread__bot_conversation` selected to stay off the N+1 path.
+    """
+    if sr.platform is None:
+        return None
+    try:
+        platform = Platform(sr.platform)
+    except ValueError:
+        # a run recorded on a platform this deploy doesn't know about - the card
+        # is worth rendering without its origin, a 500 isn't
+        return None
+    convo = sr.message_thread and sr.message_thread.bot_conversation
+    return SenderData(
+        icon=platform.get_icon(),
+        # a run can carry a platform without a conversation behind it (an older
+        # run, or a thread since deleted) - the icon alone still says where it
+        # came from, so fall back to that rather than dropping the row's origin
+        label=_sender_label(platform, convo) if convo else "",
+        title=platform.get_title(),
+    )
+
+
+def _sender_label(platform: Platform, convo: Conversation) -> str:
+    match platform:
+        case Platform.WHATSAPP if convo.wa_phone_number:
+            return mask_user_id(convo.wa_phone_number.as_international)
+        case Platform.TWILIO if convo.twilio_phone_number:
+            return mask_user_id(convo.twilio_phone_number.as_international)
+        case Platform.SLACK if convo.slack_user_name:
+            return "@" + mask_user_id(convo.slack_user_name)
+        case Platform.INSTAGRAM if convo.ig_username:
+            return "@" + mask_user_id(convo.ig_username)
+        case Platform.FACEBOOK if convo.fb_page_name:
+            return "@" + mask_user_id(convo.fb_page_name)
+        case Platform.TELEGRAM if convo.telegram_user_name:
+            return "@" + mask_user_id(convo.telegram_user_name)
+    return mask_user_id(convo.unique_user_id() or "")
+
+
+def mask_user_id(value: str) -> str:
+    """Keep enough of an id to recognise a returning sender, not enough to reach them."""
+    value = value.strip()
+    if len(value) < MASK_MIN_LEN:
+        return value
+    return f"{value[:3]}xxx{value[-4:]}"
 
 
 def pr_to_card(

@@ -9,6 +9,7 @@ import type {
   ChatPreview,
   IconPreview,
   MediaPreview,
+  SenderData,
   WorkflowCardData,
   WorkflowTabData,
 } from "@gooey-types/home_page_props";
@@ -16,6 +17,22 @@ import type {
 import { GooeyTooltip } from "../GooeyTooltip";
 
 export type CardPreview = ChatPreview | MediaPreview | IconPreview;
+
+function CardSender({ sender }: { sender: SenderData }) {
+  return (
+    <span className="d-inline-flex align-items-center gap-2 min-w-0 text-muted">
+      <span
+        className="flex-shrink-0 d-inline-flex align-items-center"
+        title={sender.title ?? undefined}
+        aria-label={sender.title ?? undefined}
+        dangerouslySetInnerHTML={{ __html: sender.icon }}
+      />
+      {sender.label && (
+        <span className="text-break text-truncate">{sender.label}</span>
+      )}
+    </span>
+  );
+}
 
 function CardAuthor({ author }: { author: AuthorData | null }) {
   if (!author?.photo_url && !author?.name) return null;
@@ -117,7 +134,14 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
 }
 
 export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
-  const hasAuthor = !!(card.author?.photo_url || card.author?.name);
+  // a sender always renders (the icon carries the platform even with no label),
+  // so it stands in for the author when deciding whether the dot separator earns
+  // its place
+  const hasByline = !!(
+    card.sender ||
+    card.author?.photo_url ||
+    card.author?.name
+  );
   return (
     <a
       href={card.href}
@@ -136,12 +160,16 @@ export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
       </div>
 
       <div className="d-flex flex-column p-3 gap-2 border-top">
-        <span className="text-break text-truncate line-clamp-1 m-0">
+        <span className="bold text-break text-truncate line-clamp-1 m-0">
           {card.title}
         </span>
         <div className="d-flex align-items-center gap-1 small">
-          <CardAuthor author={card.author} />
-          {hasAuthor && card.updated_at && <span>·</span>}
+          {card.sender ? (
+            <CardSender sender={card.sender} />
+          ) : (
+            <CardAuthor author={card.author} />
+          )}
+          {hasByline && card.updated_at && <span>·</span>}
           {card.updated_at && (
             <span className="text-nowrap text-muted">{card.updated_at}</span>
           )}
