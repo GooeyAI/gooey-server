@@ -2,6 +2,7 @@ import mimetypes
 import random
 import traceback
 import typing
+from functools import lru_cache
 from datetime import datetime
 
 from bots.models.message_thread import MessageThread
@@ -54,7 +55,7 @@ PAGE_NOT_CONNECTED_ERROR = (
     "Please go to the Deploy Tab and connect this page."
 )
 RESET_KEYWORDS = {"reset", "new", "restart", "clear"}
-RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
+RESET_MSG = "♻️ OK - Let's start a new chat. What would you like to know?"
 
 DEFAULT_RESPONSE = (
     "🤔🤖 Well that was Unexpected! I seem to be lost. Could you please try again?."
@@ -262,6 +263,23 @@ class BotInterface:
         if disable_feedback:
             send_feedback_buttons = False
 
+        if self.platform == Platform.WHATSAPP and (
+            send_feedback_buttons or len(buttons) > 2
+        ):
+            # whatsapp shows more than 2 options as a menu, which is the only
+            # place these extra options fit
+            buttons = (
+                _options_menu_buttons(
+                    show_new_conversation_button=self.bi.show_new_conversation_button,
+                    send_feedback_buttons=send_feedback_buttons,
+                    language=self.user_language,
+                    glossary_url=self.output_glossary,
+                )
+                + buttons
+            )
+            # they are part of the menu now, dont send them again
+            send_feedback_buttons = False
+
         if buttons and send_feedback_buttons and self.platform != Platform.SLACK:
             update_msg_id = self._send_msg(
                 text=text,
@@ -461,11 +479,7 @@ def msg_handler_raw(bot: BotInterface):
             return
     # handle reset keyword
     if input_text.lower().strip("/ ") in RESET_KEYWORDS:
-        # record the reset time so we don't send context
-        bot.convo.reset_at = timezone.now()
-        bot.convo.save(update_fields=["reset_at"])
-        # let the user know we've reset
-        bot.send_msg(text=RESET_MSG)
+        reset_convo(bot)
     else:
         _process_and_send_msg(
             workspace=bot.workspace,
@@ -782,9 +796,20 @@ def save_msg_pair_to_db(
         assistant_msg.save()
 
 
+def reset_convo(bot: BotInterface):
+    bot.convo.reset_at = timezone.now()
+    bot.convo.save(update_fields=["reset_at"])
+    bot.send_msg(
+        text=bot.bi.new_conversation_button_text or RESET_MSG, should_translate=True
+    )
+
+
 def _handle_interactive_msg(bot: BotInterface):
     button = bot.get_interactive_msg_info()
     match button.button_id:
+        case ButtonIds.new_conversation:
+            reset_convo(bot)
+            return True
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
             _handle_feedback_button_press(bot, button)
             return True
@@ -796,6 +821,54 @@ def _handle_interactive_msg(bot: BotInterface):
 class ButtonIds:
     feedback_thumbs_up = "FEEDBACK_THUMBS_UP"
     feedback_thumbs_down = "FEEDBACK_THUMBS_DOWN"
+    new_conversation = "NEW_CONVERSATION"
+
+
+def _options_menu_buttons(
+    *,
+    show_new_conversation_button: bool,
+    send_feedback_buttons: bool,
+    language: str | None = None,
+    glossary_url: str | None = None,
+) -> list[ReplyButton]:
+    """
+    Options shown alongside every response on platforms with an options menu
+    """
+    ret = []
+    if show_new_conversation_button:
+        ret.append(
+            {
+                "id": ButtonIds.new_conversation,
+                "title": "📝 New",
+                "description": "Start a new conversation on a different topic",
+            }
+        )
+    if send_feedback_buttons:
+        ret += [
+            {
+                "id": ButtonIds.feedback_thumbs_up,
+                "title": "👍🏾 Thumbs Up",
+                "description": "This answer was helpful",
+            },
+            {
+                "id": ButtonIds.feedback_thumbs_down,
+                "title": "👎🏽 Thumbs Down",
+                "description": "This answer was not helpful",
+            },
+        ]
+    if language:
+        for btn in ret:
+            btn["title"], btn["description"] = _translate_options_menu(
+                (btn["title"], btn["description"]), language, glossary_url
+            )
+    return ret
+
+
+@lru_cache
+def _translate_options_menu(
+    texts: tuple[str, ...], language: str, glossary_url: str | None
+) -> list[str]:
+    return run_google_translate(list(texts), language, glossary_url=glossary_url)
 
 
 def _feedback_buttons() -> list[ReplyButton]:

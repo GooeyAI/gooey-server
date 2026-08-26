@@ -311,6 +311,8 @@ class BotIntegrationAdmin(GooeyModelAdmin):
                     "streaming_enabled",
                     "show_feedback_buttons",
                     "ask_detailed_feedback",
+                    "show_new_conversation_button",
+                    "new_conversation_button_text",
                     "disable_rate_limits",
                     "view_analysis_results",
                 ]
