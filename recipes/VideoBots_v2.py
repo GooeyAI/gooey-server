@@ -39,9 +39,9 @@ from daras_ai_v2.asr import (
 from daras_ai_v2.azure_doc_extract import (
     azure_form_recognizer,
 )
+from daras_ai_v2.base import STARTING_STATE
 from daras_ai_v2.base_v2 import (
     FILL_HEIGHT_EDITOR_CSS,
-    STARTING_STATE,
     VARIABLES_DIALOG_CSS,
     BasePage,
     RecipeTabs,
