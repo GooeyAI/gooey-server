@@ -177,6 +177,7 @@ def render_demo_button_settings(
             "",
             placeholder="Add demo instructions as text or markdown",
             value=bi.demo_notes,
+            style=dict(height="200px"),
         )
 
     with col2:

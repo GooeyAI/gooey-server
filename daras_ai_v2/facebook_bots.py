@@ -23,6 +23,19 @@ WA_IMG_MAX_SIZE = 5 * 1024**2
 
 WA_MSG_MAX_SIZE = 1024
 
+# https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-reply-buttons-messages
+# whatsapp allows 3, but anything more than 2 reads better as an options menu
+WA_MAX_REPLY_BTNS = 2
+WA_BTN_MAX_TITLE_LEN = 20
+WA_BTN_MAX_ID_LEN = 256
+
+# https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-list-messages
+WA_LIST_MAX_ROWS = 10
+WA_LIST_MAX_TITLE_LEN = 24
+WA_LIST_MAX_DESC_LEN = 72
+WA_LIST_MAX_ID_LEN = 200
+WA_LIST_BTN_LABEL = "Options"
+
 
 def get_wa_auth_header(access_token: str | None = None):
     return {"Authorization": f"Bearer {access_token or settings.WHATSAPP_ACCESS_TOKEN}"}
@@ -110,9 +123,12 @@ class WhatsappBot(BotInterface):
         )
 
     def get_interactive_msg_info(self) -> ButtonPressed:
+        interactive = self.input_message["interactive"]
+        # reply buttons & list (options menu) replies look the same, apart from the key
+        reply = interactive.get("button_reply") or interactive["list_reply"]
         return ButtonPressed(
-            button_id=self.input_message["interactive"]["button_reply"]["id"],
-            button_title=self.input_message["interactive"]["button_reply"]["title"],
+            button_id=reply["id"],
+            button_title=reply.get("title"),
             context_msg_id=self.input_message["context"]["id"],
         )
 
@@ -307,8 +323,8 @@ def _build_msg_buttons(
     buttons: list[ReplyButton],
     text: str | None = None,
     *,
-    max_title_len: int = 20,
-    max_id_len: int = 256,
+    max_title_len: int = WA_BTN_MAX_TITLE_LEN,
+    max_id_len: int = WA_BTN_MAX_ID_LEN,
 ) -> list[dict]:
     ret = []
     button_group = []
@@ -328,19 +344,20 @@ def _build_msg_buttons(
             )
         else:
             button_group.append(button)
-            # group into 3 buttons per message
-            if len(button_group) < 3:
-                continue
-            ret.append(
-                _build_interactive_button_msg(
-                    button_group, text, max_title_len, max_id_len
-                )
-            )
-            button_group = []
+            continue
         # dont repeat text in subsequent messages
         text = "\u200b"
-    # send remaining buttons
-    if button_group:
+
+    if len(button_group) > WA_MAX_REPLY_BTNS:
+        # too many for reply buttons, send them as an options menu (list msg)
+        for idx in range(0, len(button_group), WA_LIST_MAX_ROWS):
+            ret.append(
+                _build_interactive_list_msg(
+                    button_group[idx : idx + WA_LIST_MAX_ROWS], text
+                )
+            )
+            text = "\u200b"
+    elif button_group:
         ret.append(
             _build_interactive_button_msg(button_group, text, max_title_len, max_id_len)
         )
@@ -383,6 +400,36 @@ def _build_interactive_button_msg(
         },
     }
     return interactive_message
+
+
+def _build_interactive_list_msg(
+    buttons: list[ReplyButton],
+    text: str | None,
+) -> dict:
+    rows = []
+    for btn in buttons:
+        title = btn["title"]
+        row = {
+            "id": truncate_text_words(btn["id"], WA_LIST_MAX_ID_LEN),
+            "title": truncate_text_words(title, WA_LIST_MAX_TITLE_LEN),
+        }
+        description = btn.get("description") or (
+            title if len(title) > WA_LIST_MAX_TITLE_LEN else ""
+        )
+        if description:
+            row["description"] = truncate_text_words(description, WA_LIST_MAX_DESC_LEN)
+        rows.append(row)
+    return {
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "action": {
+                "button": WA_LIST_BTN_LABEL,
+                "sections": [{"rows": rows}],
+            },
+            "body": {"text": _wa_body_text(text)},
+        },
+    }
 
 
 def _wa_body_text(text: str | None) -> str:

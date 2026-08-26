@@ -223,6 +223,15 @@ class BotIntegration(models.Model):
         default=False,
         help_text="Ask for detailed feedback when users give a thumbs down (requires feedback buttons to be enabled)",
     )
+    show_new_conversation_button = models.BooleanField(
+        default=True,
+        help_text="Show a 📝 New option to start a new conversation (whatsapp only)",
+    )
+    new_conversation_button_text = models.TextField(
+        default="",
+        blank=True,
+        help_text="Response sent when the user starts a new conversation (e.g. by tapping 📝 New)",
+    )
     platform = models.IntegerField(
         choices=Platform.choices,
         help_text="The platform that the bot is integrated with",
