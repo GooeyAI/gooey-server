@@ -51,6 +51,8 @@ export interface RecipeTopBarProps {
   editor_full_width: boolean;
   workspace_href: string;
   workspace_active: boolean;
+  usage_href: string;
+  usage_active: boolean;
   overflow_items: TopBarMenuItem[];
   title_menu_items: TopBarMenuItem[];
   integrations: TopBarIntegration[];

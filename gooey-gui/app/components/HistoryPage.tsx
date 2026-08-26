@@ -38,10 +38,30 @@ export function HistoryPage({
         </div>
       </div>
 
+      <HistoryCardGrid
+        cards={cards}
+        loadMoreHref={load_more_href}
+        emptyMessage={
+          empty_message ?? "Nothing here yet — your runs will show up here."
+        }
+      />
+    </div>
+  );
+}
+
+export function HistoryCardGrid({
+  cards,
+  loadMoreHref,
+  emptyMessage,
+}: {
+  cards: HistoryPageProps["cards"];
+  loadMoreHref: string | null;
+  emptyMessage: string;
+}) {
+  return (
+    <>
       {cards.length === 0 ? (
-        <p className="text-muted">
-          {empty_message ?? "Nothing here yet — your runs will show up here."}
-        </p>
+        <p className="text-muted">{emptyMessage}</p>
       ) : (
         <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
           {cards.map((card, i) => (
@@ -52,14 +72,14 @@ export function HistoryPage({
         </div>
       )}
 
-      {load_more_href && (
+      {loadMoreHref && (
         <div className="d-flex justify-content-center mt-5">
-          <a href={load_more_href} className="btn btn-theme">
+          <a href={loadMoreHref} className="btn btn-theme">
             Load more
           </a>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

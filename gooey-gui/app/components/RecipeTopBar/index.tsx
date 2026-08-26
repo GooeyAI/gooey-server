@@ -116,6 +116,8 @@ export function RecipeTopBar({
   editor_full_width,
   workspace_href,
   workspace_active,
+  usage_href,
+  usage_active,
   overflow_items,
   title_menu_items,
   integrations,
@@ -433,6 +435,19 @@ export function RecipeTopBar({
     ];
   };
 
+  const usageEntry: SheetEntry[] =
+    usage_href && !usage_active
+      ? [
+          {
+            key: "--sheet-usage",
+            label: "Usage",
+            iconClass: "fa-regular fa-chart-line",
+            href: usage_href,
+            onPick: () => setBuilder(false),
+          },
+        ]
+      : [];
+
   // The sheet carries whichever of Edit and Preview the header does not already reach in one
   // tap. At the root that is Edit, because the eye button is Preview; inside Edit it is Preview,
   // because the action button has become Update. Listing the view you are already looking at
@@ -451,6 +466,7 @@ export function RecipeTopBar({
           iconHtml: view.icon,
           onPick: () => showView(view.slug as RecipeView),
         })),
+        ...usageEntry,
         ...(builder_event_key
           ? [
               {
@@ -483,6 +499,7 @@ export function RecipeTopBar({
             ]
           : []),
         ...viewEntry(otherWorkView),
+        ...usageEntry,
         ...(history_href
           ? [
               {
@@ -605,8 +622,8 @@ export function RecipeTopBar({
         </div>
       </div>
 
-      {/* A single-view recipe does not need a selector. */}
-      {views.length > 1 && (
+      {/* A single-view recipe does not need a selector unless Usage is available. */}
+      {(views.length > 1 || !!usage_href) && (
         <div
           className="gooey-topbar-tabs"
           style={{ visibility: paneVisibility(hydrated) }}
@@ -630,6 +647,20 @@ export function RecipeTopBar({
               {view.label}
             </button>
           ))}
+          {usage_href && (
+            <Link
+              to={usage_href}
+              className={clsx(
+                "gooey-topbar-tab",
+                usage_active && "gooey-topbar-tab-active"
+              )}
+              onClick={() => setBuilder(false)}
+              aria-current={usage_active ? "page" : undefined}
+            >
+              <i className="fa-regular fa-chart-line gooey-topbar-tab-icon" />
+              Usage
+            </Link>
+          )}
         </div>
       )}
 

@@ -73,6 +73,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarIntegration,
     TopBarView,
 )
+from gooey_gui.types.usage_page_props import UsagePageProps
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
 from daras_ai_v2.utils import get_relative_time
@@ -110,6 +111,7 @@ from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
 )
+from widgets.workflow_cards import author_from_user, history_card
 from widgets.workflow_share import render_share_button, render_share_modal
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import (
@@ -129,6 +131,7 @@ STARTING_STATE = "Starting..."
 # Reading width for the working column when it has the row to itself (the Config tab). Split
 # needs none - the preview column caps it there.
 SOLO_COL_MAX_WIDTH = "1420px"
+USAGE_PAGE_SIZE = 24
 
 
 def format_credits_as_dollars(credits: int) -> str:
@@ -472,6 +475,9 @@ class BasePage:
         if not self.is_user_authorized(self.request.user):
             self.render_unauthorized()
             return
+        if self.tab == RecipeTabs.usage and not self.can_view_usage():
+            self.render_unauthorized(owner_workspace=self._usage_workspace())
+            return
 
         self.setup_sentry()
 
@@ -687,6 +693,15 @@ class BasePage:
         The bar mutates session state and calls onChange(); the server sees the key on the
         next render. Same contract `handle_workspace_switch` uses for the sidebar.
         """
+        if self.tab == RecipeTabs.usage:
+            for key in (
+                self.TOP_BAR_PUBLISH_KEY,
+                self.TOP_BAR_RUN_KEY,
+                self.TOP_BAR_SHARE_KEY,
+            ):
+                gui.session_state.pop(key, None)
+            return
+
         publish_ref = gui.use_alert_dialog(key="publish-modal")
 
         if gui.session_state.pop(self.TOP_BAR_PUBLISH_KEY, None):
@@ -837,8 +852,9 @@ class BasePage:
     def _render_top_bar(self, *, tabs: list[TabSpec]):
         sr, pr = self.current_sr_pr
         identity = self._workflow_identity()
-        cost_label, cost_title = self._top_bar_cost()
-        can_manage_sharing = self.can_manage_sharing()
+        usage_active = self.tab == RecipeTabs.usage
+        cost_label, cost_title = ("", "") if usage_active else self._top_bar_cost()
+        can_manage_sharing = not usage_active and self.can_manage_sharing()
         workspace_active = self.tab in {RecipeTabs.run, RecipeTabs.preview}
         # a root recipe has no published run behind it, so there is no published url to share
         can_share = not pr.is_root()
@@ -858,6 +874,12 @@ class BasePage:
                 editor_full_width=self._editor_wants_full_width(),
                 workspace_href=self.current_app_url(RecipeTabs.run),
                 workspace_active=workspace_active,
+                usage_href=(
+                    self.current_app_url(RecipeTabs.usage)
+                    if self.can_view_usage()
+                    else ""
+                ),
+                usage_active=usage_active,
                 views=[
                     TopBarView(
                         slug=tab.slug,
@@ -867,10 +889,16 @@ class BasePage:
                     )
                     for tab in tabs
                 ],
-                publish_label=self._top_bar_publish_label(),
-                publish_key=self.TOP_BAR_PUBLISH_KEY,
-                api_href=self.current_app_url(RecipeTabs.run_as_api),
-                deploy_href=self.current_app_url(RecipeTabs.integrations),
+                publish_label="" if usage_active else self._top_bar_publish_label(),
+                publish_key="" if usage_active else self.TOP_BAR_PUBLISH_KEY,
+                api_href=(
+                    "" if usage_active else self.current_app_url(RecipeTabs.run_as_api)
+                ),
+                deploy_href=(
+                    ""
+                    if usage_active
+                    else self.current_app_url(RecipeTabs.integrations)
+                ),
                 # Share means different things - change who can see this, or copy the link -
                 # so exactly one of these is set, and neither on a root recipe, which has no
                 # published run behind it and so nothing stable to share.
@@ -879,19 +907,22 @@ class BasePage:
                 ),
                 share_copy_url=(
                     self.current_app_url(self.tab)
-                    if can_share and not can_manage_sharing
+                    if can_share and not can_manage_sharing and not usage_active
                     else ""
                 ),
                 share_icon=icons.share,
-                has_unpublished_changes=self._has_request_changed()
-                or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
+                has_unpublished_changes=not usage_active
+                and (
+                    self._has_request_changed()
+                    or (self.can_user_save_run(sr, pr) and pr.saved_run != sr)
+                ),
                 menu_key=self.TOP_BAR_MENU_KEY,
                 integrations=self._top_bar_integrations(),
-                run_key=self.TOP_BAR_RUN_KEY,
+                run_key="" if usage_active else self.TOP_BAR_RUN_KEY,
                 viewport_wide_key=self.TOP_BAR_WIDE_KEY,
                 is_running=self._is_run_in_progress(),
                 cost_label=cost_label,
-                cost_href=self.get_credits_click_url(),
+                cost_href="" if usage_active else self.get_credits_click_url(),
                 cost_title=cost_title,
                 builder_event_key=(
                     GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else ""
@@ -1795,6 +1826,9 @@ class BasePage:
 
             case RecipeTabs.history:
                 self._history_tab()
+
+            case RecipeTabs.usage:
+                self._usage_tab()
 
             case RecipeTabs.run_as_api:
                 self.run_as_api_tab()
@@ -2944,6 +2978,65 @@ class BasePage:
         grid_layout(3, run_history, self._render_run_preview)
 
         paginate_button(url=self.request.url, cursor=cursor)
+
+    def _usage_tab(self):
+        workspace = self._usage_workspace()
+        qs = (
+            SavedRun.objects.filter(workflow=self.workflow, workspace=workspace)
+            .filter(
+                Q(surface=SavedRun.Surface.deployment)
+                | Q(parent_version__published_run=self.current_pr)
+            )
+            .select_related(
+                "parent_version__published_run",
+                "workflow_metadata",
+                "created_by",
+            )
+        )
+        runs, next_cursor = paginate_queryset(
+            qs=qs,
+            ordering=["-updated_at"],
+            cursor=self.request.query_params,
+            page_size=USAGE_PAGE_SIZE,
+        )
+        cards = [
+            history_card(
+                saved_run,
+                author=author_from_user(saved_run.created_by, self.request.user),
+            )
+            for saved_run in runs
+        ]
+        gui.model_component(
+            UsagePageProps(
+                cards=cards,
+                load_more_href=self._usage_load_more_href(next_cursor),
+            )
+        )
+
+    def can_view_usage(self) -> bool:
+        user = self.request.user
+        if not user or user.is_anonymous:
+            return False
+        if self.is_user_admin(user):
+            return True
+        if self.current_sr_user == user or self.current_pr.created_by_id == user.id:
+            return True
+        return self._usage_workspace() in user.cached_workspaces
+
+    def _usage_workspace(self) -> Workspace:
+        published_run = self.current_pr
+        if not published_run.is_root() and published_run.workspace_id:
+            return published_run.workspace
+        return self.current_workspace
+
+    def _usage_load_more_href(
+        self, next_cursor: dict[str, str] | None
+    ) -> str | None:
+        if not next_cursor:
+            return None
+        url = furl(self.request.url).set(origin=None)
+        url.query.params.update(next_cursor)
+        return str(url)
 
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
         if not self.request.user or (self.request.user.is_anonymous and not anon_ok):

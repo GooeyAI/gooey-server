@@ -421,6 +421,22 @@ def history_route(
 
 @gui.route(
     app,
+    "/{page_slug}/usage/",
+    "/{page_slug}/{run_slug}/usage/",
+    "/{page_slug}/{run_slug}-{example_id}/usage/",
+)
+def usage_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+
+    if not can_use_layout_v2(request):
+        raise HTTPException(status_code=404)
+    return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
+
+
+@gui.route(
+    app,
     "/{page_slug}/saved/",
     "/{page_slug}/{run_slug}/saved/",
     "/{page_slug}/{run_slug}-{example_id}/saved/",
@@ -934,6 +950,11 @@ class RecipeTabs(TabData, Enum):
         title=f"{icons.history} History",
         label="History",
         route=history_route,
+    )
+    usage = TabData(
+        title='<i class="fa-regular fa-chart-line"></i> Usage',
+        label="Usage",
+        route=usage_route,
     )
     integrations = TabData(
         title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Deploy',

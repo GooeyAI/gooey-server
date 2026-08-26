@@ -62,6 +62,10 @@ class RecipeTopBarProps(pydantic.BaseModel):
     editor_full_width: bool = False
     workspace_href: str
     workspace_active: bool
+    # Usage is a route rather than a client-side pane, but it shares the desktop tab strip.
+    # Empty hides it for viewers who cannot inspect the workflow's run data.
+    usage_href: str = ""
+    usage_active: bool = False
     overflow_items: list[TopBarMenuItem] = []  # the "..." beside the pill group
     title_menu_items: list[TopBarMenuItem] = []  # the chevron beside the title
 
