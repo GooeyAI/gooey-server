@@ -183,6 +183,7 @@ def _load_nav_items(
             key="history",
             label="History",
             icon=icons.history,
+            href=history_path,
             items_url=history_items_url,
             items_cache_key=history_cache_key,
             collapsible=False,
