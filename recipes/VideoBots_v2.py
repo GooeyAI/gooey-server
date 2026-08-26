@@ -1,6 +1,5 @@
 import html
 import json
-import math
 import traceback
 import typing
 from enum import Enum
@@ -8,36 +7,19 @@ from functools import cached_property
 from itertools import zip_longest
 
 import sentry_sdk
-import typing_extensions
-from pydantic import BaseModel, Field
 
 import gooey_gui as gui
-from ai_models.llm_openapi import LLMMarker
 from ai_models.models import AIModelSpec
-from app_users.models import AppUser
 from bots.models import (
     BotIntegration,
     Platform,
-    PublishedRun,
     SavedRun,
-    Workflow,
 )
 from bots.models.message_thread import MessageThread
-from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import exceptions, icons, settings
 from daras_ai_v2.asr import (
-    AsrModels,
-    TranslationModels,
-    asr_language_selector,
-    asr_model_selector,
-    run_asr,
     run_translate,
     should_translate_lang,
-    translation_language_selector,
-    translation_model_selector,
-)
-from daras_ai_v2.azure_doc_extract import (
-    azure_form_recognizer,
 )
 from daras_ai_v2.base import STARTING_STATE
 from daras_ai_v2.base_v2 import (
@@ -48,7 +30,6 @@ from daras_ai_v2.base_v2 import (
 )
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
 from daras_ai_v2.doc_search_settings_widgets import (
-    SUPPORTED_SPREADSHEET_TYPES,
     bulk_documents_uploader,
     cache_knowledge_widget,
     citation_style_selector,
@@ -57,41 +38,19 @@ from daras_ai_v2.doc_search_settings_widgets import (
     keyword_instructions_widget,
     query_instructions_widget,
 )
-from daras_ai_v2.embedding_model import EmbeddingModels
-from daras_ai_v2.enum_selector_widget import enum_selector
 from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fastapi_tricks import get_api_route_url
-from daras_ai_v2.field_render import field_desc, field_title, field_title_desc
-from daras_ai_v2.functional import flatapply_parallel
-from daras_ai_v2.glossary import validate_glossary_document
+from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.integrations_tab import render_integrations_tab
-from daras_ai_v2.language_filters import (
-    asr_languages_without_dialects,
-    language_filter_selector,
-    tts_languages_without_dialects,
-)
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
-    CHATML_ROLE_SYSTEM,
-    CHATML_ROLE_USER,
     SUPERSCRIPT,
-    ConversationEntry,
-    calc_appx_tokens,
-    format_chat_entry,
-    get_entry_text,
     run_language_model,
 )
 from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 from daras_ai_v2.language_model_settings_widgets import (
-    LanguageModelSettings,
     language_model_selector,
-    language_model_settings,
 )
-from daras_ai_v2.lipsync_api import LipsyncModel, LipsyncSettings
-from daras_ai_v2.lipsync_settings_widgets import lipsync_settings
-from daras_ai_v2.loom_video_widget import youtube_video
-from daras_ai_v2.pydantic_validation import HttpUrlStr, OptionalHttpUrlStr
-from daras_ai_v2.query_generator import generate_final_search_query
 from daras_ai_v2.search_ref import (
     CitationStyles,
     apply_response_formattings_prefix,
@@ -99,26 +58,11 @@ from daras_ai_v2.search_ref import (
     parse_refs,
 )
 from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
-from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
-from gooey_gui.types.recipe_workspace_props import (
-    GooeyEmbedTeardownProps,
-    RecipeWorkspaceTriggerProps,
-)
 from daras_ai_v2.text_output_widget import text_output
 from daras_ai_v2.text_to_speech_settings_widgets import (
     TextToSpeechProviders,
-    elevenlabs_load_state,
-    text_to_speech_provider_selector,
-    text_to_speech_settings,
-)
-from daras_ai_v2.variables_widget import render_prompt_vars
-from daras_ai_v2.vector_search import (
-    DocSearchRequest,
-    doc_or_yt_url_to_file_metas,
-    doc_url_to_text_pages,
 )
 from daras_ai_v2.web_widget_embed import (
-    chat_widget_input_to_request_body,
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
@@ -129,25 +73,23 @@ from functions.base_llm_tool import (
 )
 from functions.models import FunctionTrigger
 from functions.workflow_tools import DynamicLLMToolLoader
-from recipes.DocExtract import document_intelligence_settings
-from recipes.DocSearch import get_top_k_references, references_as_prompt
-from recipes.GoogleGPT import SearchReference
-from recipes.Lipsync import LipsyncPage
-from recipes.TextToSpeech import TextToSpeechPage, TextToSpeechSettings
-from recipes.VideoBots import VideoBotsPage
-from url_shortener.models import ShortenedURL
-from usage_costs.twilio_usage_cost import (
-    get_ivr_price_credits_and_seconds,
-    get_non_ivr_price_credits,
+from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
+from gooey_gui.types.recipe_workspace_props import (
+    GooeyEmbedTeardownProps,
+    RecipeWorkspaceTriggerProps,
+)
+
+# Extends the v1 recipe rather than copying it: the 33 members that were byte-identical are
+# inherited now, and so are the module-level helpers below. What is left in this file is the
+# v2 presentation - the config panes, the About cards, the top bar chips - plus the handful of
+# render methods that differ.
+from recipes.VideoBots import (
+    DEFAULT_TRANSLATION_MODEL,
+    VideoBotsPage,
+    _can_use_message_thread,
 )
 from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
-
-GRAYCOLOR = "#00000073"
-DEFAULT_TRANSLATION_MODEL = TranslationModels.google.name
-
-SAFETY_BUFFER = 100
-
 
 # The "Model <selector>" row above the instructions editor.
 MODEL_ROW_CSS = """
@@ -195,227 +137,30 @@ class ConfigPane(str, Enum):
     debug = "debug"
 
 
-class ReplyButton(typing_extensions.TypedDict):
-    id: str
-    title: str
+class VideoBotsPageV2(BasePage, VideoBotsPage):
+    """The agent recipe in layout v2.
 
+    Two bases, and the order matters. `BasePage` is the v2 shell - the app frame, the top bar,
+    the workspace - and it has to come first, or v1's `render` would win and this page would
+    draw the old layout. `VideoBotsPage` brings everything that makes it *this* recipe: the
+    request and response models, the inference pipeline, the cost maths. Both descend from the
+    v1 base, so the MRO is a straight line: v2 presentation over v1 recipe over v1 base.
+    """
 
-class VideoBotsPageV2(BasePage):
     @classmethod
     def get_runner_page_cls(cls):
         return VideoBotsPage
 
-    PROFIT_CREDITS = 3
-
-    title = "Agent"  # "Create Interactive Video Bots"
-    explore_image = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/8c014530-88d4-11ee-aac9-02420a00016b/Copilot.png.png"
-    workflow = Workflow.VIDEO_BOTS
-    slug_versions = ["video-bots", "bots", "copilot", "agent"]
-
-    functions_in_settings = False
-
-    sane_defaults = {
-        "messages": [],
-        # tts
-        "tts_provider": TextToSpeechProviders.GOOGLE_TTS.name,
-        "google_voice_name": "en-IN-Wavenet-A",
-        "google_pitch": 0.0,
-        "google_speaking_rate": 1.0,
-        "uberduck_voice_name": "Aiden Botha",
-        "uberduck_speaking_rate": 1.0,
-        "elevenlabs_model": "eleven_multilingual_v2",
-        "elevenlabs_stability": 0.5,
-        "elevenlabs_similarity_boost": 0.75,
-        # gpt3
-        "avoid_repetition": True,
-        "num_outputs": 1,
-        "quality": 1.0,
-        "max_tokens": 1500,
-        "sampling_temperature": 0.5,
-        # wav2lip
-        "face_padding_top": 0,
-        "face_padding_bottom": 10,
-        "face_padding_left": 0,
-        "face_padding_right": 0,
-        # doc search
-        "citation_style": CitationStyles.number.name,
-        "documents": [],
-        "task_instructions": "Make sure to use only the following search results to guide your response. "
-        'If the Search Results do not contain enough information, say "I don\'t know".',
-        "query_instructions": "<Chat History> \n{{ messages }} \n\n<Last Message> \n{{ input_prompt }} \n\n<Instructions> \nGiven the conversation, only rephrase the last message to be a standalone statement in 2nd person's perspective. Make sure you include only the relevant parts of the conversation required to answer the follow-up question, and not the answer to the question. If the conversation is irrelevant to the current question being asked, discard it. Don't use quotes in your response. \n\n<Query Sentence>",
-        "max_references": 3,
-        "max_context_words": 200,
-        "scroll_jump": 5,
-        "use_url_shortener": False,
-        "dense_weight": 1.0,
-        "translation_model": DEFAULT_TRANSLATION_MODEL,
-    }
-
-    class RequestModelBase(BasePage.RequestModel):
-        input_prompt: str | None = Field(
-            None,
-            title="Input Prompt",
-            description="The text message / prompt sent to the agent by the user",
-        )
-        input_audio: str | None = Field(
-            None,
-            title="Input Audio",
-            description="The audio message sent to the agent by the user",
-        )
-        input_images: list[HttpUrlStr] | None = Field(
-            None,
-            title="Input Images",
-            description="The images sent to the agent by the user",
-        )
-        input_documents: list[HttpUrlStr] | None = Field(
-            None,
-            title="Input Documents",
-            description="The documents sent to the agent by the user. Note: this is not the same as the knowledge base documents.",
-        )
-
-        doc_extract_url: str | None = Field(
-            None,
-            title="📚 Document Extract Workflow",
-            description="Select a workflow to extract text from documents and images.",
-        )
-
-        # conversation history/context
-        messages: list[dict] | None = None
-
-        bot_script: str | None = Field(
-            None,
-            title="Instructions",
-            description="The system prompt for the LLM. "
-            "Use this to set the personality of your agent and provide instructions for the bot's behavior. "
-            "Supports [Jinja](https://jinja.palletsprojects.com/en/stable/templates/) templating.",
-        )
-
-        # llm model
-        selected_model: LLMMarker | None = None
-        document_model: str | None = Field(
-            None,
-            title="🩻 Photo / Document Intelligence",
-            description="Which document intelligence model should be used to extract text from photos and documents?",
-        )
-
-        # doc search
-        task_instructions: str | None = Field(
-            None,
-            title="Search Instructions",
-            description="How should the LLM interpret the results from your knowledge base?",
-        )
-        query_instructions: str | None = None
-        keyword_instructions: str | None = None
-        documents: list[HttpUrlStr] | None = Field(
-            None,
-            title="Knowledge Base",
-            description="Add documents or links to give your agent a knowledge base. When asked a question, we'll search them to generate an answer with citations. [Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/curate-your-knowledge-base-documents)",
-        )
-        max_references: int | None = None
-        max_context_words: int | None = None
-        scroll_jump: int | None = None
-
-        embedding_model: (
-            typing.Literal[tuple(e.name for e in EmbeddingModels)] | None
-        ) = None
-        dense_weight: float | None = DocSearchRequest.model_fields["dense_weight"]
-
-        citation_style: typing.Literal[tuple(e.name for e in CitationStyles)] | None = (
-            None
-        )
-        use_url_shortener: bool | None = None
-        check_document_updates: bool | None = None
-
-        asr_model: typing.Literal[tuple(e.name for e in AsrModels)] | None = Field(
-            None,
-            title="Speech-to-Text Provider",
-            description="Choose a model to transcribe incoming audio messages to text.",
-        )
-        asr_language: str | None = Field(
-            None,
-            title="Spoken Language",
-            description="Choose a language to transcribe incoming audio messages to text.",
-        )
-        asr_task: typing.Literal["translate", "transcribe"] | None = Field(
-            None,
-            title="ASR Model Task",
-            description="Use **{asr_model}** for speech translation from **{asr_language}** to **English**",
-        )
-        asr_prompt: str | None = Field(
-            None,
-            title="👩‍💻 Prompt",
-            description="Optional prompt that the model can use as context to better understand the speech and maintain a consistent writing style.",
-        )
-
-        translation_model: (
-            typing.Literal[tuple(e.name for e in TranslationModels)] | None
-        ) = None
-        user_language: str | None = Field(
-            None,
-            title="Translation Language",
-            description="Choose a language to translate incoming text & audio messages to English and responses back to your selected language. Useful for low-resource languages.",
-        )
-        # llm_language: str | None = "en" <-- implicit since this is hardcoded everywhere in the code base (from facebook and bots to slack and copilot etc.)
-        input_glossary_document: OptionalHttpUrlStr = Field(
-            None,
-            title="Input Glossary",
-            description="""
-Translation Glossary for User Langauge -> LLM Language (English)
-            """,
-        )
-        output_glossary_document: OptionalHttpUrlStr = Field(
-            None,
-            title="Output Glossary",
-            description="""
-Translation Glossary for LLM Language (English) -> User Langauge
-            """,
-        )
-
-        lipsync_model: typing.Literal[tuple(e.name for e in LipsyncModel)] = (
-            LipsyncModel.Wav2Lip.name
-        )
-
-        tools: list[str] | None = Field(
-            None,
-            title="🛠️ Tools",
-            description="Use `functions` instead.",
-            deprecated=True,
-        )
-
-        bulk_runs: list[str] | None = Field(
-            None,
-            title="Bulk Evaluation",
-            description="Add a [bulk](https://gooey.ai/bulk-runner) workflow with your golden evaluation data to rate workflows on cost, speed and latency.",
-        )
-
-    class RequestModel(
-        LipsyncSettings, TextToSpeechSettings, LanguageModelSettings, RequestModelBase
-    ):
+    # Both of these suppress a renderer the v2 base provides, and both have to be declared
+    # here rather than left to the MRO: `BasePage` sits ahead of `VideoBotsPage`, so the
+    # base's version would otherwise win over the recipe's.
+    def render_form_v2(self):
+        # v2 builds the form out of config panes instead - see `_config_panes`.
         pass
 
-    class ResponseModel(BaseModel):
-        final_prompt: list[ConversationEntry | dict] | str = []
-
-        output_text: list[str] = []
-        output_audio: list[HttpUrlStr] = []
-        output_video: list[HttpUrlStr] = []
-
-        # intermediate text
-        raw_input_text: str | None = None
-        raw_tts_text: list[str] | None = None
-        raw_output_text: list[str] | None = None
-
-        # doc search
-        references: list[SearchReference] | None = []
-        final_search_query: str | None = None
-        final_keyword_query: str | list[str] | None = None
-
-        # function calls
-        output_documents: list[HttpUrlStr] | None = None
-        reply_buttons: list[ReplyButton] | None = None
-
-        finish_reason: list[str] | None = None
-        metrics: dict | None = None
+    def _render_regenerate_button(self):
+        # A chat has no seed to re-roll, so there is nothing to regenerate.
+        pass
 
     def run_v2(
         self,
@@ -489,245 +234,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
         yield from self.tts_step(model=llm_model, request=request, response=response)
 
         yield from self.lipsync_step(request, response)
-
-    def document_understanding_step(self, request):
-        ocr_texts = []
-        if request.input_images and (
-            request.document_model
-            or not AIModelSpec.objects.get(
-                name=request.selected_model
-            ).llm_is_vision_model
-        ):
-            yield "Running Azure Form Recognizer..."
-            for url in request.input_images:
-                ocr_text = (
-                    azure_form_recognizer(url, model_id="prebuilt-read")
-                    .get("content", "")
-                    .strip()
-                )
-                if not ocr_text:
-                    continue
-                ocr_texts.append(ocr_text)
-        if request.input_documents:
-            import pandas as pd
-
-            file_url_metas = yield from flatapply_parallel(
-                lambda f_url: doc_or_yt_url_to_file_metas(f_url)[1],
-                request.input_documents,
-                message="Extracting Input Documents...",
-            )
-            for f_url, file_meta in file_url_metas:
-                pages = doc_url_to_text_pages(
-                    f_url=f_url,
-                    file_meta=file_meta,
-                    selected_asr_model=request.asr_model,
-                    document_model=request.document_model,
-                )
-                if isinstance(pages, pd.DataFrame):
-                    ocr_texts.append(pages.to_csv(index=False))
-                elif len(pages) <= 1:
-                    ocr_texts.append("\n\n---\n\n".join(pages))
-                else:
-                    ocr_texts.append(json.dumps(pages))
-        return ocr_texts
-
-    def asr_step(self, model, request, response, user_input):
-        if (
-            not request.input_audio
-            or is_realtime_audio_url(request.input_audio)
-            or (model.llm_supports_input_audio and not request.asr_model)
-        ):
-            # unless an ASR model is explicitly specified,
-            # have the audio-enabled LLM accept the audio directly
-            return None, user_input
-        if not request.asr_model:
-            request.asr_model, request.asr_language = infer_asr_model_and_language(
-                request.user_language or ""
-            )
-        selected_model = AsrModels[request.asr_model]
-        yield f"Transcribing using {selected_model.value}..."
-        asr_output = run_asr(
-            audio_url=request.input_audio,
-            selected_model=request.asr_model,
-            language=request.asr_language,
-            speech_translation_target=(
-                "en" if request.asr_task == "translate" else None
-            ),
-            input_prompt=request.asr_prompt,
-        )
-        asr_msg = f'🎧: "{str(asr_output).rstrip()}"'
-        response.output_text = [asr_msg] * request.num_outputs
-        user_input = f"{asr_output}\n\n{user_input}".strip()
-        return asr_msg, user_input
-
-    def input_translation_step(self, request, user_input, ocr_texts):
-        # translate input text
-        if (
-            should_translate_lang(request.user_language)
-            and not request.asr_task == "translate"
-        ):
-            yield "Translating Input to English..."
-            user_input = run_translate(
-                texts=[user_input],
-                source_language=request.user_language,
-                target_language="en",
-                glossary_url=request.input_glossary_document,
-                model=request.translation_model,
-            )[0]
-        if ocr_texts and request.user_language:
-            yield "Translating Input Documents to English..."
-            ocr_texts = run_translate(
-                texts=ocr_texts,
-                source_language="auto",
-                target_language="en",
-            )
-        for text in ocr_texts:
-            user_input = f"Extracted Text: {text!r}\n\n{user_input}"
-        return user_input
-
-    def build_final_prompt(
-        self, request, response, user_input, model, tools_by_name, include_input_audio
-    ):
-        # construct the system prompt
-        bot_script = (request.bot_script or "").strip()
-        if bot_script:
-            variables = gui.session_state.get("variables") or {}
-            for tool_name in tools_by_name:
-                variables.pop(tool_name, None)
-            bot_script = render_prompt_vars(
-                bot_script, gui.session_state | tools_by_name
-            )
-            # insert to top
-            system_prompt = {"role": CHATML_ROLE_SYSTEM, "content": bot_script}
-        else:
-            system_prompt = None
-        # save raw input for reference
-        response.raw_input_text = user_input
-        user_input = yield from self.search_step(request, response, user_input, model)
-        # construct user prompt
-        user_prompt = format_chat_entry(
-            role=CHATML_ROLE_USER,
-            content_text=user_input,
-            input_images=request.input_images,
-            input_audio=include_input_audio and request.input_audio,
-            input_documents=request.input_documents,
-        )
-        # truncate the history to fit the model's max tokens
-        max_history_tokens = (
-            model.llm_context_window
-            - calc_appx_tokens(filter(None, [system_prompt, user_input]))
-            - request.max_tokens
-            - SAFETY_BUFFER
-        )
-        clip_idx = convo_window_clipper(
-            request.messages,
-            max_history_tokens,
-        )
-        history_prompt = request.messages[clip_idx:]
-        response.final_prompt = list(
-            filter(None, [system_prompt, *history_prompt, user_prompt])
-        )
-        # ensure input script is not too big
-        max_allowed_tokens = model.llm_context_window - calc_appx_tokens(
-            response.final_prompt
-        )
-        if max_allowed_tokens < 0:
-            raise UserError("Input Script is too long! Please reduce the script size.")
-        request.max_tokens = min(max_allowed_tokens, request.max_tokens)
-
-    def search_step(self, request, response, user_input, model):
-        # if documents are provided, run doc search on the saved msgs and get back the references
-        if request.documents:
-            # formulate the search query as a history of all the messages
-            query_msgs = request.messages + [
-                format_chat_entry(role=CHATML_ROLE_USER, content_text=user_input)
-            ]
-            clip_idx = convo_window_clipper(query_msgs, model.llm_context_window // 2)
-            query_msgs = query_msgs[clip_idx:]
-
-            chat_history = messages_as_prompt(query_msgs)
-
-            query_instructions = (request.query_instructions or "").strip()
-            if query_instructions:
-                yield "Creating search query..."
-                search_query_raw = generate_final_search_query(
-                    request=request,
-                    response=response,
-                    instructions=query_instructions,
-                    context={"messages": chat_history},
-                    response_format_type="json_object",
-                ).strip()
-                try:
-                    search_query_parsed = json.loads(search_query_raw)
-                except json.JSONDecodeError:
-                    search_query_parsed = search_query_raw
-                if isinstance(search_query_parsed, dict):
-                    search_query_parsed = ", ".join(
-                        map(str, filter(None, search_query_parsed.values()))
-                    )
-                if search_query_parsed:
-                    response.final_search_query = str(search_query_parsed)
-            else:
-                query_msgs.reverse()
-                response.final_search_query = "\n---\n".join(
-                    get_entry_text(entry) for entry in query_msgs
-                )
-
-            keyword_instructions = (request.keyword_instructions or "").strip()
-            if keyword_instructions:
-                yield "Finding keywords..."
-                k_request = request.model_copy()
-                # other models dont support JSON mode
-                k_request.selected_model = "gpt_4_o"
-                k_request.max_tokens = 4096
-                keyword_query = json.loads(
-                    generate_final_search_query(
-                        request=k_request,
-                        response=response,
-                        instructions=keyword_instructions,
-                        context={"messages": chat_history},
-                        response_format_type="json_object",
-                    ),
-                )
-                if keyword_query and isinstance(keyword_query, dict):
-                    keyword_query = list(keyword_query.values())[0]
-                response.final_keyword_query = keyword_query
-
-            if response.final_search_query:  # perform doc search
-                response.references = yield from get_top_k_references(
-                    DocSearchRequest.model_validate(
-                        {
-                            **request.model_dump(),
-                            **response.model_dump(),
-                            "search_query": response.final_search_query,
-                            "keyword_query": response.final_keyword_query,
-                        },
-                    ),
-                    current_user=self.request.user,
-                )
-            if request.use_url_shortener:
-                for reference in response.references:
-                    reference["url"] = ShortenedURL.objects.get_or_create_for_workflow(
-                        url=reference["url"],
-                        user=self.request.user,
-                        workflow=Workflow.VIDEO_BOTS,
-                    )[0].shortened_url()
-        # if doc search is successful, add the search results to the user prompt
-        if response.references:
-            # add task instructions
-            task_instructions = render_prompt_vars(
-                request.task_instructions, gui.session_state
-            )
-            user_input = (
-                references_as_prompt(response.references)
-                + f"\n**********\n{task_instructions.strip()}\n**********\n"
-                + user_input
-            )
-        return user_input
-
-    def __init__(self, *args, **kwargs):
-        self.active_tool_names = set()
-        super().__init__(*args, **kwargs)
 
     def llm_loop(
         self,
@@ -916,344 +422,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
 
         return output_text
 
-    def tts_step(self, model, request, response):
-        if request.tts_provider and not model.llm_is_audio_model:
-            response.output_audio = []
-            for text in response.raw_tts_text or response.raw_output_text:
-                tts_state = TextToSpeechPage.RequestModel.model_validate(
-                    {**gui.session_state, "text_prompt": text}
-                ).model_dump()
-                yield from TextToSpeechPage(request=self.request).run(tts_state)
-                response.output_audio.append(tts_state["audio_url"])
-
-    def lipsync_step(self, request, response):
-        if request.input_face and response.output_audio:
-            response.output_video = []
-            for audio_url in response.output_audio:
-                lip_state = LipsyncPage.RequestModel.model_validate(
-                    {
-                        **gui.session_state,
-                        "input_audio": audio_url,
-                        "selected_model": request.lipsync_model,
-                    }
-                ).model_dump()
-                yield from LipsyncPage(request=self.request).run(lip_state)
-                response.output_video.append(lip_state["output_video"])
-
-    def related_workflows(self):
-        from recipes.CompareText2Img import CompareText2ImgPage
-        from recipes.DeforumSD import DeforumSDPage
-        from recipes.DocSearch import DocSearchPage
-        from recipes.LipsyncTTS import LipsyncTTSPage
-
-        return [
-            LipsyncTTSPage,
-            DocSearchPage,
-            DeforumSDPage,
-            CompareText2ImgPage,
-        ]
-
-    @classmethod
-    def get_run_title(cls, sr: SavedRun, pr: PublishedRun | None) -> str:
-        import langcodes
-
-        if pr and pr.title and not pr.is_root():
-            return pr.title
-
-        try:
-            lang = langcodes.Language.get(
-                sr.state.get("user_language") or sr.state.get("asr_language") or ""
-            ).display_name()
-        except (KeyError, langcodes.LanguageTagError):
-            lang = None
-
-        return " ".join(filter(None, [lang, cls.get_recipe_title()]))
-
-    @classmethod
-    def get_prompt_title(cls, state: dict) -> str | None:
-        # don't show the input prompt in the run titles, instead show get_run_title()
-        return None
-
-    def speech_recognition_settings(self):
-        with gui.div(className="pt-2 ps-1"):
-            gui.caption(field_desc(self.RequestModel, "user_language"))
-
-            # drop down to filter models based on the selected language
-            selected_filter_language = language_filter_selector(
-                options=asr_languages_without_dialects(),
-                key="asr_language_filter",
-            )
-
-            col1, col2 = gui.columns(2)
-            with col1:
-                asr_model = asr_model_selector(
-                    key="asr_model",
-                    language_filter=selected_filter_language,
-                    label=f"###### {field_title(self.RequestModel, 'asr_model')}",
-                    format_func=lambda x: AsrModels[x].value if x else "Auto Select",
-                )
-            with col2:
-                if asr_model:
-                    asr_language = asr_language_selector(
-                        asr_model,
-                        language_filter=selected_filter_language,
-                        label=f"###### {field_title(self.RequestModel, 'asr_language')}",
-                        key="asr_language",
-                    )
-                else:
-                    asr_language = None
-
-            if asr_model and asr_model.supports_input_prompt():
-                gui.text_area(
-                    f"###### {field_title_desc(self.RequestModel, 'asr_prompt')}",
-                    key="asr_prompt",
-                    value="Transcribe the recording as accurately as possible.",
-                    height=300,
-                )
-
-            gui.newline()
-            if gui.checkbox(
-                "🔠 **Translate to & from English**",
-                value=bool(gui.session_state.get("translation_model")),
-            ):
-                gui.caption(
-                    "Choose an AI model & language to translate incoming text & audio messages to English and responses back your selected language. Useful for low-resource languages."
-                )
-
-                if asr_model and asr_model.supports_speech_translation():
-                    with gui.div(className="text-muted"):
-                        if gui.checkbox(
-                            label=field_desc(self.RequestModel, "asr_task").format(
-                                asr_model=asr_model.value,
-                                asr_language=asr_language or "Detected Language",
-                            ),
-                            value=gui.session_state.get("asr_task") == "translate",
-                        ):
-                            gui.session_state["asr_task"] = "translate"
-                        else:
-                            gui.session_state.pop("asr_task", None)
-                else:
-                    gui.session_state.pop("asr_task", None)
-
-                col1, col2 = gui.columns(2)
-                with col1:
-                    translation_model = translation_model_selector(
-                        allow_none=False,
-                        language_filter=selected_filter_language,
-                    )
-                with col2:
-                    translation_language_selector(
-                        model=translation_model,
-                        language_filter=selected_filter_language,
-                        label=f"###### {field_title(self.RequestModel, 'user_language')}",
-                        key="user_language",
-                    )
-            else:
-                gui.session_state["asr_task"] = None
-                gui.session_state["translation_model"] = None
-                gui.session_state["user_language"] = None
-            gui.div(className="pb-1")
-
-    def text_to_speech_settings(self):
-        with gui.div(className="pt-2 ps-1"):
-            selected_filter_language = language_filter_selector(
-                options=tts_languages_without_dialects(),
-                key="tts_language_filter",
-            )
-            text_to_speech_provider_selector(
-                self, language_filter=selected_filter_language
-            )
-
-        gui.newline()
-
-        if gui.checkbox(
-            label="**🫦 Add Lipsync Video**",
-            value=bool(gui.session_state.get("input_face")),
-        ):
-            self.lipsync_settings()
-        else:
-            gui.session_state["input_face"] = None
-            gui.session_state.pop("lipsync_model", None)
-
-        gui.div(className="pb-1")
-
-    def lipsync_settings(self):
-        with gui.div(className="pt-2 ps-1"):
-            gui.file_uploader(
-                """
-                ###### 👩‍🦰 Input Face
-                Upload a video/image with one human face. mp4, mov, png, jpg or gif preferred.
-                """,
-                key="input_face",
-            )
-            enum_selector(
-                LipsyncModel,
-                label="###### Lipsync Model",
-                key="lipsync_model",
-                use_selectbox=True,
-            )
-            gui.newline()
-
-    def document_intelligence_settings(self):
-        with gui.div(className="pt-2 ps-1"):
-            document_intelligence_settings(
-                title=f"{field_desc(self.RequestModel, 'document_model')}",
-            )
-
-    def validate_form_v2(self):
-        input_glossary = gui.session_state.get("input_glossary_document", "")
-        output_glossary = gui.session_state.get("output_glossary_document", "")
-        if input_glossary:
-            validate_glossary_document(input_glossary)
-        if output_glossary:
-            validate_glossary_document(output_glossary)
-
-    def render_usage_guide(self):
-        youtube_video("4wGKQAGUm48")
-
-    def render_settings(self):
-        tts_provider = gui.session_state.get("tts_provider")
-        if tts_provider:
-            text_to_speech_settings(self, tts_provider)
-            gui.write("---")
-
-        lipsync_model = gui.session_state.get("lipsync_model")
-        if lipsync_model and gui.session_state.get("input_face"):
-            lipsync_settings(lipsync_model)
-            gui.write("---")
-
-        translation_model = gui.session_state.get(
-            "translation_model", DEFAULT_TRANSLATION_MODEL
-        )
-        if (
-            gui.session_state.get("user_language")
-            and TranslationModels[translation_model].supports_glossary
-        ):
-            gui.markdown("##### 🔠 Translation Settings")
-            enable_glossary = gui.checkbox(
-                "📖 Add Glossary",
-                value=bool(
-                    gui.session_state.get("input_glossary_document")
-                    or gui.session_state.get("output_glossary_document")
-                ),
-                help="[Learn more](https://gooey.ai/docs/guides/build-your-ai-copilot/advanced-settings#fine-tuned-language-understanding-with-custom-glossaries) about how to super-charge your agent's domain specific language understanding!",
-            )
-            if enable_glossary:
-                gui.caption(
-                    """
-                    Provide a glossary to customize translation and improve accuracy of domain-specific terms.
-                    If not specified or invalid, no glossary will be used. Read about the expected format [here](https://docs.google.com/document/d/1TwzAvFmFYekloRKql2PXNPIyqCbsHRL8ZtnWkzAYrh8/edit?usp=sharing).
-                    """
-                )
-                gui.file_uploader(
-                    f"##### {field_title_desc(self.RequestModel, 'input_glossary_document')}",
-                    key="input_glossary_document",
-                    accept=SUPPORTED_SPREADSHEET_TYPES,
-                )
-                gui.file_uploader(
-                    f"##### {field_title_desc(self.RequestModel, 'output_glossary_document')}",
-                    key="output_glossary_document",
-                    accept=SUPPORTED_SPREADSHEET_TYPES,
-                )
-            else:
-                gui.session_state["input_glossary_document"] = None
-                gui.session_state["output_glossary_document"] = None
-            gui.write("---")
-
-        documents = gui.session_state.get("documents")
-        if documents:
-            gui.write("#### 📄 Knowledge Base")
-            gui.text_area(
-                "###### 👩‍🏫 " + field_title(self.RequestModel, "task_instructions"),
-                help=field_desc(self.RequestModel, "task_instructions"),
-                key="task_instructions",
-                height=300,
-            )
-
-            citation_style_selector()
-            gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
-            cache_knowledge_widget(self)
-            doc_extract_selector(self.request.user)
-
-            gui.write("---")
-
-        gui.markdown(
-            """
-            #### Advanced Settings
-            In general, you should not need to adjust these.
-            """
-        )
-
-        if documents:
-            query_instructions_widget()
-            keyword_instructions_widget()
-            gui.write("---")
-            doc_search_advanced_settings()
-            gui.write("---")
-
-        gui.write("##### 🔠 Language Model Settings")
-        language_model_settings(gui.session_state.get("selected_model"))
-
-    def run_as_api_tab(self):
-        elevenlabs_load_state(self)
-        super().run_as_api_tab()
-
-    @classmethod
-    def get_example_preferred_fields(cls, state: dict) -> list[str]:
-        return ["input_prompt", "messages"]
-
-    def render_run_preview_output(self, state: dict):
-        from daras_ai_v2.bots import parse_bot_html
-
-        input_prompt = state.get("input_prompt") or state.get("raw_input_text")
-        if input_prompt:
-            with (
-                gui.div(className="d-flex justify-content-end mb-1"),
-                gui.div(
-                    className="bg-light rounded-3 text-dark p-2",
-                    style=dict(maxWidth="85%"),
-                ),
-            ):
-                gui.write(
-                    truncate_text_words(input_prompt, maxlen=200),
-                    className="container-margin-reset",
-                )
-
-        output_video = state.get("output_video")
-        output_text = state.get("output_text")
-        output_audio = state.get("output_audio")
-        if not (output_text or output_video or output_audio):
-            return
-
-        with gui.div(style=dict(width="85%"), className="pt-3"):
-            if output_video:
-                gui.video(output_video[0], autoplay=True)
-
-            if output_audio:
-                gui.audio(output_audio[0])
-
-            if output_text:
-                with (
-                    gui.div(
-                        className="border rounded-3 p-2",
-                        style=dict(borderColor="#f0f0f0"),
-                    ),
-                    gui.styled("""
-                        & {
-                            max-height: 4.5em; /* ~3 lines with 1.5 line-height */
-                            overflow: hidden;
-                            display: -webkit-box;
-                            -webkit-line-clamp: 3;
-                            -webkit-box-orient: vertical;
-                            line-height: 1.5;
-                        }
-                    """),
-                ):
-                    text = parse_bot_html(output_text[0])[1]
-                    gui.write(text, className="container-margin-reset")
-
-    scroll_into_view = False
-
     def _render_running_output(self):
         # The embedded widget renders its own running state. Do not call scrollIntoView:
         # the v2 app shell keeps its header outside the body scroller.
@@ -1405,16 +573,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             platform=Platform.WHATSAPP,
         ).exists()
 
-    def on_send(self, input_data: dict):
-        request_body, message_thread = chat_widget_input_to_request_body(
-            self.current_sr, gui.session_state, input_data
-        )
-        gui.session_state.update(request_body)
-        self.submit_and_redirect(message_thread=message_thread)
-
-    def _render_regenerate_button(self):
-        pass
-
     def render_steps(self):
         if gui.session_state.get("tts_provider"):
             gui.video(gui.session_state.get("input_face"), caption="Input Face")
@@ -1466,61 +624,6 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
         for idx, audio_url in enumerate(gui.session_state.get("output_audio", [])):
             gui.write(f"###### 🔉 `output_audio[{idx}]`")
             gui.audio(audio_url)
-
-    def get_raw_price(self, state: dict):
-        total = get_non_ivr_price_credits(self.current_sr) + self.PROFIT_CREDITS
-
-        if state.get("tts_provider") == TextToSpeechProviders.ELEVEN_LABS.name:
-            output_text_list = state.get("raw_tts_text") or state.get(
-                "raw_output_text", []
-            )
-            tts_state = {"text_prompt": "".join(output_text_list)}
-            total += TextToSpeechPage().get_raw_price(tts_state)
-
-        if state.get("selected_model") == "agrillm_qwen3_30b":
-            total += 100
-
-        if is_realtime_audio_url(state.get("input_audio")):
-            total += get_ivr_price_credits_and_seconds(self.current_sr)[0]
-
-        if state.get("input_face"):
-            total += 1
-
-        return total
-
-    def additional_notes(self):
-        llm_cost = get_non_ivr_price_credits(self.current_sr)
-
-        try:
-            model = AIModelSpec.objects.get(
-                name=gui.session_state.get("selected_model")
-            )
-            if model.name == "agrillm_qwen3_30b":
-                llm_cost += 100
-            label = model.label
-        except AIModelSpec.DoesNotExist:
-            label = "LLM"
-
-        notes = (
-            f"\nBreakdown: {math.ceil(llm_cost)} ({label}) + {self.PROFIT_CREDITS}/run"
-        )
-
-        if (
-            gui.session_state.get("tts_provider")
-            == TextToSpeechProviders.ELEVEN_LABS.name
-        ):
-            notes += f" *+ {TextToSpeechPage().get_cost_note()} (11labs)*"
-
-        if is_realtime_audio_url(gui.session_state.get("input_audio")):
-            credits, duration_sec = get_ivr_price_credits_and_seconds(self.current_sr)
-            if credits:
-                duration_min = math.ceil(int(duration_sec) / 60)
-                notes += f" + {credits} ({duration_min}min call)"
-
-        if gui.session_state.get("input_face"):
-            notes += " + 1 (lipsync)"
-
-        return notes
 
     DEMO_ACTION_PREFIX = "demo:"
 
@@ -1960,59 +1063,3 @@ if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
             sr.save(update_fields=["message_thread"])
 
         return sr
-
-
-def _can_use_message_thread(
-    message_thread: MessageThread | None, user: AppUser | None
-) -> bool:
-    if not message_thread:
-        return False
-
-    if not user:
-        return False
-
-    for sr in (message_thread.first_run, message_thread.last_run):
-        if sr and sr.uid != user.uid:
-            return False
-
-    return True
-
-
-def messages_as_prompt(query_msgs: list[dict]) -> str:
-    return "\n".join(
-        f'{entry["role"]}: """{get_entry_text(entry)}"""' for entry in query_msgs
-    )
-
-
-def infer_asr_model_and_language(
-    user_language: str, default=AsrModels.gpt_4_o_audio
-) -> tuple[str, str]:
-    asr_lang = None
-    user_lang = user_language.lower()
-    if "am" in user_lang:
-        asr_model = AsrModels.usm
-        asr_lang = "am-et"
-    elif "hi" in user_lang:
-        asr_model = AsrModels.nemo_hindi
-    elif "te" in user_lang:
-        asr_model = AsrModels.whisper_telugu_large_v2
-    elif "bho" in user_lang:
-        asr_model = AsrModels.vakyansh_bhojpuri
-    elif "sw" in user_lang:
-        asr_model = AsrModels.seamless_m4t_v2
-        asr_lang = "swh"
-    else:
-        asr_model = default
-    return asr_model.name, asr_lang
-
-
-def convo_window_clipper(
-    window: list[ConversationEntry],
-    max_tokens,
-    *,
-    step=2,
-):
-    for i in range(len(window) - 2, -1, -step):
-        if calc_appx_tokens(window[i:]) > max_tokens:
-            return i + step
-    return 0
