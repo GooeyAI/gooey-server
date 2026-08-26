@@ -413,7 +413,7 @@ def msg_handler(bot: BotInterface):
 
 @db_middleware
 def msg_handler_raw(bot: BotInterface):
-    recieved_time: datetime = timezone.now()
+    received_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -475,7 +475,7 @@ def msg_handler_raw(bot: BotInterface):
             input_documents=input_documents,
             input_text=input_text,
             input_audio=input_audio,
-            recieved_time=recieved_time,
+            received_time=received_time,
         )
 
 
@@ -486,7 +486,7 @@ def _process_and_send_msg(
     input_audio: str | None,
     input_documents: list[str] | None,
     input_text: str,
-    recieved_time: datetime,
+    received_time: datetime,
 ):
     # get latest messages for context
     saved_msgs = bot.convo.last_n_msgs()
@@ -545,6 +545,12 @@ def _process_and_send_msg(
                     sr.refresh_from_db(fields=["is_cancelled"])
                     if sr.is_cancelled:
                         # stop streaming if a newer WhatsApp event replaced this run
+                        _save_partial_reply(
+                            bot=bot,
+                            sr=sr,
+                            bot_msg_id=sent_msg_id or update_msg_id,
+                            received_time=received_time,
+                        )
                         return
                 bot.recipe_run_state = bot.page_cls.get_run_state(state)
                 bot.run_status = state.get(StateKeys.run_status) or ""
@@ -605,7 +611,12 @@ def _process_and_send_msg(
     if bot.platform == Platform.WHATSAPP:
         sr.refresh_from_db(fields=["is_cancelled"])
         if sr.is_cancelled:
-            # a newer event replaced this run; it answers instead
+            _save_partial_reply(
+                bot=bot,
+                sr=sr,
+                bot_msg_id=sent_msg_id or update_msg_id,
+                received_time=received_time,
+            )
             return
     # get the final state from db
     state = sr.to_dict()
@@ -641,18 +652,15 @@ def _process_and_send_msg(
             update_msg_id=update_msg_id,
         )
 
-    # use the merged WhatsApp inputs when saving the message
-    if bot.platform == Platform.WHATSAPP:
-        input_images = state.get("input_images")
-        input_documents = state.get("input_documents")
-
-    # save msgs to db
+    # save msgs to db. the attachments come off the run row, not the locals: on
+    # WhatsApp the row holds the inputs merged from the events this run replaced,
+    # and those events saved nothing of their own (see _save_partial_reply)
     save_msg_pair_to_db(
         convo=bot.convo,
-        input_images=input_images,
-        input_documents=input_documents,
+        input_images=state.get("input_images"),
+        input_documents=state.get("input_documents"),
         saved_run=sr,
-        received_time=recieved_time,
+        received_time=received_time,
         user_msg_id=bot.user_msg_id,
         bot_msg_id=sent_msg_id or update_msg_id,
         # user input
@@ -681,6 +689,34 @@ def strip_thinking(text: str | None) -> str:
 THINKING_TAG_RE = re.compile(
     r"<think\b[^>]*>.*?(?:</think\s*>|\Z)", flags=re.IGNORECASE | re.DOTALL
 )
+
+
+def _save_partial_reply(
+    *,
+    bot: BotInterface,
+    sr: SavedRun,
+    bot_msg_id: str | None,
+    received_time: datetime,
+):
+    sr.refresh_from_db()
+    state = sr.to_dict()
+    reply_text = (state.get("raw_output_text") or state.get("output_text") or [""])[0]
+    if not reply_text:
+        return
+    save_msg_pair_to_db(
+        convo=bot.convo,
+        input_images=state.get("input_images"),
+        input_documents=state.get("input_documents"),
+        saved_run=sr,
+        received_time=received_time,
+        user_msg_id=bot.user_msg_id,
+        bot_msg_id=bot_msg_id,
+        user_msg_display_content=state.get("input_prompt") or "",
+        user_msg_content=state.get("raw_input_text") or "",
+        bot_msg_content=reply_text,
+        bot_msg_display_content=reply_text,
+        skip_analysis=True,
+    )
 
 
 def _submit_bot_run(
@@ -768,8 +804,6 @@ def _cancel_active_run_and_merge_inputs(
 def _merge_run_inputs(previous: dict, current: dict) -> dict:
     merged = previous | current
 
-    # raw_output_text is only set once the model step finishes; fall back to
-    # output_text for a reply cut off mid-stream
     previous_reply = (
         previous.get("raw_output_text") or previous.get("output_text") or [""]
     )[0]
@@ -884,6 +918,7 @@ def save_msg_pair_to_db(
     bot_msg_display_content: str = "",
     saved_run: SavedRun | None = None,
     received_time: datetime | None = None,
+    skip_analysis: bool = False,
 ):
     if received_time:
         response_time = timezone.now() - received_time
@@ -913,6 +948,7 @@ def save_msg_pair_to_db(
         saved_run=saved_run,
         response_time=response_time,
     )
+    assistant_msg._analysis_started = skip_analysis
     # save the messages & attachments
     # note that its important to save the user_msg and assistant_msg together because we use get_next_by_created_at in our code
     with transaction.atomic():
