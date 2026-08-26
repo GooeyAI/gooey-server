@@ -36,9 +36,9 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
     ConversationEntry,
+    format_chat_entry,
 )
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
-from daras_ai_v2.redis_cache import redis_lock
 from daras_ai_v2.search_ref import SearchReference
 from daras_ai_v2.vector_search import doc_url_to_file_metadata
 from gooeysite.bg_db_conn import db_middleware
@@ -48,7 +48,7 @@ from number_cycling.models import (
 )
 from number_cycling.utils import parse_extension_number
 from recipes.VideoBots import ReplyButton
-from routers.api import submit_api_call
+from routers.api import create_new_run, submit_api_call
 from workspaces.models import Workspace
 
 PAGE_NOT_CONNECTED_ERROR = (
@@ -605,6 +605,7 @@ def _process_and_send_msg(
     if bot.platform == Platform.WHATSAPP:
         sr.refresh_from_db(fields=["is_cancelled"])
         if sr.is_cancelled:
+            # a newer event replaced this run; it answers instead
             return
     # get the final state from db
     state = sr.to_dict()
@@ -699,8 +700,10 @@ def _submit_bot_run(
         _save_run_message_id(bot, sr)
         return result, sr
 
-    with redis_lock(f"gooey/whatsapp-message-thread/{message_thread.pk}"):
-        message_thread.refresh_from_db()
+    with transaction.atomic():
+        message_thread = MessageThread.objects.select_for_update().get(
+            pk=message_thread.pk
+        )
         # Ignore duplicate webhook deliveries that already started a run.
         if (
             bot.user_msg_id
@@ -712,18 +715,29 @@ def _submit_bot_run(
             return None
         kwargs["message_thread"] = message_thread
         kwargs["request_body"] = _cancel_active_run_and_merge_inputs(
-            message_thread, request_body
+            bot, message_thread, request_body
         )
-        result, sr = submit_api_call(**kwargs)
+        # create the run while still holding the lock, so message_thread.last_run
+        # already points at it when the next event takes the lock
+        page, sr = create_new_run(**kwargs)
+        if sr.message_thread_id != message_thread.pk:
+            capture_exception(
+                RuntimeError(
+                    f"whatsapp run {sr.pk} did not join locked message thread "
+                    f"{message_thread.pk}; event batching is inert for this convo"
+                )
+            )
         _save_run_message_id(bot, sr)
-        return result, sr
+    result = page.call_runner_task(sr)
+    return result, sr
 
 
 def _save_run_message_id(bot: BotInterface, sr: SavedRun):
     try:
-        sr.platform = bot.platform
-        sr.user_message_id = bot.user_msg_id
-        sr.save(update_fields=["platform", "user_message_id"])
+        with transaction.atomic():
+            sr.platform = bot.platform
+            sr.user_message_id = bot.user_msg_id
+            sr.save(update_fields=["platform", "user_message_id"])
     except IntegrityError as e:
         # Likely duplicate (platform, user_message_id). Log and proceed.
         traceback.print_exc()
@@ -731,33 +745,54 @@ def _save_run_message_id(bot: BotInterface, sr: SavedRun):
 
 
 def _cancel_active_run_and_merge_inputs(
+    bot: BotInterface,
     message_thread: MessageThread,
     request_body: dict,
 ) -> dict:
     last_run = message_thread.last_run
     # Only merge when there is an active, uncancelled run to replace.
-    if not last_run or not last_run.run_status or last_run.is_cancelled:
+    if (
+        not last_run
+        or last_run.is_cancelled
+        or bot.page_cls.get_run_state(last_run.to_dict())
+        not in (RecipeRunState.starting, RecipeRunState.running)
+    ):
         return request_body
 
-    request_body = _merge_run_inputs(last_run.state, request_body)
     last_run.is_cancelled = True
     last_run.save(update_fields=["is_cancelled", "updated_at"])
-    return request_body
+    last_run.refresh_from_db()
+    return _merge_run_inputs(last_run.state, request_body)
 
 
 def _merge_run_inputs(previous: dict, current: dict) -> dict:
     merged = previous | current
 
-    previous_prompt = previous.get("input_prompt") or ""
-    current_prompt = current.get("input_prompt") or ""
+    # raw_output_text is only set once the model step finishes; fall back to
+    # output_text for a reply cut off mid-stream
+    previous_reply = (
+        previous.get("raw_output_text") or previous.get("output_text") or [""]
+    )[0]
+
+    if previous_reply:
+        merged["messages"] = (current.get("messages") or []) + [
+            format_chat_entry(
+                role=CHATML_ROLE_USER,
+                content_text=previous.get("raw_input_text")
+                or previous.get("input_prompt")
+                or "",
+                input_images=previous.get("input_images"),
+                input_documents=previous.get("input_documents"),
+            ),
+            format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text=previous_reply),
+        ]
+        return merged
+
     merged["input_prompt"] = "\n".join(
-        prompt for prompt in (previous_prompt, current_prompt) if prompt
+        filter(None, [previous.get("input_prompt"), current.get("input_prompt")])
     )
-
     for field in ("input_images", "input_documents"):
-        values = [*(previous.get(field) or []), *(current.get(field) or [])]
-        merged[field] = values or None
-
+        merged[field] = (previous.get(field) or []) + (current.get(field) or []) or None
     merged["input_audio"] = current.get("input_audio") or previous.get("input_audio")
     return merged
 
