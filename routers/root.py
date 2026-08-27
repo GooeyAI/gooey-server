@@ -421,11 +421,13 @@ def history_route(
     from widgets.history import history_href_for_workflow
 
     # v2 has one History, not one per recipe - send this slug's runs to it as a
-    # filter. v1 pages keep their own tab.
+    # filter. v1 pages keep their own tab, and since which one you get depends on
+    # the user, this redirect is 302: a 301 would be cached against the next
+    # visitor, who may not be on v2 at all.
     page_cls = page_slug_map.get(normalize_slug(page_slug))
     if page_cls and can_use_layout_v2(request):
         return RedirectResponse(
-            history_href_for_workflow(page_cls.workflow), status_code=301
+            history_href_for_workflow(page_cls.workflow), status_code=302
         )
     return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
 

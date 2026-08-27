@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import datetime
 import mimetypes
 from typing import TYPE_CHECKING
-
-from django.utils import timezone
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, Workflow
@@ -30,10 +27,6 @@ if TYPE_CHECKING:
 
 CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
-
-# nothing kills a celery worker on a clock, so a run whose status stopped moving
-# looks exactly like one still working - past this the card stops claiming it is
-RUN_STALE_AFTER = datetime.timedelta(minutes=10)
 
 # the badge shares the preview's top edge with the workflow icon
 RUN_STATUS_MAXLEN = 28
@@ -109,25 +102,25 @@ def sr_to_card(
 def run_status_from_run(sr: SavedRun) -> RunStatusData | None:
     """What this run is doing, when that's still worth saying.
 
-    Mirrors `BasePage.get_run_state`, off the model's own columns rather than the
-    state blob, plus the two things that page can't see from a single run: a
-    cancel, and a worker that stopped reporting.
+    A finished run says nothing - a tick on every card is noise.
     """
+    from daras_ai_v2.base import RecipeRunState
+
     if sr.is_cancelled:
         return RunStatusData(state="cancelled", label="Cancelled")
-    if sr.error_msg:
-        return RunStatusData(state="failed", label="Failed")
-    if not sr.run_status:
-        # completed, or never started - neither needs a badge
-        return None
-    if sr.updated_at and timezone.now() - sr.updated_at > RUN_STALE_AFTER:
-        return RunStatusData(state="failed", label="Timed out")
-    if sr.run_status.lower().strip(". ") == "starting":  # BasePage.STARTING_STATE
-        return RunStatusData(state="starting", label="Starting")
-    return RunStatusData(
-        state="running",
-        label=truncate_text_words(sr.run_status, maxlen=RUN_STATUS_MAXLEN),
-    )
+    match sr.get_run_state():
+        case RecipeRunState.failed:
+            return RunStatusData(
+                state="failed", label="Timed out" if sr.is_stale else "Failed"
+            )
+        case RecipeRunState.starting:
+            return RunStatusData(state="starting", label="Starting")
+        case RecipeRunState.running:
+            return RunStatusData(
+                state="running",
+                label=truncate_text_words(sr.run_status, maxlen=RUN_STATUS_MAXLEN),
+            )
+    return None
 
 
 def sender_from_run(sr: SavedRun) -> SenderData | None:
@@ -137,10 +130,7 @@ def sender_from_run(sr: SavedRun) -> SenderData | None:
     """
     if sr.platform is None:
         return None
-    try:
-        platform = Platform(sr.platform)
-    except ValueError:
-        return None  # a platform this deploy doesn't define: no origin, but no 500
+    platform = Platform(sr.platform)
     convo = sr.message_thread and sr.message_thread.bot_conversation
     # a run can carry a platform without a conversation behind it - the icon
     # alone still says where it came from

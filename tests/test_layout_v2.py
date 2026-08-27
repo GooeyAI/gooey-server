@@ -40,7 +40,8 @@ def test_agent_history_redirects_to_filtered_global_history(
 
     response = client.get("/agent/history/", follow_redirects=False)
 
-    assert response.status_code == 301
+    # 302, not 301: whether this redirects at all depends on the user
+    assert response.status_code == 302
     assert response.headers["location"].endswith("/history/?workflow=agent")
 
 

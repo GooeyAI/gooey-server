@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.db import models
 from django.db.models import IntegerChoices
+from django.utils import timezone
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
@@ -19,10 +20,14 @@ from gooeysite.bg_db_conn import get_celery_result_db_safe
 from . import Platform
 from .workflow import Workflow, WorkflowMetadata
 
+# how long a run can go without reporting progress before it's presumed dead
+RUN_STALE_AFTER = datetime.timedelta(minutes=10)
+
 if typing.TYPE_CHECKING:
     import celery.result
     import pandas as pd
 
+    from daras_ai_v2.base import RecipeRunState
     from functions.models import CalledFunction
     from .published_run import PublishedRun, PublishedRunVersion
     from workspaces.models import Workspace
@@ -273,6 +278,38 @@ class SavedRun(models.Model):
         query_params = query_params or {}
         return Workflow(self.workflow).page_cls.raw_app_url(
             query_params=query_params | dict(run_id=self.run_id, uid=self.uid),
+        )
+
+    @property
+    def is_stale(self) -> bool:
+        """Whether this run stopped reporting progress long enough ago to be dead.
+
+        Nothing kills a celery worker on a clock, and `run_status` is only ever
+        cleared by the runner's own `finally`, so a killed run keeps claiming to
+        be running forever.
+        """
+        return bool(
+            self.run_status
+            and self.updated_at
+            and timezone.now() - self.updated_at > RUN_STALE_AFTER
+        )
+
+    def get_run_state(self) -> "RecipeRunState":
+        """`BasePage.get_run_state` over this row's columns instead of a live state dict.
+
+        Defers to that ladder rather than repeating it, and adds the one thing a
+        single row knows and a state dict cannot: that the worker went away.
+        """
+        from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+
+        if self.is_stale:
+            return RecipeRunState.failed
+        return BasePage.get_run_state(
+            {
+                StateKeys.run_status: self.run_status,
+                StateKeys.error_msg: self.error_msg,
+                StateKeys.run_time: self.run_time,
+            }
         )
 
     def to_dict(self) -> dict:

@@ -4,8 +4,8 @@ from django.utils import timezone
 
 from bots.models import Conversation, MessageThread, SavedRun
 from bots.models.bot_integration import Platform
+from bots.models.saved_run import RUN_STALE_AFTER
 from widgets.workflow_cards import (
-    RUN_STALE_AFTER,
     mask_user_id,
     run_status_from_run,
     sender_from_run,
@@ -40,9 +40,8 @@ def test_sender_names_the_conversation_and_its_platform():
 
 
 def test_sender_falls_back_to_the_icon_alone():
-    # no platform at all, an unknown one, and a run whose conversation is gone
+    # no platform at all, and a run whose conversation is gone
     assert sender_from_run(_run(None)) is None
-    assert sender_from_run(_run(999)) is None
     assert sender_from_run(_run(Platform.WHATSAPP)).label == ""
 
 
@@ -73,16 +72,16 @@ def test_a_worker_that_stopped_reporting_is_not_still_running():
     assert status.label == "Timed out"
 
 
-def test_a_cancel_outranks_an_error_which_outranks_a_leftover_status():
+def test_a_failed_run_reads_as_failed():
+    # the runner's finally clears run_status on the way out, so a failed row is
+    # an error_msg with no status behind it
+    assert run_status_from_run(_status_run(error_msg="boom")).state == "failed"
+
+
+def test_a_cancel_outranks_the_ladder():
     assert (
         run_status_from_run(
             _status_run(run_status="Working...", error_msg="boom", is_cancelled=True)
         ).state
         == "cancelled"
-    )
-    assert (
-        run_status_from_run(
-            _status_run(run_status="Working...", error_msg="boom")
-        ).state
-        == "failed"
     )
