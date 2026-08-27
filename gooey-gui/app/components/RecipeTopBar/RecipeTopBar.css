@@ -92,11 +92,6 @@
   white-space: nowrap;
 }
 
-a.gooey-topbar-author:hover {
-  color: var(--gooey-ink);
-  text-decoration: underline;
-}
-
 /* ---------------------------------------------------------------- tabs */
 
 /* The pill group is centred in the bar but never pushes the right cluster off

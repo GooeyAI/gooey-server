@@ -1,39 +1,52 @@
 import "./RecipeWorkspace/RecipeWorkspace.css";
 
 import clsx from "clsx";
-import type { WorkspacePaneControlProps } from "@gooey-types/recipe_workspace_props";
+
+import type {
+  EventControlTarget,
+  FontAwesomeIcon,
+  PanelControlTarget,
+  PhotoIcon,
+  WorkspacePaneControlProps,
+} from "@gooey-types/recipe_workspace_props";
+import { useAppShellPanelActions } from "~/appShellContext";
+
 import { GooeyTooltip } from "./GooeyTooltip";
 
-/** Field docs live on the python model. `Partial` because RecipeWorkspace renders its own
- * controls in React with only a label and a handler, while python sends the full set. */
-export function WorkspacePaneControl({
-  label,
-  tooltip,
-  icon,
-  photo_url,
-  show_label,
-  onClick,
-  event_name,
-  className,
-}: Partial<WorkspacePaneControlProps> & {
-  label: string;
-  /** React call sites act directly; python ones pass `event_name` instead. */
-  onClick?: () => void;
-}) {
-  const handleClick = () => {
-    if (onClick) {
-      onClick();
-      return;
-    }
-    if (event_name) {
-      window.dispatchEvent(new Event(event_name));
-    }
-  };
+type ControlIcon = FontAwesomeIcon | PhotoIcon;
+type ControlTarget = PanelControlTarget | EventControlTarget;
 
-  // Contains the visible label (WCAG 2.5.3), plus the action when a tooltip names one.
+type SharedProps = {
+  label: string;
+  icon: ControlIcon;
+  tooltip?: string | null;
+  show_label?: boolean;
+  className?: string | null;
+};
+
+export function WorkspacePaneControl(props: WorkspacePaneControlProps) {
+  const { setPanelOpen } = useAppShellPanelActions();
+  const handleClick = () => runTarget(props.target, setPanelOpen);
+  return <PaneControlButton {...props} onClick={handleClick} />;
+}
+
+export function LocalWorkspacePaneControl({
+  onClick,
+  ...props
+}: SharedProps & { onClick: () => void }) {
+  return <PaneControlButton {...props} onClick={onClick} />;
+}
+
+function PaneControlButton({
+  label,
+  tooltip = null,
+  icon,
+  show_label = false,
+  onClick,
+  className,
+}: SharedProps & { onClick: () => void }) {
   const accessibleName =
     show_label && tooltip ? `${label}: ${tooltip}` : tooltip || label;
-
   const button = (
     <button
       type="button"
@@ -42,24 +55,35 @@ export function WorkspacePaneControl({
         show_label && "v2-pane-control-labelled",
         className
       )}
-      onClick={handleClick}
+      onClick={onClick}
       aria-label={accessibleName}
     >
-      {photo_url ? (
-        <img className="v2-pane-control-photo" src={photo_url} alt="" />
+      {icon.kind === "photo" ? (
+        <img className="v2-pane-control-photo" src={icon.url} alt="" />
       ) : (
-        <i className={icon} />
+        <i className={icon.class_name} />
       )}
       {show_label && <span className="v2-pane-control-label">{label}</span>}
     </button>
   );
 
-  // A labelled control needs no tooltip repeating its label; an explicit one still shows.
-  if (show_label && !tooltip) return button;
-
+  if (show_label && !tooltip) {
+    return button;
+  }
   return (
     <GooeyTooltip content={tooltip || label} placement="bottom" fitContent>
       {button}
     </GooeyTooltip>
   );
+}
+
+function runTarget(
+  target: ControlTarget,
+  setPanelOpen: (key: string, open: boolean) => void
+) {
+  if (target.kind === "panel") {
+    setPanelOpen(target.panel_key, target.open);
+    return;
+  }
+  window.dispatchEvent(new Event(target.event_name));
 }

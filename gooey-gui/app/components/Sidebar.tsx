@@ -1,6 +1,8 @@
 import type { CustomComponentProps } from "~/components";
 import { RenderedChildren } from "~/renderer";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { useAppShellPanel } from "~/appShellContext";
+import type { SidebarProps } from "@gooey-types/sidebar_props";
 import SidebarResizer from "./SidebarResizer";
 
 export function Sidebar({
@@ -8,22 +10,20 @@ export function Sidebar({
   children,
   onChange,
   state,
-  defaultOpen,
+  default_open,
   disabled,
-  enableResize = true,
-  clientOnly = false,
-  storageKey = "",
-}: CustomComponentProps & {
-  name: string;
-  defaultOpen: boolean;
-  disabled: boolean;
-  enableResize?: boolean;
-  clientOnly?: boolean;
-  storageKey?: string;
-}) {
-  const [isOpen, setOpen] = useState(defaultOpen);
+  enable_resize,
+  client_only,
+  storage_key,
+}: CustomComponentProps & SidebarProps) {
+  const [legacyOpen, setLegacyOpen] = useState(default_open);
+  const managedPanel = useAppShellPanel(
+    client_only ? name : null,
+    default_open,
+    client_only ? storage_key : null
+  );
+  const isOpen = client_only ? managedPanel.open : legacyOpen;
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
-  const [storageReady, setStorageReady] = useState(!clientOnly);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,17 +34,15 @@ export function Sidebar({
     sidebarRef.current?.setAttribute("inert", "");
   }, [isOpen]);
 
-  // An explicit `:open` / `:close` command outranks the persisted default below.
-  const commandedRef = useRef(false);
-
   useEffect(() => {
+    if (client_only) {
+      return;
+    }
     function handleOpen() {
-      commandedRef.current = true;
-      setOpen(true);
+      setLegacyOpen(true);
     }
     function handleClose() {
-      commandedRef.current = true;
-      setOpen(false);
+      setLegacyOpen(false);
     }
     window.addEventListener(name + ":open", handleOpen);
     window.addEventListener(name + ":close", handleClose);
@@ -52,7 +50,7 @@ export function Sidebar({
       window.removeEventListener(name + ":open", handleOpen);
       window.removeEventListener(name + ":close", handleClose);
     };
-  }, [name]);
+  }, [client_only, name]);
 
   useEffect(() => {
     for (const openBtn of document.getElementsByClassName(
@@ -62,50 +60,17 @@ export function Sidebar({
     }
   }, [isOpen, name]);
 
-  // The panel is the authority on whether it is open, and announces every settled value.
-  // Mirrors cannot rely on the commands alone: a command is fire-and-forget and can be
-  // dispatched before a listener exists, and the storage restore below changes `isOpen`
-  // without commanding anything.
   useEffect(() => {
-    if (disabled) return;
+    if (client_only || disabled) {
+      return;
+    }
     window.dispatchEvent(
       new CustomEvent(name + ":changed", { detail: { open: isOpen } })
     );
-  }, [disabled, isOpen, name]);
+  }, [client_only, disabled, isOpen, name]);
 
   useEffect(() => {
-    if (!clientOnly) {
-      return;
-    }
-    if (!storageKey) {
-      setStorageReady(true);
-      return;
-    }
-    try {
-      const stored = window.sessionStorage.getItem(storageKey);
-      // `!commandedRef.current` so a restore cannot undo an open/close that was asked for
-      // explicitly, whichever of the two effects happens to run first
-      if (stored !== null && !commandedRef.current) {
-        setOpen(stored === "true");
-      }
-    } catch {
-      // Storage can be unavailable; the server-provided default remains usable.
-    }
-    setStorageReady(true);
-  }, [clientOnly, storageKey]);
-
-  useEffect(() => {
-    if (clientOnly) {
-      if (!storageReady) {
-        return;
-      }
-      if (storageKey) {
-        try {
-          window.sessionStorage.setItem(storageKey, String(isOpen));
-        } catch {
-          // The pane still works without persistence.
-        }
-      }
+    if (client_only) {
       return;
     }
     if (state[name] != isOpen) {
@@ -117,7 +82,7 @@ export function Sidebar({
       }
       onChange();
     }
-  }, [clientOnly, isOpen, name, onChange, state, storageKey, storageReady]);
+  }, [client_only, isOpen, name, onChange, state]);
 
   let [sidebarDiv, pageDiv] = children;
 
@@ -159,7 +124,7 @@ export function Sidebar({
   } as CSSProperties;
 
   const sidebarContainerClassName = `flex-column flex-grow-1 gooey-sidebar ${sidebarClassName} ${
-    enableResize ? "gooey-sidebar-resizable" : "gooey-sidebar-bordered"
+    enable_resize ? "gooey-sidebar-resizable" : "gooey-sidebar-bordered"
   }`;
 
   return (
@@ -178,7 +143,7 @@ export function Sidebar({
           onChange={onChange}
           state={state}
         />
-        {!!enableResize && !!isOpen && (
+        {!!enable_resize && !!isOpen && (
           <SidebarResizer
             minWidth={340}
             maxWidth={800}

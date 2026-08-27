@@ -5,10 +5,12 @@ export function GooeyBuilderButton({
   gooey_builder,
   compact,
   mobile = false,
+  onOpen,
 }: {
   gooey_builder: GooeyBuilderData;
   compact: boolean;
   mobile?: boolean;
+  onOpen: () => void;
 }) {
   return (
     <button
@@ -21,9 +23,7 @@ export function GooeyBuilderButton({
       title={gooey_builder.name}
       onClick={(e) => {
         e.stopPropagation();
-        window.dispatchEvent(
-          new CustomEvent(`${gooey_builder.event_key}:open`)
-        );
+        onOpen();
       }}
     >
       <img

@@ -2,47 +2,40 @@ import "./RecipeTopBar.css";
 
 import clsx from "clsx";
 import { Fragment, useEffect, useRef, useState } from "react";
-import type { CustomComponentProps } from "~/components";
 import type {
+  LinkTarget,
   RecipeTopBarProps,
+  SubmitTarget,
   TopBarMenuItem,
 } from "@gooey-types/recipe_top_bar_props";
-import { Link, useNavigate } from "@remix-run/react";
-import type { RecipeView } from "../RecipeWorkspace/paneState";
+import type { WorkspaceView } from "@gooey-types/recipe_workspace_props";
+import { Link, useNavigate, useNavigation } from "@remix-run/react";
 import {
-  activeTabView,
+  useAppShellPanel,
+  useNavDrawer,
+  useWorkspaceLayout,
+} from "~/appShellContext";
+import type { CustomComponentProps } from "~/components";
+import {
+  activeViewForLayouts,
+  layoutsEqual,
   paneVisibility,
-  selectedWorkspaceView,
-  shownLayout,
-  viewAfterRun,
-  viewForLayout,
-  workspaceTargetForView,
+  workspaceTargetForLayout,
 } from "../RecipeWorkspace/paneState";
-import { usePaneLayout } from "../RecipeWorkspace/usePaneLayout";
-import { NAV_DRAWER_OPEN_EVENT } from "../NavigationSidebar/navDrawer";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
+import { encodeSubmitIntent, type RecipeSubmitIntent } from "./submitIntent";
 
-/** Raw FontAwesome html arrives from python, the same way NavItemData.icon does. */
-function Icon({ html, className }: { html?: string; className?: string }) {
-  if (!html) return null;
-  return (
-    <span className={className} dangerouslySetInnerHTML={{ __html: html }} />
-  );
-}
-
-function useDismissOnOutsideClick(onDismiss: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handle = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
-    };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [onDismiss]);
-  return ref;
-}
-
-type MenuEntry = TopBarMenuItem & { mobileOnly?: boolean; heading?: boolean };
+type TopBarTarget = LinkTarget | SubmitTarget;
+type MenuEntry = {
+  key: string;
+  label: string;
+  iconHtml?: string | null;
+  target?: TopBarTarget;
+  isDanger?: boolean;
+  mobileOnly?: boolean;
+  heading?: boolean;
+  onPick?: () => void;
+};
 
 // the Publish menu's own entries, distinguishable from anything the server declares
 const PUBLISH_ITEM_KEY = "--topbar-item-publish";
@@ -50,223 +43,149 @@ const SHARE_ITEM_KEY = "--topbar-item-share";
 const API_ITEM_KEY = "--topbar-item-api";
 const DEPLOY_ITEM_KEY = "--topbar-item-deploy";
 
-function Menu({
-  items,
-  open,
-  onPick,
-  onNavigate,
-}: {
-  items: MenuEntry[];
-  open: boolean;
-  onPick: (item: TopBarMenuItem) => void;
-  /** A link navigates client-side, so the component is never unmounted and the menu would
-   * otherwise stay open behind the page it opened. */
-  onNavigate: () => void;
-}) {
-  if (!open || !items.length) return null;
-  return (
-    <div className="gooey-topbar-menu">
-      {items.map((item) =>
-        item.heading ? (
-          <div
-            key={item.key}
-            className={clsx(
-              "gooey-topbar-menu-heading",
-              item.mobileOnly && "d-lg-none"
-            )}
-          >
-            {item.label}
-          </div>
-        ) : item.href ? (
-          <Link
-            key={item.key}
-            to={item.href}
-            onClick={onNavigate}
-            className={clsx(
-              "gooey-topbar-menu-item",
-              item.is_danger && "text-danger",
-              item.mobileOnly && "d-lg-none"
-            )}
-          >
-            <Icon html={item.icon} className="gooey-topbar-menu-icon" />
-            {item.label}
-          </Link>
-        ) : (
-          <button
-            key={item.key}
-            type="button"
-            className={clsx(
-              "gooey-topbar-menu-item",
-              item.is_danger && "text-danger",
-              item.mobileOnly && "d-lg-none"
-            )}
-            onClick={() => onPick(item)}
-          >
-            <Icon html={item.icon} className="gooey-topbar-menu-icon" />
-            {item.label}
-          </button>
-        )
-      )}
-    </div>
-  );
-}
-
 export function RecipeTopBar({
+  config,
   title,
   photo_url,
   circle_photo,
   author,
-  views,
-  storage_key,
-  initial_view,
-  editor_full_width,
-  narrow_pane,
-  workspace_href,
-  workspace_active,
-  overflow_items,
   title_menu_items,
   integrations,
+  submit_intent_key,
   publish_label,
-  publish_key,
+  publish_intent,
   has_unpublished_changes,
   api_href,
-  share_key,
-  share_icon,
-  share_copy_url,
-  menu_key,
-  run_key,
-  run_label,
-  run_disabled,
-  is_running,
+  share,
+  run_intent,
   cost_label,
   cost_href,
   cost_title,
   view_only,
   crumb_label,
   deploy_href,
-  builder_event_key,
+  builder_panel_key,
   builder_new_event,
   history_href,
-  onChange,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
   const [shareCopied, setShareCopied] = useState(false);
-  // the tick is the only feedback a copy gets, so it needs a fallback
   const copyShareUrl = () => {
+    if (share.kind !== "copy") {
+      return;
+    }
+    if (!navigator.clipboard) {
+      window.prompt("Copy this link", share.url);
+      return;
+    }
     navigator.clipboard
-      ?.writeText(share_copy_url)
+      .writeText(share.url)
       .then(() => {
         setShareCopied(true);
         setTimeout(() => setShareCopied(false), 2000);
       })
-      .catch(() => window.prompt("Copy this link", share_copy_url));
+      .catch(() => window.prompt("Copy this link", share.url));
   };
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  // Mirrors the Builder panel. Seeded from the server, then kept in step by the panel's
-  // `:changed` announcement, which is the authority - the commands can be missed.
-  const [builderOpen, setBuilderOpen] = useState(
-    Boolean(builder_event_key && state[builder_event_key])
+  const builder = useAppShellPanel(
+    builder_panel_key,
+    Boolean(builder_panel_key && state[builder_panel_key]),
+    builder_panel_key ? `${config.storage_key}:builder` : null
   );
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { layout, storedLayout, hydrated, isNarrow, selectView } =
-    usePaneLayout(storage_key, initial_view, narrow_pane);
-  // The shown layout, so the bar names the arrangement actually on screen.
-  const activeView = viewForLayout(shownLayout(layout, editor_full_width));
-  const selectedView = selectedWorkspaceView(activeView, workspace_active);
-  // Which pill is lit, and what the crumb reads - see `activeTabView` for why this is not
-  // simply the view on screen.
-  const activeSlug = activeTabView(
-    views.map((view) => view.slug),
-    selectedView,
-    workspace_active ? viewForLayout(storedLayout) : null
+  const navigation = useNavigation();
+  const submitDisabled = navigation.state !== "idle";
+  const {
+    layout,
+    storedLayout,
+    hydrated,
+    hadStoredLayout,
+    isNarrow,
+    selectLayout,
+  } = useWorkspaceLayout(config);
+  const activeViewSpec = activeViewForLayouts(
+    config.views,
+    layout,
+    storedLayout,
+    config.workspace_active
   );
-  const activeViewSpec = views.find((view) => view.slug === activeSlug);
-  const chooseView = (view: RecipeView) => {
-    selectView(view);
-    const target = workspaceTargetForView(workspace_active, workspace_href);
+  const chooseView = (view: WorkspaceView) => {
+    selectLayout(view.layout);
+    const target = workspaceTargetForLayout(
+      config.workspace_active,
+      config.workspace_href
+    );
     if (target) {
       navigate(target);
     }
   };
   const handleRun = () => {
-    if (workspace_active) {
-      selectView(viewAfterRun(activeView, is_running));
+    if (config.workspace_active && run_intent.kind === "run") {
+      window.setTimeout(() => selectLayout(config.run_layout), 0);
     }
-    fire(run_key);
   };
 
   useEffect(() => {
-    if (!builder_event_key) return;
-    const onOpen = () => setBuilderOpen(true);
-    const onClose = () => setBuilderOpen(false);
-    const onChanged = (e: Event) => {
-      const open = (e as CustomEvent<{ open?: boolean }>).detail?.open;
-      if (typeof open === "boolean") setBuilderOpen(open);
-    };
-    window.addEventListener(`${builder_event_key}:open`, onOpen);
-    window.addEventListener(`${builder_event_key}:close`, onClose);
-    window.addEventListener(`${builder_event_key}:changed`, onChanged);
-    return () => {
-      window.removeEventListener(`${builder_event_key}:open`, onOpen);
-      window.removeEventListener(`${builder_event_key}:close`, onClose);
-      window.removeEventListener(`${builder_event_key}:changed`, onChanged);
-    };
-  }, [builder_event_key]);
-
-  // On a phone a workflow opens on Ask Gooey, so the panel shows itself until this session
-  // has picked a view - an absent stored layout being what "has not picked" means.
-  // lg, the same threshold the panel's takeover uses: above it the panel shares the screen.
-  useEffect(() => {
-    if (!builder_event_key) return;
-    // Only on the workspace; elsewhere the panel would cover a page the user navigated to.
-    if (!workspace_active) return;
-    // A visitor lands on About; Remix is how they opt into a chat.
-    if (view_only) return;
-    if (window.innerWidth >= 992) return;
-    let chosen: string | null = null;
-    try {
-      chosen = window.sessionStorage.getItem(storage_key);
-    } catch {
-      // Storage can be unavailable; treat that as nothing chosen yet.
+    if (!builder_panel_key || !config.workspace_active || view_only) {
+      return;
     }
-    if (chosen) return;
-    window.dispatchEvent(new CustomEvent(`${builder_event_key}:open`));
-  }, [builder_event_key, storage_key]);
+    if (window.innerWidth >= 992) {
+      return;
+    }
+    if (!hadStoredLayout) {
+      builder.setOpen(true);
+    }
+  }, [
+    builder_panel_key,
+    config.storage_key,
+    config.workspace_active,
+    hadStoredLayout,
+    view_only,
+  ]);
 
-  // Below lg the bar is a navigation stack. Its root is Ask Gooey where the page has a
-  // Builder, and the entry view otherwise; a tab that is not the workspace is never the root.
-  // Assume the root until hydrated, since before then the layout is only `initial_view`.
   const atRoot =
-    workspace_active &&
+    config.workspace_active &&
     (!hydrated ||
-      (builder_event_key ? builderOpen : selectedView === initial_view));
-  // The server names a non-workspace tab; on the workspace it is the view on screen.
+      (builder_panel_key
+        ? builder.open
+        : layoutsEqual(storedLayout, config.initial_layout)));
   const crumb = crumb_label || activeViewSpec?.label || "";
-  const previewable = views.some((view) => view.slug === "preview");
-
-  const openNavDrawer = () =>
-    window.dispatchEvent(new CustomEvent(NAV_DRAWER_OPEN_EVENT));
+  const previewView = config.views.find((view) => view.key === "preview");
+  const editView = config.views.find((view) => view.key === "edit");
+  const { setOpen: setNavDrawerOpen } = useNavDrawer();
+  const isRunning = run_intent.kind === "stop";
 
   const setBuilder = (open: boolean) => {
-    if (!builder_event_key) return;
-    window.dispatchEvent(
-      new CustomEvent(`${builder_event_key}:${open ? "open" : "close"}`)
-    );
+    if (builder_panel_key) {
+      builder.setOpen(open);
+    }
   };
 
-  // Back a level: to the workspace from another tab, else to Ask Gooey or the entry view.
   const goBack = () => {
-    if (!workspace_active) return chooseView("edit");
-    if (builder_event_key) return setBuilder(true);
-    chooseView(initial_view);
+    if (!config.workspace_active) {
+      setBuilder(false);
+      if (editView) {
+        chooseView(editView);
+      }
+      return;
+    }
+    if (builder_panel_key) {
+      setBuilder(true);
+      return;
+    }
+    const initialView = config.views.find((view) =>
+      layoutsEqual(view.layout, config.initial_layout)
+    );
+    if (initialView) {
+      chooseView(initialView);
+    }
   };
 
-  // Puts Ask Gooey away first, or the selected pane renders behind it.
-  const showView = (view: RecipeView) => {
+  const showView = (view: WorkspaceView) => {
     setBuilder(false);
     chooseView(view);
   };
@@ -277,132 +196,106 @@ export function RecipeTopBar({
     setPublishMenuOpen(false)
   );
 
-  // mutate-then-notify: the server pops these keys on the next render
-  const fire = (key: string, value: unknown = true) => {
-    if (!key) return;
-    state[key] = value;
-    onChange();
-  };
-
-  // What the Publish control offers. `publish_label` is permission-derived.
   const publishEntries: MenuEntry[] = [];
-  if (publish_label) {
+  if (publish_label && publish_intent) {
     publishEntries.push({
       key: PUBLISH_ITEM_KEY,
       label: publish_label,
-      icon: '<i class="fa-regular fa-floppy-disk"></i>',
-      href: null,
-      is_danger: false,
+      iconHtml: '<i class="fa-regular fa-floppy-disk"></i>',
+      target: { kind: "submit", intent: publish_intent },
     });
   }
-  // The server sets exactly one of these: a visibility dialog, or a link to copy.
-  if (share_key || share_copy_url) {
+  if (share.kind !== "none") {
     publishEntries.push({
       key: SHARE_ITEM_KEY,
       label: shareCopied ? "Link copied" : "Share",
-      icon: share_icon,
-      href: null,
-      is_danger: false,
+      iconHtml: share.icon_html,
+      target:
+        share.kind === "manage"
+          ? { kind: "submit", intent: share.intent }
+          : undefined,
+      onPick: share.kind === "copy" ? copyShareUrl : undefined,
     });
   }
-  // A plain link - Menu renders any entry with an href as a <Link>.
   if (api_href) {
     publishEntries.push({
       key: API_ITEM_KEY,
       label: "API",
-      icon: '<i class="fa-regular fa-code"></i>',
-      href: api_href,
-      is_danger: false,
+      iconHtml: '<i class="fa-regular fa-code"></i>',
+      target: { kind: "link", href: api_href },
     });
   }
 
-  // A route rather than a pane, so a link like the API entry above.
   if (deploy_href) {
     publishEntries.push({
       key: DEPLOY_ITEM_KEY,
       label: "Deploy",
-      icon: '<i class="fa-regular fa-rocket"></i>',
-      href: deploy_href,
-      is_danger: false,
+      iconHtml: '<i class="fa-regular fa-rocket"></i>',
+      target: { kind: "link", href: deploy_href },
     });
   }
 
-  // Below lg the chips and Publish fold into this menu. Both lists render and CSS picks
-  // one, so no media-query JS and the chip count does not matter.
+  const titleEntries = title_menu_items.map(menuEntryFromTopBarItem);
   const overflowEntries: MenuEntry[] = [
-    // the actions first - they are what the menu is for on a phone
     ...publishEntries.map((it) => ({ ...it, mobileOnly: true })),
-    ...overflow_items,
-    // ...then the deployed channels, under a heading so they do not read as more actions
     ...(integrations.length
       ? [
           {
             key: "--topbar-heading-deployments",
             label: "Deployments",
-            icon: "",
-            href: null,
-            is_danger: false,
             mobileOnly: true,
             heading: true,
           },
         ]
       : []),
-    ...integrations.map((it, i) => ({
-      key: it.key || it.href || `integration-${i}`,
+    ...integrations.map((it) => ({
+      key: it.key,
       label: it.label,
-      icon: it.icon,
-      href: it.href ?? null,
-      is_danger: false,
+      iconHtml: it.icon_html,
+      target: it.target,
       mobileOnly: true,
     })),
   ];
-  // with nothing but mobile-only entries the button itself has no desktop purpose
-  const overflowDesktopOnly = overflow_items.length === 0;
-
-  // The mobile sheet: the design's entries, then what the desktop bar keeps in its own
-  // menus, since this is the only menu below lg. Preview is absent - it is the eye button.
-  const viewEntry = (slug: RecipeView): SheetEntry[] => {
-    const view = views.find((v) => v.slug === slug);
-    if (!view) return [];
+  const viewEntry = (key: string): SheetEntry[] => {
+    const view = config.views.find((candidate) => candidate.key === key);
+    if (!view) {
+      return [];
+    }
     return [
       {
-        key: `--sheet-view-${view.slug}`,
+        key: `--sheet-view-${view.key}`,
         label: view.label,
-        iconHtml: view.icon,
-        onPick: () => showView(view.slug as RecipeView),
+        iconHtml: view.icon_html ?? undefined,
+        onPick: () => showView(view),
       },
     ];
   };
 
-  // Whichever of Edit and Preview the header does not already reach in one tap.
-  const otherWorkView: RecipeView =
-    !atRoot && selectedView === "edit" ? "preview" : "edit";
+  const otherWorkView = activeViewSpec?.key === "edit" ? "preview" : "edit";
 
   const sheetEntries: SheetEntry[] = view_only
     ? [
-        // A visitor owns nothing here, so only read / inspect / remix are offered.
-        ...views.map((view) => ({
-          key: `--sheet-view-${view.slug}`,
-          label: view.label,
-          iconHtml: view.icon,
-          onPick: () => showView(view.slug as RecipeView),
-        })),
-        ...(builder_event_key
+        ...config.views
+          .filter((view) => !view.desktop_only)
+          .map((view) => ({
+            key: `--sheet-view-${view.key}`,
+            label: view.label,
+            iconHtml: view.icon_html ?? undefined,
+            onPick: () => showView(view),
+          })),
+        ...(builder_panel_key
           ? [
               {
                 key: "--sheet-remix",
                 label: "Remix",
                 iconClass: "fa-regular fa-shuffle",
-                // Opens Ask Gooey, where a workflow of their own starts.
                 onPick: () => setBuilder(true),
               },
             ]
           : []),
       ]
     : [
-        // Placed by name, since the design's order is not the view selector's.
         ...viewEntry("about"),
-        // Only while Ask Gooey is on screen - it acts on the chat.
         ...(builder_new_event && atRoot
           ? [
               {
@@ -419,8 +312,6 @@ export function RecipeTopBar({
           ? [
               {
                 key: "--sheet-history",
-                // "History" rather than "Version History": this is the tab listing runs of
-                // this workflow, while the title menu's entry lists the published versions.
                 label: "History",
                 iconClass: "fa-regular fa-clock-rotate-left",
                 href: history_href,
@@ -428,26 +319,25 @@ export function RecipeTopBar({
               },
             ]
           : []),
-        // The title's chevron menu is not rendered at this width, so its entries come here.
-        ...title_menu_items.map((item) => ({
+        ...titleEntries.map((item) => ({
           key: item.key,
           label: item.label,
-          iconHtml: item.icon,
-          onPick: () => pickMenuItem(item),
+          iconHtml: item.iconHtml ?? undefined,
+          href: item.target?.kind === "link" ? item.target.href : undefined,
+          submitIntent:
+            item.target?.kind === "submit" ? item.target.intent : undefined,
         })),
-        // Update is dropped - it already has a button in the header at this width.
         ...overflowEntries
           .filter((item) => item.key !== PUBLISH_ITEM_KEY)
           .map((item) => ({
             key: item.key,
             label: item.label,
-            iconHtml: item.icon,
-            href: item.href ?? undefined,
+            iconHtml: item.iconHtml ?? undefined,
+            href: item.target?.kind === "link" ? item.target.href : undefined,
+            submitIntent:
+              item.target?.kind === "submit" ? item.target.intent : undefined,
             heading: item.heading,
-            // A link only needs to put Ask Gooey away before it navigates.
-            onPick: item.href
-              ? () => setBuilder(false)
-              : () => pickMenuItem(item),
+            onPick: item.onPick ?? (() => setBuilder(false)),
           })),
       ];
 
@@ -455,17 +345,6 @@ export function RecipeTopBar({
     setTitleMenuOpen(false);
     setOverflowOpen(false);
     setPublishMenuOpen(false);
-  };
-
-  const pickMenuItem = (item: TopBarMenuItem) => {
-    closeMenus();
-    // the component's own entries, so they go straight to their keys
-    if (item.key === PUBLISH_ITEM_KEY) return fire(publish_key);
-    if (item.key === SHARE_ITEM_KEY) {
-      if (share_key) return fire(share_key);
-      return copyShareUrl();
-    }
-    fire(menu_key, item.key);
   };
 
   return (
@@ -481,7 +360,7 @@ export function RecipeTopBar({
         <button
           type="button"
           className="gooey-topbar-nav d-lg-none"
-          onClick={atRoot ? openNavDrawer : goBack}
+          onClick={atRoot ? () => setNavDrawerOpen(true) : goBack}
           title={atRoot ? "Open menu" : "Back"}
           aria-label={atRoot ? "Open menu" : "Back"}
         >
@@ -525,45 +404,40 @@ export function RecipeTopBar({
               </span>
             )}
           </button>
-          {author &&
-            (author.href ? (
-              <a className="gooey-topbar-author" href={author.href}>
-                {author.label}
-              </a>
-            ) : (
-              <span className="gooey-topbar-author">{author.label}</span>
-            ))}
+          {author && (
+            <span className="gooey-topbar-author">{author.label}</span>
+          )}
           <Menu
-            items={title_menu_items}
+            items={titleEntries}
             open={titleMenuOpen && !isNarrow}
-            onPick={pickMenuItem}
-            onNavigate={closeMenus}
+            submitIntentKey={submit_intent_key}
+            submitDisabled={submitDisabled}
+            onDismiss={closeMenus}
           />
         </div>
       </div>
 
       {/* A single-view recipe does not need a selector. */}
-      {views.length > 1 && (
+      {config.views.length > 1 && (
         <div
           className="gooey-topbar-tabs"
           style={{ visibility: paneVisibility(hydrated) }}
         >
-          {views.map((view) => (
+          {config.views.map((view) => (
             <button
               type="button"
-              key={view.slug}
+              key={view.key}
               className={clsx(
                 "gooey-topbar-tab",
-                view.slug === activeViewSpec?.slug && "gooey-topbar-tab-active",
-                view.desktop_only && "gooey-topbar-tab-desktop-only"
+                view.key === activeViewSpec?.key && "gooey-topbar-tab-active"
               )}
-              onClick={() => chooseView(view.slug as RecipeView)}
-              // no title: they carry a visible label. `aria-pressed` conveys that these
-              // change the workspace layout rather
-              // than navigate to another page.
-              aria-pressed={view.slug === activeViewSpec?.slug}
+              onClick={() => chooseView(view)}
+              aria-pressed={view.key === activeViewSpec?.key}
             >
-              <Icon html={view.icon} className="gooey-topbar-tab-icon" />
+              <Icon
+                html={view.icon_html ?? undefined}
+                className="gooey-topbar-tab-icon"
+              />
               {view.label}
             </button>
           ))}
@@ -590,22 +464,25 @@ export function RecipeTopBar({
         {/* Preview at the root, Update below it. The sheet never lists Preview, so this is
             the only way to reach it. */}
         {atRoot
-          ? previewable && (
+          ? previewView && (
               <button
                 type="button"
                 className="gooey-topbar-action d-lg-none"
-                onClick={() => showView("preview")}
+                onClick={() => showView(previewView)}
                 title="Preview"
                 aria-label="Preview"
               >
                 <i className="fa-regular fa-eye" />
               </button>
             )
-          : !!publish_label && (
+          : !!publish_label &&
+            !!publish_intent && (
               <button
-                type="button"
+                type="submit"
+                name={submit_intent_key}
+                value={encodeSubmitIntent(publish_intent)}
                 className="gooey-topbar-action d-lg-none"
-                onClick={() => fire(publish_key)}
+                disabled={submitDisabled}
                 title={
                   has_unpublished_changes
                     ? `${publish_label} (unpublished changes)`
@@ -627,10 +504,7 @@ export function RecipeTopBar({
           <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
             <button
               type="button"
-              className={clsx(
-                "gooey-topbar-overflow-btn",
-                overflowDesktopOnly && "d-lg-none"
-              )}
+              className="gooey-topbar-overflow-btn d-lg-none"
               onClick={() => setOverflowOpen((v) => !v)}
               title="More actions"
               aria-label="More actions"
@@ -642,8 +516,9 @@ export function RecipeTopBar({
             <Menu
               items={overflowEntries}
               open={overflowOpen}
-              onPick={pickMenuItem}
-              onNavigate={closeMenus}
+              submitIntentKey={submit_intent_key}
+              submitDisabled={submitDisabled}
+              onDismiss={closeMenus}
             />
           </div>
         )}
@@ -663,7 +538,7 @@ export function RecipeTopBar({
             : undefined;
           const content = (
             <Fragment>
-              <Icon html={integration.icon} />
+              <Icon html={integration.icon_html} />
               {labelled && (
                 <span className="gooey-topbar-integration-label">
                   {integration.label}
@@ -674,10 +549,10 @@ export function RecipeTopBar({
           // aria-label as well as title: every chip past the first renders no text at all, so
           // the tooltip is the only thing naming it and `title` alone is not a reliable
           // accessible name
-          return integration.href ? (
+          return integration.target.kind === "link" ? (
             <a
-              key={integration.href}
-              href={integration.href}
+              key={integration.key}
+              href={integration.target.href}
               className={className}
               style={style}
               title={integration.label}
@@ -687,13 +562,15 @@ export function RecipeTopBar({
             </a>
           ) : (
             <button
-              key={integration.key || i}
-              type="button"
+              key={integration.key}
+              type="submit"
+              name={submit_intent_key}
+              value={encodeSubmitIntent(integration.target.intent)}
               className={className}
               style={style}
               title={integration.label}
               aria-label={integration.label}
-              onClick={() => fire(menu_key, integration.key)}
+              disabled={submitDisabled}
             >
               {content}
             </button>
@@ -733,8 +610,9 @@ export function RecipeTopBar({
             <Menu
               items={publishEntries}
               open={publishMenuOpen}
-              onPick={pickMenuItem}
-              onNavigate={closeMenus}
+              submitIntentKey={submit_intent_key}
+              submitDisabled={submitDisabled}
+              onDismiss={closeMenus}
             />
           </div>
         )}
@@ -767,43 +645,41 @@ export function RecipeTopBar({
             );
           })()}
 
-        {!!cost_label && !!run_key && (
+        {!!cost_label && (
           <span className="gooey-topbar-sep" aria-hidden="true">
             /
           </span>
         )}
 
-        {!!run_key && (
-          <button
-            type="button"
-            className={clsx(
-              "gooey-topbar-run",
-              is_running && "gooey-topbar-run-stop"
-            )}
-            disabled={run_disabled}
-            onClick={handleRun}
-            // `.gooey-topbar-btn-label` is hidden below lg, so on a phone this is an
-            // unlabelled icon - the tooltip and aria-label are its only name there
-            title={is_running ? "Stop this run" : run_label}
-            aria-label={is_running ? "Stop this run" : run_label}
-          >
-            {is_running ? (
-              <i className="fa-regular fa-xmark-large" />
-            ) : (
-              <i className="fa-solid fa-play" />
-            )}
-            <span className="gooey-topbar-btn-label">
-              {is_running ? "Stop" : run_label}
-            </span>
-          </button>
-        )}
+        <button
+          type="submit"
+          name={submit_intent_key}
+          value={encodeSubmitIntent(run_intent)}
+          className={clsx(
+            "gooey-topbar-run",
+            isRunning && "gooey-topbar-run-stop"
+          )}
+          disabled={submitDisabled}
+          onClick={handleRun}
+          title={isRunning ? "Stop this run" : "Run"}
+          aria-label={isRunning ? "Stop this run" : "Run"}
+        >
+          {isRunning ? (
+            <i className="fa-regular fa-xmark-large" />
+          ) : (
+            <i className="fa-solid fa-play" />
+          )}
+          <span className="gooey-topbar-btn-label">
+            {isRunning ? "Stop" : "Run"}
+          </span>
+        </button>
       </div>
 
       {/* The editor's bottom bar, below lg only - above it cost and Run sit in the right
           cluster. Scoped to the editor, the one view with something to submit; Preview and
           Ask Gooey both put a composer at this edge. `!atRoot` as well as the view, since
           Ask Gooey covers the workspace without changing which view is selected behind it. */}
-      {!atRoot && selectedView === "edit" && (!!cost_label || !!run_key) && (
+      {!atRoot && activeViewSpec?.key === "edit" && (
         <div className="gooey-topbar-runbar d-lg-none">
           {!!cost_label &&
             (() => {
@@ -837,34 +713,145 @@ export function RecipeTopBar({
               );
             })()}
 
-          {!!run_key && (
-            <button
-              type="button"
-              className={clsx(
-                "gooey-topbar-runbar-run",
-                is_running && "gooey-topbar-runbar-run-stop"
-              )}
-              disabled={run_disabled}
-              onClick={handleRun}
-              title={is_running ? "Stop this run" : run_label}
-              aria-label={is_running ? "Stop this run" : run_label}
-            >
-              {is_running ? (
-                <i className="fa-regular fa-xmark-large" />
-              ) : (
-                <i className="fa-solid fa-play" />
-              )}
-            </button>
-          )}
+          <button
+            type="submit"
+            name={submit_intent_key}
+            value={encodeSubmitIntent(run_intent)}
+            className={clsx(
+              "gooey-topbar-runbar-run",
+              isRunning && "gooey-topbar-runbar-run-stop"
+            )}
+            disabled={submitDisabled}
+            onClick={handleRun}
+            title={isRunning ? "Stop this run" : "Run"}
+            aria-label={isRunning ? "Stop this run" : "Run"}
+          >
+            {isRunning ? (
+              <i className="fa-regular fa-xmark-large" />
+            ) : (
+              <i className="fa-solid fa-play" />
+            )}
+          </button>
         </div>
       )}
 
       {sheetOpen && (
         <MobileActionSheet
           entries={sheetEntries}
+          submitIntentKey={submit_intent_key}
+          submitDisabled={submitDisabled}
           onDismiss={() => setSheetOpen(false)}
         />
       )}
     </div>
   );
+}
+
+function Menu({
+  items,
+  open,
+  submitIntentKey,
+  submitDisabled,
+  onDismiss,
+}: {
+  items: MenuEntry[];
+  open: boolean;
+  submitIntentKey: string;
+  submitDisabled: boolean;
+  onDismiss: () => void;
+}) {
+  if (!open || !items.length) return null;
+  return (
+    <div className="gooey-topbar-menu">
+      {items.map((item) =>
+        item.heading ? (
+          <div
+            key={item.key}
+            className={clsx(
+              "gooey-topbar-menu-heading",
+              item.mobileOnly && "d-lg-none"
+            )}
+          >
+            {item.label}
+          </div>
+        ) : item.target?.kind === "link" ? (
+          <Link
+            key={item.key}
+            to={item.target.href}
+            onClick={onDismiss}
+            className={clsx(
+              "gooey-topbar-menu-item",
+              item.isDanger && "text-danger",
+              item.mobileOnly && "d-lg-none"
+            )}
+          >
+            <Icon
+              html={item.iconHtml ?? undefined}
+              className="gooey-topbar-menu-icon"
+            />
+            {item.label}
+          </Link>
+        ) : (
+          <button
+            key={item.key}
+            type={item.target?.kind === "submit" ? "submit" : "button"}
+            name={item.target?.kind === "submit" ? submitIntentKey : undefined}
+            value={
+              item.target?.kind === "submit"
+                ? encodeSubmitIntent(item.target.intent)
+                : undefined
+            }
+            disabled={item.target?.kind === "submit" && submitDisabled}
+            className={clsx(
+              "gooey-topbar-menu-item",
+              item.isDanger && "text-danger",
+              item.mobileOnly && "d-lg-none"
+            )}
+            onClick={() => {
+              item.onPick?.();
+              if (item.target?.kind !== "submit") {
+                onDismiss();
+              }
+            }}
+          >
+            <Icon
+              html={item.iconHtml ?? undefined}
+              className="gooey-topbar-menu-icon"
+            />
+            {item.label}
+          </button>
+        )
+      )}
+    </div>
+  );
+}
+
+/** Raw FontAwesome html arrives from python, the same way NavItemData.icon does. */
+function Icon({ html, className }: { html?: string; className?: string }) {
+  if (!html) return null;
+  return (
+    <span className={className} dangerouslySetInnerHTML={{ __html: html }} />
+  );
+}
+
+function useDismissOnOutsideClick(onDismiss: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [onDismiss]);
+  return ref;
+}
+
+function menuEntryFromTopBarItem(item: TopBarMenuItem): MenuEntry {
+  return {
+    key: item.key,
+    label: item.label,
+    iconHtml: item.icon_html,
+    target: item.target,
+    isDanger: item.is_danger,
+  };
 }

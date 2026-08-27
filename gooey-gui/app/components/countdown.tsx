@@ -14,7 +14,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ endTime, delayText, chi
     const [remainingSeconds, setRemainingSeconds] = useState(0);
 
     useEffect(() => {
-        let intervalId: NodeJS.Timer | null = null;
+        let intervalId: ReturnType<typeof setInterval> | null = null;
 
         function updateState() {
             const now = new Date();

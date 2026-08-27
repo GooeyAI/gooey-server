@@ -1,102 +1,114 @@
 import "./RecipeWorkspace.css";
 
 import clsx from "clsx";
-
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import type { CustomComponentProps } from "~/components";
+
 import type {
+  PageShellConfig,
+  RecipeSurfaceProps,
   RecipeWorkspaceProps,
   RecipeWorkspaceTriggerProps,
+  SurfaceId,
 } from "@gooey-types/recipe_workspace_props";
+import { useWorkspaceLayout } from "~/appShellContext";
+import type { CustomComponentProps } from "~/components";
 import { RenderedChildren } from "~/renderer";
+import type { TreeNode } from "~/renderer";
 
-import { WorkspacePaneControl } from "../WorkspacePaneControl";
+import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
-  type PaneRole,
+  collapsePane,
   paneRolesForLayout,
   paneVisibility,
-  shownLayout,
   workspaceControlsForLayout,
 } from "./paneState";
-import { usePaneLayout } from "./usePaneLayout";
+
+const RecipeWorkspaceConfigContext = createContext<PageShellConfig | null>(
+  null
+);
 
 export function RecipeWorkspace({
   children,
   onChange,
   state,
-  storage_key,
-  initial_view,
-  editor_full_width,
-  narrow_pane,
+  config,
 }: CustomComponentProps & RecipeWorkspaceProps) {
-  const { layout, hydrated, selectView, collapse } = usePaneLayout(
-    storage_key,
-    initial_view,
-    narrow_pane
-  );
-  const [aboutPane, editorPane, previewPane] = children;
-  // Both come off the shown layout, so a control can never contradict what is on screen.
-  const shown = shownLayout(layout, editor_full_width);
-  const roles = paneRolesForLayout(shown);
-  const controls = workspaceControlsForLayout(shown, editor_full_width);
+  const { layout, storedLayout, hydrated, selectLayout } =
+    useWorkspaceLayout(config);
+  const surfaces = namedSurfaces(children);
+  const roles = paneRolesForLayout(layout);
+  const controls = workspaceControlsForLayout(layout);
 
   return (
-    <div
-      style={{ visibility: paneVisibility(hydrated) }}
-      className="recipe-workspace container-xxl py-lg-2"
-    >
-      <WorkspacePane
-        className="recipe-workspace-about"
-        role={roles.about}
-        node={aboutPane}
-        onChange={onChange}
-        state={state}
-      />
-      <WorkspacePane
-        className="recipe-workspace-editor"
-        role={roles.editor}
-        node={editorPane}
-        onChange={onChange}
-        state={state}
-        rightControls={
-          <>
-            {controls.mergePreview && (
-              <WorkspacePaneControl
-                label="Close Preview"
-                icon="fa-regular fa-table-columns-merge-next"
-                onClick={() => collapse("preview")}
-              />
-            )}
-            {controls.addPreview && (
-              <WorkspacePaneControl
-                label="Open Preview"
-                icon="fa-regular fa-table-columns-add-after"
+    <RecipeWorkspaceConfigContext.Provider value={config}>
+      <div
+        style={{ visibility: paneVisibility(hydrated) }}
+        className="recipe-workspace container-xxl py-lg-2"
+      >
+        <WorkspacePane
+          className="recipe-workspace-about"
+          role={roles.about}
+          node={surfaces.about}
+          onChange={onChange}
+          state={state}
+        />
+        <WorkspacePane
+          className="recipe-workspace-editor"
+          role={roles.editor}
+          node={surfaces.editor}
+          onChange={onChange}
+          state={state}
+          rightControls={
+            <>
+              {controls.closePreview && (
+                <LocalWorkspacePaneControl
+                  label="Close Preview"
+                  icon={{
+                    kind: "font_awesome",
+                    class_name: "fa-regular fa-table-columns-merge-next",
+                  }}
+                  onClick={() =>
+                    selectLayout(collapsePane(storedLayout, "preview"))
+                  }
+                />
+              )}
+              {controls.addPreview && (
+                <LocalWorkspacePaneControl
+                  label="Open Preview"
+                  icon={{
+                    kind: "font_awesome",
+                    class_name: "fa-regular fa-table-columns-add-after",
+                  }}
+                  className="d-none d-lg-inline-flex"
+                  onClick={() => selectLayout(config.run_layout)}
+                />
+              )}
+            </>
+          }
+        />
+        <WorkspacePane
+          className="recipe-workspace-preview"
+          role={roles.preview}
+          node={surfaces.preview}
+          onChange={onChange}
+          state={state}
+          leftControls={
+            controls.addEditor && (
+              <LocalWorkspacePaneControl
+                label="Open Edit"
+                icon={{
+                  kind: "font_awesome",
+                  class_name: "fa-regular fa-table-columns-add-before",
+                }}
                 className="d-none d-lg-inline-flex"
-                onClick={() => selectView("split")}
+                onClick={() => selectLayout(config.run_layout)}
               />
-            )}
-          </>
-        }
-      />
-      <WorkspacePane
-        className="recipe-workspace-preview"
-        role={roles.preview}
-        node={previewPane}
-        onChange={onChange}
-        state={state}
-        leftControls={
-          controls.addEdit && (
-            <WorkspacePaneControl
-              label="Open Edit"
-              icon="fa-regular fa-table-columns-add-before"
-              className="d-none d-lg-inline-flex"
-              onClick={() => selectView("split")}
-            />
-          )
-        }
-      />
-    </div>
+            )
+          }
+        />
+      </div>
+    </RecipeWorkspaceConfigContext.Provider>
   );
 }
 
@@ -104,25 +116,37 @@ export function RecipeWorkspaceTrigger({
   children,
   onChange,
   state,
-  storage_key,
-  initial_view,
-  view,
-  state_key,
-  state_value,
+  layout,
+  state_update,
   className,
 }: CustomComponentProps & RecipeWorkspaceTriggerProps) {
-  const { selectView } = usePaneLayout(storage_key, initial_view);
+  const config = useRecipeWorkspaceConfig();
+  const { selectLayout } = useWorkspaceLayout(config);
   const handleClick = () => {
-    selectView(view);
-    if (state_key && state[state_key] !== state_value) {
-      state[state_key] = state_value;
+    selectLayout(layout);
+    if (state_update && state[state_update.key] !== state_update.value) {
+      state[state_update.key] = state_update.value;
       onChange();
     }
   };
   return (
-    <button type="button" className={className} onClick={handleClick}>
+    <button
+      type="button"
+      className={className ?? undefined}
+      onClick={handleClick}
+    >
       <RenderedChildren children={children} onChange={onChange} state={state} />
     </button>
+  );
+}
+
+export function RecipeSurface({
+  children,
+  onChange,
+  state,
+}: CustomComponentProps & RecipeSurfaceProps) {
+  return (
+    <RenderedChildren children={children} onChange={onChange} state={state} />
   );
 }
 
@@ -136,8 +160,8 @@ function WorkspacePane({
   rightControls,
 }: {
   className: string;
-  role: PaneRole;
-  node: CustomComponentProps["children"][number] | undefined;
+  role: "closed" | "solo" | "major" | "minor";
+  node: TreeNode;
   onChange: CustomComponentProps["onChange"];
   state: CustomComponentProps["state"];
   leftControls?: ReactNode;
@@ -175,14 +199,42 @@ function WorkspacePane({
         </div>
       )}
       <div className="recipe-workspace-pane-content">
-        {node && (
-          <RenderedChildren
-            children={node.children}
-            onChange={onChange}
-            state={state}
-          />
-        )}
+        <RenderedChildren
+          children={node.children}
+          onChange={onChange}
+          state={state}
+        />
       </div>
     </section>
   );
+}
+
+function namedSurfaces(children: TreeNode[]): Record<SurfaceId, TreeNode> {
+  const surfaces = {} as Partial<Record<SurfaceId, TreeNode>>;
+  for (const child of children) {
+    if (child.name !== "RecipeSurface") {
+      throw new Error(
+        `RecipeWorkspace child must be RecipeSurface, got ${child.name}`
+      );
+    }
+    const surface = child.props.surface as SurfaceId;
+    if (surfaces[surface]) {
+      throw new Error(`RecipeWorkspace received duplicate ${surface} surface`);
+    }
+    surfaces[surface] = child;
+  }
+  for (const surface of ["about", "editor", "preview"] as const) {
+    if (!surfaces[surface]) {
+      throw new Error(`RecipeWorkspace is missing ${surface} surface`);
+    }
+  }
+  return surfaces as Record<SurfaceId, TreeNode>;
+}
+
+function useRecipeWorkspaceConfig(): PageShellConfig {
+  const config = useContext(RecipeWorkspaceConfigContext);
+  if (!config) {
+    throw new Error("RecipeWorkspaceTrigger must be inside RecipeWorkspace");
+  }
+  return config;
 }

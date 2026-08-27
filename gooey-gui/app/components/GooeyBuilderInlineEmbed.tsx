@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { fetchServerAPI } from "~/fetchServerAPI";
 import type { CustomComponentProps } from "~/components";
 import { useGlobalContext } from "~/globalContext";
+import { useAppShellPanelActions } from "~/appShellContext";
 
 declare global {
   interface Window {
@@ -26,6 +27,7 @@ export function GooeyBuilderInlineEmbed(
   const controllerRef = useRef<any>(null);
 
   const ctx = useGlobalContext();
+  const { setPanelOpen } = useAppShellPanelActions();
 
   useEffect(() => {
     const loadEmbed = () => {
@@ -41,9 +43,7 @@ export function GooeyBuilderInlineEmbed(
       // builder-only pages are standalone, so there's no sidebar to close
       if (!propsRef.current.builder_only) {
         config.onClose = function () {
-          window.dispatchEvent(
-            new CustomEvent(`${propsRef.current.event_key}:close`)
-          );
+          setPanelOpen(propsRef.current.event_key, false);
         };
       }
 
@@ -96,7 +96,8 @@ export function GooeyBuilderInlineEmbed(
     // v2 hides the widget's header, so the panel's title button fires this instead. Routed
     // through the controller, the same path the widget's own control uses.
     const newConversationEvent = `${propsRef.current.event_key}:new`;
-    const onNewConversation = () => controllerRef.current?.onNewConversation?.();
+    const onNewConversation = () =>
+      controllerRef.current?.onNewConversation?.();
     window.addEventListener(newConversationEvent, onNewConversation);
 
     return () => {

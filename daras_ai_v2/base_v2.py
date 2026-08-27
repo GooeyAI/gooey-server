@@ -4,6 +4,7 @@ import typing
 from textwrap import dedent
 
 import gooey_gui as gui
+import pydantic
 from bots.models import (
     PublishedRun,
     RetentionPolicy,
@@ -33,20 +34,42 @@ from daras_ai_v2.gooey_builder import (
     render_gooey_builder,
 )
 from daras_ai_v2.grid_layout_widget import grid_layout
-from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
+from daras_ai_v2.tab_spec import (
+    PaneSpec,
+    SingleLayout,
+    SplitLayout,
+    SurfaceId,
+    TabSpec,
+    WorkspaceLayout,
+)
 from daras_ai_v2.variables_widget import variables_input
 from functions.base_llm_tool import functions_input
 
 from gooey_gui.types.recipe_top_bar_props import (
+    CopyShare,
+    LinkTarget,
+    ManageShare,
+    MenuIntent,
+    NoShare,
+    PublishIntent,
     RecipeTopBarProps,
+    RecipeSubmitIntent,
+    RunIntent,
+    ShareIntent,
+    StopIntent,
+    SubmitTarget,
     TopBarAuthor,
     TopBarIntegration,
     TopBarMenuItem,
-    TopBarView,
 )
 from gooey_gui.types.recipe_workspace_props import (
+    EventControlTarget,
+    FontAwesomeIcon,
+    PageShellConfig,
+    PanelControlTarget,
+    PhotoIcon,
+    RecipeSurfaceProps,
     RecipeWorkspaceProps,
-    WorkPane,
     WorkspacePaneControlProps,
 )
 from routers.root import RecipeTabs
@@ -109,12 +132,9 @@ class BasePage(BasePageV1):
         if self.should_submit_after_login():
             self.submit_and_redirect()
 
-        if gui.session_state.get("show_report_workflow"):
-            self.render_report_form()
-            return
-
         tabs = self.get_tab_spec()
         assert tabs, f"{type(self).__name__}.get_tab_spec() returned no tabs"
+        shell_config = self._page_shell_config(tabs)
 
         # App shell: a fixed-height bar over a body that scrolls inside itself. The bar's
         # node is reserved here so it comes first in the DOM, but filled at the end of this
@@ -152,7 +172,7 @@ class BasePage(BasePageV1):
             ),
         ):
             if self.tab in {RecipeTabs.run, RecipeTabs.preview}:
-                self._render_workspace(tabs)
+                self._render_workspace(shell_config)
             else:
                 self.render_selected_tab()
 
@@ -161,34 +181,61 @@ class BasePage(BasePageV1):
                 self._render_gooey_builder()
 
         with top_bar_placeholder:
-            self._render_top_bar(tabs=tabs)
+            self._render_top_bar(config=shell_config)
 
         self._handle_top_bar_actions()
 
-    def _render_workspace(self, tabs: list[TabSpec]):
+    def _page_shell_config(self, tabs: list[TabSpec]) -> PageShellConfig:
+        workspace_active = self.tab in {RecipeTabs.run, RecipeTabs.preview}
+        route_layout = None
+        if self.tab == RecipeTabs.preview:
+            route_layout = SingleLayout(surface=SurfaceId.preview)
+
+        active_run_id = None
+        if workspace_active:
+            active_run_id = self.request.query_params.get("run_id") or None
+
+        return PageShellConfig(
+            storage_key=self._workspace_storage_key(),
+            initial_layout=self.entry_layout(tabs),
+            run_layout=SplitLayout(
+                primary=SurfaceId.editor,
+                secondary=SurfaceId.preview,
+            ),
+            route_layout=route_layout,
+            views=tabs,
+            narrow_surface=self.narrow_surface(),
+            workspace_href=self.current_app_url(RecipeTabs.run),
+            workspace_active=workspace_active,
+            active_run_id=active_run_id,
+        )
+
+    def _render_workspace(self, config: PageShellConfig):
         """Render each reusable work surface once; React controls their arrangement."""
-        with gui.model_component(
-            RecipeWorkspaceProps(
-                storage_key=self._workspace_storage_key(),
-                initial_view=self.entry_tab_slug(tabs),
-                editor_full_width=self._editor_wants_full_width(),
-                narrow_pane=self.narrow_pane(),
-            )
-        ):
+        with gui.model_component(RecipeWorkspaceProps(config=config)):
             # framed surfaces need holding off the top bar's rule; the editor leads with
             # the pane strip, which brings its own spacing
-            with gui.div(className="mt-1"):
+            with (
+                gui.model_component(RecipeSurfaceProps(surface=SurfaceId.about)),
+                gui.div(className="mt-1"),
+            ):
                 with gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
                     self._render_about_content()
 
-            with gui.div():
+            with (
+                gui.model_component(RecipeSurfaceProps(surface=SurfaceId.editor)),
+                gui.div(),
+            ):
                 if self._render_deleted_output_if_needed():
                     submitted = False
                 else:
                     submitted = self._render_solo_input_col()
 
             # mt-lg-1 only: below lg the preview meets the header's rule directly
-            with gui.div(className="mt-lg-1"):
+            with (
+                gui.model_component(RecipeSurfaceProps(surface=SurfaceId.preview)),
+                gui.div(className="mt-lg-1"),
+            ):
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
                 else:
@@ -208,15 +255,7 @@ class BasePage(BasePageV1):
             circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
         )
 
-    def _editor_wants_full_width(self) -> bool:
-        """Whether the open config pane needs the whole row.
-
-        Server-side, because it depends on session state and both the workspace and the top
-        bar have to agree on it.
-        """
-        return False
-
-    def narrow_pane(self) -> WorkPane:
+    def narrow_surface(self) -> SurfaceId:
         """Which half of a two-pane view a phone shows.
 
         Per-recipe rather than a layout rule: a chat keeps the bot, a media recipe would keep
@@ -224,8 +263,8 @@ class BasePage(BasePageV1):
         """
         if self.is_unowned_example():
             # A visitor's one work tab is "How it works", which exists to show config.
-            return WorkPane.editor
-        return WorkPane.preview
+            return SurfaceId.editor
+        return SurfaceId.preview
 
     def _workspace_storage_key(self) -> str:
         return (
@@ -259,8 +298,11 @@ class BasePage(BasePageV1):
         gui.model_component(
             WorkspacePaneControlProps(
                 label="Close Ask gooey",
-                icon=icons.cls.cancel,
-                event_name=f"{GOOEY_BUILDER_EVENT_KEY}:close",
+                icon=FontAwesomeIcon(class_name=icons.cls.cancel),
+                target=PanelControlTarget(
+                    panel_key=GOOEY_BUILDER_EVENT_KEY,
+                    open=False,
+                ),
                 className="v2-builder-close",
             )
         )
@@ -272,9 +314,11 @@ class BasePage(BasePageV1):
                     label=GOOEY_BUILDER_TITLE,
                     # the label names the panel; the tooltip says what clicking it does
                     tooltip="New Chat",
-                    photo_url=get_gooey_builder_photo_url(),
+                    icon=PhotoIcon(url=get_gooey_builder_photo_url()),
+                    target=EventControlTarget(
+                        event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new"
+                    ),
                     show_label=True,
-                    event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new",
                     # padding is owned by `.v2-pane-control-labelled`, not a utility class
                     className="v2-builder-new",
                 )
@@ -284,14 +328,10 @@ class BasePage(BasePageV1):
         )
 
     def _handle_top_bar_actions(self):
-        """Pop the keys RecipeTopBar wrote and act on them.
-
-        The bar mutates session state and calls onChange(); the server sees the key on the
-        next render.
-        """
+        intent = self._pop_submit_intent()
         publish_ref = gui.use_alert_dialog(key="publish-modal")
 
-        if gui.session_state.pop(self.TOP_BAR_PUBLISH_KEY, None):
+        if isinstance(intent, PublishIntent):
             if self.is_logged_in():
                 clear_publish_form()
                 publish_ref.set_open(True)
@@ -303,7 +343,7 @@ class BasePage(BasePageV1):
 
         # the one Share dialog on the page: the bar's button and About's both set the key
         share_ref = gui.use_alert_dialog(key="share-modal")
-        if gui.session_state.pop(self.TOP_BAR_SHARE_KEY, None):
+        if isinstance(intent, ShareIntent):
             share_ref.set_open(True)
         if share_ref.is_open:
             render_share_modal(
@@ -315,11 +355,25 @@ class BasePage(BasePageV1):
                 session=self.request.session,
             )
 
-        if gui.session_state.pop(self.TOP_BAR_RUN_KEY, None):
-            self._handle_top_bar_run()
+        if isinstance(intent, (RunIntent, StopIntent)):
+            self._handle_top_bar_run(intent)
 
-        # Popped in the base, which is what ships `menu_key` and `title_menu_items`.
-        self._handle_menu_pick(gui.session_state.pop(self.TOP_BAR_MENU_KEY, None))
+        menu_key = intent.item_key if isinstance(intent, MenuIntent) else None
+        self._handle_menu_pick(menu_key)
+
+    def _pop_submit_intent(self) -> RecipeSubmitIntent | None:
+        raw_intent = gui.session_state.pop(self.SUBMIT_INTENT_KEY, None)
+        if not raw_intent:
+            return None
+
+        adapter = pydantic.TypeAdapter(RecipeSubmitIntent)
+        try:
+            if isinstance(raw_intent, str):
+                return adapter.validate_json(raw_intent)
+            return adapter.validate_python(raw_intent)
+        except (pydantic.ValidationError, ValueError, TypeError):
+            gui.error("Invalid workflow action. Please refresh and try again.")
+            return None
 
     def _handle_menu_pick(self, picked: str | None):
         """Act on a title-menu pick, and keep whatever dialog it opened on screen.
@@ -388,13 +442,16 @@ class BasePage(BasePageV1):
             )
         raise gui.RedirectException(self.app_url(example_id=new_pr.published_run_id))
 
-    def _handle_top_bar_run(self):
-        """Run (or Stop) pressed in the top bar. Validates first and starts nothing if that
-        fails; anonymous users go through `submit_and_redirect`'s login redirect."""
-        if self._is_run_in_progress():
+    def _handle_top_bar_run(self, intent: RunIntent | StopIntent):
+        if isinstance(intent, StopIntent):
+            if not self._is_run_in_progress():
+                return
             self.current_sr.is_cancelled = True
             self.current_sr.save(update_fields=["is_cancelled", "updated_at"])
             raise gui.RerunException()
+
+        if self._is_run_in_progress():
+            return
 
         try:
             self.validate_form_v2()
@@ -404,9 +461,8 @@ class BasePage(BasePageV1):
 
         self.submit_and_redirect()
 
-    def entry_tab_slug(self, tabs: list[TabSpec]) -> RecipeView:
-        """Initial client view when this workflow has no stored pane layout."""
-        return tabs[0].slug
+    def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
+        return tabs[0].layout
 
     def is_unowned_example(self) -> bool:
         """The url points at a published workflow the viewer does not own, rather than at a
@@ -415,27 +471,15 @@ class BasePage(BasePageV1):
         sr, pr = self.current_sr_pr
         return pr.saved_run_id == sr.id and not self.is_current_user_owner()
 
-    # keys the RecipeTopBar writes into session state; popped by _handle_top_bar_actions
-    TOP_BAR_MENU_KEY = "--topbar-menu"
+    SUBMIT_INTENT_KEY = "--recipe-submit-intent"
 
-    TOP_BAR_PUBLISH_KEY = "--topbar-publish"
-
-    TOP_BAR_RUN_KEY = "--topbar-run"
-
-    TOP_BAR_SHARE_KEY = "--topbar-share"
-
-    # Picks from the title chevron, echoed back through `menu_key`. Namespaced so a recipe's
-    # own menu keys cannot collide with the base's.
+    # Stable item keys carried by MenuIntent.
     MENU_VERSION_HISTORY = "--menu-version-history"
     MENU_DUPLICATE = "--menu-duplicate"
     MENU_DELETE = "--menu-delete"
 
     def _title_menu_items(self) -> list[TopBarMenuItem]:
-        """The chevron menu beside the workflow name.
-
-        Gated the same way v1 gates its Options dialog, so the menu never offers something
-        the server would refuse.
-        """
+        """Menu actions available to the current user."""
         if not self.is_logged_in():
             return []
 
@@ -448,7 +492,10 @@ class BasePage(BasePageV1):
                 TopBarMenuItem(
                     key=self.MENU_VERSION_HISTORY,
                     label="Version history",
-                    icon=icons.history,
+                    icon_html=icons.history,
+                    target=SubmitTarget(
+                        intent=MenuIntent(item_key=self.MENU_VERSION_HISTORY)
+                    ),
                 )
             )
 
@@ -459,7 +506,8 @@ class BasePage(BasePageV1):
                 label=(
                     "Duplicate" if pr.saved_run == self.current_sr else "Save as New"
                 ),
-                icon=icons.fork,
+                icon_html=icons.fork,
+                target=SubmitTarget(intent=MenuIntent(item_key=self.MENU_DUPLICATE)),
             )
         )
 
@@ -476,16 +524,16 @@ class BasePage(BasePageV1):
                 TopBarMenuItem(
                     key=self.MENU_DELETE,
                     label="Delete",
-                    icon=icons.trash,
+                    icon_html=icons.trash,
+                    target=SubmitTarget(intent=MenuIntent(item_key=self.MENU_DELETE)),
+                    is_danger=True,
                 )
             )
 
         return items
 
     def can_manage_sharing(self) -> bool:
-        """Whether this user may change who can see the workflow, rather than only copy its
-        url. Unlike v1 this does not require the url to point at the published run - the
-        dialog edits `pr` either way and gates its own options by role."""
+        """Whether this user may edit workflow visibility."""
         pr = self.current_pr
         user = self.request.user
         # render_share_modal asserts both of these
@@ -500,7 +548,6 @@ class BasePage(BasePageV1):
             return self.current_workspace.id == pr.workspace_id
         except Workspace.DoesNotExist:
             return False
-
 
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars."""
@@ -526,72 +573,55 @@ class BasePage(BasePageV1):
             and (self.is_current_user_owner() or self.is_current_user_admin())
         )
 
-    def _render_top_bar(self, *, tabs: list[TabSpec]):
+    def _render_top_bar(self, *, config: PageShellConfig):
         sr, pr = self.current_sr_pr
         identity = self._workflow_identity()
         cost_label, cost_title = self._top_bar_cost()
         can_manage_sharing = self.can_manage_sharing()
-        workspace_active = self.tab in {RecipeTabs.run, RecipeTabs.preview}
         # a root recipe has no published run behind it, so there is no published url to share
         can_share = not pr.is_root()
+        share = NoShare()
+        if can_share and can_manage_sharing:
+            share = ManageShare(icon_html=icons.share)
+        elif can_share:
+            share = CopyShare(
+                url=self.current_app_url(self.tab),
+                icon_html=icons.share,
+            )
+
+        is_running = self._is_run_in_progress()
 
         gui.model_component(
             RecipeTopBarProps(
+                config=config,
                 # Prefixed on the workspace; elsewhere the tab's label is the crumb.
-                title=identity.title if workspace_active else identity.name,
-                crumb_label="" if workspace_active else (self.tab.label or ""),
+                title=identity.title if config.workspace_active else identity.name,
+                crumb_label=None if config.workspace_active else self.tab.label,
                 view_only=self.is_unowned_example(),
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
-                storage_key=self._workspace_storage_key(),
-                initial_view=self.entry_tab_slug(tabs),
-                editor_full_width=self._editor_wants_full_width(),
-                narrow_pane=self.narrow_pane(),
-                workspace_href=self.current_app_url(RecipeTabs.run),
-                workspace_active=workspace_active,
-                views=[
-                    TopBarView(
-                        slug=tab.slug,
-                        label=tab.label,
-                        icon=tab.icon,
-                        desktop_only=tab.desktop_only,
-                    )
-                    for tab in tabs
-                ],
+                submit_intent_key=self.SUBMIT_INTENT_KEY,
                 publish_label=self._top_bar_publish_label(),
-                publish_key=self.TOP_BAR_PUBLISH_KEY,
+                publish_intent=PublishIntent(),
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
                 deploy_href=self.current_app_url(RecipeTabs.integrations),
-                # Exactly one of these is set, and neither on a root recipe.
-                share_key=(
-                    self.TOP_BAR_SHARE_KEY if can_share and can_manage_sharing else ""
-                ),
-                share_copy_url=(
-                    self.current_app_url(self.tab)
-                    if can_share and not can_manage_sharing
-                    else ""
-                ),
-                share_icon=icons.share,
+                share=share,
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
-                menu_key=self.TOP_BAR_MENU_KEY,
                 title_menu_items=self._title_menu_items(),
                 integrations=self._top_bar_integrations(),
-                run_key=self.TOP_BAR_RUN_KEY,
-                is_running=self._is_run_in_progress(),
-                cost_label=cost_label,
-                cost_href=self.get_credits_click_url(),
-                cost_title=cost_title,
-                builder_event_key=(
-                    GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else ""
+                run_intent=StopIntent() if is_running else RunIntent(),
+                cost_label=cost_label or None,
+                cost_href=self.get_credits_click_url() or None,
+                cost_title=cost_title or None,
+                builder_panel_key=(
+                    GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else None
                 ),
-                # Below lg the bar is the app's only header and carries these; inert above.
-                # Empty on a thread that has not started - the same gate the panel uses.
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
                     if self._can_show_builder() and not builder_thread_is_empty(self)
-                    else ""
+                    else None
                 ),
                 history_href=self.current_app_url(RecipeTabs.history),
             )
@@ -604,18 +634,16 @@ class BasePage(BasePageV1):
         if pr.workspace_id and not pr.workspace.is_personal:
             return TopBarAuthor(
                 label=f"by {pr.workspace.display_name(self.request.user)}",
-                photo_url=pr.workspace.photo_url or None,
             )
         user = self.current_sr_user
         if user:
             return TopBarAuthor(
                 label=f"by {user.display_name or user.first_name(fallback='User')}",
-                photo_url=user.photo_url or None,
             )
         return None
 
     def _top_bar_publish_label(self) -> str:
-        """Same permission-derived wording v1's save button uses."""
+        """Permission-derived label for the publish action."""
         if not self.is_logged_in():
             return "Save"
         if WorkflowAccessLevel.can_user_edit_published_run(
@@ -662,48 +690,61 @@ class BasePage(BasePageV1):
 
         return by_id[gui.session_state[key]].render
 
-
     def get_tab_spec(self) -> list[TabSpec]:
-        """The client views for this request, in selector order."""
         if self.is_unowned_example():
             return self.get_viewer_tab_spec()
         return [
             TabSpec(
-                slug=RecipeView.about,
+                key="about",
                 label="About",
-                icon=icons.info,
+                icon_html=icons.info,
+                layout=SplitLayout(
+                    primary=SurfaceId.about,
+                    secondary=SurfaceId.preview,
+                ),
             ),
             TabSpec(
-                slug=RecipeView.edit,
+                key="edit",
                 label="Edit",
-                icon=icons.edit,
+                icon_html=icons.edit,
+                layout=SingleLayout(surface=SurfaceId.editor),
             ),
             TabSpec(
-                slug=RecipeView.preview,
+                key="preview",
                 label="Preview",
-                icon=icons.preview,
+                icon_html=icons.preview,
+                layout=SingleLayout(surface=SurfaceId.preview),
             ),
             TabSpec(
-                slug=RecipeView.split,
+                key="split",
                 label="Split",
-                icon=icons.run,
+                icon_html=icons.run,
+                layout=SplitLayout(
+                    primary=SurfaceId.editor,
+                    secondary=SurfaceId.preview,
+                ),
             ),
         ]
 
     def get_viewer_tab_spec(self) -> list[TabSpec]:
-        """What a first-time visitor sees. Two entries, since they own nothing here to edit;
-        "How it works" is backed by `split` so the configuration shows beside a live
-        preview."""
         return [
             TabSpec(
-                slug=RecipeView.about,
+                key="about",
                 label="About",
-                icon=icons.info,
+                icon_html=icons.info,
+                layout=SplitLayout(
+                    primary=SurfaceId.about,
+                    secondary=SurfaceId.preview,
+                ),
             ),
             TabSpec(
-                slug=RecipeView.split,
+                key="how-it-works",
                 label="How it works",
-                icon=icons.edit,
+                icon_html=icons.edit,
+                layout=SplitLayout(
+                    primary=SurfaceId.editor,
+                    secondary=SurfaceId.preview,
+                ),
             ),
         ]
 
@@ -756,14 +797,13 @@ class BasePage(BasePageV1):
             with gui.div(className="v2-about-meta"):
                 for it in integrations:
                     body = (
-                        f'<span class="v2-about-meta-icon">{it.icon}</span>'
+                        f'<span class="v2-about-meta-icon">{it.icon_html}</span>'
                         f'<span class="v2-about-meta-label">{html.escape(it.label)}</span>'
                     )
-                    # A channel with no url opens a dialog from the bar, not from here.
-                    if it.href:
+                    if isinstance(it.target, LinkTarget):
                         gui.html(
                             f'<a class="v2-about-meta-card"'
-                            f' href="{html.escape(it.href)}">{body}</a>'
+                            f' href="{html.escape(it.target.href)}">{body}</a>'
                         )
                     else:
                         gui.html(f'<div class="v2-about-meta-card">{body}</div>')
@@ -784,8 +824,6 @@ class BasePage(BasePageV1):
             ):
                 return self._render_input_col()
 
-
-
     def _render_deleted_output_if_needed(self) -> bool:
         """True if this run's data is gone, in which case that is all there is to render."""
         if self.current_sr.retention_policy != RetentionPolicy.delete:
@@ -794,7 +832,7 @@ class BasePage(BasePageV1):
         return True
 
     def render_selected_tab(self):
-        """Bodies of the v1 tab urls the v2 strip drops - reached only by deep link."""
+        """Render document-style tabs reached by URL."""
         match self.tab:
             case RecipeTabs.examples:
                 self._examples_tab()
@@ -833,10 +871,6 @@ class BasePage(BasePageV1):
                 gui.caption(truncate_text_words(root_run.notes, maxlen=210))
 
         grid_layout(2, page_clses, _render)
-
-
-
-
 
     def _render_functions(self):
         if not self.functions_in_settings:
@@ -903,7 +937,7 @@ class BasePage(BasePageV1):
         # bottom of the output out of reach. `minHeight: 0` at every level, or a flex child
         # refuses to shrink below its content.
         with gui.div(
-            className="d-flex flex-column " + self._output_col_class_name(),
+            className="d-flex flex-column",
             style=dict(height="100%", minHeight=0),
         ):
             run_state = self.get_run_state(gui.session_state)
@@ -923,10 +957,6 @@ class BasePage(BasePageV1):
                 self._render_running_output()
             elif not is_deleted:
                 self._render_after_output()
-
-    def _output_col_class_name(self) -> str:
-        """The client-side Preview view controls visibility at every breakpoint."""
-        return ""
 
     def submit_and_redirect(
         self,
@@ -1100,18 +1130,7 @@ PANE_STRIP_CSS = """
 """
 
 SPLIT_PANES_CSS = """
-/* App-shell panes. The row fills the body exactly, so the body never overflows and therefore
-   never scrolls; the left pane scrolls inside itself and the right pane (the preview) stays
-   put.
-
-   This used to stop at lg, on the reasoning that a stacked phone layout may as well scroll
-   the page. But the shell is the frame at every width, and cutting the height chain here cut
-   it for everything below: with no definite height on the column, the `h-100` inside it
-   resolves to `auto`, the working column's `flex-grow-1 overflow-auto` pane never gets a
-   bound to scroll against, and it grows to fit its content instead - so a short pane like
-   Knowledge or Tools still scrolled the whole section, and the strip and submit row went with
-   it. Bounded at every width, `overflow: auto` does what it says: nothing scrolls until the
-   content is actually taller than the pane. */
+/* Keep the height chain definite at every breakpoint so inner panes own scrolling. */
 & {
     margin: 0;
     padding-top: 0;

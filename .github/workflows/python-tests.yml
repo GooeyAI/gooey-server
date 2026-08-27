@@ -46,6 +46,10 @@ jobs:
         working-directory: gooey-gui
         run: npm test
 
+      - name: Type-check GUI
+        working-directory: gooey-gui
+        run: npm run typecheck
+
   test:
     runs-on: ubuntu-22.04
     strategy:

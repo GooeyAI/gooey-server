@@ -326,7 +326,6 @@ button .gui-html-container,
   --gooey-surface-100: #f7f5f2; /* surface-100 - selected pill fill */
   --gooey-surface-200: #f1f2f4; /* surface-200 - the tab group's track */
   --gooey-bg-page: #fffefd; /* bg - outline button fill */
-  --gooey-icon-chrome: #dadce0; /* icon-chrome - avatar placeholder */
   --gooey-scrim: rgb(10 16 33 / 30%); /* the drawer's backdrop */
 
   /* Not in the Figma set - added because the v2 surfaces need them and had been carrying
@@ -343,7 +342,6 @@ button .gui-html-container,
   --gooey-space-4: 16px; /* space/4 */
 
   --gooey-radius-xs: 8px; /* radius/xs - buttons */
-  --gooey-radius-sm: 12px; /* radius/sm - pills */
   --gooey-radius-pill: 32px; /* radius/pill - the drawer's top corners */
   --gooey-radius-full: 99px; /* radius/full - avatars, grab handle */
 }

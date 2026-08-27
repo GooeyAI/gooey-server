@@ -1,84 +1,204 @@
-import type { RecipeView, WorkPane } from "@gooey-types/recipe_workspace_props";
+import type {
+  PageShellConfig,
+  SingleLayout,
+  SplitLayout,
+  SurfaceId,
+  WorkspaceView,
+} from "@gooey-types/recipe_workspace_props";
 
-export type { RecipeView, WorkPane };
+export type WorkspaceLayout = SingleLayout | SplitLayout;
 
-/** Every view, as a value. `Record<RecipeView, true>` makes the exhaustiveness a compile
- * error rather than a stale list. */
-const RECIPE_VIEWS: Record<RecipeView, true> = {
-  about: true,
-  edit: true,
-  preview: true,
-  split: true,
+export type PersistedWorkspaceState = {
+  version: 1;
+  layout: WorkspaceLayout;
+  handled_run_id: string | null;
 };
 
-function isRecipeView(value: unknown): value is RecipeView {
-  return typeof value === "string" && value in RECIPE_VIEWS;
-}
-
-export type PaneLayout = {
-  mode: "about" | "work";
-  editorOpen: boolean;
-  previewOpen: boolean;
-};
-
-/** The layout to render when a config pane has claimed the whole row. Derived, so the
- * stored layout still holds whatever the user picked. */
-export function shownLayout(
-  layout: PaneLayout,
-  editorFullWidth: boolean
-): PaneLayout {
-  if (!editorFullWidth || layout.mode !== "work" || !layout.editorOpen) {
-    return layout;
-  }
-  return { ...layout, previewOpen: false };
-}
-
-/** The layout a narrow viewport can show: one half of a two-pane arrangement, chosen by
- * the recipe via `BasePage.narrow_pane`. Derived, so widening restores the pair. */
-export function foldForNarrowViewport(
-  layout: PaneLayout,
-  narrowPane: WorkPane,
-  isNarrow: boolean
-): PaneLayout {
-  if (!isNarrow) {
-    return layout;
-  }
-  if (layout.mode !== "work" || !layout.editorOpen || !layout.previewOpen) {
-    return layout;
-  }
-  return layoutForView(narrowPane === "editor" ? "edit" : "preview");
-}
-
-/** A pane's share of the row: the whole of it, the larger half, the smaller half, or none. */
 export type PaneRole = "closed" | "solo" | "major" | "minor";
+export type PaneRoles = Record<SurfaceId, PaneRole>;
 
-export type PaneRoles = Record<"about" | "editor" | "preview", PaneRole>;
+export type WorkspaceControls = {
+  addEditor: boolean;
+  addPreview: boolean;
+  closePreview: boolean;
+};
 
-/** The preview pairs with whichever of About or Editor is open - that one is major, the
- * preview minor. A pane with no company is solo. */
-export function paneRolesForLayout(layout: PaneLayout): PaneRoles {
-  const aboutOpen = layout.mode === "about";
-  const editorOpen = layout.mode === "work" && layout.editorOpen;
-  const paired = layout.previewOpen && (aboutOpen || editorOpen);
+export function initialWorkspaceState(
+  config: PageShellConfig,
+  storage: { getItem(key: string): string | null },
+  navigationState: unknown
+): PersistedWorkspaceState {
+  const stored = storedWorkspaceState(storage, config);
+  if (config.route_layout) {
+    return {
+      version: 1,
+      layout: config.route_layout,
+      handled_run_id: config.active_run_id ?? stored.handled_run_id,
+    };
+  }
+
+  const navigationLayout = workspaceLayoutFromNavigationState(navigationState);
+  const initial = navigationLayout
+    ? { ...stored, layout: navigationLayout }
+    : stored;
+  return revealRunLayout(initial, config);
+}
+
+export function normalizeWorkspaceLayout(
+  value: unknown,
+  fallback: WorkspaceLayout
+): WorkspaceLayout {
+  if (isWorkspaceLayout(value)) {
+    return value;
+  }
+  const migrated = migrateLegacyLayout(value);
+  return migrated ?? fallback;
+}
+
+export function workspaceLayoutNavigationState(layout: WorkspaceLayout): {
+  workspaceLayout: WorkspaceLayout;
+} {
+  return { workspaceLayout: layout };
+}
+
+export function workspaceLayoutFromNavigationState(
+  state: unknown
+): WorkspaceLayout | null {
+  if (!state || typeof state !== "object") {
+    return null;
+  }
+  const { workspaceLayout } = state as { workspaceLayout?: unknown };
+  if (!isWorkspaceLayout(workspaceLayout)) {
+    return null;
+  }
+  return workspaceLayout;
+}
+
+export function clearWorkspaceLayoutNavigationState() {
+  const historyState = window.history.state;
+  const userState = historyState?.usr;
+  if (
+    !userState ||
+    typeof userState !== "object" ||
+    !("workspaceLayout" in userState)
+  ) {
+    return;
+  }
+  const remainingUserState = {
+    ...(userState as Record<string, unknown>),
+  };
+  delete remainingUserState.workspaceLayout;
+  const nextUserState = Object.keys(remainingUserState).length
+    ? remainingUserState
+    : null;
+  window.history.replaceState({ ...historyState, usr: nextUserState }, "");
+}
+
+export function revealRunLayout(
+  state: PersistedWorkspaceState,
+  config: PageShellConfig
+): PersistedWorkspaceState {
+  if (!config.active_run_id || config.active_run_id === state.handled_run_id) {
+    return state;
+  }
   return {
-    about: paneRole(aboutOpen, paired ? "major" : "solo"),
-    editor: paneRole(editorOpen, paired ? "major" : "solo"),
-    preview: paneRole(layout.previewOpen, paired ? "minor" : "solo"),
+    version: 1,
+    layout: config.run_layout,
+    handled_run_id: config.active_run_id,
   };
 }
 
-function paneRole(open: boolean, openRole: PaneRole): PaneRole {
-  return open ? openRole : "closed";
-}
-
-export function paneVisibility(hydrated: boolean): "hidden" | "visible" {
-  if (!hydrated) {
-    return "hidden";
+export function foldForNarrowViewport(
+  layout: WorkspaceLayout,
+  narrowSurface: SurfaceId,
+  isNarrow: boolean
+): WorkspaceLayout {
+  if (!isNarrow || layout.kind === "single") {
+    return layout;
   }
-  return "visible";
+  if (layout.primary === "about") {
+    return singleLayout("about");
+  }
+  if (layoutHasSurface(layout, narrowSurface)) {
+    return singleLayout(narrowSurface);
+  }
+  return singleLayout(layout.primary);
 }
 
-export function workspaceTargetForView(
+export function paneRolesForLayout(layout: WorkspaceLayout): PaneRoles {
+  const roles: PaneRoles = {
+    about: "closed",
+    editor: "closed",
+    preview: "closed",
+  };
+  if (layout.kind === "single") {
+    roles[layout.surface] = "solo";
+    return roles;
+  }
+  roles[layout.primary] = "major";
+  roles[layout.secondary] = "minor";
+  return roles;
+}
+
+export function viewForLayout(
+  views: readonly WorkspaceView[],
+  layout: WorkspaceLayout
+): WorkspaceView | null {
+  return views.find((view) => layoutsEqual(view.layout, layout)) ?? null;
+}
+
+export function activeViewForLayouts(
+  views: readonly WorkspaceView[],
+  shown: WorkspaceLayout,
+  stored: WorkspaceLayout,
+  workspaceActive: boolean
+): WorkspaceView | null {
+  if (!workspaceActive) {
+    return null;
+  }
+  return viewForLayout(views, shown) ?? viewForLayout(views, stored);
+}
+
+export function collapsePane(
+  layout: WorkspaceLayout,
+  surface: SurfaceId
+): WorkspaceLayout {
+  if (layout.kind === "single" || !layoutHasSurface(layout, surface)) {
+    return layout;
+  }
+  if (layout.primary === surface) {
+    return singleLayout(layout.secondary);
+  }
+  return singleLayout(layout.primary);
+}
+
+export function workspaceControlsForLayout(
+  layout: WorkspaceLayout
+): WorkspaceControls {
+  const noControls: WorkspaceControls = {
+    addEditor: false,
+    addPreview: false,
+    closePreview: false,
+  };
+  if (layoutHasSurface(layout, "about")) {
+    return noControls;
+  }
+  if (layout.kind === "split") {
+    return {
+      ...noControls,
+      closePreview: layoutHasSurface(layout, "preview"),
+    };
+  }
+  if (layout.surface === "editor") {
+    return { ...noControls, addPreview: true };
+  }
+  if (layout.surface === "preview") {
+    return { ...noControls, addEditor: true };
+  }
+  return noControls;
+}
+
+export function workspaceTargetForLayout(
   workspaceActive: boolean,
   workspaceHref: string
 ): string | null {
@@ -88,241 +208,161 @@ export function workspaceTargetForView(
   return appRelativeHref(workspaceHref);
 }
 
+export function paneVisibility(hydrated: boolean): "hidden" | "visible" {
+  if (!hydrated) {
+    return "hidden";
+  }
+  return "visible";
+}
+
+export function singleLayout(surface: SurfaceId): SingleLayout {
+  return { kind: "single", surface };
+}
+
+export function splitLayout(
+  primary: SurfaceId,
+  secondary: SurfaceId
+): SplitLayout {
+  if (primary === secondary) {
+    throw new Error("A split layout requires two different surfaces");
+  }
+  return { kind: "split", primary, secondary };
+}
+
+export function layoutsEqual(
+  left: WorkspaceLayout,
+  right: WorkspaceLayout
+): boolean {
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "single" && right.kind === "single") {
+    return left.surface === right.surface;
+  }
+  if (left.kind === "split" && right.kind === "split") {
+    return left.primary === right.primary && left.secondary === right.secondary;
+  }
+  return false;
+}
+
+function storedWorkspaceState(
+  storage: { getItem(key: string): string | null },
+  config: PageShellConfig
+): PersistedWorkspaceState {
+  let stored: unknown = null;
+  try {
+    const serialized = storage.getItem(config.storage_key);
+    if (serialized) {
+      stored = JSON.parse(serialized);
+    }
+  } catch {
+    return defaultWorkspaceState(config);
+  }
+  if (isPersistedWorkspaceState(stored)) {
+    return {
+      version: 1,
+      layout: normalizeWorkspaceLayout(stored.layout, config.initial_layout),
+      handled_run_id: stored.handled_run_id,
+    };
+  }
+  return {
+    version: 1,
+    layout: normalizeWorkspaceLayout(stored, config.initial_layout),
+    handled_run_id: null,
+  };
+}
+
+function defaultWorkspaceState(
+  config: PageShellConfig
+): PersistedWorkspaceState {
+  return {
+    version: 1,
+    layout: config.initial_layout,
+    handled_run_id: null,
+  };
+}
+
+function isPersistedWorkspaceState(
+  value: unknown
+): value is PersistedWorkspaceState {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const state = value as Partial<PersistedWorkspaceState>;
+  return (
+    state.version === 1 &&
+    isWorkspaceLayout(state.layout) &&
+    (state.handled_run_id === null || typeof state.handled_run_id === "string")
+  );
+}
+
+function isWorkspaceLayout(value: unknown): value is WorkspaceLayout {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const layout = value as Partial<WorkspaceLayout>;
+  if (layout.kind === "single") {
+    return isSurfaceId(layout.surface);
+  }
+  if (layout.kind !== "split") {
+    return false;
+  }
+  return (
+    isSurfaceId(layout.primary) &&
+    isSurfaceId(layout.secondary) &&
+    layout.primary !== layout.secondary
+  );
+}
+
+function migrateLegacyLayout(value: unknown): WorkspaceLayout | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const legacy = value as {
+    mode?: unknown;
+    editorOpen?: unknown;
+    previewOpen?: unknown;
+  };
+  if (
+    (legacy.mode !== "about" && legacy.mode !== "work") ||
+    typeof legacy.editorOpen !== "boolean" ||
+    typeof legacy.previewOpen !== "boolean"
+  ) {
+    return null;
+  }
+  if (legacy.mode === "about") {
+    if (legacy.previewOpen) {
+      return splitLayout("about", "preview");
+    }
+    return singleLayout("about");
+  }
+  if (legacy.editorOpen && legacy.previewOpen) {
+    return splitLayout("editor", "preview");
+  }
+  if (legacy.previewOpen) {
+    return singleLayout("preview");
+  }
+  return singleLayout("editor");
+}
+
+function layoutHasSurface(
+  layout: WorkspaceLayout,
+  surface: SurfaceId
+): boolean {
+  if (layout.kind === "single") {
+    return layout.surface === surface;
+  }
+  return layout.primary === surface || layout.secondary === surface;
+}
+
+function isSurfaceId(value: unknown): value is SurfaceId {
+  return value === "about" || value === "editor" || value === "preview";
+}
+
 function appRelativeHref(href: string): string {
   if (!href.startsWith("http://") && !href.startsWith("https://")) {
     return href;
   }
   const url = new URL(href);
   return `${url.pathname}${url.search}${url.hash}`;
-}
-
-export function initialPaneLayout(
-  storage: { getItem(key: string): string | null },
-  storageKey: string,
-  initialView: RecipeView,
-  navigationState: unknown
-): PaneLayout {
-  const navigationView = recipeViewFromNavigationState(navigationState);
-  if (navigationView) {
-    return layoutForView(navigationView);
-  }
-  return storedPaneLayout(storage, storageKey, initialView);
-}
-
-export function recipeViewNavigationState(view: RecipeView): {
-  recipeView: RecipeView;
-} {
-  return { recipeView: view };
-}
-
-export function recipeViewFromNavigationState(
-  state: unknown
-): RecipeView | null {
-  if (!state || typeof state !== "object") {
-    return null;
-  }
-  const { recipeView } = state as { recipeView?: unknown };
-  return isRecipeView(recipeView) ? recipeView : null;
-}
-
-export function clearRecipeViewNavigationState() {
-  const historyState = window.history.state;
-  const userState = historyState?.usr;
-  if (
-    !userState ||
-    typeof userState !== "object" ||
-    !("recipeView" in userState)
-  ) {
-    return;
-  }
-  const remainingUserState = {
-    ...(userState as Record<string, unknown>),
-  };
-  delete remainingUserState.recipeView;
-  let nextUserState: Record<string, unknown> | null = null;
-  if (Object.keys(remainingUserState).length) {
-    nextUserState = remainingUserState;
-  }
-  window.history.replaceState({ ...historyState, usr: nextUserState }, "");
-}
-
-export function layoutAfterSelectingView(
-  _layout: PaneLayout,
-  view: RecipeView
-): PaneLayout {
-  return layoutForView(view);
-}
-
-export function layoutForView(view: RecipeView): PaneLayout {
-  switch (view) {
-    case "about":
-      return { mode: "about", editorOpen: true, previewOpen: true };
-    case "edit":
-      return { mode: "work", editorOpen: true, previewOpen: false };
-    case "preview":
-      return { mode: "work", editorOpen: false, previewOpen: true };
-    case "split":
-      return { mode: "work", editorOpen: true, previewOpen: true };
-    default: {
-      const exhaustiveView: never = view;
-      return exhaustiveView;
-    }
-  }
-}
-
-export function viewForLayout(layout: PaneLayout): RecipeView {
-  if (layout.mode === "about") {
-    return "about";
-  }
-  if (layout.editorOpen && layout.previewOpen) {
-    return "split";
-  }
-  if (layout.previewOpen) {
-    return "preview";
-  }
-  return "edit";
-}
-
-export function selectedWorkspaceView(
-  activeView: RecipeView,
-  workspaceActive: boolean
-): RecipeView | null {
-  if (!workspaceActive) {
-    return null;
-  }
-  return activeView;
-}
-
-/** Which tab reads as active: the view on screen, or the view the user picked when a fold
- * has landed on one this recipe does not offer as a tab. */
-export function activeTabView(
-  tabSlugs: readonly RecipeView[],
-  shownView: RecipeView | null,
-  pickedView: RecipeView | null
-): RecipeView | null {
-  if (shownView && tabSlugs.includes(shownView)) {
-    return shownView;
-  }
-  if (pickedView && tabSlugs.includes(pickedView)) {
-    return pickedView;
-  }
-  return null;
-}
-
-export function viewAfterRun(
-  activeView: RecipeView,
-  isRunning: boolean
-): RecipeView {
-  if (isRunning) {
-    return activeView;
-  }
-  if (activeView === "edit" || activeView === "about") {
-    return "split";
-  }
-  return activeView;
-}
-
-export type WorkspaceControls = {
-  addEdit: boolean;
-  addPreview: boolean;
-  mergePreview: boolean;
-};
-
-const NO_CONTROLS: WorkspaceControls = {
-  addEdit: false,
-  addPreview: false,
-  mergePreview: false,
-};
-
-export function workspaceControlsForLayout(
-  layout: PaneLayout,
-  editorFullWidth = false
-): WorkspaceControls {
-  // A pane holding the whole row is not offering to share it.
-  if (editorFullWidth && layout.mode === "work" && layout.editorOpen) {
-    return NO_CONTROLS;
-  }
-  if (layout.mode === "about") {
-    return NO_CONTROLS;
-  }
-  if (layout.editorOpen && layout.previewOpen) {
-    return {
-      addEdit: false,
-      addPreview: false,
-      mergePreview: true,
-    };
-  }
-  if (layout.editorOpen) {
-    return {
-      addEdit: false,
-      addPreview: true,
-      mergePreview: false,
-    };
-  }
-  return {
-    addEdit: layout.previewOpen,
-    addPreview: false,
-    mergePreview: false,
-  };
-}
-
-export function collapsePane(layout: PaneLayout, pane: WorkPane): PaneLayout {
-  if (layout.mode === "about") {
-    if (pane === "preview" && layout.previewOpen) {
-      return { ...layout, previewOpen: false };
-    }
-    return layout;
-  }
-  if (pane === "editor") {
-    if (!layout.previewOpen) {
-      return layout;
-    }
-    return { ...layout, editorOpen: false };
-  }
-  if (!layout.editorOpen) {
-    return layout;
-  }
-  return { ...layout, previewOpen: false };
-}
-
-export function storedPaneLayout(
-  storage: { getItem(key: string): string | null },
-  storageKey: string,
-  initialView: RecipeView
-): PaneLayout {
-  let stored: unknown = null;
-  try {
-    const serialized = storage.getItem(storageKey);
-    if (serialized) {
-      stored = JSON.parse(serialized);
-    }
-  } catch {
-    // Storage can be unavailable or malformed.
-  }
-  return normalizePaneLayout(stored, initialView);
-}
-
-export function normalizePaneLayout(
-  value: unknown,
-  initialView: RecipeView
-): PaneLayout {
-  if (!isPaneLayout(value)) {
-    return layoutForView(initialView);
-  }
-  if (!value.editorOpen && !value.previewOpen) {
-    return layoutForView(initialView);
-  }
-  return value;
-}
-
-function isPaneLayout(value: unknown): value is PaneLayout {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const layout = value as Partial<PaneLayout>;
-  return (
-    (layout.mode === "about" || layout.mode === "work") &&
-    typeof layout.editorOpen === "boolean" &&
-    typeof layout.previewOpen === "boolean"
-  );
 }

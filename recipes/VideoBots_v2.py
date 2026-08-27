@@ -29,15 +29,29 @@ from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
-from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
+from daras_ai_v2.tab_spec import (
+    PaneSpec,
+    SingleLayout,
+    SplitLayout,
+    SurfaceId,
+    TabSpec,
+    WorkspaceLayout,
+)
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
 from functions.base_llm_tool import render_called_functions
 from functions.models import FunctionTrigger
-from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
-from gooey_gui.types.recipe_workspace_props import RecipeWorkspaceTriggerProps
+from gooey_gui.types.recipe_top_bar_props import (
+    MenuIntent,
+    SubmitTarget,
+    TopBarIntegration,
+)
+from gooey_gui.types.recipe_workspace_props import (
+    RecipeWorkspaceTriggerProps,
+    SessionStateUpdate,
+)
 
 from recipes.VideoBots import VideoBotsPage
 from widgets.switch_with_section import switch_with_section
@@ -64,9 +78,7 @@ MODEL_ROW_CSS = """
 /* ...and the pills' 10px corners. `gui.selectbox` renders react-select with no
    `classNamePrefix`, so its control has only emotion-generated classes (`css-xxxxx-control`) -
    hence the attribute match on the one stable part of that name. Scoped under two classes, so
-   it outranks emotion's own single-class rule without `!important`.
-   If we end up restyling selects in more than this one place, the better fix is to add
-   `classNamePrefix` in GooeySelect.tsx and target `.gooey-select__control` everywhere. */
+   it outranks emotion's own single-class rule without `!important`. */
 & .gui-input-select [class*="-control"] {
     border-radius: 10px;
 }
@@ -96,8 +108,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     @classmethod
     def get_runner_page_cls(cls):
         return VideoBotsPage
-
-
 
     def _render_running_output(self):
         # The embedded widget renders its own running state. Do not call scrollIntoView:
@@ -186,11 +196,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             config["apiUrl"] = get_api_route_url(stream_create)
 
         load_chat_widget_lib()
-        # Master's component: it renders #gooey-embed and mounts the widget into it once,
-        # with theme, branding and messages reaching it through the controller afterwards.
-        # v2 differs only in sizing - it fills the scrolling body area rather than the
-        # viewport, because the top bar sits above this and `100vh` would overflow by
-        # exactly the bar's height.
+        # Fill the remaining preview area below the top bar.
         gui.component(
             "GooeyEmbedPreview",
             config=config,
@@ -211,7 +217,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             platform=Platform.WHATSAPP,
         ).exists()
 
-
     DEMO_ACTION_PREFIX = "demo:"
 
     def _top_bar_integrations(self) -> list[TopBarIntegration]:
@@ -224,12 +229,13 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             platform = Platform(platform_id)
             integrations.append(
                 TopBarIntegration(
-                    # the chip opens a demo of the live bot, so it says so - v1 could get away
-                    # with a bare platform name because its buttons sat under a "Demos" header
-                    label=f"Try in {platform.get_title()}",
-                    icon=platform.get_icon(),
-                    color=platform.get_demo_button_color() or None,
                     key=f"{self.DEMO_ACTION_PREFIX}{bi_id}",
+                    label=f"Try in {platform.get_title()}",
+                    icon_html=platform.get_icon(),
+                    target=SubmitTarget(
+                        intent=MenuIntent(item_key=f"{self.DEMO_ACTION_PREFIX}{bi_id}")
+                    ),
+                    color=platform.get_demo_button_color() or None,
                 )
             )
         return integrations
@@ -249,10 +255,10 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             if ref.is_open:
                 render_demo_dialog(ref, bi_id)
 
-
-    def entry_tab_slug(self, tabs: list[TabSpec]) -> RecipeView:
-        """About for a first-time visitor, Split for everyone else."""
-        return RecipeView.about if self.is_unowned_example() else RecipeView.split
+    def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
+        if self.is_unowned_example():
+            return tabs[0].layout
+        return next(tab.layout for tab in tabs if tab.key == "split")
 
     def get_tab_spec(self) -> list[TabSpec]:
         """The agent tab set. Deploy is absent - its body is reached through the
@@ -261,27 +267,34 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             return self.get_viewer_tab_spec()
         return [
             TabSpec(
-                slug=RecipeView.about,
+                key="about",
                 label="About",
-                icon=icons.info,
+                icon_html=icons.info,
+                layout=SplitLayout(
+                    primary=SurfaceId.about,
+                    secondary=SurfaceId.preview,
+                ),
             ),
             TabSpec(
-                slug=RecipeView.edit,
+                key="edit",
                 label="Edit",
-                icon=icons.edit,
+                icon_html=icons.edit,
+                layout=SingleLayout(surface=SurfaceId.editor),
             ),
             TabSpec(
-                slug=RecipeView.preview,
+                key="preview",
                 label="Preview",
-                icon=icons.preview,
-                # Keeps the header on a phone rather than taking the whole screen; the
-                # header's back arrow is the way out.
+                icon_html=icons.preview,
+                layout=SingleLayout(surface=SurfaceId.preview),
             ),
             TabSpec(
-                slug=RecipeView.split,
+                key="split",
                 label="Split",
-                icon=icons.split,
-                # two columns side by side - there is no room for it on a phone
+                icon_html=icons.split,
+                layout=SplitLayout(
+                    primary=SurfaceId.editor,
+                    secondary=SurfaceId.preview,
+                ),
                 desktop_only=True,
             ),
         ]
@@ -340,11 +353,11 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     def _render_about_meta_card(self, *, icon: str, label: str, pane: ConfigPane):
         with gui.model_component(
             RecipeWorkspaceTriggerProps(
-                storage_key=self._workspace_storage_key(),
-                initial_view=self.entry_tab_slug(self.get_tab_spec()),
-                view=RecipeView.edit,
-                state_key=self.CONFIG_PANE_KEY,
-                state_value=pane,
+                layout=SingleLayout(surface=SurfaceId.editor),
+                state_update=SessionStateUpdate(
+                    key=self.CONFIG_PANE_KEY,
+                    value=pane.value,
+                ),
                 className="v2-about-meta-card",
             )
         ):
@@ -456,9 +469,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 )
 
     def _render_knowledge_pane(self):
-        # v1 gated this on language_model_selector's RETURN VALUE, which only exists while
-        # that widget renders. It lives on another pane now, so read the state key instead -
-        # otherwise the uploader silently disappears unless LLM Instructions rendered first.
+        # The model selector is on another pane, so read its session-state value.
         if not AIModelSpec.objects.filter(
             name=gui.session_state.get("selected_model"), llm_is_audio_model=True
         ).exists():
@@ -553,9 +564,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         )
 
     def _render_deploy_panel(self):
-        """Deploy's body. Reached two ways - the Config sub-tab, and v1's `/integrations/`
-        deep link via `render_selected_tab()` - so it lives in exactly one place.
-        """
+        """Render deployment settings for the integrations route."""
         user = self.request.user
         # not signed in case
         if not user or user.is_anonymous:

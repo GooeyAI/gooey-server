@@ -8,7 +8,5 @@ def can_use_layout_v2(request: fastapi.Request) -> bool:
         return False
     if not request.user or request.user.is_anonymous:
         return False
-    # deliberately admin-only for now (no per-workspace opt-in arm yet, unlike
-    # can_launch_gooey_builder's workspace arm) - a workspace flag is a future addition,
-    # not an oversight.
+    # Initial rollout is admin-only.
     return request.user.is_admin()

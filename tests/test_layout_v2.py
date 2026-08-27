@@ -1,7 +1,29 @@
 from types import SimpleNamespace
 
+import pydantic
+import pytest
+
+import gooey_gui as gui
 from daras_ai_v2.base import BasePage as BasePageV1
-from gooey_gui.types.recipe_workspace_props import WorkPane
+from daras_ai_v2.tab_spec import TabSpec
+from gooey_gui.types.recipe_top_bar_props import (
+    MenuIntent,
+    RecipeTopBarProps,
+    RecipeSubmitIntent,
+    RunIntent,
+)
+from gooey_gui.types.sidebar_props import SidebarProps
+from gooey_gui.types.recipe_workspace_props import (
+    PageShellConfig,
+    RecipeSurfaceProps,
+    SingleLayout,
+    SplitLayout,
+    SurfaceId,
+    WorkspacePaneControlProps,
+    WorkspaceView,
+    RecipeWorkspaceProps,
+    RecipeWorkspaceTriggerProps,
+)
 from recipes.VideoBots import VideoBotsPage
 from recipes.VideoBots_v2 import VideoBotsPageV2
 from routers.root import RecipeTabs
@@ -11,6 +33,45 @@ def test_video_bots_v2_uses_existing_celery_runner_class():
     assert VideoBotsPageV2.get_runner_page_cls() is VideoBotsPage
 
 
+def test_video_bots_v2_schedules_legacy_celery_payload(monkeypatch):
+    captured = {}
+    task_result = SimpleNamespace(id="task-1")
+    runner_task = SimpleNamespace(
+        delay=lambda **kwargs: captured.update(kwargs) or task_result
+    )
+    monkeypatch.setattr("celeryapp.tasks.runner_task", runner_task)
+
+    saved_fields = []
+    saved_run = SimpleNamespace(
+        run_id="run-1",
+        uid="user-1",
+        celery_task_id=None,
+        save=lambda *, update_fields: saved_fields.extend(update_fields),
+    )
+    page = object.__new__(VideoBotsPageV2)
+    page.request = SimpleNamespace(user=SimpleNamespace(id=123))
+    page.realtime_channel_name = lambda run_id, uid: f"channel/{uid}/{run_id}"
+
+    result = page.call_runner_task(
+        saved_run,
+        deduct_credits=False,
+        unsaved_state={"input_prompt": "hello"},
+    )
+
+    assert result is task_result
+    assert captured == {
+        "page_cls": VideoBotsPage,
+        "user_id": 123,
+        "run_id": "run-1",
+        "uid": "user-1",
+        "channel": "channel/user-1/run-1",
+        "unsaved_state": {"input_prompt": "hello"},
+        "deduct_credits": False,
+    }
+    assert saved_run.celery_task_id == "task-1"
+    assert saved_fields == ["celery_task_id", "updated_at"]
+
+
 def test_video_bots_v2_inherits_business_logic():
     assert VideoBotsPageV2.create_new_run is VideoBotsPage.create_new_run
     assert VideoBotsPageV2.run_v2 is VideoBotsPage.run_v2
@@ -18,23 +79,149 @@ def test_video_bots_v2_inherits_business_logic():
     assert VideoBotsPageV2.render_steps is VideoBotsPage.render_steps
 
 
-def test_layout_v2_run_output_stays_visible_on_mobile():
+def test_generated_v2_component_names_match_registry():
+    assert {
+        RecipeSurfaceProps._component,
+        RecipeTopBarProps._component,
+        RecipeWorkspaceProps._component,
+        RecipeWorkspaceTriggerProps._component,
+        SidebarProps._component,
+        WorkspacePaneControlProps._component,
+    } == {
+        "RecipeSurface",
+        "RecipeTopBar",
+        "RecipeWorkspace",
+        "RecipeWorkspaceTrigger",
+        "Sidebar",
+        "WorkspacePaneControl",
+    }
+
+
+def test_layout_models_reject_extra_and_duplicate_surfaces():
+    with pytest.raises(pydantic.ValidationError):
+        SingleLayout(surface=SurfaceId.editor, typo=True)
+
+    with pytest.raises(pydantic.ValidationError):
+        SplitLayout(
+            primary=SurfaceId.editor,
+            secondary=SurfaceId.editor,
+        )
+
+
+def test_page_shell_rejects_undeclared_initial_layout():
+    edit = SingleLayout(surface=SurfaceId.editor)
+    split = SplitLayout(
+        primary=SurfaceId.editor,
+        secondary=SurfaceId.preview,
+    )
+
+    with pytest.raises(pydantic.ValidationError):
+        PageShellConfig(
+            storage_key="layout",
+            initial_layout=SingleLayout(surface=SurfaceId.about),
+            run_layout=split,
+            views=[
+                WorkspaceView(
+                    key="edit",
+                    label="Edit",
+                    layout=edit,
+                ),
+                WorkspaceView(
+                    key="split",
+                    label="Split",
+                    layout=split,
+                ),
+            ],
+            workspace_href="/agent/",
+            workspace_active=True,
+        )
+
+
+def test_page_shell_config_is_built_once_from_typed_layouts(monkeypatch):
     page = object.__new__(VideoBotsPageV2)
     page.tab = RecipeTabs.run
+    page.request = SimpleNamespace(query_params={})
+    split = SplitLayout(
+        primary=SurfaceId.editor,
+        secondary=SurfaceId.preview,
+    )
+    tabs = [
+        TabSpec(
+            key="split",
+            label="Split",
+            layout=split,
+        )
+    ]
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_workspace_storage_key",
+        lambda self: "layout",
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "entry_layout",
+        lambda self, specs: specs[0].layout,
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "narrow_surface",
+        lambda self: SurfaceId.preview,
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_app_url",
+        lambda self, tab: "/agent/",
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_is_run_in_progress",
+        lambda self: False,
+    )
 
-    assert page._output_col_class_name() == ""
+    config = page._page_shell_config(tabs)
+
+    assert config.initial_layout == split
+    assert config.run_layout == split
+    assert config.route_layout is None
+
+    page.tab = RecipeTabs.preview
+    page.request.query_params = {"run_id": "run-1"}
+    preview_config = page._page_shell_config(tabs)
+
+    assert preview_config.route_layout == SingleLayout(surface=SurfaceId.preview)
+    assert preview_config.active_run_id == "run-1"
 
 
-def test_narrow_pane_keeps_the_editor_for_a_visitor(monkeypatch):
+def test_submit_intent_is_discriminated_and_strict():
+    adapter = pydantic.TypeAdapter(RecipeSubmitIntent)
+
+    assert adapter.validate_json('{"kind":"run"}') == RunIntent()
+    assert adapter.validate_json(
+        '{"kind":"menu","item_key":"duplicate"}'
+    ) == MenuIntent(item_key="duplicate")
+
+    with pytest.raises(pydantic.ValidationError):
+        adapter.validate_json('{"kind":"run","item_key":"duplicate"}')
+
+
+def test_submit_intent_is_consumed_once():
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state[page.SUBMIT_INTENT_KEY] = '{"kind":"run"}'
+
+    assert page._pop_submit_intent() == RunIntent()
+    assert page._pop_submit_intent() is None
+
+
+def test_narrow_surface_keeps_the_editor_for_a_visitor(monkeypatch):
     """A visitor's one work tab is "How it works", which exists to show the configuration -
     so a phone keeps the editor. An owner on Split keeps the bot."""
     page = object.__new__(VideoBotsPageV2)
 
     monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
-    assert page.narrow_pane() == WorkPane.editor
+    assert page.narrow_surface() == SurfaceId.editor
 
     monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: False)
-    assert page.narrow_pane() == WorkPane.preview
+    assert page.narrow_surface() == SurfaceId.preview
 
 
 def test_title_menu_offers_v1s_options(monkeypatch):

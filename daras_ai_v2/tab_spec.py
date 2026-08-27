@@ -1,13 +1,21 @@
 import typing
 
-import pydantic
+from gooey_gui.types.recipe_workspace_props import (
+    SingleLayout,
+    SplitLayout,
+    SurfaceId,
+    WorkspaceLayout,
+    WorkspaceView,
+)
 
-from gooey_gui.types.recipe_workspace_props import RecipeView
-
-# Re-exported: `RecipeView` is defined next to the props that carry it into TypeScript, so
-# the generator can emit it as a named union. Recipes still import it from here, where the
-# rest of the tab vocabulary lives.
-__all__ = ["PaneSpec", "RecipeView", "TabSpec"]
+__all__ = [
+    "PaneSpec",
+    "SingleLayout",
+    "SplitLayout",
+    "SurfaceId",
+    "TabSpec",
+    "WorkspaceLayout",
+]
 
 
 class PaneSpec(typing.NamedTuple):
@@ -22,16 +30,5 @@ class PaneSpec(typing.NamedTuple):
     render: typing.Callable[[], None]
 
 
-class TabSpec(pydantic.BaseModel):
-    """One client-side view in the layout-v2 workspace selector."""
-
-    slug: RecipeView
-    """View identity; it is deliberately not a URL segment."""
-
-    label: str
-    icon: str = ""
-    """Raw FontAwesome html, like `NavItemData.icon`."""
-
-    desktop_only: bool = False
-    """Hidden from the strip below `lg`. For tabs whose layout needs the width - Split is
-    two columns side by side, which a phone cannot show."""
+class TabSpec(WorkspaceView):
+    pass

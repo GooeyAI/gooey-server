@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "@remix-run/react";
+import { encodeSubmitIntent, type RecipeSubmitIntent } from "./submitIntent";
 
 /** One row of the sheet. Either a link (`href`) or an action (`onPick`), never both. */
 export type SheetEntry = {
@@ -9,6 +10,7 @@ export type SheetEntry = {
   iconHtml?: string;
   iconClass?: string;
   href?: string;
+  submitIntent?: RecipeSubmitIntent;
   onPick?: () => void;
   /** A group label rather than a row you can press - it names the entries under it. */
   heading?: boolean;
@@ -21,9 +23,13 @@ export type SheetEntry = {
  */
 export function MobileActionSheet({
   entries,
+  submitIntentKey,
+  submitDisabled,
   onDismiss,
 }: {
   entries: SheetEntry[];
+  submitIntentKey: string;
+  submitDisabled: boolean;
   onDismiss: () => void;
 }) {
   // Escape closes it. Pointer dismissal is the scrim's job below - it covers the whole
@@ -98,12 +104,21 @@ export function MobileActionSheet({
           ) : (
             <button
               key={entry.key}
-              type="button"
+              type={entry.submitIntent ? "submit" : "button"}
+              name={entry.submitIntent ? submitIntentKey : undefined}
+              value={
+                entry.submitIntent
+                  ? encodeSubmitIntent(entry.submitIntent)
+                  : undefined
+              }
+              disabled={Boolean(entry.submitIntent && submitDisabled)}
               className="gooey-sheet-item"
               role="menuitem"
               onClick={() => {
                 entry.onPick?.();
-                onDismiss();
+                if (!entry.submitIntent) {
+                  onDismiss();
+                }
               }}
             >
               {inner}

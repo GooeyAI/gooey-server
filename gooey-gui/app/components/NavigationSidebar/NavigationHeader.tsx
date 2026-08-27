@@ -64,6 +64,7 @@ export function NavigationHeaderMobile({
   builderOpen,
   account,
   onSwitchWorkspace,
+  onBuilderOpen,
 }: {
   logo_image_url: NavigationSidebarProps["logo_image_url"];
   logo_href: NavigationSidebarProps["logo_href"];
@@ -75,6 +76,7 @@ export function NavigationHeaderMobile({
   builderOpen: boolean;
   account: NavigationSidebarProps["account"];
   onSwitchWorkspace: (workspaceId: number) => void;
+  onBuilderOpen: () => void;
 }) {
   return (
     <Fragment>
@@ -104,7 +106,12 @@ export function NavigationHeaderMobile({
             />
           </a>
           {gooey_builder && !builderOpen && (
-            <GooeyBuilderButton gooey_builder={gooey_builder} compact mobile />
+            <GooeyBuilderButton
+              gooey_builder={gooey_builder}
+              compact
+              mobile
+              onOpen={onBuilderOpen}
+            />
           )}
         </div>
         <div className="ms-auto">

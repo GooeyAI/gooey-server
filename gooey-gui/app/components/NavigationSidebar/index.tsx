@@ -9,12 +9,11 @@ import type {
   NavigationSidebarProps,
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
+import { useAppShellPanelValue, useNavDrawer } from "~/appShellContext";
 import { AccountSection } from "./AccountSection";
-import { builderOpenEventName } from "./builderNavigation";
 import { clearBuilderIntent, readBuilderIntent } from "./builderIntent";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
-import { NAV_DRAWER_OPEN_EVENT } from "./navDrawer";
 import { PrimaryNavItems } from "./PrimaryNavItems";
 
 // Below this width the rail becomes an off-canvas drawer (matches the CSS
@@ -38,18 +37,19 @@ export function NavigationSidebar({
   const builderInitiallyOpen = Boolean(
     builderEventKey && state[builderEventKey]
   );
+  const builder = useAppShellPanelValue(builderEventKey, builderInitiallyOpen);
+  const navDrawer = useNavDrawer();
   const [collapsed, setCollapsed] = useState(
     builderInitiallyOpen || default_collapsed
   );
   const [isMobile, setIsMobile] = useState(false);
-  const [builderOpen, setBuilderOpen] = useState(builderInitiallyOpen);
   const mounted = useRef(false);
 
   const railCollapsed = !isMobile && collapsed;
-  const drawerOpen = isMobile && !collapsed;
+  const drawerOpen = isMobile && navDrawer.open;
 
   useEffect(() => {
-    if (isMobile || builderOpen) return;
+    if (isMobile || builder.open) return;
     if (!mounted.current) {
       mounted.current = true;
       if (state[collapsed_state_key] === collapsed) return;
@@ -57,15 +57,21 @@ export function NavigationSidebar({
     state[collapsed_state_key] = collapsed;
     onChange();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapsed, isMobile, builderOpen, collapsed_state_key]);
+  }, [collapsed, isMobile, builder.open, collapsed_state_key]);
+
+  useEffect(() => {
+    if (builder.open) {
+      setCollapsed(true);
+    }
+  }, [builder.open]);
 
   useEffect(() => {
     const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
     const update = () => {
       setIsMobile(mq.matches);
-      // Entering mobile always starts with the drawer closed (batched with the
-      // isMobile update so `drawerOpen` never flips true in between).
-      if (mq.matches) setCollapsed(true);
+      if (mq.matches) {
+        navDrawer.setOpen(false);
+      }
     };
     update();
     mq.addEventListener("change", update);
@@ -77,54 +83,20 @@ export function NavigationSidebar({
   // nowhere -- opening the account menu, switching workspace, toggling a section
   // open -- leave the drawer where it is.
   useEffect(() => {
-    if (isMobile) setCollapsed(true);
+    if (isMobile) {
+      navDrawer.setOpen(false);
+    }
   }, [isMobile, location.key]);
 
-  useEffect(() => {
-    if (!builderEventKey) return;
-    const onOpen = () => {
-      setBuilderOpen(true);
-      setCollapsed(true);
-    };
-    const onClose = () => {
-      setBuilderOpen(false);
-    };
-    // The panel's settled state, which outranks the commands above - those can be
-    // dispatched before the panel is listening.
-    const onChanged = (e: Event) => {
-      const open = (e as CustomEvent<{ open?: boolean }>).detail?.open;
-      if (typeof open === "boolean") setBuilderOpen(open);
-    };
-    window.addEventListener(`${builderEventKey}:open`, onOpen);
-    window.addEventListener(`${builderEventKey}:close`, onClose);
-    window.addEventListener(`${builderEventKey}:changed`, onChanged);
-    return () => {
-      window.removeEventListener(`${builderEventKey}:open`, onOpen);
-      window.removeEventListener(`${builderEventKey}:close`, onClose);
-      window.removeEventListener(`${builderEventKey}:changed`, onChanged);
-    };
-  }, [builderEventKey]);
-
-  // A Builder-chat row in the rail carries an "open" intent as navigation state.
-  // This effect runs once the navigation has committed, so the panel is already
-  // listening; consuming the intent here also clears it, leaving refreshes and
-  // Back to honour whatever the user last chose. Nothing ever closes the panel
-  // on the user's behalf.
   const builderIntent = readBuilderIntent(location.state);
-  const builderOpenEvent = builderOpenEventName(builderEventKey, builderIntent);
   useEffect(() => {
-    if (!builderOpenEvent) return;
+    if (!builderEventKey || !builderIntent) {
+      return;
+    }
     clearBuilderIntent();
-    window.dispatchEvent(new CustomEvent(builderOpenEvent));
-  }, [builderOpenEvent, location.key]);
-
-  // Opened from RecipeTopBar, a sibling with no common ancestor - hence an event. Open
-  // only: closing belongs to the scrim and the header, both inside this component.
-  useEffect(() => {
-    const onOpen = () => setCollapsed(false);
-    window.addEventListener(NAV_DRAWER_OPEN_EVENT, onOpen);
-    return () => window.removeEventListener(NAV_DRAWER_OPEN_EVENT, onOpen);
-  }, []);
+    builder.setOpen(true);
+    setCollapsed(true);
+  }, [builderEventKey, builderIntent, location.key]);
 
   const expandRail = (e?: React.MouseEvent) => {
     e?.preventDefault();
@@ -150,12 +122,13 @@ export function NavigationSidebar({
         logo_href={logo_href}
         isMobile={isMobile}
         drawerOpen={drawerOpen}
-        onDrawerOpen={() => setCollapsed(false)}
-        onDrawerClose={() => setCollapsed(true)}
+        onDrawerOpen={() => navDrawer.setOpen(true)}
+        onDrawerClose={() => navDrawer.setOpen(false)}
         gooey_builder={gooey_builder}
-        builderOpen={builderOpen}
+        builderOpen={builder.open}
         account={account}
         onSwitchWorkspace={switchWorkspace}
+        onBuilderOpen={() => builder.setOpen(true)}
       />
 
       <nav
@@ -169,7 +142,7 @@ export function NavigationSidebar({
           isMobile={isMobile}
           onExpand={expandRail}
           onCollapse={() => setCollapsed(true)}
-          onDrawerClose={() => setCollapsed(true)}
+          onDrawerClose={() => navDrawer.setOpen(false)}
         />
 
         <PrimaryNavItems
@@ -182,10 +155,11 @@ export function NavigationSidebar({
         <NavigationFooter
           gooey_builder={gooey_builder}
           railCollapsed={railCollapsed}
-          builderOpen={builderOpen}
+          builderOpen={builder.open}
           isMobile={isMobile}
           account={account}
           onSwitchWorkspace={switchWorkspace}
+          onBuilderOpen={() => builder.setOpen(true)}
         />
       </nav>
     </div>
@@ -199,6 +173,7 @@ function NavigationFooter({
   isMobile,
   account,
   onSwitchWorkspace,
+  onBuilderOpen,
 }: {
   gooey_builder: NavigationSidebarProps["gooey_builder"];
   railCollapsed: boolean;
@@ -206,6 +181,7 @@ function NavigationFooter({
   isMobile: boolean;
   account: NavAccountData;
   onSwitchWorkspace: (workspaceId: number) => void;
+  onBuilderOpen: () => void;
 }) {
   return (
     <div className="flex-shrink-0 px-2 pb-2 d-flex flex-column gap-2">
@@ -213,6 +189,7 @@ function NavigationFooter({
         <GooeyBuilderButton
           gooey_builder={gooey_builder}
           compact={railCollapsed}
+          onOpen={onBuilderOpen}
         />
       )}
       <div className="border-top pt-2">
