@@ -180,5 +180,5 @@ def modal_scaffold(
             return (
                 gui.div(className="modal-header border-0"),
                 gui.div(className="modal-body"),
-                gui.div(className="modal-footer border-0 py-0"),
+                gui.div(className="modal-footer border-0 pt-0 pb-3"),
             )
