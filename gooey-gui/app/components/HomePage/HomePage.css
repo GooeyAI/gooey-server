@@ -169,3 +169,16 @@
     animation: none;
   }
 }
+
+/* The tab bar sits beside the workflow selector, so it matches that control's
+   height exactly: 4px of padding each side around a 30px pill. */
+.surface-tabs {
+  padding: 4px !important;
+}
+
+.surface-tabs .workflow-tab-pill {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  min-height: 30px;
+  padding: 0 0.75rem !important;
+}

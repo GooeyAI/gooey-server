@@ -30,24 +30,19 @@ export function HistoryPage({
 }: CustomComponentProps & HistoryPageProps) {
   return (
     <div className="container-xxl my-4">
-      {/* tabs and owner filter share the heading's line, dropping below it when narrow */}
-      <div className="d-flex flex-column flex-xl-row align-items-xl-center justify-content-xl-between gap-3 mb-4">
-        <h1 className="mb-0 d-flex align-items-center gap-2 flex-shrink-0">
-          <span>{title}</span>
-          <i
-            className="fa-regular fa-history text-muted fs-5"
-            aria-hidden="true"
-          />
-        </h1>
+      <h1 className="mb-4">{title}</h1>
 
-        <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-xl-end gap-2 min-w-0">
-          <SurfaceSelector tabs={surface_tabs} />
-          <OwnerFilter options={owner_options} />
+      <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
+        <SurfaceSelector tabs={surface_tabs} />
+        <div className="flex-grow-1 mt-2" style={{ width: "300px" }}>
+          <WorkflowFilter options={workflow_options} />
         </div>
       </div>
 
-      <div className="mb-4" style={{ maxWidth: "300px" }}>
-        <WorkflowFilter options={workflow_options} />
+      {/* its own row: the toggle is 201px, and the row above has no width to
+          spare for it once the tabs and the workflow selector have theirs */}
+      <div className="mb-4 d-flex justify-content-end">
+        <OwnerFilter options={owner_options} />
       </div>
 
       <HistoryCardGrid
@@ -225,7 +220,8 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
   if (tabs.length === 0) return null;
   return (
     <div className="overflow-auto workflow-tab-scroll flex-grow-1 min-w-0">
-      <div className="d-inline-flex p-1 rounded-pill gap-1 align-items-center bg-light">
+      {/* `surface-tabs` sizes the bar to match the workflow selector beside it */}
+      <div className="surface-tabs d-inline-flex p-1 rounded-pill gap-1 align-items-center bg-light">
         {tabs.map((tab) => (
           <Link
             key={tab.id}
