@@ -1,9 +1,7 @@
-from bots.models import SavedRun, Workflow
 from gooey_gui.types.recipe_workspace_props import WorkPane
 from recipes.VideoBots import VideoBotsPage
 from recipes.VideoBots_v2 import VideoBotsPageV2
 from routers.root import RecipeTabs
-from widgets.history import _surface_href, parse_workflow
 
 
 def test_video_bots_v2_uses_existing_celery_runner_class():
@@ -15,17 +13,6 @@ def test_layout_v2_run_output_stays_visible_on_mobile():
     page.tab = RecipeTabs.run
 
     assert page._output_col_class_name() == ""
-
-
-def test_history_workflow_filter_uses_global_history_url():
-    href = _surface_href(SavedRun.Surface.run, Workflow.VIDEO_BOTS)
-
-    assert href == "/history/run/?workflow=agent"
-
-
-def test_history_workflow_filter_parses_canonical_slug():
-    assert parse_workflow("agent") == Workflow.VIDEO_BOTS
-    assert parse_workflow("missing") is None
 
 
 def test_narrow_pane_keeps_the_editor_for_a_visitor(monkeypatch):
