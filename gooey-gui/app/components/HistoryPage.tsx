@@ -137,7 +137,13 @@ function OwnerFilter({ options }: { options: SurfaceTabData[] }) {
               dangerouslySetInnerHTML={{ __html: option.icon }}
             />
           )}
-          <span className="text-truncate">{option.title}</span>
+          {/* only a workspace name can be arbitrarily long, and the server caps it
+              at 30 characters; "Just me" is two words and never truncates, which
+              is also what stops it shrinking - a label that can ellipsize lets its
+              button shrink to nothing */}
+          <span className={option.id === "all" ? "text-truncate" : ""}>
+            {option.title}
+          </span>
         </Link>
       ))}
     </div>

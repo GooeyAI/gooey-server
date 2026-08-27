@@ -210,16 +210,6 @@
   min-height: 38px;
 }
 
-/* On a phone the group still runs out of room, capped name or not. Only the
-   workspace name gives way - "Just me" is two words and keeps them. */
-.history-header-controls .btn-group .btn:first-child {
-  flex: 0 0 auto;
-}
-
-.history-header-controls .btn-group .btn:last-child {
-  min-width: 0;
-}
-
 /* Phone: the controls take the full row and centre. `safe` drops the tabs back to
    flex-start once they overflow - centred overflow can't be scrolled back. */
 @media (max-width: 425px) {
