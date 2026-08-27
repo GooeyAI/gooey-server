@@ -137,7 +137,6 @@
 }
 
 .recent-card-run-status-dot {
-  background: #d9a642;
   border-radius: 999px;
   flex-shrink: 0;
   height: 0.5rem;
@@ -146,6 +145,7 @@
 
 .recent-card-run-status--running .recent-card-run-status-dot {
   animation: recent-card-run-status-pulse 0.8s ease-in-out infinite;
+  background: #2275d7;
 }
 
 .recent-card-run-status--starting .recent-card-run-status-dot,
@@ -170,11 +170,10 @@
   }
 }
 
-/* The tab bar sits beside the workflow selector, so it matches that control's
-   height exactly: 4px of padding each side around a 34px pill makes 42, which
-   is FILTER_HEIGHT in HistoryPage.tsx. */
+/* 4px around a 34px pill makes 42 - FILTER_HEIGHT in HistoryPage.tsx, the height
+   of the workflow selector beside it */
 .surface-tabs {
-  padding: 4px !important;
+  padding: 4px;
   position: relative;
 }
 
@@ -182,15 +181,13 @@
   font-size: 0.9rem;
   line-height: 1.5;
   min-height: 34px;
-  padding: 0 0.75rem !important;
+  padding: 0 0.75rem;
 }
 
-/* No scrollbar: it would cut across a rounded track, and on macOS it is hidden
-   until you scroll anyway - so it can't be the thing that tells you to. */
+/* the fade and chevrons signal overflow instead of a scrollbar, which would cut
+   across the rounded track */
 .surface-tabs-scroll {
-  /* tighter than the bootstrap gap it replaces: wide gaps between transparent
-     pills read as holes in the bar rather than as spacing */
-  gap: 2px !important;
+  gap: 2px;
   scrollbar-width: none;
 }
 
@@ -198,15 +195,11 @@
   display: none;
 }
 
-/* The Type dropdown keeps a fixed share of the heading's line rather than
-   growing with its longest workflow name. */
 .history-type-filter {
   width: 240px;
 }
 
-/* .gui-input carries margin-bottom: 0.9rem for stacked forms. On this row the
-   flex box centres that margin along with the control, which lifts the dropdown
-   off the line the toggle sits on. */
+/* .gui-input's stacked-form margin lifts the dropdown off this row's line */
 .history-type-filter .gui-input {
   margin-bottom: 0;
 }
@@ -215,12 +208,17 @@
    height - FILTER_HEIGHT in HistoryPage.tsx */
 .history-header-controls .btn-group .btn {
   min-height: 42px;
+  /* let a long workspace name ellipsize rather than overflow the group */
+  min-width: 0;
+  overflow: hidden;
 }
 
-/* Mobile L (425px) and down. At that width a right-aligned control group reads
-   as a stray rather than as alignment, so it takes the full row and centres,
-   and the tabs centre with it. `safe` drops the tabs back to flex-start once
-   they overflow - centred overflow can't be scrolled back to its first item. */
+.history-header-controls .btn-group .btn > .text-truncate {
+  min-width: 0;
+}
+
+/* Phone: the controls take the full row and centre. `safe` drops the tabs back to
+   flex-start once they overflow - centred overflow can't be scrolled back. */
 @media (max-width: 425px) {
   .surface-tabs-scroll {
     justify-content: safe center;
@@ -234,14 +232,13 @@
   .history-type-filter {
     width: 100%;
   }
+
+  .history-header-controls .btn-group {
+    width: 100%;
+  }
 }
 
-/* Fade the trailing edge, the way Material leaves a tab half-visible: a cut-off
-   tab dissolving into the track reads as "there is more". The gradient is the
-   track's own colour, so where no tab reaches the edge it paints grey on grey
-   and disappears - no need to detect whether the bar actually overflows. */
-/* Fade and chevron are gated on there being more that way: at either end of the
-   strip the outermost tab has to read as a tab, not as something greyed out. */
+/* Fade the edge that has more tabs beyond it, in the track's own colour. */
 .surface-tabs--more::after,
 .surface-tabs--less::before {
   bottom: 0;
@@ -252,9 +249,6 @@
   width: 4rem;
 }
 
-/* Flush to the track's edge, not inset: a gap there lets letters scroll past
-   unfaded and surface as specks beyond the chevron. Only the corners on that
-   side are rounded - rounding the far side would reopen the same gap. */
 .surface-tabs--more::after {
   background: linear-gradient(
     to right,
@@ -279,9 +273,6 @@
   left: 0;
 }
 
-/* No disc behind these: the active tab is already a white pill, and a second one
-   at the end of the same bar reads as another tab. The fade underneath is opaque
-   by the time it reaches them, so bare strokes sit on flat track. */
 .surface-tabs-scroll-btn {
   align-items: center;
   background: transparent;
@@ -299,8 +290,6 @@
   z-index: 1;
 }
 
-/* colour only on hover: a filled shape here has to be either a disc, which
-   fights the track's rounded end, or a pill, which reads as another tab */
 .surface-tabs-scroll-btn:hover {
   color: #212529;
 }

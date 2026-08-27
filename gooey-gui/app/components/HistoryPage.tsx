@@ -34,20 +34,15 @@ export function HistoryPage({
   empty_message,
 }: CustomComponentProps & HistoryPageProps) {
   return (
-    <div className="container-xxl my-4">
-      {/* "Type" is the workflow dropdown's own label; it and the owner toggle sit
-          right-aligned on the heading's line, which the three of them fit in at
-          ~725px. The tab strip gets the row below to itself - it is the one
-          control that wants the whole width. */}
+    // `sidebar_page_wrapper` already supplies the container-xxl
+    <div className="my-4">
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-        {/* mt-0 as well as mb-0: the app gives h1 a 20px top margin, and flex
-            centres the margin box, which drops the word 10px below the controls */}
+        {/* mt-0 as well as mb-0: flex centres the margin box, and the app gives h1 a
+            20px top margin */}
         <h1 className="my-0 d-flex align-items-baseline gap-2">
           <span>{title}</span>
-          {/* the sidebar's own History icon. On the baseline and sized to the
-              heading's cap height, so it sits like a letter rather than floating
-              above the word - centring lands it high, the line box it centres in
-              being taller than the letters themselves. */}
+          {/* on the baseline and sized to the heading's cap height, so it sits
+              like a letter rather than floating above the word */}
           <i
             className="fa-regular fa-history text-muted fs-4"
             aria-hidden="true"
@@ -62,9 +57,7 @@ export function HistoryPage({
         </div>
       </div>
 
-      <div className="mb-4">
-        <SurfaceSelector tabs={surface_tabs} />
-      </div>
+      <SurfaceSelector tabs={surface_tabs} />
 
       <HistoryCardGrid
         cards={cards}
@@ -91,8 +84,8 @@ export function HistoryCardGrid({
       {cards.length === 0 ? (
         <p className="text-muted">{emptyMessage}</p>
       ) : (
-        // one card per row on a phone: two makes each ~173px wide, and a 16:10
-        // preview of that is too short for a chat to fit without clipping
+        // one card per row on a phone: at two the 16:10 preview is too short for
+        // a chat to fit without clipping
         <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
           {cards.map((card, i) => (
             <div key={`${card.href}-${i}`} className="col">
@@ -116,7 +109,7 @@ export function HistoryCardGrid({
 function OwnerFilter({ options }: { options: SurfaceTabData[] }) {
   if (options.length === 0) return null;
   return (
-    <div className="btn-group flex-shrink-0" role="group">
+    <div className="btn-group min-w-0" role="group">
       {options.map((option) => (
         <Link
           key={option.id}
@@ -174,6 +167,9 @@ function WorkflowFilter({ options }: { options: WorkflowFilterOption[] }) {
             isClearable={false}
             styles={{
               control: (base) => ({ ...base, minHeight: FILTER_HEIGHT }),
+              // above the tab strip's scroll chevrons (z-index 1), which come
+              // later in the document and drew through the open menu
+              menu: (base) => ({ ...base, zIndex: 5 }),
             }}
             className="mb-0 text-nowrap"
             placeholder='<i class="fa-regular fa-gift"></i> Type'
@@ -267,13 +263,11 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
 
   if (tabs.length === 0) return null;
   return (
-    // the track is the full width of the row and scrolls its tabs inside, so
-    // both its ends stay round - a track that hugs its tabs gets sliced through
-    // the middle by the scroll container, which reads as broken rather than as
-    // "there is more". `surface-tabs` also sizes it to the selector beside it.
+    // the track is the full width of the row and scrolls its tabs inside, so both
+    // its ends stay round
     <div
       className={
-        "surface-tabs rounded-pill bg-light flex-grow-1 min-w-0" +
+        "surface-tabs rounded-pill bg-light mb-4" +
         (canScrollLeft ? " surface-tabs--less" : "") +
         (canScrollRight ? " surface-tabs--more" : "")
       }
@@ -292,7 +286,7 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
       )}
       <div
         ref={scrollerRef}
-        className="surface-tabs-scroll d-flex gap-1 align-items-center overflow-auto"
+        className="surface-tabs-scroll d-flex align-items-center overflow-auto"
       >
         {tabs.map((tab) => (
           <Link
@@ -300,7 +294,7 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
             ref={tab.active ? activeRef : undefined}
             to={tab.href}
             className={
-              "btn rounded-pill px-3 py-2 border-0 d-flex align-items-center gap-2 text-body text-decoration-none text-nowrap flex-shrink-0 workflow-tab-pill " +
+              "btn rounded-pill border-0 d-flex align-items-center gap-2 text-body text-decoration-none text-nowrap flex-shrink-0 workflow-tab-pill " +
               (tab.active ? "bg-white active" : "bg-transparent")
             }
           >

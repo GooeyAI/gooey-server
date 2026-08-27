@@ -38,8 +38,6 @@ HISTORY_PAGE_SIZE = 24
 
 app = CustomAPIRouter()
 
-
-# "just me" is the default, so the param only ever appears as ?for=all
 OWNER_PARAM = "for"
 OWNER_ALL = "all"
 OWNER_ME = "me"
@@ -102,6 +100,9 @@ def _build_owner_options(
     workflow: Workflow | None,
     mine_only: bool,
 ) -> list[SurfaceTabData]:
+    # a personal workspace holds nobody else's runs, so there is nothing to choose between
+    if workspace.is_personal:
+        return []
     return [
         SurfaceTabData(
             id=OWNER_ME,
@@ -124,18 +125,12 @@ def _build_owner_options(
 
 
 def parse_workflow(slug: str) -> Workflow | None:
+    from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+
     if not slug:
         return None
-    normalized_slug = slug.lower()
-    return next(
-        (
-            workflow
-            for workflow in Workflow
-            if normalized_slug
-            in {page_slug.lower() for page_slug in workflow.page_cls.slug_versions}
-        ),
-        None,
-    )
+    page_cls = page_slug_map.get(normalize_slug(slug))
+    return page_cls and page_cls.workflow
 
 
 def build_meta_tags(url: str):
@@ -178,7 +173,7 @@ def _load_history(
     cards = [
         history_card(sr, author=author_from_user(sr.created_by, user)) for sr in runs
     ]
-    return cards, _load_more_href(request, next_cursor)
+    return cards, load_more_href(request, next_cursor)
 
 
 def _build_workflow_options(
@@ -194,8 +189,14 @@ def _build_workflow_options(
             active=active_workflow is None,
         )
     ]
-    for metadata in WorkflowMetadata.objects.all().order_by("-priority"):
-        workflow = Workflow(metadata.workflow)
+    workflows = _filterable_workflows(active_workflow)
+    metadata_by_workflow = WorkflowMetadata.objects.in_bulk(
+        workflows, field_name="workflow"
+    )
+    for workflow in workflows:
+        metadata = metadata_by_workflow.get(workflow)
+        if metadata is None:
+            continue
         options.append(
             WorkflowFilterOption(
                 id=workflow.page_cls.canonical_slug(),
@@ -205,6 +206,19 @@ def _build_workflow_options(
             )
         )
     return options
+
+
+def _filterable_workflows(active_workflow: Workflow | None) -> list[Workflow]:
+    """The recipes still on offer, in /explore's order, plus whatever is filtered on now.
+
+    Every workflow ever shipped has a `WorkflowMetadata` row, retired ones included.
+    """
+    from daras_ai_v2.all_pages import all_home_pages
+
+    workflows = [page_cls.workflow for page_cls in all_home_pages]
+    if active_workflow is not None and active_workflow not in workflows:
+        workflows.append(active_workflow)
+    return workflows
 
 
 def _build_surface_tabs(
@@ -226,7 +240,6 @@ def _build_surface_tabs(
 
 
 def history_href_for_workflow(workflow: Workflow) -> str:
-    """The global History page, filtered to one recipe. v2's answer to /<recipe>/history."""
     href = furl(get_route_path(history_page))
     href.args["workflow"] = workflow.page_cls.canonical_slug()
     return str(href)
@@ -238,7 +251,6 @@ def _surface_href(
     *,
     mine_only: bool = True,
 ) -> str:
-    """Every control rebuilds the whole url, so no filter drops the others."""
     href = furl(get_route_path(history_page, path_params={"surface": surface.name}))
     if workflow is not None:
         href.args["workflow"] = workflow.page_cls.canonical_slug()
@@ -247,7 +259,7 @@ def _surface_href(
     return str(href)
 
 
-def _load_more_href(request: Request, next_cursor: dict[str, str] | None) -> str | None:
+def load_more_href(request: Request, next_cursor: dict[str, str] | None) -> str | None:
     if not next_cursor:
         return None
     f = furl(request.url).set(origin=None)

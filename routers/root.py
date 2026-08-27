@@ -417,15 +417,18 @@ def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
     from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
     from daras_ai_v2.layout_v2 import can_use_layout_v2
     from widgets.history import history_href_for_workflow
 
-    # v2 has one History, not one per recipe - send this slug's runs to it as a
-    # filter. v1 pages keep their own tab, and since which one you get depends on
-    # the user, this redirect is 302: a 301 would be cached against the next
-    # visitor, who may not be on v2 at all.
-    page_cls = page_slug_map.get(normalize_slug(page_slug))
+    normalized_slug = normalize_slug(page_slug)
+    page_cls = page_slug_map.get(normalized_slug)
     if page_cls and can_use_layout_v2(request):
+        # a v2 fork keeps this tab, renamed Usage
+        if normalized_slug in page_slug_map_v2:
+            return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
+        # otherwise v2 has one History for every recipe - 302, since which page you get
+        # depends on the user
         return RedirectResponse(
             history_href_for_workflow(page_cls.workflow), status_code=302
         )
