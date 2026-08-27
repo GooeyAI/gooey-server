@@ -9,7 +9,7 @@ import type {
   TopBarMenuItem,
 } from "@gooey-types/recipe_top_bar_props";
 import type { WorkspaceView } from "@gooey-types/recipe_workspace_props";
-import { Link, useNavigate, useNavigation } from "@remix-run/react";
+import { Link, useNavigate } from "@remix-run/react";
 import {
   useAppShellPanel,
   useNavDrawer,
@@ -97,8 +97,6 @@ export function RecipeTopBar({
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const navigation = useNavigation();
-  const submitDisabled = navigation.state !== "idle";
   const {
     layout,
     storedLayout,
@@ -411,7 +409,6 @@ export function RecipeTopBar({
             items={titleEntries}
             open={titleMenuOpen && !isNarrow}
             submitIntentKey={submit_intent_key}
-            submitDisabled={submitDisabled}
             onDismiss={closeMenus}
           />
         </div>
@@ -482,7 +479,6 @@ export function RecipeTopBar({
                 name={submit_intent_key}
                 value={encodeSubmitIntent(publish_intent)}
                 className="gooey-topbar-action d-lg-none"
-                disabled={submitDisabled}
                 title={
                   has_unpublished_changes
                     ? `${publish_label} (unpublished changes)`
@@ -517,7 +513,6 @@ export function RecipeTopBar({
               items={overflowEntries}
               open={overflowOpen}
               submitIntentKey={submit_intent_key}
-              submitDisabled={submitDisabled}
               onDismiss={closeMenus}
             />
           </div>
@@ -570,7 +565,6 @@ export function RecipeTopBar({
               style={style}
               title={integration.label}
               aria-label={integration.label}
-              disabled={submitDisabled}
             >
               {content}
             </button>
@@ -611,7 +605,6 @@ export function RecipeTopBar({
               items={publishEntries}
               open={publishMenuOpen}
               submitIntentKey={submit_intent_key}
-              submitDisabled={submitDisabled}
               onDismiss={closeMenus}
             />
           </div>
@@ -659,7 +652,6 @@ export function RecipeTopBar({
             "gooey-topbar-run",
             isRunning && "gooey-topbar-run-stop"
           )}
-          disabled={submitDisabled}
           onClick={handleRun}
           title={isRunning ? "Stop this run" : "Run"}
           aria-label={isRunning ? "Stop this run" : "Run"}
@@ -721,7 +713,6 @@ export function RecipeTopBar({
               "gooey-topbar-runbar-run",
               isRunning && "gooey-topbar-runbar-run-stop"
             )}
-            disabled={submitDisabled}
             onClick={handleRun}
             title={isRunning ? "Stop this run" : "Run"}
             aria-label={isRunning ? "Stop this run" : "Run"}
@@ -739,7 +730,6 @@ export function RecipeTopBar({
         <MobileActionSheet
           entries={sheetEntries}
           submitIntentKey={submit_intent_key}
-          submitDisabled={submitDisabled}
           onDismiss={() => setSheetOpen(false)}
         />
       )}
@@ -751,13 +741,11 @@ function Menu({
   items,
   open,
   submitIntentKey,
-  submitDisabled,
   onDismiss,
 }: {
   items: MenuEntry[];
   open: boolean;
   submitIntentKey: string;
-  submitDisabled: boolean;
   onDismiss: () => void;
 }) {
   if (!open || !items.length) return null;
@@ -801,7 +789,6 @@ function Menu({
                 ? encodeSubmitIntent(item.target.intent)
                 : undefined
             }
-            disabled={item.target?.kind === "submit" && submitDisabled}
             className={clsx(
               "gooey-topbar-menu-item",
               item.isDanger && "text-danger",

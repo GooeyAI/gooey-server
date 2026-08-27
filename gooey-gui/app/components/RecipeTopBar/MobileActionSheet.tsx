@@ -24,12 +24,10 @@ export type SheetEntry = {
 export function MobileActionSheet({
   entries,
   submitIntentKey,
-  submitDisabled,
   onDismiss,
 }: {
   entries: SheetEntry[];
   submitIntentKey: string;
-  submitDisabled: boolean;
   onDismiss: () => void;
 }) {
   // Escape closes it. Pointer dismissal is the scrim's job below - it covers the whole
@@ -111,7 +109,6 @@ export function MobileActionSheet({
                   ? encodeSubmitIntent(entry.submitIntent)
                   : undefined
               }
-              disabled={Boolean(entry.submitIntent && submitDisabled)}
               className="gooey-sheet-item"
               role="menuitem"
               onClick={() => {
