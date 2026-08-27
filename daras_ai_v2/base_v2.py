@@ -1254,11 +1254,21 @@ class BasePage(BasePageV1):
         if submitted:
             self.submit_and_redirect()
 
-        # h-100 so a percentage-height child (the chat widget) resolves against the
-        # scrolling body area rather than the viewport
+        # A flex column, not a plain block. The output is often something that sizes itself
+        # to the column - the chat widget fills whatever it is given - and every one of the
+        # notices around it is a sibling: the failure box above, the cancelled warning, the
+        # spinner while a run is going. The widget used to ask for `height: 100%`, which in a
+        # block meant the full column no matter what was stacked above it, so the column
+        # overflowed by however tall the notice was and `.recipe-workspace-preview`'s
+        # `overflow: hidden` clipped the bottom off - taking the end of the widget's own
+        # scroll region and part of its composer with it.
+        #
+        # Same shape the editor column uses: notices size to themselves, the output takes
+        # what is left. `minHeight: 0` throughout, or a flex child refuses to shrink below
+        # its content and the clipping comes straight back.
         with gui.div(
+            className="d-flex flex-column " + self._output_col_class_name(),
             style=dict(height="100%", minHeight=0),
-            className=self._output_col_class_name(),
         ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
@@ -1267,7 +1277,11 @@ class BasePage(BasePageV1):
             # render outputs
             if not is_deleted:
                 self.render_is_cancelled()
-                self.render_output()
+                with gui.div(
+                    className="flex-grow-1 d-flex flex-column",
+                    style=dict(minHeight=0),
+                ):
+                    self.render_output()
 
             if run_state in (RecipeRunState.running, RecipeRunState.starting):
                 self._render_running_output()

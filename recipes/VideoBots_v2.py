@@ -516,7 +516,12 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             config=config,
             messages=messages,
             run_url=str(self.request.url),
-            style=dict(height="100%", minHeight=0),
+            # Sized by the flex column in `_render_output_col`, not by `height: 100%`: the
+            # widget shares that column with the failure box, the cancelled notice and the
+            # run spinner, and a percentage height would claim the whole column regardless of
+            # what is above it. `minHeight: 0` so it can shrink when one of them appears.
+            className="flex-grow-1",
+            style=dict(minHeight=0),
         )
 
     @cached_property
