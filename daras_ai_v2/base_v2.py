@@ -15,10 +15,8 @@ from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 
 from daras_ai_v2.base import (
-    MAX_SEED,
     RecipeRunState,
     StateKeys,
-    gooey_rng,
 )
 from daras_ai_v2.base import (
     BasePage as BasePageV1,
@@ -923,11 +921,6 @@ class BasePage(BasePageV1):
     def _render_output_col(self, *, submitted: bool = False, is_deleted: bool = False):
         assert inspect.isgeneratorfunction(self.run)
 
-        if gui.session_state.get(StateKeys.pressed_randomize):
-            gui.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
-            gui.session_state.pop(StateKeys.pressed_randomize, None)
-            submitted = True
-
         if submitted:
             self.submit_and_redirect()
 
@@ -995,13 +988,6 @@ class BasePage(BasePageV1):
     def get_runner_page_cls(cls):
         """The stable page class serialized into Celery jobs."""
         return cls
-
-    def _render_regenerate_button(self):
-        if "seed" in self.RequestModel.schema_json():
-            randomize = gui.button(f"{icons.regenerate} Regenerate", type="tertiary")
-            if randomize:
-                gui.session_state[StateKeys.pressed_randomize] = True
-                gui.rerun()
 
 
 FILL_HEIGHT_EDITOR_CSS = """

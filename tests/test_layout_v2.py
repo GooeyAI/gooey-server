@@ -77,6 +77,10 @@ def test_video_bots_v2_inherits_business_logic():
     assert VideoBotsPageV2.run_v2 is VideoBotsPage.run_v2
     assert VideoBotsPageV2.bind_tool is BasePageV1.bind_tool
     assert VideoBotsPageV2.render_steps is VideoBotsPage.render_steps
+    assert (
+        VideoBotsPageV2._render_regenerate_button
+        is VideoBotsPage._render_regenerate_button
+    )
 
 
 def test_generated_v2_component_names_match_registry():
