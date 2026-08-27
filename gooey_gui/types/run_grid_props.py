@@ -5,9 +5,11 @@ import pydantic
 from gooey_gui.types.home_page_props import WorkflowCardData
 
 
-class UsagePageProps(pydantic.BaseModel):
-    _component: str = "UsagePage"
+class RunGridProps(pydantic.BaseModel):
+    """A page of run cards. Shared by every tab that lists runs."""
+
+    _component: str = "RunGrid"
 
     cards: list[WorkflowCardData] = []
     load_more_href: str | None = None
-    empty_message: str = "No usage yet."
+    empty_message: str = "Nothing here yet."

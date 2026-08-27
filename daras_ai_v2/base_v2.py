@@ -18,7 +18,7 @@ from time import sleep
 
 import sentry_sdk
 import yarl
-from django.db.models import Q, Sum
+from django.db.models import Q, QuerySet, Sum
 from django.utils.text import slugify
 from fastapi import HTTPException
 from furl import furl
@@ -73,10 +73,9 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarIntegration,
     TopBarView,
 )
-from gooey_gui.types.usage_page_props import UsagePageProps
+from gooey_gui.types.run_grid_props import RunGridProps
 from daras_ai_v2.urls import paginate_button, paginate_queryset
 from daras_ai_v2.user_date_widgets import render_local_dt_attrs
-from daras_ai_v2.utils import get_relative_time
 from daras_ai_v2.variables_widget import variables_input
 from functions.base_llm_tool import (
     BaseLLMTool,
@@ -111,6 +110,7 @@ from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
 )
+from widgets.history import history_href_for_workflow
 from widgets.workflow_cards import author_from_user, history_card
 from widgets.workflow_share import render_share_button, render_share_modal
 from workspaces.models import Workspace, WorkspaceMembership
@@ -131,7 +131,7 @@ STARTING_STATE = "Starting..."
 # Reading width for the working column when it has the row to itself (the Config tab). Split
 # needs none - the preview column caps it there.
 SOLO_COL_MAX_WIDTH = "1420px"
-USAGE_PAGE_SIZE = 24
+RUN_GRID_PAGE_SIZE = 24
 
 
 def format_credits_as_dollars(credits: int) -> str:
@@ -937,7 +937,7 @@ class BasePage:
                     if self._can_show_builder() and not builder_thread_is_empty(self)
                     else ""
                 ),
-                history_href=self.current_app_url(RecipeTabs.history),
+                history_href=history_href_for_workflow(self.workflow),
             )
         )
 
@@ -1823,9 +1823,6 @@ class BasePage:
 
             case RecipeTabs.examples:
                 self._examples_tab()
-
-            case RecipeTabs.history:
-                self._history_tab()
 
             case RecipeTabs.usage:
                 self._usage_tab()
@@ -2946,71 +2943,39 @@ class BasePage:
 
         paginate_button(url=self.request.url, cursor=cursor)
 
-    def _history_tab(self):
-        self.ensure_authentication(anon_ok=True)
-
-        # Filter by workspace
-        qs = SavedRun.objects.filter(
-            workflow=self.workflow, workspace=self.current_workspace
-        )
-
-        if not self.is_current_user_admin():
-            qs = qs.exclude(surface=SavedRun.Surface.builder_prompt)
-
-        # Apply user filter if specified. A personal workspace gets the same
-        # treatment even though it has no "All" toggle to switch back with: it's
-        # still charged for every run its copilots serve over an integration or
-        # the API, and those aren't the owner's own runs. The Usage tab is where
-        # they belong.
-        for_param = self.request.query_params.get("for", "me")
-        if for_param != "all" and self.request.user:
-            qs = qs.filter(uid=self.request.user.uid).exclude(
-                surface=SavedRun.Surface.deployment
-            )
-
-        run_history, cursor = paginate_queryset(
-            qs=qs, ordering=["-updated_at"], cursor=self.request.query_params
-        )
-        if not run_history:
-            gui.write("No history yet")
-            return
-
-        grid_layout(3, run_history, self._render_run_preview)
-
-        paginate_button(url=self.request.url, cursor=cursor)
-
     def _usage_tab(self):
-        workspace = self._usage_workspace()
-        qs = (
-            SavedRun.objects.filter(workflow=self.workflow, workspace=workspace)
-            .filter(
-                Q(surface=SavedRun.Surface.deployment)
-                | Q(parent_version__published_run=self.current_pr)
-            )
-            .select_related(
+        qs = SavedRun.objects.filter(
+            workflow=self.workflow, workspace=self._usage_workspace()
+        ).filter(
+            Q(surface=SavedRun.Surface.deployment)
+            | Q(parent_version__published_run=self.current_pr)
+        )
+
+        self._render_run_grid(qs, empty_message="No usage yet.")
+
+    def _render_run_grid(self, qs: QuerySet[SavedRun], *, empty_message: str):
+        """The card grid behind History and Usage - same rows, different question."""
+        runs, next_cursor = paginate_queryset(
+            qs=qs.select_related(
                 "parent_version__published_run",
                 "workflow_metadata",
                 "created_by",
                 "message_thread__bot_conversation",
-            )
-        )
-        runs, next_cursor = paginate_queryset(
-            qs=qs,
+            ),
             ordering=["-updated_at"],
             cursor=self.request.query_params,
-            page_size=USAGE_PAGE_SIZE,
+            page_size=RUN_GRID_PAGE_SIZE,
         )
-        cards = [
-            history_card(
-                saved_run,
-                author=author_from_user(saved_run.created_by, self.request.user),
-            )
-            for saved_run in runs
-        ]
         gui.model_component(
-            UsagePageProps(
-                cards=cards,
-                load_more_href=self._usage_load_more_href(next_cursor),
+            RunGridProps(
+                cards=[
+                    history_card(
+                        sr, author=author_from_user(sr.created_by, self.request.user)
+                    )
+                    for sr in runs
+                ],
+                load_more_href=self._run_grid_load_more_href(next_cursor),
+                empty_message=empty_message,
             )
         )
 
@@ -3030,7 +2995,9 @@ class BasePage:
             return published_run.workspace
         return self.current_workspace
 
-    def _usage_load_more_href(self, next_cursor: dict[str, str] | None) -> str | None:
+    def _run_grid_load_more_href(
+        self, next_cursor: dict[str, str] | None
+    ) -> str | None:
         if not next_cursor:
             return None
         url = furl(self.request.url).set(origin=None)
@@ -3046,52 +3013,6 @@ class BasePage:
 
     def get_auth_url(self, next_url: str | None = None) -> str:
         return get_login_url(self.request, next_url)
-
-    def _render_run_preview(self, saved_run: SavedRun):
-        from daras_ai_v2.billing import left_and_right
-
-        published_run: PublishedRun | None = (
-            saved_run.parent_version.published_run if saved_run.parent_version else None
-        )
-        is_latest_version = published_run and published_run.saved_run == saved_run
-        tb = get_title_breadcrumbs(self, sr=saved_run, pr=published_run)
-
-        with gui.link(
-            to=saved_run.get_app_url(), className="text-decoration-none text-reset"
-        ):
-            with gui.div(className="mb-1", style={"fontSize": "0.9rem"}):
-                if is_latest_version:
-                    gui.pill(
-                        published_run.get_share_badge_html(),
-                        unsafe_allow_html=True,
-                        className="border border-dark",
-                    )
-            gui.write(f"#### {tb.title_with_prefix()}")
-
-            author, _ = AppUser.objects.get_or_create_from_uid(saved_run.uid)
-            updated_at = saved_run.updated_at
-            left, right = left_and_right(className="container-margin-reset")
-            with left:
-                render_author_from_user(author)
-            with right:
-                if (
-                    updated_at
-                    and isinstance(updated_at, datetime.datetime)
-                    and not saved_run.run_status
-                ):
-                    gui.caption(
-                        f"{icons.time} {get_relative_time(updated_at)}",
-                        unsafe_allow_html=True,
-                    )
-
-            with gui.div(className="mt-2"):
-                if saved_run.run_status:
-                    started_at_text(saved_run.created_at)
-                    html_spinner(saved_run.run_status)
-                elif saved_run.error_msg:
-                    gui.error(saved_run.error_msg, unsafe_allow_html=True)
-                else:
-                    self.render_run_preview_output(saved_run.to_dict())
 
     def render_run_preview_output(self, state: dict):
         pass

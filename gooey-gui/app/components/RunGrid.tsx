@@ -1,15 +1,15 @@
 import "./HomePage/HomePage.css";
 
 import type { CustomComponentProps } from "~/components";
-import type { UsagePageProps } from "@gooey-types/usage_page_props";
+import type { RunGridProps } from "@gooey-types/run_grid_props";
 
 import { HistoryCardGrid } from "./HistoryPage";
 
-export function UsagePage({
+export function RunGrid({
   cards,
   load_more_href,
   empty_message,
-}: CustomComponentProps & UsagePageProps) {
+}: CustomComponentProps & RunGridProps) {
   return (
     <div className="container-xxl py-4">
       <HistoryCardGrid

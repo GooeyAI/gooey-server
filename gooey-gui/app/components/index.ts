@@ -16,7 +16,7 @@ export * from "./GooeyBuilderInlineEmbed";
 export * from "./GooeyEmbedTeardown";
 export * from "./GooeyPopover";
 export * from "./HistoryPage";
-export * from "./UsagePage";
+export * from "./RunGrid";
 export * from "./HomePage";
 export * from "./InsufficientCredits";
 export * from "./LoginForm";
