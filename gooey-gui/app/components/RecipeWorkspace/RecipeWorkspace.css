@@ -182,7 +182,8 @@
 /* The editor is framed like the preview - white, hairline, 12px - so the two read as
    siblings. On the content box rather than the pane, which animates its width.
 
-   Deliberately no `overflow: hidden`, unlike the prev
+   No `overflow: hidden` here, unlike the preview's frame: the model selector's menu has to
+   be able to leave this box. */
 .recipe-workspace-editor > .recipe-workspace-pane-content {
   background: #fff;
   border: 1px solid #e0ddd7;
@@ -210,14 +211,14 @@
      background between the two. `!important` to beat `pt-2`. About keeps its gutter - it is a
      card, and sits off the rule. */
   .v2-workspace-body:has(.recipe-workspace-editor.recipe-workspace-pane--solo),
-  .v2-workspace-body:has(.recipe-workspace-preview.recipe-workspace-pane--solo) {
+  .v2-workspace-body:has(
+      .recipe-workspace-preview.recipe-workspace-pane--solo
+    ) {
     padding-top: 0 !important;
   }
 
   /* Only the editor has a run bar under it to clear. */
-  .v2-workspace-body:has(
-      .recipe-workspace-editor.recipe-workspace-pane--solo
-    ) {
+  .v2-workspace-body:has(.recipe-workspace-editor.recipe-workspace-pane--solo) {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
   }
 
