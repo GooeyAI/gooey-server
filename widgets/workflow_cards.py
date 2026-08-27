@@ -28,7 +28,6 @@ if TYPE_CHECKING:
 CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
 
-# the badge shares the preview's top edge with the workflow icon
 RUN_STATUS_MAXLEN = 28
 
 
@@ -85,7 +84,6 @@ def sr_to_card(
     parent_pr = sr.parent_published_run()
     workflow = Workflow(sr.workflow)
     metadata = sr.get_workflow_metadata()
-    sender = sender_from_run(sr)
     return WorkflowCardData(
         title=f"{sr.get_surface_display()}: "
         + ((parent_pr and parent_pr.title) or workflow.label),
@@ -94,16 +92,13 @@ def sr_to_card(
         description=(parent_pr and parent_pr.notes) or None,
         preview=_sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata),
         author=author,
-        sender=sender,
+        sender=sender_from_run(sr),
         run_status=run_status_from_run(sr),
     )
 
 
 def run_status_from_run(sr: SavedRun) -> RunStatusData | None:
-    """What this run is doing, when that's still worth saying.
-
-    A finished run says nothing - a tick on every card is noise.
-    """
+    """What this run is doing - a finished run says nothing."""
     from daras_ai_v2.base import RecipeRunState
 
     if sr.is_cancelled:
@@ -124,16 +119,12 @@ def run_status_from_run(sr: SavedRun) -> RunStatusData | None:
 
 
 def sender_from_run(sr: SavedRun) -> SenderData | None:
-    """Who this run was for, when it came in over a bot integration.
-
-    Needs `message_thread__bot_conversation` selected to stay off the N+1 path.
-    """
+    """Needs `message_thread__bot_conversation` selected to stay off the N+1 path."""
     if sr.platform is None:
         return None
     platform = Platform(sr.platform)
+    # a run can carry a platform without a conversation behind it
     convo = sr.message_thread and sr.message_thread.bot_conversation
-    # a run can carry a platform without a conversation behind it - the icon
-    # alone still says where it came from
     return SenderData(
         icon=platform.get_icon(),
         label=mask_user_id(convo.get_display_name() or "") if convo else "",
@@ -141,7 +132,6 @@ def sender_from_run(sr: SavedRun) -> SenderData | None:
 
 
 def mask_user_id(value: str) -> str:
-    """Keep enough of an id to recognise a returning sender, not enough to reach them."""
     value = value.strip()
     if len(value) < len("123xxx1233"):
         return value

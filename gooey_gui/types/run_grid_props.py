@@ -6,7 +6,7 @@ from gooey_gui.types.home_page_props import WorkflowCardData
 
 
 class RunGridProps(pydantic.BaseModel):
-    """A page of run cards. Shared by every tab that lists runs."""
+    """A page of run cards."""
 
     _component: str = "RunGrid"
 

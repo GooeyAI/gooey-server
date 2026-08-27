@@ -170,24 +170,24 @@
   }
 }
 
-/* 4px around a 34px pill makes 42 - FILTER_HEIGHT in HistoryPage.tsx, the height
+/* 4px around a 30px pill makes 38 - FILTER_HEIGHT in HistoryPage.tsx, the height
    of the workflow selector beside it */
 .surface-tabs {
-  padding: 4px;
+  padding: 4px !important;
   position: relative;
 }
 
 .surface-tabs .workflow-tab-pill {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   line-height: 1.5;
-  min-height: 34px;
-  padding: 0 0.75rem;
+  min-height: 30px;
+  padding: 0 0.75rem !important;
 }
 
 /* the fade and chevrons signal overflow instead of a scrollbar, which would cut
    across the rounded track */
 .surface-tabs-scroll {
-  gap: 2px;
+  gap: 2px !important;
   scrollbar-width: none;
 }
 
@@ -207,18 +207,16 @@
 /* the owner toggle shares the line with that dropdown, so it takes the same
    height - FILTER_HEIGHT in HistoryPage.tsx */
 .history-header-controls .btn-group .btn {
-  min-height: 42px;
+  min-height: 38px;
 }
 
-/* Only the workspace name gives way to a narrow row - "Just me" is two words and
-   keeps them. Bootstrap makes every button in a group `flex: 1 1 auto`, so both
-   were shrinking and a long workspace name pushed "Just me" into an ellipsis. */
+/* On a phone the group still runs out of room, capped name or not. Only the
+   workspace name gives way - "Just me" is two words and keeps them. */
 .history-header-controls .btn-group .btn:first-child {
   flex: 0 0 auto;
 }
 
-.history-header-controls .btn-group .btn:last-child,
-.history-header-controls .btn-group .btn:last-child > .text-truncate {
+.history-header-controls .btn-group .btn:last-child {
   min-width: 0;
 }
 

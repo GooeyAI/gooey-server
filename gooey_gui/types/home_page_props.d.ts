@@ -24,9 +24,6 @@ export interface AuthorData {
   name: string;
   photo_url: string | null;
 }
-/**
- * A run's state, when it's worth saying out loud - a finished run says nothing.
- */
 export interface RunStatusData {
   state: "starting" | "running" | "failed" | "cancelled";
   label: string;

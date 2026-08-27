@@ -110,7 +110,7 @@ from widgets.workflow_image import (
     render_change_notes_input,
     render_workflow_photo_uploader,
 )
-from widgets.history import history_href_for_workflow
+from widgets.history import history_href_for_workflow, load_more_href
 from widgets.workflow_cards import author_from_user, history_card
 from widgets.workflow_share import render_share_button, render_share_modal
 from workspaces.models import Workspace, WorkspaceMembership
@@ -2973,7 +2973,7 @@ class BasePage:
                     )
                     for sr in runs
                 ],
-                load_more_href=self._run_grid_load_more_href(next_cursor),
+                load_more_href=load_more_href(self.request, next_cursor),
                 empty_message="No usage yet.",
             )
         )
@@ -2993,15 +2993,6 @@ class BasePage:
         if not published_run.is_root() and published_run.workspace_id:
             return published_run.workspace
         return self.current_workspace
-
-    def _run_grid_load_more_href(
-        self, next_cursor: dict[str, str] | None
-    ) -> str | None:
-        if not next_cursor:
-            return None
-        url = furl(self.request.url).set(origin=None)
-        url.query.params.update(next_cursor)
-        return str(url)
 
     def ensure_authentication(self, next_url: str | None = None, anon_ok: bool = False):
         if not self.request.user or (self.request.user.is_anonymous and not anon_ok):

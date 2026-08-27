@@ -20,7 +20,6 @@ from gooeysite.bg_db_conn import get_celery_result_db_safe
 from . import Platform
 from .workflow import Workflow, WorkflowMetadata
 
-# how long a run can go without reporting progress before it's presumed dead
 RUN_STALE_AFTER = datetime.timedelta(minutes=10)
 
 if typing.TYPE_CHECKING:
@@ -282,12 +281,7 @@ class SavedRun(models.Model):
 
     @property
     def is_stale(self) -> bool:
-        """Whether this run stopped reporting progress long enough ago to be dead.
-
-        Nothing kills a celery worker on a clock, and `run_status` is only ever
-        cleared by the runner's own `finally`, so a killed run keeps claiming to
-        be running forever.
-        """
+        """A killed worker never clears `run_status`, so a stale row still claims to run."""
         return bool(
             self.run_status
             and self.updated_at
@@ -295,11 +289,6 @@ class SavedRun(models.Model):
         )
 
     def get_run_state(self) -> "RecipeRunState":
-        """`BasePage.get_run_state` over this row's columns instead of a live state dict.
-
-        Defers to that ladder rather than repeating it, and adds the one thing a
-        single row knows and a state dict cannot: that the worker went away.
-        """
         from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
 
         if self.is_stale:

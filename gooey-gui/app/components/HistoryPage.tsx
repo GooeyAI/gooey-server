@@ -22,7 +22,7 @@ import type {
 // the tab bar and the workflow selector are set to the same height; the bar
 // builds it out of padding and pill (see .surface-tabs), react-select needs
 // telling directly
-const FILTER_HEIGHT = 42;
+const FILTER_HEIGHT = 38;
 
 export function HistoryPage({
   title,
@@ -57,7 +57,9 @@ export function HistoryPage({
         </div>
       </div>
 
-      <SurfaceSelector tabs={surface_tabs} />
+      <div className="mb-4">
+        <SurfaceSelector tabs={surface_tabs} />
+      </div>
 
       <HistoryCardGrid
         cards={cards}
@@ -267,7 +269,7 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
     // its ends stay round
     <div
       className={
-        "surface-tabs rounded-pill bg-light mb-4" +
+        "surface-tabs rounded-pill bg-light flex-grow-1 min-w-0" +
         (canScrollLeft ? " surface-tabs--less" : "") +
         (canScrollRight ? " surface-tabs--more" : "")
       }
@@ -286,7 +288,7 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
       )}
       <div
         ref={scrollerRef}
-        className="surface-tabs-scroll d-flex align-items-center overflow-auto"
+        className="surface-tabs-scroll d-flex gap-1 align-items-center overflow-auto"
       >
         {tabs.map((tab) => (
           <Link
@@ -294,7 +296,7 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
             ref={tab.active ? activeRef : undefined}
             to={tab.href}
             className={
-              "btn rounded-pill border-0 d-flex align-items-center gap-2 text-body text-decoration-none text-nowrap flex-shrink-0 workflow-tab-pill " +
+              "btn rounded-pill px-3 py-2 border-0 d-flex align-items-center gap-2 text-body text-decoration-none text-nowrap flex-shrink-0 workflow-tab-pill " +
               (tab.active ? "bg-white active" : "bg-transparent")
             }
           >

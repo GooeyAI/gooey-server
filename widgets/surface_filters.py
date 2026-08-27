@@ -9,9 +9,7 @@ from daras_ai_v2 import icons
 DEFAULT_SURFACE = SavedRun.Surface.run
 
 
-# Tab order: roughly how often a workspace looks at each, rather than the order
-# the enum happens to declare. A surface missing here sorts to the end, so a new
-# one shows up rather than vanishing.
+# tab order - roughly how often a workspace looks at each, admin-only ones last
 SURFACE_ORDER: list[SavedRun.Surface] = [
     SavedRun.Surface.run,
     SavedRun.Surface.deployment,
@@ -21,10 +19,11 @@ SURFACE_ORDER: list[SavedRun.Surface] = [
     SavedRun.Surface.analysis,
     SavedRun.Surface.bulk,
     SavedRun.Surface.export,
+    SavedRun.Surface.builder_prompt,
+    SavedRun.Surface.internal,
 ]
 
-# `Surface.label` names what made the run ("Deployment"); a tab names what you
-# find under it. Only the ones that actually differ - the rest fall through.
+# tab names, where they differ from `Surface.label`; the rest fall through
 SURFACE_LABELS: dict[SavedRun.Surface, str] = {
     SavedRun.Surface.run: "Runs",
     SavedRun.Surface.deployment: "Deployed Chats",
@@ -33,9 +32,6 @@ SURFACE_LABELS: dict[SavedRun.Surface, str] = {
     SavedRun.Surface.export: "Exports",
 }
 
-# Borrowed from wherever the app already draws these: the Run tab's runner, the
-# Deploy tab's four-platform strip, the API tab's rocket, and the Bulk Runner and
-# Functions workflows' own emoji.
 SURFACE_ICONS: dict[SavedRun.Surface, str] = {
     SavedRun.Surface.run: icons.run,
     SavedRun.Surface.deployment: (
@@ -74,14 +70,6 @@ def surface_label(surface: SavedRun.Surface) -> str:
 
 
 def visible_surfaces(user: AppUser | None) -> list[SavedRun.Surface]:
-    surfaces = sorted(SavedRun.Surface, key=_tab_position)
     if user and user.is_admin():
-        return surfaces
-    return [s for s in surfaces if s not in ADMIN_ONLY_SURFACES]
-
-
-def _tab_position(surface: SavedRun.Surface) -> int:
-    try:
-        return SURFACE_ORDER.index(surface)
-    except ValueError:
-        return len(SURFACE_ORDER)
+        return list(SURFACE_ORDER)
+    return [s for s in SURFACE_ORDER if s not in ADMIN_ONLY_SURFACES]

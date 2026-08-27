@@ -13,16 +13,6 @@ export interface WorkflowFilterOption {
   href: string;
   active: boolean;
 }
-/**
- * "Just me" vs the whole workspace.
- */
-export interface OwnerFilterOption {
-  id: string;
-  label: string;
-  icon_html: string;
-  href: string;
-  active: boolean;
-}
 export interface HistoryPageProps {
   title: string;
   owner_options: SurfaceTabData[];
@@ -57,9 +47,6 @@ export interface SenderData {
   icon: string;
   label: string;
 }
-/**
- * A run's state, when it's worth saying out loud - a finished run says nothing.
- */
 export interface RunStatusData {
   state: "starting" | "running" | "failed" | "cancelled";
   label: string;
