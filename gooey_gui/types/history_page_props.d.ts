@@ -28,6 +28,7 @@ export interface WorkflowCardData {
   description: string | null;
   author: AuthorData | null;
   sender: SenderData | null;
+  run_status: RunStatusData | null;
   preview: (ChatPreview | MediaPreview | IconPreview) | null;
   updated_at: string | null;
   run_count: number | null;
@@ -45,6 +46,13 @@ export interface SenderData {
   icon: string;
   label: string;
   title: string | null;
+}
+/**
+ * A run's state, when it's worth saying out loud - a finished run says nothing.
+ */
+export interface RunStatusData {
+  state: "starting" | "running" | "failed" | "cancelled";
+  label: string;
 }
 export interface ChatPreview {
   type: "chat";

@@ -9,6 +9,7 @@ import type {
   ChatPreview,
   IconPreview,
   MediaPreview,
+  RunStatusData,
   SenderData,
   WorkflowCardData,
   WorkflowTabData,
@@ -17,6 +18,27 @@ import type {
 import { GooeyTooltip } from "../GooeyTooltip";
 
 export type CardPreview = ChatPreview | MediaPreview | IconPreview;
+
+function CardRunStatus({ runStatus }: { runStatus: RunStatusData }) {
+  return (
+    // sits opposite the workflow icon, so neither badge covers the other
+    <span
+      className={`recent-card-run-status recent-card-run-status--${runStatus.state} position-absolute top-0 end-0 m-2 shadow-sm z-1`}
+    >
+      {/* a stopped run gets the stop glyph, everything else the marker dot -
+          same two markers BulkProgressCard uses for the same three states */}
+      {runStatus.state === "cancelled" ? (
+        <i
+          className="fa-solid fa-circle-stop recent-card-run-status-icon"
+          aria-hidden="true"
+        />
+      ) : (
+        <span className="recent-card-run-status-dot" />
+      )}
+      <span className="text-truncate">{runStatus.label}</span>
+    </span>
+  );
+}
 
 function CardSender({ sender }: { sender: SenderData }) {
   return (
@@ -156,6 +178,7 @@ export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
             />
           </span>
         )}
+        {card.run_status && <CardRunStatus runStatus={card.run_status} />}
         {card.preview && <PreviewContent preview={card.preview} />}
       </div>
 

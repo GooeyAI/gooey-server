@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import mimetypes
 from typing import TYPE_CHECKING
+
+from django.utils import timezone
 
 from app_users.models import AppUser
 from bots.models import Conversation, PublishedRun, SavedRun, Workflow
@@ -16,6 +19,7 @@ from gooey_gui.types.home_page_props import (
     ChatPreview,
     IconPreview,
     MediaPreview,
+    RunStatusData,
     SenderData,
     WorkflowCardData,
 )
@@ -26,6 +30,19 @@ if TYPE_CHECKING:
 
 CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
+
+# Nothing kills a celery worker on a clock, so a run whose status stopped moving
+# is indistinguishable from one still working. Past this, the card stops claiming
+# it's running - a permanent spinner on a dead run is worse than calling it early.
+RUN_STALE_AFTER = datetime.timedelta(minutes=10)
+
+# the badge shares the preview's top edge with the workflow icon, so a long
+# status line gets cut here rather than growing across it
+RUN_STATUS_MAXLEN = 28
+
+# `BasePage.STARTING_STATE`, normalised the way that page compares it. Copied
+# rather than imported: base_v2 imports this module.
+STARTING_STATE = "starting"
 
 # An id is masked to first-3 + last-4. Anything shorter would leak most of
 # itself to the mask, so it's shown whole instead - a display name like @seanb
@@ -88,7 +105,7 @@ def sr_to_card(
     metadata = sr.get_workflow_metadata()
     sender = sender_from_run(sr)
     return WorkflowCardData(
-        title=(parent_pr and parent_pr.title) or workflow.label,
+        title=_run_title(sr, (parent_pr and parent_pr.title) or workflow.label),
         href=sr.get_app_url(),
         workflow_icon=(metadata and (metadata.fa_icon or metadata.emoji)) or "",
         description=(parent_pr and parent_pr.notes) or None,
@@ -97,6 +114,40 @@ def sr_to_card(
         # takes the author's place rather than sitting next to it
         author=None if sender else author,
         sender=sender,
+        run_status=run_status_from_run(sr),
+    )
+
+
+def _run_title(sr: SavedRun, title: str) -> str:
+    """Name the surface a run came from, so a deployment doesn't read like a playground run."""
+    try:
+        surface = SavedRun.Surface(sr.surface)
+    except ValueError:
+        return title
+    return f"{surface.label}: {title}"
+
+
+def run_status_from_run(sr: SavedRun) -> RunStatusData | None:
+    """What this run is doing, when that's still worth saying.
+
+    Mirrors `BasePage.get_run_state`, off the model's own columns rather than the
+    state blob, plus the two things that page can't see from a single run: a
+    cancel, and a worker that stopped reporting.
+    """
+    if sr.is_cancelled:
+        return RunStatusData(state="cancelled", label="Cancelled")
+    if sr.error_msg:
+        return RunStatusData(state="failed", label="Failed")
+    if not sr.run_status:
+        # completed, or never started - neither needs a badge
+        return None
+    if sr.updated_at and timezone.now() - sr.updated_at > RUN_STALE_AFTER:
+        return RunStatusData(state="failed", label="Timed out")
+    if sr.run_status.lower().strip(". ") == STARTING_STATE:
+        return RunStatusData(state="starting", label="Starting")
+    return RunStatusData(
+        state="running",
+        label=truncate_text_words(sr.run_status, maxlen=RUN_STATUS_MAXLEN),
     )
 
 

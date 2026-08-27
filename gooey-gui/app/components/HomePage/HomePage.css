@@ -98,3 +98,80 @@
   max-width: 85%;
   font-size: 0.85rem;
 }
+
+/* Run state on a history card. Same palette and markers as BulkProgressCard -
+   an amber pulsing dot for work in flight, the stopped/error tints for the rest -
+   so a run reads the same here as it does on the bulk progress card. */
+.recent-card-run-status {
+  --run-status-accent: #070b1a;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 999px;
+  color: var(--run-status-accent);
+  display: inline-flex;
+  font-size: 0.75rem;
+  gap: 0.4rem;
+  line-height: 1.3;
+  /* leaves the workflow icon on the opposite corner uncovered */
+  max-width: calc(100% - 4rem);
+  padding: 0.2rem 0.55rem;
+}
+
+.recent-card-run-status--starting {
+  --run-status-accent: #59617d;
+}
+
+.recent-card-run-status--cancelled {
+  --run-status-accent: #9d7b1f;
+  background: #fff7d8;
+  border-color: #f0dc92;
+}
+
+.recent-card-run-status--failed {
+  --run-status-accent: #b42318;
+  background: #fff4f2;
+  border-color: #f5b8b0;
+}
+
+.recent-card-run-status-dot {
+  background: #d9a642;
+  border-radius: 999px;
+  flex-shrink: 0;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+.recent-card-run-status--running .recent-card-run-status-dot {
+  animation: recent-card-run-status-pulse 0.8s ease-in-out infinite;
+}
+
+.recent-card-run-status--starting .recent-card-run-status-dot,
+.recent-card-run-status--failed .recent-card-run-status-dot {
+  background: var(--run-status-accent);
+}
+
+.recent-card-run-status-icon {
+  color: var(--run-status-accent);
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+@keyframes recent-card-run-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recent-card-run-status--running .recent-card-run-status-dot {
+    animation: none;
+  }
+}
