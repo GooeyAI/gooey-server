@@ -9,7 +9,6 @@ import type {
   RecipeSurfaceProps,
   RecipeWorkspaceProps,
   RecipeWorkspaceTriggerProps,
-  SurfaceId,
 } from "@gooey-types/recipe_workspace_props";
 import { useWorkspaceLayout } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
@@ -23,6 +22,7 @@ import {
   paneVisibility,
   workspaceControlsForLayout,
 } from "./paneState";
+import { namedSurfaceSlots } from "./surfaceSlots";
 
 const RecipeWorkspaceConfigContext = createContext<PageShellConfig | null>(
   null
@@ -36,7 +36,7 @@ export function RecipeWorkspace({
 }: CustomComponentProps & RecipeWorkspaceProps) {
   const { layout, storedLayout, hydrated, selectLayout } =
     useWorkspaceLayout(config);
-  const surfaces = namedSurfaces(children);
+  const surfaces = namedSurfaceSlots(children);
   const roles = paneRolesForLayout(layout);
   const controls = workspaceControlsForLayout(layout);
 
@@ -207,28 +207,6 @@ function WorkspacePane({
       </div>
     </section>
   );
-}
-
-function namedSurfaces(children: TreeNode[]): Record<SurfaceId, TreeNode> {
-  const surfaces = {} as Partial<Record<SurfaceId, TreeNode>>;
-  for (const child of children) {
-    if (child.name !== "RecipeSurface") {
-      throw new Error(
-        `RecipeWorkspace child must be RecipeSurface, got ${child.name}`
-      );
-    }
-    const surface = child.props.surface as SurfaceId;
-    if (surfaces[surface]) {
-      throw new Error(`RecipeWorkspace received duplicate ${surface} surface`);
-    }
-    surfaces[surface] = child;
-  }
-  for (const surface of ["about", "editor", "preview"] as const) {
-    if (!surfaces[surface]) {
-      throw new Error(`RecipeWorkspace is missing ${surface} surface`);
-    }
-  }
-  return surfaces as Record<SurfaceId, TreeNode>;
 }
 
 function useRecipeWorkspaceConfig(): PageShellConfig {
