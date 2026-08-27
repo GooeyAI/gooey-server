@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from daras_ai_v2.base import BasePage as BasePageV1
 from gooey_gui.types.recipe_workspace_props import WorkPane
 from recipes.VideoBots import VideoBotsPage
 from recipes.VideoBots_v2 import VideoBotsPageV2
@@ -8,6 +9,13 @@ from routers.root import RecipeTabs
 
 def test_video_bots_v2_uses_existing_celery_runner_class():
     assert VideoBotsPageV2.get_runner_page_cls() is VideoBotsPage
+
+
+def test_video_bots_v2_inherits_business_logic():
+    assert VideoBotsPageV2.create_new_run is VideoBotsPage.create_new_run
+    assert VideoBotsPageV2.run_v2 is VideoBotsPage.run_v2
+    assert VideoBotsPageV2.bind_tool is BasePageV1.bind_tool
+    assert VideoBotsPageV2.render_steps is VideoBotsPage.render_steps
 
 
 def test_layout_v2_run_output_stays_visible_on_mobile():

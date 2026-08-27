@@ -1,27 +1,12 @@
 import html
 import json
-import traceback
-import typing
 from enum import Enum
 from functools import cached_property
-from itertools import zip_longest
-
-import sentry_sdk
 
 import gooey_gui as gui
 from ai_models.models import AIModelSpec
-from bots.models import (
-    BotIntegration,
-    Platform,
-    SavedRun,
-)
-from bots.models.message_thread import MessageThread
-from daras_ai_v2 import exceptions, icons, settings
-from daras_ai_v2.asr import (
-    run_translate,
-    should_translate_lang,
-)
-from daras_ai_v2.base import STARTING_STATE
+from bots.models import BotIntegration, Platform
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base_v2 import (
     FILL_HEIGHT_EDITOR_CSS,
     VARIABLES_DIALOG_CSS,
@@ -38,53 +23,23 @@ from daras_ai_v2.doc_search_settings_widgets import (
     keyword_instructions_widget,
     query_instructions_widget,
 )
-from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.fastapi_tricks import get_api_route_url
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.integrations_tab import render_integrations_tab
-from daras_ai_v2.language_model import (
-    CHATML_ROLE_ASSISTANT,
-    SUPERSCRIPT,
-    run_language_model,
-)
-from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
-from daras_ai_v2.search_ref import (
-    CitationStyles,
-    apply_response_formattings_prefix,
-    apply_response_formattings_suffix,
-    parse_refs,
-)
 from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
-from daras_ai_v2.text_output_widget import text_output
-from daras_ai_v2.text_to_speech_settings_widgets import (
-    TextToSpeechProviders,
-)
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
-from functions.base_llm_tool import (
-    BaseLLMTool,
-    get_tool_from_call,
-    render_called_functions,
-)
+from functions.base_llm_tool import render_called_functions
 from functions.models import FunctionTrigger
-from functions.workflow_tools import DynamicLLMToolLoader
 from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
 from gooey_gui.types.recipe_workspace_props import RecipeWorkspaceTriggerProps
 
-# Extends the v1 recipe rather than copying it: the 33 members that were byte-identical are
-# inherited now, and so are the module-level helpers below. What is left in this file is the
-# v2 presentation - the config panes, the About cards, the top bar chips - plus the handful of
-# render methods that differ.
-from recipes.VideoBots import (
-    DEFAULT_TRANSLATION_MODEL,
-    VideoBotsPage,
-    _can_use_message_thread,
-)
+from recipes.VideoBots import VideoBotsPage
 from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
 
@@ -142,276 +97,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     def get_runner_page_cls(cls):
         return VideoBotsPage
 
-    # Both of these suppress a renderer the v2 base provides, and both have to be declared
-    # here rather than left to the MRO: `BasePage` sits ahead of `VideoBotsPage`, so the
-    # base's version would otherwise win over the recipe's.
-    def render_form_v2(self):
-        # v2 builds the form out of config panes instead - see `_config_panes`.
-        pass
 
-    def _render_regenerate_button(self):
-        # A chat has no seed to re-roll, so there is nothing to regenerate.
-        pass
-
-    def run_v2(
-        self,
-        request: "VideoBotsPageV2.RequestModel",
-        response: "VideoBotsPageV2.ResponseModel",
-    ) -> typing.Iterator[str | None]:
-        if request.tts_provider == TextToSpeechProviders.ELEVEN_LABS.name and not (
-            self.is_current_user_paying() or self.is_current_user_admin()
-        ):
-            raise UserError(
-                """
-                Please purchase Gooey.AI credits to use ElevenLabs voices <a href="/account">here</a>.
-                """
-            )
-
-        try:
-            llm_model = AIModelSpec.objects.get(name=request.selected_model)
-        except AIModelSpec.DoesNotExist:
-            raise UserError(
-                f"Model {request.selected_model} not found. Should be one of: "
-                + ", ".join(
-                    AIModelSpec.objects.filter(category=AIModelSpec.Categories.llm)
-                    .order_for_frontend()
-                    .values_list("name", flat=True)
-                )
-            )
-        user_input = (request.input_prompt or "").strip()
-        if not (
-            user_input
-            or request.input_audio
-            or request.input_images
-            or request.input_documents
-        ):
-            return
-
-        asr_msg, user_input = yield from self.asr_step(
-            model=llm_model, request=request, response=response, user_input=user_input
-        )
-
-        ocr_texts = yield from self.document_understanding_step(request=request)
-
-        request.translation_model = (
-            request.translation_model or DEFAULT_TRANSLATION_MODEL
-        )
-        user_input = yield from self.input_translation_step(
-            request=request, user_input=user_input, ocr_texts=ocr_texts
-        )
-
-        tools_by_name = self.get_current_llm_tools()
-
-        yield from self.build_final_prompt(
-            request=request,
-            response=response,
-            user_input=user_input,
-            model=llm_model,
-            tools_by_name=tools_by_name,
-            # use LLM audio input capability if not using a dedicated ASR model
-            include_input_audio=(
-                not asr_msg and not is_realtime_audio_url(request.input_audio)
-            ),
-        )
-
-        yield from self.llm_loop(
-            request=request,
-            response=response,
-            model=llm_model,
-            asr_msg=asr_msg,
-            tools_by_name=tools_by_name,
-        )
-
-        yield from self.tts_step(model=llm_model, request=request, response=response)
-
-        yield from self.lipsync_step(request, response)
-
-    def llm_loop(
-        self,
-        *,
-        request: "VideoBotsPageV2.RequestModel",
-        response: "VideoBotsPageV2.ResponseModel",
-        model: AIModelSpec,
-        asr_msg: str | None = None,
-        prev_output_text: list[str] | None = None,
-        tools_by_name: dict[str, BaseLLMTool],
-    ) -> typing.Iterator[str | None]:
-        from functions.gooey_builder_tools import get_current_builder_tools
-
-        yield f"Summarizing with {model.label}..."
-
-        audio_session_extra = None
-        if model.llm_is_audio_model:
-            audio_session_extra = {}
-            if request.openai_voice_name:
-                audio_session_extra["voice"] = request.openai_voice_name
-
-        tools_by_name |= get_current_builder_tools(self.current_sr)
-
-        loader = DynamicLLMToolLoader(tools_by_name, self.active_tool_names)
-        tools_by_name[loader.name] = loader
-        active_tools = [
-            tool for tool in tools_by_name.values() if loader.is_tool_active(tool)
-        ]
-        response.final_prompt[0]["tools"] = [
-            tool.spec_function for tool in active_tools
-        ]
-
-        chunks: typing.Generator[list[dict], None, None] = run_language_model(
-            model=model.name,
-            messages=response.final_prompt,
-            max_tokens=request.max_tokens,
-            num_outputs=request.num_outputs,
-            temperature=request.sampling_temperature,
-            avoid_repetition=request.avoid_repetition,
-            response_format_type=request.response_format_type,
-            reasoning_effort=request.reasoning_effort,
-            tools=active_tools,
-            stream=True,
-            audio_url=request.input_audio,
-            audio_session_extra=audio_session_extra,
-        )
-
-        tool_calls = None
-        output_text = None
-        response.final_prompt.append({"role": CHATML_ROLE_ASSISTANT, "content": ""})
-
-        for i, choices in enumerate(chunks):
-            if not choices:
-                continue
-
-            metrics = choices[0].get("metrics")
-            if metrics:
-                response.metrics = metrics
-
-            output_text = [
-                "\n\n".join(filter(None, (prev_text, entry.get("content"))))
-                for prev_text, entry in zip_longest(
-                    (prev_output_text or []), choices, fillvalue=""
-                )
-            ]
-            response.final_prompt[-1]["content"] = choices[0]["content"] or ""
-
-            tool_calls = choices[0].get("tool_calls")
-            if tool_calls:
-                for call in tool_calls:
-                    tool = tools_by_name[call["function"]["name"]]
-                    call["label"] = tool.label
-                    call["icon"] = tool.get_icon()
-                response.final_prompt[-1]["tool_calls"] = tool_calls
-
-            try:
-                response.raw_input_text = choices[0]["input_audio_transcript"]
-            except KeyError:
-                pass
-            try:
-                response.output_audio += [choices[0]["audio_url"]]
-            except KeyError:
-                pass
-
-            # save raw model response without citations and translation for history
-            response.raw_output_text = [
-                "".join(snippet for snippet, _ in parse_refs(text, response.references))
-                for text in output_text
-            ]
-
-            output_text = yield from self.output_translation_step(
-                request, response, output_text
-            )
-
-            if response.references:
-                citation_style = (
-                    request.citation_style and CitationStyles[request.citation_style]
-                ) or None
-                all_refs_list = apply_response_formattings_prefix(
-                    output_text, response.references, citation_style
-                )
-            else:
-                citation_style = None
-                all_refs_list = None
-
-            if asr_msg:
-                output_text = [asr_msg + "\n\n" + text for text in output_text]
-
-            response.output_text = output_text
-
-            finish_reason = [entry.get("finish_reason") for entry in choices]
-            if all(finish_reason):
-                if all_refs_list:
-                    apply_response_formattings_suffix(
-                        all_refs_list, response.output_text, citation_style
-                    )
-                response.finish_reason = finish_reason
-            else:
-                yield f"Streaming{str(i + 1).translate(SUPERSCRIPT)} {model.label}..."
-
-        if response.output_text:
-            response.output_text = [text.strip() for text in response.output_text]
-
-        if not tool_calls:
-            return
-        for call in tool_calls:
-            tool, arguments = get_tool_from_call(call["function"], tools_by_name)
-            if not arguments:
-                continue
-            yield f"🛠 {tool.label}..."
-            try:
-                output = tool.call_json(arguments)
-            except Exception as e:
-                output = json.dumps(dict(error=str(e)))
-                error_type = getattr(e, "error_type", type(e).__name__)
-                if error_type and exceptions.get_error_renderer(error_type):
-                    # bubble up error so the parent run's standard error pipeline renders it
-                    raise
-                else:
-                    traceback.print_exc()
-                    sentry_sdk.capture_exception(e)
-            finally:
-                response.final_prompt.append(
-                    dict(
-                        role="tool",
-                        content=output,
-                        tool_call_id=call["id"],
-                        run_url=tool.get_url(),
-                    ),
-                )
-
-        yield from self.llm_loop(
-            request=request,
-            response=response,
-            model=model,
-            prev_output_text=output_text,
-            tools_by_name=tools_by_name,
-        )
-
-    def output_translation_step(self, request, response, output_text):
-        from daras_ai_v2.bots import parse_bot_html
-
-        # translate response text
-        if should_translate_lang(request.user_language):
-            yield f"Translating response to {request.user_language}..."
-            output_text = run_translate(
-                texts=output_text,
-                source_language="en",
-                target_language=request.user_language,
-                glossary_url=request.output_glossary_document,
-                model=request.translation_model,
-            )
-            # save translated response for tts
-            tts_source = [
-                "".join(snippet for snippet, _ in parse_refs(text, response.references))
-                for text in output_text
-            ]
-            response.raw_tts_text = tts_source
-        else:
-            tts_source = output_text
-
-        # remove html tags from the output text for tts
-        raw_tts_text = [parse_bot_html(text)[1].strip() for text in tts_source]
-        if raw_tts_text != output_text:
-            response.raw_tts_text = raw_tts_text
-
-        return output_text
 
     def _render_running_output(self):
         # The embedded widget renders its own running state. Do not call scrollIntoView:
@@ -525,57 +211,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             platform=Platform.WHATSAPP,
         ).exists()
 
-    def render_steps(self):
-        if gui.session_state.get("tts_provider"):
-            gui.video(gui.session_state.get("input_face"), caption="Input Face")
-
-        final_search_query = gui.session_state.get("final_search_query")
-        if final_search_query:
-            gui.text_area(
-                "###### `search_query`",
-                value=str(final_search_query),
-                disabled=True,
-            )
-
-        final_keyword_query = gui.session_state.get("final_keyword_query")
-        if final_keyword_query:
-            if isinstance(final_keyword_query, list):
-                gui.write("###### `final_keyword_query`")
-                gui.json(final_keyword_query)
-            else:
-                gui.text_area(
-                    "###### `final_keyword_query`",
-                    value=str(final_keyword_query),
-                    disabled=True,
-                )
-
-        references = gui.session_state.get("references", [])
-        if references:
-            gui.write("###### `references`")
-            gui.json(references, collapseStringsAfterLength=False)
-
-        final_prompt = gui.session_state.get("final_prompt")
-        if final_prompt:
-            if isinstance(final_prompt, str):
-                text_output("###### `final_prompt`", value=final_prompt, height=300)
-            else:
-                gui.write(
-                    f"###### {icons.terminal} `final_prompt`",
-                    unsafe_allow_html=True,
-                )
-                gui.json(final_prompt, depth=5)
-
-        for k in ["raw_output_text", "output_text", "raw_tts_text"]:
-            for idx, text in enumerate(gui.session_state.get(k) or []):
-                gui.text_area(
-                    f"###### 📜 `{k}[{idx}]`",
-                    value=text,
-                    disabled=True,
-                )
-
-        for idx, audio_url in enumerate(gui.session_state.get("output_audio", [])):
-            gui.write(f"###### 🔉 `output_audio[{idx}]`")
-            gui.audio(audio_url)
 
     DEMO_ACTION_PREFIX = "demo:"
 
@@ -614,9 +249,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             if ref.is_open:
                 render_demo_dialog(ref, bi_id)
 
-    def render_header_extra(self):
-        # v2 surfaces the demo buttons as chips in the top bar instead
-        pass
 
     def entry_tab_slug(self, tabs: list[TabSpec]) -> RecipeView:
         """About for a first-time visitor, Split for everyone else."""
@@ -945,37 +577,3 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             self._render_deploy_panel()
         else:
             super().render_selected_tab()
-
-    def create_new_run(
-        self,
-        *,
-        enable_rate_limits: bool = False,
-        run_status: str | None = STARTING_STATE,
-        **defaults,
-    ) -> SavedRun:
-        message_thread = defaults.pop("message_thread", None)
-        if not _can_use_message_thread(message_thread, self.request.user):
-            message_thread = None
-
-        sr = super().create_new_run(
-            enable_rate_limits=enable_rate_limits,
-            run_status=run_status,
-            message_thread=message_thread,
-            **defaults,
-        )
-
-        if message_thread:
-            if not message_thread.first_run:
-                message_thread.first_run = sr
-            message_thread.last_run = sr
-            message_thread.save(update_fields=["first_run", "last_run"])
-        else:
-            message_thread = MessageThread.objects.create(
-                title=gui.session_state.get("input_prompt") or "",
-                first_run=sr,
-                last_run=sr,
-            )
-            sr.message_thread = message_thread
-            sr.save(update_fields=["message_thread"])
-
-        return sr

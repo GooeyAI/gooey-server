@@ -13,10 +13,8 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 
-# Shared with v1 rather than copied. This module holds only what v2 changes or adds.
 from daras_ai_v2.base import (
     MAX_SEED,
-    SUBMIT_AFTER_LOGIN_Q,
     RecipeRunState,
     StateKeys,
     gooey_rng,
@@ -25,7 +23,6 @@ from daras_ai_v2.base import (
     BasePage as BasePageV1,
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
@@ -38,19 +35,8 @@ from daras_ai_v2.gooey_builder import (
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.tab_spec import PaneSpec, RecipeView, TabSpec
 from daras_ai_v2.variables_widget import variables_input
-from functions.base_llm_tool import (
-    BaseLLMTool,
-    functions_input,
-)
-from functions.composio_tools import ComposioLLMTool
-from functions.memory_tools import GooeyMemoryLLMTool
-from functions.models import (
-    FunctionScopes,
-    FunctionTrigger,
-)
-from functions.workflow_tools import WorkflowLLMTool
+from functions.base_llm_tool import functions_input
 
-# leaf modules - pydantic models only - so there is no cycle to dodge with a lazy import
 from gooey_gui.types.recipe_top_bar_props import (
     RecipeTopBarProps,
     TopBarAuthor,
@@ -515,25 +501,6 @@ class BasePage(BasePageV1):
         except Workspace.DoesNotExist:
             return False
 
-    def _render_share_trigger(self, *, key: str, className: str = "mb-0"):
-        """Share, outside the top bar. Sets the same key the bar's menu item sets, so
-        `_handle_top_bar_actions` still owns the one dialog."""
-        if not self.can_manage_sharing():
-            copy_to_clipboard_button(
-                label=f"{icons.link} Share",
-                value=self.current_app_url(self.tab),
-                type="secondary",
-                className=className,
-            )
-            return
-        if gui.button(
-            f"{self.current_pr.get_share_icon()} Share",
-            key=key,
-            type="secondary",
-            className=className,
-        ):
-            gui.session_state[self.TOP_BAR_SHARE_KEY] = True
-            gui.rerun()
 
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars."""
@@ -695,72 +662,6 @@ class BasePage(BasePageV1):
 
         return by_id[gui.session_state[key]].render
 
-    def _saved_options_modal(self):
-        assert self.is_logged_in()
-
-        with gui.div(
-            className="mb-3 d-flex justify-content-around align-items-center gap-3"
-        ):
-            is_latest_version = self.current_pr.saved_run == self.current_sr
-            if is_latest_version:
-                label = "Duplicate"
-            else:
-                label = "Save as New"
-            save_as_new_button = gui.button(f"{icons.fork} {label}", className="w-100")
-
-            if (
-                self.request.user
-                and WorkflowAccessLevel.can_user_delete_published_run(
-                    workspace=self.current_workspace,
-                    user=self.request.user,
-                    pr=self.current_pr,
-                )
-                and not self.current_pr.is_root()
-            ):
-                ref = gui.use_confirm_dialog(key="--delete-run-modal")
-                gui.button_with_confirm_dialog(
-                    ref=ref,
-                    trigger_label=f"{icons.trash} Delete",
-                    trigger_className="w-100 text-danger",
-                    modal_title="#### Are you sure?",
-                    modal_content=f"""
-    Are you sure you want to delete this published run?
-
-    **{self.current_pr.title}**
-
-    This will also delete all the associated versions.
-                    """,
-                    confirm_label="Delete",
-                    confirm_className="border-danger bg-danger text-white",
-                )
-                if ref.pressed_confirm:
-                    self.current_pr.delete()
-                    raise gui.RedirectException(self.app_url())
-
-        title = f"{self.current_pr.title} (Copy)"
-        if self.current_pr.is_root():
-            notes = ""
-        else:
-            notes = self.current_pr.notes
-
-        if save_as_new_button:
-            new_pr = self.create_published_run(
-                published_run_id=get_random_doc_id(),
-                saved_run=self.current_sr,
-                user=self.request.user,
-                workspace=self.current_workspace,
-                tags=list(self.current_pr.tags.all()),
-                title=title,
-                notes=notes,
-            )
-            raise gui.RedirectException(
-                self.app_url(example_id=new_pr.published_run_id)
-            )
-
-        with gui.div(className="mt-4"):
-            with gui.div(className="mb-4"):
-                gui.write(f"#### {icons.time} Version History", unsafe_allow_html=True)
-            self._render_version_history()
 
     def get_tab_spec(self) -> list[TabSpec]:
         """The client views for this request, in selector order."""
@@ -883,25 +784,7 @@ class BasePage(BasePageV1):
             ):
                 return self._render_input_col()
 
-    def _preview_frame(self):
-        """Frames the preview when it shares the view. Alone it needs none - a border there
-        would just outline the viewport."""
-        # By class, not inline, so the frame can be dropped below lg where the preview runs
-        # edge to edge.
-        return gui.div(className="h-100 v2-preview-frame")
 
-    def _render_split_tab(self):
-        """Both columns side by side. Only the columns: an app shell has no page scroll to
-        put anything below them, so the guide lives on About and Debug on a config pane."""
-        if self._render_deleted_output_if_needed():
-            return
-
-        with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
-            input_col, output_col = gui.columns([3, 2], gap="medium")
-            with input_col:
-                submitted = self._render_input_col()
-            with output_col, self._preview_frame():
-                self._render_output_col(submitted=submitted)
 
     def _render_deleted_output_if_needed(self) -> bool:
         """True if this run's data is gone, in which case that is all there is to render."""
@@ -913,9 +796,6 @@ class BasePage(BasePageV1):
     def render_selected_tab(self):
         """Bodies of the v1 tab urls the v2 strip drops - reached only by deep link."""
         match self.tab:
-            case RecipeTabs.run | RecipeTabs.preview:
-                self._render_split_tab()
-
             case RecipeTabs.examples:
                 self._examples_tab()
 
@@ -954,94 +834,9 @@ class BasePage(BasePageV1):
 
         grid_layout(2, page_clses, _render)
 
-    def bind_tool(self, tool: BaseLLMTool) -> BaseLLMTool:
-        match tool:
-            case WorkflowLLMTool():
-                return tool.bind(
-                    saved_run=self.current_sr,
-                    workspace=self.current_workspace,
-                    current_user=self.request.user,
-                    request_model=self.RequestModel,
-                    response_model=self.ResponseModel,
-                    state=gui.session_state,
-                    trigger=FunctionTrigger.prompt,
-                )
-            case ComposioLLMTool():
-                return tool.bind(
-                    user_id=FunctionScopes.get_user_id_for_scope(
-                        tool.scope,
-                        workspace=self.current_workspace,
-                        user=self.request.user,
-                        published_run=self.current_pr,
-                        variables=gui.session_state.get("variables"),
-                    ),
-                    redirect_url=self.current_app_url(
-                        query_params={SUBMIT_AFTER_LOGIN_Q: "1"}
-                    ),
-                )
-            case GooeyMemoryLLMTool():
-                if not tool.scope:
-                    tool.scope = FunctionScopes.workspace
-                memory_entry = tool.scope.build_memory_entry(
-                    saved_run=self.current_sr,
-                    workspace=self.current_workspace,
-                    user=self.request.user,
-                    published_run=self.current_pr,
-                    variables=gui.session_state.get("variables"),
-                )
-                return tool.bind(memory_entry)
-            case _:
-                return tool
 
-    def get_run_cost_display(self) -> str:
-        url = self.get_credits_click_url()
-        run_cost = self.get_run_cost_credits()
-        if run_cost is not None:
-            # dollars, matching the top bar's readout
-            ret = (
-                f'Run cost = <a href="{url}">{format_credits_as_dollars(run_cost)}</a>'
-            )
-        else:
-            ret = ""
 
-        cost_note = self.get_cost_note()
-        if cost_note:
-            ret += f" ({cost_note.strip()})"
 
-        additional_notes = self.additional_notes()
-        if additional_notes:
-            ret += f" \n{additional_notes}"
-
-        return ret
-
-    def _render_report_button(self):
-        sr, pr = self.current_sr_pr
-        is_example = pr.saved_run_id == sr.id
-        # only logged in users can report a run (but not examples/root runs)
-        if not self.request.user or is_example:
-            return
-
-        with gui.tooltip("Report"):
-            reported = gui.button(
-                icons.flag,
-                type="tertiary",
-                className="mb-0 p-1",
-            )
-        if not reported:
-            return
-
-        gui.session_state["show_report_workflow"] = reported
-        gui.rerun()
-
-    def render_variables(self):
-        """v1's combined block, kept whole for the default input column.
-
-        A recipe that wants them apart uses the two halves directly - VideoBots keeps
-        functions on the Tools pane and opens the variables editor in a dialog beside the
-        prompt, which is where the variables are actually referenced.
-        """
-        self._render_functions()
-        self._render_variables_editor()
 
     def _render_functions(self):
         if not self.functions_in_settings:
