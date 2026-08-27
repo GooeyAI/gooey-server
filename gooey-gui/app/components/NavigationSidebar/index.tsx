@@ -138,7 +138,7 @@ export function NavigationSidebar({
   };
 
   const navClass = clsx(
-    "nav-sidebar d-flex flex-column border-end bg-body",
+    "nav-sidebar d-flex flex-column border-end",
     railCollapsed && "nav-sidebar--collapsed",
     drawerOpen && "nav-sidebar--drawer-open"
   );

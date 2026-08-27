@@ -322,6 +322,7 @@ button .gui-html-container,
   --gooey-ink: #0a1021;             /* ink - titles, pill and drawer labels */
   --gooey-line-default: #d9d9d9;    /* line - root header rule, outline button border */
   --gooey-line-soft: #e6e6e6;       /* line-soft - sub-view rule, pill border, grab handle */
+  --gooey-surface-50: #fbfaf8;      /* surface-50 - navigation rail, app shell */
   --gooey-surface-100: #f7f5f2;     /* surface-100 - selected pill fill */
   --gooey-bg-page: #fffefd;         /* bg - outline button fill */
   --gooey-icon-chrome: #dadce0;     /* icon-chrome - avatar placeholder */
