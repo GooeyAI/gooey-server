@@ -208,12 +208,17 @@
    height - FILTER_HEIGHT in HistoryPage.tsx */
 .history-header-controls .btn-group .btn {
   min-height: 42px;
-  /* let a long workspace name ellipsize rather than overflow the group */
-  min-width: 0;
-  overflow: hidden;
 }
 
-.history-header-controls .btn-group .btn > .text-truncate {
+/* Only the workspace name gives way to a narrow row - "Just me" is two words and
+   keeps them. Bootstrap makes every button in a group `flex: 1 1 auto`, so both
+   were shrinking and a long workspace name pushed "Just me" into an ellipsis. */
+.history-header-controls .btn-group .btn:first-child {
+  flex: 0 0 auto;
+}
+
+.history-header-controls .btn-group .btn:last-child,
+.history-header-controls .btn-group .btn:last-child > .text-truncate {
   min-width: 0;
 }
 

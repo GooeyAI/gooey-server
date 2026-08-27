@@ -7,6 +7,7 @@ import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import SavedRun
 from bots.models.workflow import Workflow, WorkflowMetadata
+from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.meta_content import raw_build_meta_tags
@@ -35,6 +36,8 @@ META_TITLE = "History | Gooey.AI"
 META_DESCRIPTION = "Your run history on Gooey.AI"
 
 HISTORY_PAGE_SIZE = 24
+# a workspace can be named anything, and this label shares the heading's line
+WORKSPACE_NAME_MAXLEN = 30
 
 app = CustomAPIRouter()
 
@@ -116,7 +119,9 @@ def _build_owner_options(
         ),
         SurfaceTabData(
             id=OWNER_ALL,
-            title=workspace.display_name(user),
+            title=truncate_text_words(
+                workspace.display_name(user), maxlen=WORKSPACE_NAME_MAXLEN
+            ),
             icon=workspace.html_icon(size="20px"),
             href=_surface_href(surface, workflow, mine_only=False),
             active=not mine_only,

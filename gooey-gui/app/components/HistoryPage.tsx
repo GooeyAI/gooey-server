@@ -121,7 +121,7 @@ function OwnerFilter({ options }: { options: SurfaceTabData[] }) {
         >
           {option.icon && (
             <span
-              className="d-inline-flex align-items-center"
+              className="d-inline-flex align-items-center flex-shrink-0"
               aria-hidden="true"
               dangerouslySetInnerHTML={{ __html: option.icon }}
             />
