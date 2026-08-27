@@ -603,12 +603,17 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             )
         return integrations
 
-    def _handle_top_bar_actions(self):
-        super()._handle_top_bar_actions()
+    def _handle_menu_pick(self, picked: str | None):
+        """The demo chips, which come back through the same menu key the title menu uses.
+
+        Extends rather than replaces: `super()` still handles Version history, Duplicate and
+        Delete, so a chip key and a title-menu key can share one round trip without either
+        having to know about the other.
+        """
+        super()._handle_menu_pick(picked)
 
         from widgets.demo_button import get_demo_bots, render_demo_dialog
 
-        picked = gui.session_state.pop(self.TOP_BAR_MENU_KEY, None)
         for bi_id, _ in get_demo_bots(self.current_pr):
             # the dialog has to be re-entered on every pass while it is open, so this runs
             # for each demo bot rather than only the one just clicked

@@ -58,6 +58,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     RecipeTopBarProps,
     TopBarAuthor,
     TopBarIntegration,
+    TopBarMenuItem,
     TopBarView,
 )
 from gooey_gui.types.recipe_workspace_props import (
@@ -389,6 +390,83 @@ class BasePage(BasePageV1):
         if gui.session_state.pop(self.TOP_BAR_RUN_KEY, None):
             self._handle_top_bar_run()
 
+        # Popped here, in the base, rather than left to each recipe: the base is what ships
+        # `menu_key` and `title_menu_items`, so a page that declares a menu item and forgets
+        # to override anything would otherwise drop the click on the floor.
+        self._handle_menu_pick(gui.session_state.pop(self.TOP_BAR_MENU_KEY, None))
+
+    def _handle_menu_pick(self, picked: str | None):
+        """Act on a title-menu pick, and keep whatever dialog it opened on screen.
+
+        `picked` is only the edge - the one render where the click arrives. The dialogs are
+        entered on every pass while they are open, which is why each `is_open` check sits
+        outside its `picked ==` check rather than inside it.
+
+        Recipes extend this for their own keys and call `super()`.
+        """
+        history_ref = gui.use_alert_dialog(key="version-history-modal")
+        if picked == self.MENU_VERSION_HISTORY:
+            history_ref.set_open(True)
+        if history_ref.is_open:
+            with gui.alert_dialog(
+                ref=history_ref,
+                modal_title=f"#### {icons.time} Version History",
+                large=True,
+                unsafe_allow_html=True,
+            ):
+                self._render_version_history()
+
+        delete_ref = gui.use_confirm_dialog(key="--delete-run-modal")
+        if picked == self.MENU_DELETE:
+            delete_ref.set_open(True)
+        if delete_ref.is_open:
+            with gui.confirm_dialog(
+                ref=delete_ref,
+                modal_title="#### Are you sure?",
+                confirm_label="Delete",
+                confirm_className="border-danger bg-danger text-white",
+            ):
+                gui.write(
+                    f"Are you sure you want to delete **{self.current_pr.title}**?\n\n"
+                    "This will also delete all the associated versions."
+                )
+        if delete_ref.pressed_confirm:
+            self.current_pr.delete()
+            raise gui.RedirectException(self.app_url())
+
+        if picked == self.MENU_DUPLICATE:
+            self._duplicate_and_redirect()
+
+    def _duplicate_and_redirect(self) -> typing.NoReturn:
+        """Copy this workflow into the current workspace and open the copy.
+
+        Two paths, as in v1. Someone who can edit this run gets a straight copy of it -
+        that is "Duplicate", or "Save as New" off an older version. Someone who cannot is
+        forking a workflow that is not theirs, so the copy is named after them, which is what
+        makes it findable in their own list afterwards.
+        """
+        pr = self.current_pr
+        if WorkflowAccessLevel.can_user_edit_published_run(
+            workspace=self.current_workspace, user=self.request.user, pr=pr
+        ):
+            new_pr = self.create_published_run(
+                published_run_id=get_random_doc_id(),
+                saved_run=self.current_sr,
+                user=self.request.user,
+                workspace=self.current_workspace,
+                tags=list(pr.tags.all()),
+                title=f"{pr.title} (Copy)",
+                notes="" if pr.is_root() else pr.notes,
+            )
+        else:
+            new_pr = pr.duplicate(
+                user=self.request.user,
+                workspace=self.current_workspace,
+                title=f"{self.request.user.first_name_possesive()} {pr.title}",
+                notes=pr.notes,
+            )
+        raise gui.RedirectException(self.app_url(example_id=new_pr.published_run_id))
+
     def _handle_top_bar_run(self):
         """Run (or Stop) pressed in the top bar.
 
@@ -428,6 +506,69 @@ class BasePage(BasePageV1):
     TOP_BAR_RUN_KEY = "--topbar-run"
 
     TOP_BAR_SHARE_KEY = "--topbar-share"
+
+    # Picks from the title chevron, echoed back through `menu_key`. Namespaced so a recipe's
+    # own menu keys cannot collide with the base's.
+    MENU_VERSION_HISTORY = "--menu-version-history"
+    MENU_DUPLICATE = "--menu-duplicate"
+    MENU_DELETE = "--menu-delete"
+
+    def _title_menu_items(self) -> list[TopBarMenuItem]:
+        """The chevron menu beside the workflow name - v1's Options dialog, as a menu.
+
+        v1 reached these from a `...` button that opened one modal holding all three: two
+        buttons and the version list stacked together. They are unrelated actions, so v2
+        lists them and opens a dialog only where one is actually needed - Version history has
+        a body to show and Delete needs confirming, while Duplicate just acts and redirects.
+
+        Same gates v1 uses, so the menu never offers something the server would refuse.
+        """
+        if not self.is_logged_in():
+            return []
+
+        pr = self.current_pr
+        items = []
+
+        # A root recipe has no versions of its own - it is the template every run forks from.
+        if not pr.is_root():
+            items.append(
+                TopBarMenuItem(
+                    key=self.MENU_VERSION_HISTORY,
+                    label="Version history",
+                    icon=icons.history,
+                )
+            )
+
+        # "Duplicate" off the latest version, "Save as New" off an older one - v1's wording,
+        # which distinguishes copying the workflow from promoting an old run to a new one.
+        items.append(
+            TopBarMenuItem(
+                key=self.MENU_DUPLICATE,
+                label=(
+                    "Duplicate" if pr.saved_run == self.current_sr else "Save as New"
+                ),
+                icon=icons.fork,
+            )
+        )
+
+        if (
+            self.request.user
+            and WorkflowAccessLevel.can_user_delete_published_run(
+                workspace=self.current_workspace,
+                user=self.request.user,
+                pr=pr,
+            )
+            and not pr.is_root()
+        ):
+            items.append(
+                TopBarMenuItem(
+                    key=self.MENU_DELETE,
+                    label="Delete",
+                    icon=icons.trash,
+                )
+            )
+
+        return items
 
     def can_manage_sharing(self) -> bool:
         """Whether this user may change who can see the workflow, rather than only copy
@@ -558,6 +699,7 @@ class BasePage(BasePageV1):
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 menu_key=self.TOP_BAR_MENU_KEY,
+                title_menu_items=self._title_menu_items(),
                 integrations=self._top_bar_integrations(),
                 run_key=self.TOP_BAR_RUN_KEY,
                 is_running=self._is_run_in_progress(),
