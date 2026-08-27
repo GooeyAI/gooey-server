@@ -24,6 +24,15 @@ import type {
 // telling directly
 const FILTER_HEIGHT = 38;
 
+// An option's title carries the icon's own markup, which react-select renders as
+// markdown. The fallback <select> below can only hold text, so it showed the tags
+// themselves until hydration replaced it.
+const titleAsText = (title: string) =>
+  title
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+
 export function HistoryPage({
   title,
   owner_options,
@@ -153,7 +162,7 @@ function WorkflowFilter({ options }: { options: WorkflowFilterOption[] }) {
           >
             {options.map((option) => (
               <option key={option.id} value={option.id}>
-                {option.title}
+                {titleAsText(option.title)}
               </option>
             ))}
           </select>
