@@ -171,14 +171,125 @@
 }
 
 /* The tab bar sits beside the workflow selector, so it matches that control's
-   height exactly: 4px of padding each side around a 30px pill. */
+   height exactly: 4px of padding each side around a 34px pill makes 42, which
+   is FILTER_HEIGHT in HistoryPage.tsx. */
 .surface-tabs {
   padding: 4px !important;
+  position: relative;
 }
 
 .surface-tabs .workflow-tab-pill {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   line-height: 1.5;
-  min-height: 30px;
+  min-height: 34px;
   padding: 0 0.75rem !important;
+}
+
+/* No scrollbar: it would cut across a rounded track, and on macOS it is hidden
+   until you scroll anyway - so it can't be the thing that tells you to. */
+.surface-tabs-scroll {
+  /* tighter than the bootstrap gap it replaces: wide gaps between transparent
+     pills read as holes in the bar rather than as spacing */
+  gap: 2px !important;
+  scrollbar-width: none;
+}
+
+.surface-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile L (425px) and down. At that width a left-aligned selector and a
+   right-aligned toggle read as strays rather than as alignment, so the tabs,
+   the selector and the owner toggle all centre. `safe` drops the tabs back to
+   flex-start once they overflow - centred overflow can't be scrolled back to
+   its first item. */
+@media (max-width: 425px) {
+  .surface-tabs-scroll {
+    justify-content: safe center;
+  }
+
+  .history-mobile-center {
+    align-self: center;
+  }
+
+  .history-owner-row {
+    justify-content: center !important;
+  }
+}
+
+/* Fade the trailing edge, the way Material leaves a tab half-visible: a cut-off
+   tab dissolving into the track reads as "there is more". The gradient is the
+   track's own colour, so where no tab reaches the edge it paints grey on grey
+   and disappears - no need to detect whether the bar actually overflows. */
+/* Fade and chevron are gated on there being more that way: at either end of the
+   strip the outermost tab has to read as a tab, not as something greyed out. */
+.surface-tabs--more::after,
+.surface-tabs--less::before {
+  bottom: 0;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 4rem;
+}
+
+/* Flush to the track's edge, not inset: a gap there lets letters scroll past
+   unfaded and surface as specks beyond the chevron. Only the corners on that
+   side are rounded - rounding the far side would reopen the same gap. */
+.surface-tabs--more::after {
+  background: linear-gradient(
+    to right,
+    rgba(242, 242, 242, 0),
+    rgba(242, 242, 242, 0.85) 40%,
+    #f2f2f2 60%
+  );
+  border-bottom-right-radius: inherit;
+  border-top-right-radius: inherit;
+  right: 0;
+}
+
+.surface-tabs--less::before {
+  background: linear-gradient(
+    to left,
+    rgba(242, 242, 242, 0),
+    rgba(242, 242, 242, 0.85) 40%,
+    #f2f2f2 60%
+  );
+  border-bottom-left-radius: inherit;
+  border-top-left-radius: inherit;
+  left: 0;
+}
+
+/* No disc behind these: the active tab is already a white pill, and a second one
+   at the end of the same bar reads as another tab. The fade underneath is opaque
+   by the time it reaches them, so bare strokes sit on flat track. */
+.surface-tabs-scroll-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #6c757d;
+  display: flex;
+  font-size: 0.8rem;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  z-index: 1;
+}
+
+/* colour only on hover: a filled shape here has to be either a disc, which
+   fights the track's rounded end, or a pill, which reads as another tab */
+.surface-tabs-scroll-btn:hover {
+  color: #212529;
+}
+
+.surface-tabs-prev {
+  left: 4px;
+}
+
+.surface-tabs-next {
+  right: 4px;
 }

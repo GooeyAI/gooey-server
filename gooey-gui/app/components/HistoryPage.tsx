@@ -6,7 +6,7 @@ import type {
   SingleValueProps,
 } from "react-select";
 import Select, { components } from "react-select";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@remix-run/react";
 
 import { HistoryWorkflowCard } from "./HomePage/workflows";
@@ -18,6 +18,11 @@ import type {
   SurfaceTabData,
   WorkflowFilterOption,
 } from "@gooey-types/history_page_props";
+
+// the tab bar and the workflow selector are set to the same height; the bar
+// builds it out of padding and pill (see .surface-tabs), react-select needs
+// telling directly
+const FILTER_HEIGHT = 42;
 
 export function HistoryPage({
   title,
@@ -34,14 +39,17 @@ export function HistoryPage({
 
       <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
         <SurfaceSelector tabs={surface_tabs} />
-        <div className="flex-grow-1 mt-2" style={{ width: "300px" }}>
+        <div
+          className="flex-grow-1 mt-2 history-mobile-center"
+          style={{ width: "300px" }}
+        >
           <WorkflowFilter options={workflow_options} />
         </div>
       </div>
 
       {/* its own row: the toggle is 201px, and the row above has no width to
           spare for it once the tabs and the workflow selector have theirs */}
-      <div className="mb-4 d-flex justify-content-end">
+      <div className="mb-4 d-flex justify-content-end history-owner-row">
         <OwnerFilter options={owner_options} />
       </div>
 
@@ -131,7 +139,7 @@ function WorkflowFilter({ options }: { options: WorkflowFilterOption[] }) {
         fallback={
           <select
             className="form-select"
-            style={{ height: "38px", border: "none" }}
+            style={{ height: `${FILTER_HEIGHT}px`, border: "none" }}
             disabled
             defaultValue={active.id}
           >
@@ -151,6 +159,9 @@ function WorkflowFilter({ options }: { options: WorkflowFilterOption[] }) {
             getOptionLabel={(option) => option.title}
             isMulti={false}
             isClearable={false}
+            styles={{
+              control: (base) => ({ ...base, minHeight: FILTER_HEIGHT }),
+            }}
             className="mb-0 text-nowrap"
             placeholder='<i class="fa-regular fa-gift"></i> Type'
             components={{
@@ -211,6 +222,9 @@ const MarkdownPlaceholder = (
 
 function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
   const activeRef = useRef<HTMLAnchorElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const activeId = tabs.find((tab) => tab.active)?.id;
   // keep the active tab in view on initial load (deep links) and after
   // client-side navigation between surfaces (component stays mounted, so this
@@ -219,11 +233,54 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
     activeRef.current?.scrollIntoView({ inline: "nearest", block: "nearest" });
   }, [activeId]);
 
+  // the chevron only earns its place while there is something to its right -
+  // a button that scrolls nothing is worse than no button
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () => {
+      setCanScrollLeft(el.scrollLeft > 1);
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, [tabs.length]);
+
   if (tabs.length === 0) return null;
   return (
-    <div className="overflow-auto workflow-tab-scroll flex-grow-1 min-w-0">
-      {/* `surface-tabs` sizes the bar to match the workflow selector beside it */}
-      <div className="surface-tabs d-inline-flex p-1 rounded-pill gap-1 align-items-center bg-light">
+    // the track is the full width of the row and scrolls its tabs inside, so
+    // both its ends stay round - a track that hugs its tabs gets sliced through
+    // the middle by the scroll container, which reads as broken rather than as
+    // "there is more". `surface-tabs` also sizes it to the selector beside it.
+    <div
+      className={
+        "surface-tabs rounded-pill bg-light flex-grow-1 min-w-0" +
+        (canScrollLeft ? " surface-tabs--less" : "") +
+        (canScrollRight ? " surface-tabs--more" : "")
+      }
+    >
+      {canScrollLeft && (
+        <button
+          type="button"
+          className="surface-tabs-scroll-btn surface-tabs-prev"
+          aria-label="Show previous tabs"
+          onClick={() =>
+            scrollerRef.current?.scrollBy({ left: -200, behavior: "smooth" })
+          }
+        >
+          <i className="fa-regular fa-chevron-left" aria-hidden="true" />
+        </button>
+      )}
+      <div
+        ref={scrollerRef}
+        className="surface-tabs-scroll d-flex gap-1 align-items-center overflow-auto"
+      >
         {tabs.map((tab) => (
           <Link
             key={tab.id}
@@ -241,6 +298,18 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
           </Link>
         ))}
       </div>
+      {canScrollRight && (
+        <button
+          type="button"
+          className="surface-tabs-scroll-btn surface-tabs-next"
+          aria-label="Show more tabs"
+          onClick={() =>
+            scrollerRef.current?.scrollBy({ left: 200, behavior: "smooth" })
+          }
+        >
+          <i className="fa-regular fa-chevron-right" aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }
