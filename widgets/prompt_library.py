@@ -45,13 +45,16 @@ First display the questions to the user as plain text (with an appropriate emoji
 {emoji1} {question1}
 {emoji2} {question2}
 {emoji3} {question3}
-Then render quick buttons as HTML elements like so: 
+Then render quick buttons as HTML elements like so, where the button text is a short label (under 24 characters, including the emoji) and gui-description is the full question (under 72 characters), which whatsapp shows below the label in the options menu:
+<button gui-target="input_prompt" gui-description="{question1}">{emoji1} {short_label1}</button>
+<button gui-target="input_prompt" gui-description="{question2}">{emoji2} {short_label2}</button>
+<button gui-target="input_prompt" gui-description="{question3}">{emoji3} {short_label3}</button>
 {% else %}
 Display the questions to the user as HTML elements like so: 
-{% endif %}
 <button gui-target="input_prompt">{emoji1} {question1}</button>
 <button gui-target="input_prompt">{emoji2} {question2}</button> 
 <button gui-target="input_prompt">{emoji3} {question3}</button>
+{% endif %}
         """.strip(),
     ),
     Prompt(

@@ -376,19 +376,21 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]
     for idx, btn in enumerate(doc("button") or []):
         if "disable_feedback" in (btn.attrib.get("gui-action") or ""):
             disable_feedback = True
-        buttons.append(
-            ReplyButton(
-                # parsed by _handle_interactive_msg
-                id=csv_encode_row(
-                    idx + 1,
-                    btn.attrib.get("gui-target") or "input_prompt",
-                    btn.attrib.get("gui-action"),
-                    # title must be the last item because it might get truncated
-                    btn.text or "",
-                ),
-                title=btn.text or "",
-            )
+        btn_text = (btn.text or "").strip()
+        reply = ReplyButton(
+            # parsed by _handle_interactive_msg
+            id=csv_encode_row(
+                idx + 1,
+                btn.attrib.get("gui-target") or "input_prompt",
+                btn.attrib.get("gui-action"),
+                # title must be the last item because it might get truncated
+                btn_text,
+            ),
+            title=btn_text,
         )
+        if description := (btn.attrib.get("gui-description") or "").strip():
+            reply["description"] = description
+        buttons.append(reply)
 
     text = "".join(
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem)
