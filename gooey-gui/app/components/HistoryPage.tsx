@@ -35,22 +35,35 @@ export function HistoryPage({
 }: CustomComponentProps & HistoryPageProps) {
   return (
     <div className="container-xxl my-4">
-      <h1 className="mb-4">{title}</h1>
+      {/* "Type" is the workflow dropdown's own label; it and the owner toggle sit
+          right-aligned on the heading's line, which the three of them fit in at
+          ~725px. The tab strip gets the row below to itself - it is the one
+          control that wants the whole width. */}
+      <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        {/* mt-0 as well as mb-0: the app gives h1 a 20px top margin, and flex
+            centres the margin box, which drops the word 10px below the controls */}
+        <h1 className="my-0 d-flex align-items-baseline gap-2">
+          <span>{title}</span>
+          {/* the sidebar's own History icon. On the baseline and sized to the
+              heading's cap height, so it sits like a letter rather than floating
+              above the word - centring lands it high, the line box it centres in
+              being taller than the letters themselves. */}
+          <i
+            className="fa-regular fa-history text-muted fs-4"
+            aria-hidden="true"
+          />
+        </h1>
 
-      <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-3">
-        <SurfaceSelector tabs={surface_tabs} />
-        <div
-          className="flex-grow-1 mt-2 history-mobile-center"
-          style={{ width: "300px" }}
-        >
-          <WorkflowFilter options={workflow_options} />
+        <div className="history-header-controls d-flex flex-wrap align-items-center gap-2">
+          <div className="history-type-filter">
+            <WorkflowFilter options={workflow_options} />
+          </div>
+          <OwnerFilter options={owner_options} />
         </div>
       </div>
 
-      {/* its own row: the toggle is 201px, and the row above has no width to
-          spare for it once the tabs and the workflow selector have theirs */}
-      <div className="mb-4 d-flex justify-content-end history-owner-row">
-        <OwnerFilter options={owner_options} />
+      <div className="mb-4">
+        <SurfaceSelector tabs={surface_tabs} />
       </div>
 
       <HistoryCardGrid

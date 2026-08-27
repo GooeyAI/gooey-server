@@ -198,22 +198,41 @@
   display: none;
 }
 
-/* Mobile L (425px) and down. At that width a left-aligned selector and a
-   right-aligned toggle read as strays rather than as alignment, so the tabs,
-   the selector and the owner toggle all centre. `safe` drops the tabs back to
-   flex-start once they overflow - centred overflow can't be scrolled back to
-   its first item. */
+/* The Type dropdown keeps a fixed share of the heading's line rather than
+   growing with its longest workflow name. */
+.history-type-filter {
+  width: 240px;
+}
+
+/* .gui-input carries margin-bottom: 0.9rem for stacked forms. On this row the
+   flex box centres that margin along with the control, which lifts the dropdown
+   off the line the toggle sits on. */
+.history-type-filter .gui-input {
+  margin-bottom: 0;
+}
+
+/* the owner toggle shares the line with that dropdown, so it takes the same
+   height - FILTER_HEIGHT in HistoryPage.tsx */
+.history-header-controls .btn-group .btn {
+  min-height: 42px;
+}
+
+/* Mobile L (425px) and down. At that width a right-aligned control group reads
+   as a stray rather than as alignment, so it takes the full row and centres,
+   and the tabs centre with it. `safe` drops the tabs back to flex-start once
+   they overflow - centred overflow can't be scrolled back to its first item. */
 @media (max-width: 425px) {
   .surface-tabs-scroll {
     justify-content: safe center;
   }
 
-  .history-mobile-center {
-    align-self: center;
+  .history-header-controls {
+    justify-content: center;
+    width: 100%;
   }
 
-  .history-owner-row {
-    justify-content: center !important;
+  .history-type-filter {
+    width: 100%;
   }
 }
 
