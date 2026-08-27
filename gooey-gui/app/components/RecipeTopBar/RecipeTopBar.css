@@ -1,14 +1,6 @@
-/* Three tracks so the pill group sits in the true centre of the bar. With flex +
-   `margin: auto` it would only be centred in the space the left block happens to leave,
-   so it drifted as the title got longer. */
-/* Three tracks so the pill group sits in the true centre of the bar, whatever the title's
-   length or the right cluster's width. `minmax(0, 1fr)` rather than a bare `1fr`: with a 0
-   floor the side tracks stay even and their content truncates inside its own share instead of
-   widening the track and shoving the pills off centre.
-
-   The corollary is that the right cluster only ever has half the slack, and a `1fr` track does
-   not grow to fit content - so the cluster has to stay narrow enough to fit. That is what the
-   chip-label rules below are for, not decoration. */
+/* Three tracks so the pill group sits in the true centre of the bar. `minmax(0, 1fr)`
+   rather than `1fr` so the side tracks stay even and truncate their own content. The right
+   cluster therefore has only half the slack, which is what the chip-label rules enforce. */
 .gooey-topbar {
   /* One height for every control in the right cluster - see the shared rule below. */
   --topbar-control-h: 36px;
@@ -20,9 +12,8 @@
   min-width: 0;
 }
 
-/* The wrapper base_v2 renders the bar into, made a query container so the chips can size
-   themselves against the bar's real width. `inline-size` only - the bar's height still comes
-   from its content, and this does not clip, so the dropdown menus still overflow it. */
+/* A query container, so the chips size against the bar's real width. `inline-size` only,
+   so the bar's height still comes from its content and the menus still overflow it. */
 .v2-topbar-container {
   container: topbar / inline-size;
 }
@@ -54,9 +45,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* No fixed cap: the grid's left track already bounds this, so the title uses whatever
-     width the bar actually has and only ellipsises once it runs out. A hard 280px truncated
-     names that had room to spare on a wide screen. */
+  /* No fixed cap - the grid's left track already bounds this. */
   max-width: 100%;
 }
 
@@ -169,12 +158,8 @@ a.gooey-topbar-author:hover {
   min-width: 0;
 }
 
-/* One height and one box model for the right cluster.
-   These were built from three different sizing models: the icon chips were a fixed 32px
-   square, while Publish and Run sized to their content. Publish carries a 1px border and Run
-   does not, so the same `padding: 6px` left them 35px and 33px - three heights in one row,
-   with 10px / 12px / 14px of horizontal padding to match. Height is set here and the
-   vertical padding removed, so a border can no longer change how tall a control is. */
+/* One height and one box model for the right cluster. Height is set here and the vertical
+   padding left off each control, so a border cannot change how tall a control is. */
 .gooey-topbar-integration,
 .gooey-topbar-overflow-btn,
 .gooey-topbar-publish,
@@ -190,8 +175,7 @@ a.gooey-topbar-author:hover {
   gap: 6px;
   width: var(--topbar-control-h);
   border-radius: 9px;
-  /* default: a neutral chip. Only platforms with a brand colour get white-on-colour -
-     otherwise the icon is white on a near-white surface and disappears. */
+  /* neutral by default; only platforms with a brand colour get white-on-colour */
   border: 1px solid #e0ddd7;
   background: #fff;
   color: #111;
@@ -200,9 +184,8 @@ a.gooey-topbar-author:hover {
   white-space: nowrap;
 }
 
-/* "Try in WhatsApp" rather than an unlabelled green square - but for the *first* channel only
-   (`--labelled`, set on `i === 0`). Every extra chip stays a 32px square and carries its name
-   in the tooltip and the ... menu.
+/* Only the first chip is labelled; the rest stay square and carry their name in the tooltip
+   and the ... menu.
 
    A @container query, not @media: the bar narrows when the Builder opens or the rail expands,
    neither of which changes the viewport, so a viewport breakpoint let the label appear on a
@@ -210,7 +193,7 @@ a.gooey-topbar-author:hover {
    into) is the query container. */
 .gooey-topbar-integration-label {
   display: none;
-  /* matches Publish; 0.8125rem read visibly smaller beside it */
+  /* matches Publish, which sits beside it */
   font-size: 0.875rem;
   font-weight: 500;
 }
@@ -218,7 +201,7 @@ a.gooey-topbar-author:hover {
 @container topbar (min-width: 1150px) {
   .gooey-topbar-integration--labelled {
     width: auto;
-    /* the same 12px Publish uses - these sit side by side */
+    /* the same 12px Publish uses */
     padding: 0 12px;
   }
 
@@ -390,8 +373,7 @@ a.gooey-topbar-cost:hover {
   background: #fbfaf8;
 }
 
-/* A section label, not a control - it groups the entries below it and takes no click. The
-   rule above it does the separating, so the group needs no divider element of its own. */
+/* A section label, not a control. Its top rule is what separates the group. */
 .gooey-topbar-menu-heading {
   margin-top: 6px;
   padding: 8px 10px 4px;
@@ -418,14 +400,9 @@ a.gooey-topbar-cost:hover {
 /* -------------------------------------------------------------- mobile */
 
 @media (max-width: 991.98px) {
-  /* With the pills gone there is nothing left to centre, so the three-track grid collapses to
-     one row of nav + title + actions.
-
-     The bar owns its own padding here, and the wrapper's is zeroed: the design asks for 12px,
-     which Bootstrap's 4/8/16/24 scale cannot express, and the two header states want different
-     insets - which a class on a wrapper rendered by python, that knows nothing about the view,
-     could not vary anyway. Same reason the wrapper's rule is dropped and drawn here: only the
-     bar knows which of the two line colours applies. */
+  /* The pills are gone, so the grid collapses to one row of nav + title + actions. The
+     bar owns its padding and its rule here, since the two header states differ and only
+     the bar knows which applies. */
   .v2-topbar-container {
     padding: 0 !important;
     border-bottom: 0 !important;
@@ -437,35 +414,26 @@ a.gooey-topbar-cost:hover {
     align-items: center;
     gap: var(--gooey-space-2);
     padding: var(--gooey-space-3);
-    /* 0.33px, not 1px: a hairline at device pixel ratio 3, which is what the design is drawn
-       at. It rounds up to a solid line on a 1x display, which is the right fallback. */
+    /* a hairline at device pixel ratio 3; rounds up to 1px on a 1x display */
     border-bottom: 0.33px solid var(--gooey-line-default);
   }
 
-  /* A level down the stack - Edit, Preview - which the design draws 4px shorter and rules with
-     the softer line.
-
-     The design also insets it 8px on the left rather than 12px, and that part is not kept: the
-     left slot is the one control on the row that is always there, so 4px of horizontal travel
-     every time you enter or leave a view reads as the header twitching. The height difference
-     costs nothing, because nothing is anchored to the bottom edge. */
+  /* A level down the stack: 4px shorter, ruled with the softer line. The horizontal inset
+     is deliberately unchanged, so the left control does not shift on entering a view. */
   .gooey-topbar-stacked {
     padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
       var(--gooey-space-3);
     border-bottom-color: var(--gooey-line-soft);
   }
 
-  /* Back, or the drawer at the root. A bare 24px icon box, no chip behind it: it is the one
-     control on the row that is pure navigation, and the design leaves it unadorned. */
+  /* Back, or the drawer at the root. A bare 24px icon box, no chip behind it. */
   .gooey-topbar-nav {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    /* A fixed box, because the two glyphs it holds are not the same width - `fa-bars` is
-       square, `fa-chevron-left` about half that - and the row would otherwise shift by the
-       difference every time the header changed state. The box is what holds still; the glyph
-       centres inside it. */
+    /* A fixed box: the two glyphs it holds differ in width, so the row would otherwise
+       shift every time the header changed state. */
     width: 24px;
     height: 24px;
     padding: 0;
@@ -483,9 +451,7 @@ a.gooey-topbar-cost:hover {
     text-align: center;
   }
 
-  /* 32px and always round here. The square-with-rounded-corners treatment and the
-     `circle_photo` opt-out are both desktop-only: at this size, beside a 14px title, the
-     circle is what reads as an avatar rather than as a thumbnail. */
+  /* Always round at this size; the square treatment and `circle_photo` are desktop-only. */
   .gooey-topbar-avatar,
   .gooey-topbar-avatar-circle {
     width: 32px;
@@ -546,9 +512,8 @@ a.gooey-topbar-cost:hover {
     font-size: 1rem;
   }
 
-  /* The desktop cluster. Cost and Run are no loss: `render_submit_row` already pins both to
-     the bottom of the editor, which is where the design puts them. The chips and Publish keep
-     their full labels in the sheet. */
+  /* The desktop cluster. Cost and Run return as the editor's bottom bar; the chips and
+     Publish keep their labels in the sheet. */
   .gooey-topbar-overflow-wrap,
   .gooey-topbar-cost,
   .gooey-topbar-sep,
@@ -556,11 +521,8 @@ a.gooey-topbar-cost:hover {
     display: none !important;
   }
 
-  /* The pill group is gone at this width. It used to float over the bottom of the viewport,
-     which cost it a shadow to sit above the content it overlapped, a `max-width` to stay on a
-     narrow screen, and `env(safe-area-inset-bottom)` to clear the home indicator - all of it
-     to work around covering the thing it switched. The design replaces it with the action
-     sheet, which is a list, so it also carries the entries a strip of pills never could. */
+  /* Replaced at this width by the action sheet, which is a list and so carries entries a
+     strip of pills could not. */
   .gooey-topbar-tabs {
     display: none;
   }
@@ -630,9 +592,8 @@ a.gooey-topbar-cost:hover {
   z-index: 5;
 }
 
-/* The panel's title, opposite the close button. v2 hides the widget's own header, so this is
-   both what names the surface and the only way to start a fresh conversation. Anchored the
-   same way as the close button, for the same reason. */
+/* The panel's title and its "new conversation" control, since v2 hides the widget's own
+   header. Anchored like the close button. */
 .v2-builder-new {
   position: absolute;
   top: 0.6rem;
@@ -640,11 +601,8 @@ a.gooey-topbar-cost:hover {
   z-index: 5;
 }
 
-/* `.gooey-sidebar` is `height: 100dvh` because in v1 it flanks the whole page. v2 mounts it
-   *inside* the app shell, below the top bar, so a viewport-tall panel overruns its container
-   by the bar's height - and since the panel is `overflow: hidden`, what gets clipped off the
-   bottom is the chat widget's input. Fill the container instead. Scoped to the v2 shell so
-   v1's full-height sidebar is untouched. */
+/* v2 mounts the panel inside the app shell, below the top bar, so `100dvh` would overrun
+   its container by the bar's height. Scoped so v1's full-height sidebar is untouched. */
 .v2-app-shell .gooey-sidebar {
   height: 100%;
 }
@@ -676,62 +634,42 @@ a.gooey-topbar-cost:hover {
     border-left: 0;
   }
 
-  /* ...and the surface behind it steps aside - but only where that surface is the workspace.
-     `:has()` rather than a bare descendant match because API, Deploy and History are not panes:
-     the sibling there is the tab's own body, and hiding it left the panel covering a page the
-     user had just navigated to, with nothing on screen to say so.
-
-     `!important` because that sibling carries Bootstrap's `d-flex`, which is
-     `display: flex !important` and wins otherwise. Without it the workspace was not hidden at
-     all - it was squeezed into a sliver down the right-hand edge, beside a panel that had taken
-     the rest of the row, which is the exact failure this rule exists to prevent. */
+  /* ...and the workspace behind it steps aside. `:has()` rather than a descendant match,
+     since on API or Deploy the sibling is the tab's own body, not a pane. `!important`
+     because that sibling carries Bootstrap's `d-flex`. */
   .v2-app-shell:has(.recipe-workspace) .gooey-sidebar-open ~ div {
     display: none !important;
   }
 
-  /* On one of those tabs the panel is not shown at all. Ask Gooey is the root of the *workspace*
-     stack; API and Deploy sit above the editor, so a full-screen chat over them has nothing
-     behind it to close back to - the header's back arrow goes to Edit, not here. Closing it on
-     the way out of the sheet covers the navigation; this covers arriving with it already open,
-     which Back, a reload or a deep link all do. */
+  /* Not shown on those tabs at all: Ask Gooey is the root of the workspace stack, so over
+     API or Deploy there would be nothing behind it to close back to. This covers arriving
+     with it already open - Back, a reload, a deep link. */
   .v2-app-shell:not(:has(.recipe-workspace)) .gooey-sidebar-open {
     display: none !important;
   }
 
-  /* The chat widget is pinned to `--sidebar_mobile_width` (100vw) at this breakpoint, which was
-     the panel's width back when the panel was the viewport. In the shell it is the width of a
-     box that sits inside the body's padding, so 100vw overruns it on both sides - which is what
-     pushed the widget's own title off the left edge and its composer off the right. Fill the
-     panel instead. */
+  /* The panel is a box inside the body's padding here, not the viewport, so the widget
+     fills the panel rather than `--sidebar_mobile_width`. */
   .v2-app-shell .gooey-sidebar #gooey-builder-embed {
     width: 100%;
   }
 
-  /* Both of the panel's own floating controls go at this width, because the header above it
-     already does their jobs: it names the surface, and "New Chat" is an entry in the sheet.
-     Left in, they float over the first line of the chat - and the labelled one is wide enough
-     that it wrapped and ran off the panel's left edge.
-
-     No way out of Ask Gooey either, by design: it is the root of the mobile stack, so there is
-     nothing behind it to close back to. The header's back arrow is what leaves a view, and at
-     the root there is no view to leave. */
+  /* Both floating controls go at this width - the header names the surface and the sheet
+     carries "New Chat". No close either: at the root there is no view to leave. */
   .v2-builder-new {
     display: none !important;
   }
 
   .v2-builder-close {
-    /* `!important` for the same reason the nav bar's hide needs it: the control renders with
-       Bootstrap display utilities, which carry their own `!important`. */
+    /* `!important`: the control renders with Bootstrap display utilities. */
     display: none !important;
   }
 }
 
 /* ---------------------------------------------------- editor bottom run bar
 
-   Fixed to the bottom edge rather than sticky inside the column: `VideoBots_v2` overrides
-   `_render_input_col` and returns without calling `render_submit_row` - "the top bar owns Run" -
-   so there is no submit row in the flow to make sticky. The action still goes through the bar's
-   own `handleRun`, so this is a second place to press it, not a second way to do it. */
+   Fixed to the bottom edge rather than sticky: the editor column has no submit row in the
+   flow to make sticky. Goes through the bar's own `handleRun`. */
 .gooey-topbar-runbar {
   position: fixed;
   left: 0;
@@ -797,9 +735,8 @@ a.gooey-topbar-cost:hover {
 
 /* ------------------------------------------------------- mobile action sheet
 
-   Only ever opened from a `d-lg-none` control, but hidden above lg regardless: a viewport that
-   crosses the breakpoint while the sheet is up would otherwise leave it stranded over a layout
-   that has the pills back. */
+   Hidden above lg regardless of how it was opened, so crossing the breakpoint while it is up
+   cannot strand it. */
 .gooey-sheet-scrim {
   position: fixed;
   inset: 0;
@@ -863,9 +800,8 @@ a.gooey-topbar-cost:hover {
   color: var(--gooey-ink);
 }
 
-/* Names the group below it, and takes no click. Indented to the labels rather than to the
-   icons: it is not one of them, and lining it up with the glyph column made it read as a row
-   whose icon had failed to load. */
+/* Names the group below it. Indented to the labels, not the icon column, so it does not
+   read as a row with a missing glyph. */
 .gooey-sheet-heading {
   width: 100%;
   padding: var(--gooey-space-3) var(--gooey-space-2) var(--gooey-space-1)
@@ -890,20 +826,11 @@ a.gooey-topbar-cost:hover {
 
 /* ------------------------------------------------- no motion below lg
 
-   The layout animations are desktop affordances: the pane slide reads as one surface making
-   room for another beside it, and the panel slide as a rail coming in from the edge. On a phone
-   there is no "beside" - one surface replaces another outright - so the same transitions play as
-   the whole screen sliding about, and they animate layout properties (width, transform on a
-   full-width element), which is the expensive kind.
-
-   Scoped to the surfaces that move. Not a blanket `* { transition: none }`: the loading shimmer
-   and the hover tints are not what makes this feel unsteady, and switching them all off to fix
-   two is how a stylesheet stops being explicable. */
+   The layout animations are desktop affordances - one surface making room for another beside
+   it. Below lg one surface replaces another outright, so the same transitions read as the
+   whole screen sliding. Scoped to the surfaces that move, not a blanket rule. */
 @media (max-width: 991.98px) {
-  /* The panes only slide because one is making room for another beside it. Below lg one pane
-     holds the screen, so the same transition plays as the whole view sliding about. Cut at lg,
-     not at the panel's 1140: between the two the layout is still two columns, and About
-     sliding in is the affordance that says the surface changed. */
+  /* Cut at lg, not the panel's 1140: between the two the layout is still two columns. */
   .recipe-workspace-pane {
     transition: none !important;
   }

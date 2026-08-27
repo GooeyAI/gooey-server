@@ -146,8 +146,7 @@ export function RecipeTopBar({
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
   const [shareCopied, setShareCopied] = useState(false);
-  // the tick is the only feedback a copy gets, so it has to fall back to something rather
-  // than leave the click looking like it did nothing
+  // the tick is the only feedback a copy gets, so it needs a fallback
   const copyShareUrl = () => {
     navigator.clipboard
       ?.writeText(share_copy_url)
@@ -159,10 +158,8 @@ export function RecipeTopBar({
   };
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  // Mirrors the Builder panel's own state. Seeded from the server's copy, then kept in step by
-  // the panel's `:changed` announcement - which is the authority, because a `:open` / `:close`
-  // command can be dispatched before a listener exists, and the panel also restores itself
-  // from storage without commanding anything at all.
+  // Mirrors the Builder panel. Seeded from the server, then kept in step by the panel's
+  // `:changed` announcement, which is the authority - the commands can be missed.
   const [builderOpen, setBuilderOpen] = useState(
     Boolean(builder_event_key && state[builder_event_key])
   );
@@ -175,8 +172,7 @@ export function RecipeTopBar({
     initial_view,
     narrow_pane
   );
-  // The shown layout, not the stored one - the bar must name the arrangement that is on
-  // screen. A config pane holding the whole row makes that Edit even where a split is saved.
+  // The shown layout, so the bar names the arrangement actually on screen.
   const activeView = viewForLayout(shownLayout(layout, editor_full_width));
   const selectedView = selectedWorkspaceView(activeView, workspace_active);
   // Which pill is lit, and what the crumb reads - see `activeTabView` for why this is not
@@ -219,63 +215,34 @@ export function RecipeTopBar({
     };
   }, [builder_event_key]);
 
-  // Ask Gooey is where a workflow opens on a phone, so the panel is shown unasked - the design
-  // has no way to close it, because there is nothing behind it to close back to.
-  //
-  // "Unasked" only until the user picks a view, which is what the stored pane layout records:
-  // `usePaneLayout` writes it on every selection, so its absence means this session has not
-  // chosen anything yet. Keying off that rather than a flag of our own keeps one fact in one
-  // place, and stops the panel reopening over a pane the user just asked for.
-  //
-  // 1140px is the panel's own breakpoint (`--sidebar_desktop_breakpoint`), not lg: above it the
-  // panel is a side rail that shares the screen, and opening it uninvited would take half the
-  // window from whatever is already there.
+  // On a phone a workflow opens on Ask Gooey, so the panel shows itself until this session
+  // has picked a view - an absent stored layout being what "has not picked" means.
+  // 1140px is the panel's own breakpoint, not lg: above it the panel shares the screen.
   useEffect(() => {
     if (!builder_event_key) return;
-    // Only on the workspace. On API or Deploy the panel is not this page's root - the editor
-    // is, one level down - and opening it there would bury a page the user navigated to.
+    // Only on the workspace; elsewhere the panel would cover a page the user navigated to.
     if (!workspace_active) return;
-    // A visitor lands on About, not on a chat: the first question is what this workflow is,
-    // and Remix is how they opt into building one. Opening the panel over that answers a
-    // question they have not asked yet.
+    // A visitor lands on About; Remix is how they opt into a chat.
     if (view_only) return;
     if (window.innerWidth >= 1140) return;
     let chosen: string | null = null;
     try {
       chosen = window.sessionStorage.getItem(storage_key);
     } catch {
-      // Storage can be unavailable in private browsing; treat that as "nothing chosen yet",
-      // which is the state a first visit is in anyway.
+      // Storage can be unavailable; treat that as nothing chosen yet.
     }
     if (chosen) return;
     window.dispatchEvent(new CustomEvent(`${builder_event_key}:open`));
   }, [builder_event_key, storage_key]);
 
-  // Below lg the bar is a navigation stack, not a set of tabs, and Ask Gooey is its root: the
-  // panel covers the shell below the header, so while it is open there is no view on screen to
-  // go back from - the left slot opens the nav drawer instead.
-  //
-  // Where there is no Builder at all there is no panel to be the root, so the entry view takes
-  // the job. `initial_view` is the server's answer to "where does this workflow open", which
-  // makes it the root by definition rather than a second guess at it.
-  // A tab that is not the workspace is never the root: API and Deploy are levels above the
-  // editor, so they always offer a way back, whatever the panel happens to be doing.
-  //
-  // Until the layout has hydrated, assume the root. Before then `layout` is whatever
-  // `initial_view` says, and for an owner that is Split - so the crumb rendered "Split" for a
-  // frame, until sessionStorage loaded, `foldForNarrowViewport` folded Split away at this
-  // width, and the panel announced itself. Naming a view the user never chose, and one that does not
-  // exist on a phone, is worse than naming none: the root is the safe assumption, because
-  // Ask Gooey is what a workflow opens on here. The pill group guards the same frame with
-  // `paneVisibility(hydrated)`; this is that guard for the rest of the bar - it also keeps the
-  // run bar from flashing in and the back arrow from appearing before there is a level to
-  // leave.
+  // Below lg the bar is a navigation stack. Its root is Ask Gooey where the page has a
+  // Builder, and the entry view otherwise; a tab that is not the workspace is never the root.
+  // Assume the root until hydrated, since before then the layout is only `initial_view`.
   const atRoot =
     workspace_active &&
     (!hydrated ||
       (builder_event_key ? builderOpen : selectedView === initial_view));
-  // What the crumb reads. The server names a non-workspace tab; on the workspace it is
-  // whichever view is on screen.
+  // The server names a non-workspace tab; on the workspace it is the view on screen.
   const crumb = crumb_label || activeViewSpec?.label || "";
   const previewable = views.some((view) => view.slug === "preview");
 
@@ -289,22 +256,14 @@ export function RecipeTopBar({
     );
   };
 
-  // Back out of a view. From API or Deploy that means leaving the tab for the workspace and
-  // landing on Edit, which is the level they sit above - `chooseView` navigates on its own when
-  // the workspace is not the current tab. On the workspace it is Ask Gooey where there is one,
-  // and the entry view otherwise.
+  // Back a level: to the workspace from another tab, else to Ask Gooey or the entry view.
   const goBack = () => {
     if (!workspace_active) return chooseView("edit");
     if (builder_event_key) return setBuilder(true);
     chooseView(initial_view);
   };
 
-  // Choosing a view from the sheet or the eye has to put Ask Gooey away, or the pane it
-  // selects renders behind a panel that is covering the whole shell.
-  //
-  // No special case for Split at this width any more: the fold is derived from
-  // `narrow_pane`, which the recipe declares, so asking for a two-pane view on a phone
-  // already lands on the half that recipe wants.
+  // Puts Ask Gooey away first, or the selected pane renders behind it.
   const showView = (view: RecipeView) => {
     setBuilder(false);
     chooseView(view);
@@ -323,9 +282,7 @@ export function RecipeTopBar({
     onChange();
   };
 
-  // What the Publish control offers. `publish_label` is permission-derived (Update / Save
-  // and Run / Save as New); Share only appears when the user may change visibility, and
-  // its icon is the current setting, so it doubles as a read-out.
+  // What the Publish control offers. `publish_label` is permission-derived.
   const publishEntries: MenuEntry[] = [];
   if (publish_label) {
     publishEntries.push({
@@ -336,9 +293,7 @@ export function RecipeTopBar({
       is_danger: false,
     });
   }
-  // Share sits in the Publish menu for both capabilities - opening the visibility dialog for
-  // someone who can change it, copying the link for everyone else. The server sets exactly one
-  // of the two, and neither on an unpublished run, which has no stable url to share.
+  // The server sets exactly one of these: a visibility dialog, or a link to copy.
   if (share_key || share_copy_url) {
     publishEntries.push({
       key: SHARE_ITEM_KEY,
@@ -348,8 +303,7 @@ export function RecipeTopBar({
       is_danger: false,
     });
   }
-  // Shipping this workflow over HTTP is the third way to publish it. A plain link, so it
-  // needs no key round-trip - Menu renders any entry with an href as a <Link>.
+  // A plain link - Menu renders any entry with an href as a <Link>.
   if (api_href) {
     publishEntries.push({
       key: API_ITEM_KEY,
@@ -360,8 +314,7 @@ export function RecipeTopBar({
     });
   }
 
-  // Deploy is the fourth way to ship this workflow, beside saving, sharing and the API - and
-  // like the API it is a route now rather than a pane, so it needs no key round-trip either.
+  // A route rather than a pane, so a link like the API entry above.
   if (deploy_href) {
     publishEntries.push({
       key: DEPLOY_ITEM_KEY,
@@ -372,16 +325,13 @@ export function RecipeTopBar({
     });
   }
 
-  // Below lg the chips and the title compete for one row and the title always loses, so
-  // the chips move into the overflow menu. Both lists are rendered and CSS picks one - no
-  // media-query JS, and the chip count stops mattering. Publish folds in the same way:
-  // there is one menu on a phone, not a menu plus a button.
+  // Below lg the chips and Publish fold into this menu. Both lists render and CSS picks
+  // one, so no media-query JS and the chip count does not matter.
   const overflowEntries: MenuEntry[] = [
     // the actions first - they are what the menu is for on a phone
     ...publishEntries.map((it) => ({ ...it, mobileOnly: true })),
     ...overflow_items,
-    // ...then the channels this workflow is live on, under their own label so a long list
-    // of them cannot be mistaken for more actions
+    // ...then the deployed channels, under a heading so they do not read as more actions
     ...(integrations.length
       ? [
           {
@@ -407,10 +357,8 @@ export function RecipeTopBar({
   // with nothing but mobile-only entries the button itself has no desktop purpose
   const overflowDesktopOnly = overflow_items.length === 0;
 
-  // The mobile sheet. The design's five entries first, then whatever the desktop bar keeps in
-  // its own menus - Publish, Share, API, the deployed channels. Those are appended rather than
-  // dropped because the sheet is the *only* menu below lg: the design simply never drew a
-  // workflow that had any of them. Preview is absent on purpose - it is the eye button.
+  // The mobile sheet: the design's entries, then what the desktop bar keeps in its own
+  // menus, since this is the only menu below lg. Preview is absent - it is the eye button.
   const viewEntry = (slug: RecipeView): SheetEntry[] => {
     const view = views.find((v) => v.slug === slug);
     if (!view) return [];
@@ -424,18 +372,13 @@ export function RecipeTopBar({
     ];
   };
 
-  // The sheet carries whichever of Edit and Preview the header does not already reach in one
-  // tap. At the root that is Edit, because the eye button is Preview; inside Edit it is Preview,
-  // because the action button has become Update. Listing the view you are already looking at
-  // was the alternative, and it is a row that does nothing.
+  // Whichever of Edit and Preview the header does not already reach in one tap.
   const otherWorkView: RecipeView =
     !atRoot && selectedView === "edit" ? "preview" : "edit";
 
   const sheetEntries: SheetEntry[] = view_only
     ? [
-        // Read it, see how it is built, make your own. Everything else in this bar acts on a
-        // run the visitor does not own, so none of it is offered rather than offered and
-        // refused: no Update, no Share, no API, no Deploy, no version history.
+        // A visitor owns nothing here, so only read / inspect / remix are offered.
         ...views.map((view) => ({
           key: `--sheet-view-${view.slug}`,
           label: view.label,
@@ -448,20 +391,16 @@ export function RecipeTopBar({
                 key: "--sheet-remix",
                 label: "Remix",
                 iconClass: "fa-regular fa-shuffle",
-                // Remix is not a save - there is nothing of the visitor's to save yet. It
-                // opens Ask Gooey, which is where a workflow of their own starts.
+                // Opens Ask Gooey, where a workflow of their own starts.
                 onPick: () => setBuilder(true),
               },
             ]
           : []),
       ]
     : [
-        // Listed in the design's order, which is not the order the view selector uses - so each
-        // entry is placed by name rather than swept up from `views`. Usage has no destination in
-        // the app yet, so it is left out rather than rendered as a row that does nothing.
+        // Placed by name, since the design's order is not the view selector's.
         ...viewEntry("about"),
-        // Only while Ask Gooey is the surface on screen. A fresh thread is an action on the chat,
-        // so offering it from Edit or Preview means starting one somewhere you cannot see it.
+        // Only while Ask Gooey is on screen - it acts on the chat.
         ...(builder_new_event && atRoot
           ? [
               {
@@ -485,9 +424,7 @@ export function RecipeTopBar({
               },
             ]
           : []),
-        // Update is dropped: it is the outlined button in the header on every view that has one,
-        // and a menu row for the control sitting two inches above it is just a second way to miss.
-        // Share, API and Deploy stay - they have no button of their own at this width.
+        // Update is dropped - it already has a button in the header at this width.
         ...overflowEntries
           .filter((item) => item.key !== PUBLISH_ITEM_KEY)
           .map((item) => ({
@@ -496,8 +433,7 @@ export function RecipeTopBar({
             iconHtml: item.icon,
             href: item.href ?? undefined,
             heading: item.heading,
-            // A link navigates, so its only job here is to put Ask Gooey away first -
-            // otherwise the panel is still open when the next page mounts, on top of it.
+            // A link only needs to put Ask Gooey away before it navigates.
             onPick: item.href
               ? () => setBuilder(false)
               : () => pickMenuItem(item),
@@ -508,8 +444,7 @@ export function RecipeTopBar({
     setTitleMenuOpen(false);
     setOverflowOpen(false);
     setPublishMenuOpen(false);
-    // these two are the component's own entries, not server-declared menu items, so they
-    // go straight to their keys instead of round-tripping through menu_key
+    // the component's own entries, so they go straight to their keys
     if (item.key === PUBLISH_ITEM_KEY) return fire(publish_key);
     if (item.key === SHARE_ITEM_KEY) {
       if (share_key) return fire(share_key);
@@ -527,9 +462,7 @@ export function RecipeTopBar({
       )}
     >
       <div className="gooey-topbar-left">
-        {/* The app's only header below lg, so it owns the way back: the drawer at the root of
-            the stack, the previous level anywhere else. Above lg the rail is always on screen
-            and the pills do the switching, so this has no job and is not rendered. */}
+        {/* The way back below lg: the nav drawer at the root, the previous level elsewhere. */}
         <button
           type="button"
           className="gooey-topbar-nav d-lg-none"
@@ -566,10 +499,7 @@ export function RecipeTopBar({
             {!!title_menu_items.length && (
               <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
             )}
-            {/* Which level of the stack is on screen, below lg only - above it the active
-                pill already says so. Inside the title button rather than beside it: the two
-                read as one heading, and the author line that shares this block is hidden at
-                this width, so there is nothing else on the row to disturb. */}
+            {/* Which level of the stack is on screen; above lg the active pill says so. */}
             {!atRoot && !!crumb && (
               <span className="gooey-topbar-crumb d-lg-none">
                 <i
@@ -612,8 +542,8 @@ export function RecipeTopBar({
                 view.desktop_only && "gooey-topbar-tab-desktop-only"
               )}
               onClick={() => chooseView(view.slug as RecipeView)}
-              // no title: these carry a visible label, so a tooltip repeating it is noise.
-              // `aria-pressed` conveys that these controls change the workspace layout rather
+              // no title: they carry a visible label. `aria-pressed` conveys that these
+              // change the workspace layout rather
               // than navigate to another page.
               aria-pressed={view.slug === activeViewSpec?.slug}
             >
@@ -625,10 +555,8 @@ export function RecipeTopBar({
       )}
 
       <div className="gooey-topbar-right">
-        {/* Two controls below lg, per the design: everything listable goes in the sheet, and
-            the one action worth a tap of its own sits beside it. The desktop cluster below -
-            chips, Publish, cost, Run - is hidden at this width by CSS; cost and Run come back
-            as the editor's own bottom bar, which is where the design puts them. */}
+        {/* Below lg only these two render; the desktop cluster is hidden by CSS, and cost
+            and Run return as the editor's own bottom bar. */}
         {!!sheetEntries.length && (
           <button
             type="button"
@@ -643,9 +571,8 @@ export function RecipeTopBar({
           </button>
         )}
 
-        {/* Preview at the root of the stack, Update below it. ASSUMPTION: the design shows an
-            eye on the Ask screens and a floppy on Preview/Edit, and Preview is the one pane
-            the sheet never lists - so the eye is how you reach it. Flagged for review. */}
+        {/* Preview at the root, Update below it. The sheet never lists Preview, so this is
+            the only way to reach it. */}
         {atRoot
           ? previewable && (
               <button
@@ -704,11 +631,9 @@ export function RecipeTopBar({
           </div>
         )}
 
-        {/* At most ONE chip is ever labelled, and none at all once there are more than two.
-            The pill group is centred, so the right cluster only gets half the bar's slack; a
-            workflow deployed to three channels has enough chips that even one label pushes the
-            cluster over the pills. Unlabelled chips keep their name in the tooltip, and every
-            channel appears with its full label in the ... menu regardless. */}
+        {/* At most one chip is labelled, none past two: the centred pill group leaves the
+            right cluster half the bar's slack. Unlabelled chips keep their name in the
+            tooltip and in the ... menu. */}
         {integrations.map((integration, i) => {
           const labelled = i === 0 && integrations.length <= 2;
           const className = clsx(
@@ -758,9 +683,8 @@ export function RecipeTopBar({
           );
         })}
 
-        {/* One control rather than two buttons: Publish opens Update and Share. Below lg
-            it is hidden entirely and the same two entries live in the ... menu, which is
-            the only menu on a phone. */}
+        {/* One control holding Update and Share. Hidden below lg, where both live in the
+            ... menu instead. */}
         {!!publishEntries.length && (
           <div
             className="gooey-topbar-overflow-wrap d-none d-lg-block"
@@ -797,9 +721,8 @@ export function RecipeTopBar({
           </div>
         )}
 
-        {/* `cost_label` on its own is a bare price. The tooltip names what it is and appends
-            any per-recipe note; the aria-label says it outright, since "$0.05" read aloud in
-            a row of controls is meaningless. */}
+        {/* The tooltip names the price and appends any per-recipe note; a bare "$0.05"
+            read aloud in a row of controls means nothing. */}
         {!!cost_label &&
           (() => {
             const costName = `Run cost: ${cost_label}`;
@@ -858,20 +781,10 @@ export function RecipeTopBar({
         )}
       </div>
 
-      {/* The editor's bottom bar: what a run will cost on the left, the run itself on the
-          right. Below lg only - above it both sit in this bar's right cluster.
-
-          Scoped to the editor because that is the only view with anything to submit. The design
-          gives Preview the bot's own composer at this edge and Ask Gooey the chat's, so a run
-          bar there would be a second thing competing for the same strip of screen.
-
-          `!atRoot` as well as the view, because the two are independent: Ask Gooey covers the
-          workspace without changing which view is selected behind it, so checking the view
-          alone put this bar over the chat's composer whenever the editor was what you had left.
-
-          Same `handleRun` as the desktop button rather than a second path to the server: this
-          is the same action in a different place, and a run that lands on a different view
-          depending on which control started it would be a bug waiting to happen. */}
+      {/* The editor's bottom bar, below lg only - above it cost and Run sit in the right
+          cluster. Scoped to the editor, the one view with something to submit; Preview and
+          Ask Gooey both put a composer at this edge. `!atRoot` as well as the view, since
+          Ask Gooey covers the workspace without changing which view is selected behind it. */}
       {!atRoot && selectedView === "edit" && (!!cost_label || !!run_key) && (
         <div className="gooey-topbar-runbar d-lg-none">
           {!!cost_label &&

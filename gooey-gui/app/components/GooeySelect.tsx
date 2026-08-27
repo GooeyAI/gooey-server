@@ -160,13 +160,8 @@ const MENU_CLASS = "gooey-select-menu";
 const Menu = (props: MenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  /* Keep the menu inside the viewport.
-   *
-   * A menu is only as wide as its control by default, but a call site can widen it, and then
-   * neither edge is safe: this used to right-align an overflowing menu to its control, which
-   * on a narrow screen just moved the overflow to the other side - a 300px menu on a control
-   * ending at x=224 landed at x=-76, cut off at the start of every option. Clamped to the
-   * viewport instead, and capped so a menu wider than the screen cannot happen at all. */
+  /* Keep the menu inside the viewport. A call site can widen a menu past its control, so
+   * neither edge is safe - clamped to the viewport and capped to its width. */
   useEffect(() => {
     const menu = menuRef.current;
     if (!menu || !props.selectProps.menuIsOpen) return;

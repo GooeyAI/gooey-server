@@ -3,29 +3,20 @@
 /**
  * The client-side views of the layout-v2 workspace.
  *
- * Defined here, in the props package, because these ids cross into TypeScript: the
- * generator emits them as a named `RecipeView` union in every `.d.ts` that references
- * them, and `RecipeWorkspace/paneState.ts` imports that instead of declaring its own.
- * One definition, checked by the compiler on the far side.
- *
- * `daras_ai_v2.tab_spec` re-exports this, so recipes keep importing it from there.
+ * Defined here so the generator emits it as a named TypeScript union that `paneState.ts`
+ * imports. `daras_ai_v2.tab_spec` re-exports it for recipes.
  */
 export type RecipeView = "about" | "edit" | "preview" | "split";
 /**
- * One of the two work surfaces, as opposed to one of the views.
- *
- * Not a `RecipeView`: these name panes, and only the preview is both. Defined here for
- * the same reason - `RecipeWorkspace/paneState.ts` imports the generated union rather
- * than declaring its own.
+ * One of the two work surfaces. Not a `RecipeView`: these name panes, and only the
+ * preview is both.
  */
 export type WorkPane = "editor" | "preview";
 
 /**
- * The workspace shell: three server-rendered surfaces, arranged by the client.
- *
- * Takes About, the editor and the preview as its render-tree children, in that order,
- * and decides which are on screen and how wide. Switching view costs no round trip,
- * which is the whole point - the trade is that all three render every request.
+ * The workspace shell. Takes About, the editor and the preview as its render-tree
+ * children, in that order, and decides which are on screen and how wide. All three render
+ * every request; switching between them costs no round trip.
  */
 export interface RecipeWorkspaceProps {
   storage_key: string;
@@ -34,11 +25,8 @@ export interface RecipeWorkspaceProps {
   narrow_pane: WorkPane;
 }
 /**
- * A button that selects a view, and optionally a pane within it.
- *
- * Wraps its children, so the caller supplies the whole visual - About's meta cards are
- * the only user today. `state_key`/`state_value` are the pane half: the client writes
- * them and notifies, which is what lets a card on About land on a specific config pane.
+ * A button that selects a view, and optionally a pane within it. Wraps its children,
+ * so the caller supplies the visual. `state_key`/`state_value` are the pane half.
  */
 export interface RecipeWorkspaceTriggerProps {
   storage_key: string;
@@ -50,9 +38,6 @@ export interface RecipeWorkspaceTriggerProps {
 }
 /**
  * A square icon button, or a labelled pill, pinned to a pane's corner.
- *
- * Used for the pane-pairing controls the workspace renders itself, and for the Builder
- * panel's own close and title buttons.
  */
 export interface WorkspacePaneControlProps {
   label: string;

@@ -93,10 +93,8 @@ export function GooeyBuilderInlineEmbed(
     script?.addEventListener("load", loadEmbed);
     loadEmbed();
 
-    // v2 hides the widget's own header, which is where "new conversation" normally lives, so
-    // the panel's floating title button fires this instead. Routed through the controller
-    // rather than setting session state here, so there is one definition of what starting a
-    // conversation means - the widget's own control uses the same path.
+    // v2 hides the widget's header, so the panel's title button fires this instead. Routed
+    // through the controller, the same path the widget's own control uses.
     const newConversationEvent = `${propsRef.current.event_key}:new`;
     const onNewConversation = () => controllerRef.current?.onNewConversation?.();
     window.addEventListener(newConversationEvent, onNewConversation);
@@ -111,8 +109,7 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
 
-  // No `w-100`: Bootstrap's width utilities are `!important`, so it would beat the rule in
-  // app.css that pins this to the panel's settled width during the open/close transition.
-  // Width is owned by CSS there - it defaults to 100% and is only overridden inside a panel.
+  // No `w-100`: Bootstrap's width utilities are `!important` and would beat the settled-width
+  // rule in app.css. Width is owned there.
   return <div className="h-100" id="gooey-builder-embed" />;
 }

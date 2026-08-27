@@ -62,9 +62,7 @@ export function usePaneLayout(
       location.state
     );
     setLayout(nextLayout);
-    // Read before paint, in the same commit as `hydrated`: the panes stay hidden until then,
-    // so learning the viewport a frame later would show a two-pane arrangement for one
-    // frame on a phone.
+    // Before paint, in the same commit as `hydrated`, which is what the panes wait on.
     setIsNarrow(!window.matchMedia(WIDE_QUERY).matches);
     if (navigationView) {
       try {
@@ -92,8 +90,7 @@ export function usePaneLayout(
     return () => wide.removeEventListener("change", sync);
   }, []);
 
-  // `layout` stays the layout the user asked for, so selecting and collapsing act on that
-  // rather than on whatever the current viewport happens to allow.
+  // These act on the stored layout, not on what the viewport currently allows.
   const selectView = useCallback(
     (view: RecipeView) => {
       updateLayout(layoutAfterSelectingView(layout, view));
@@ -107,12 +104,9 @@ export function usePaneLayout(
   );
 
   return {
-    // What can be shown here. Consumers compose `shownLayout` on top for the full-width
-    // case; both are readings of the stored layout, never writes to it.
+    // What can be shown here; consumers compose `shownLayout` on top.
     layout: foldForNarrowViewport(layout, narrowPane, isNarrow),
-    // What the user actually picked. The top bar needs both: it names the arrangement on
-    // screen, but the *pill* has to stay lit on the tab that was chosen even when the fold
-    // lands on a view this recipe does not offer as a tab.
+    // What the user picked. The top bar needs both - see `activeTabView`.
     storedLayout: layout,
     hydrated: hydratedStorageKey === storageKey,
     isNarrow,

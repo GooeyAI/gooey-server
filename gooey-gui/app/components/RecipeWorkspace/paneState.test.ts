@@ -265,9 +265,7 @@ describe("foldForNarrowViewport", () => {
     expect(foldForNarrowViewport(split, "editor", true)).toEqual(edit);
   });
 
-  // The bug this replaced: the fold was hardcoded to `preview`, so a recipe whose tabs are
-  // About and a two-pane "Generate" - no Preview tab at all - folded to a view it does not
-  // declare. No pill matched it, so none rendered active and the crumb went blank.
+  // A recipe may declare no Preview tab at all - About plus a two-pane "Generate".
   it("can fold to the editor, for a recipe with no preview tab", () => {
     const folded = foldForNarrowViewport(split, "editor", true);
     expect(viewForLayout(folded)).toBe("edit");
@@ -293,8 +291,7 @@ describe("foldForNarrowViewport", () => {
     expect(foldForNarrowViewport(about, "editor", true)).toEqual(about);
   });
 
-  // The other half of the old bug: folding used to write the result to sessionStorage, so a
-  // phone turned sideways lost the split for good. Deriving it leaves the stored layout be.
+  // Derived, not stored, so the stored layout survives a fold.
   it("is a derivation, so turning the phone back restores the pair", () => {
     const stored = split;
     expect(foldForNarrowViewport(stored, "preview", true)).toEqual(preview);
@@ -303,7 +300,7 @@ describe("foldForNarrowViewport", () => {
 });
 
 describe("activeTabView", () => {
-  const VIEWER_TABS = ["about", "split"] as const;   // About + "How it works"
+  const VIEWER_TABS = ["about", "split"] as const; // About + "How it works"
   const OWNER_TABS = ["about", "edit", "preview", "split"] as const;
 
   it("names the view on screen when the recipe offers it as a tab", () => {

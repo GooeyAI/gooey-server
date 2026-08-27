@@ -314,18 +314,10 @@ button .gui-html-container,
   background-color: var(--bs-gray-200) !important;
 }
 
-/* Design-system tokens, from the Figma file's "🎨 Design System" page.
-   Prefixed because the design's own names - ink, white, line-soft - are far too generic to
-   own globally. The comment on each line is the Figma token it comes from, so a value can be
-   traced back without opening the file.
-
-   This is a deliberate subset: only what the mobile header, its drawer and the pane pills
-   actually use. The rest of the scale is real but unused, and a token nothing references is
-   just a claim that the codebase has adopted a system it has not. Extend as surfaces land.
-
-   The corollary, accepted knowingly: these do not match the v2 desktop bar, which runs an
-   older ad-hoc palette (#111, #e0ddd7, #fbfaf8). Mobile and desktop will disagree on colour
-   until desktop is converted too. */
+/* Design-system tokens, prefixed because the design's own names are too generic to own
+   globally. Each comment names the Figma token it comes from. A deliberate subset: only what
+   the mobile header, its drawer and the pane pills use. The v2 desktop bar still runs an
+   older ad-hoc palette, so the two disagree on colour until it is converted. */
 :root {
   --gooey-ink: #0a1021;             /* ink - titles, pill and drawer labels */
   --gooey-line-default: #d9d9d9;    /* line - root header rule, outline button border */
@@ -384,13 +376,10 @@ button .gui-html-container,
   width: 100%;
 }
 
-/* Inside a panel, pin the chat widget to the width that panel settles at, so the open/close
-   transition reveals it rather than reflowing it. `.gooey-sidebar` animates min/max/width -
-   layout properties - so a widget tracking its container re-wraps every message on every
-   frame of the 280ms slide. `--sidebar-settled-width` is published by Sidebar.tsx because a
-   resized panel's width only exists in JS; it falls back to the default open width.
-   A container unit would not work here: the animating element *is* the container, so `cqw`
-   would track it frame by frame exactly as `100%` does. */
+/* Inside a panel, pin the widget to the width the panel settles at, so the transition
+   reveals it rather than reflowing it on every frame. `--sidebar-settled-width` comes from
+   Sidebar.tsx; a container unit would not work, since the animating element is the
+   container. */
 .gooey-sidebar #gooey-builder-embed {
   width: var(--sidebar-settled-width, var(--sidebar_open_width));
 }
@@ -469,8 +458,7 @@ button .gui-html-container,
   justify-content: center;
 }
 
-/* A vertical run of dots, so the edge reads as a grab handle rather than relying on the
-   cursor changing once you are already on it. */
+/* A vertical run of dots, so the edge reads as a grab handle before you are on it. */
 .gooey-sidebar-resizer::before {
   content: "";
   width: 3px;

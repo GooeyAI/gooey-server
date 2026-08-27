@@ -13,11 +13,8 @@ __all__ = ["PaneSpec", "RecipeView", "TabSpec"]
 class PaneSpec(typing.NamedTuple):
     """One panel of the working column.
 
-    `id` and `label` are deliberately separate. The id is the pane's identity - it is what
-    goes into session state and into the `RecipeWorkspaceTrigger` deep links the About cards
-    build - so it has to stay stable. The label is display-only and free to change. Keying a
-    pane by its label instead meant renaming the label silently broke every deep link
-    pointing at it, with no error: the strip just fell back to the first pane.
+    `id` is the pane's identity - it goes into session state and into
+    `RecipeWorkspaceTrigger` deep links, so it must stay stable. `label` is display-only.
     """
 
     id: str

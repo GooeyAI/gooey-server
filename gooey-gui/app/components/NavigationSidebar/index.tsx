@@ -89,10 +89,8 @@ export function NavigationSidebar({
     const onClose = () => {
       setBuilderOpen(false);
     };
-    // The panel's settled state, which outranks the commands above: a command says what should
-    // happen and can be dispatched before the panel is listening, while this says what the
-    // panel actually is. Without it the rail could sit on a stale `true` - the panel closed,
-    // its button still withheld - until a reload reset this state from the server's.
+    // The panel's settled state, which outranks the commands above - those can be
+    // dispatched before the panel is listening.
     const onChanged = (e: Event) => {
       const open = (e as CustomEvent<{ open?: boolean }>).detail?.open;
       if (typeof open === "boolean") setBuilderOpen(open);
@@ -120,9 +118,8 @@ export function NavigationSidebar({
     window.dispatchEvent(new CustomEvent(builderOpenEvent));
   }, [builderOpenEvent, location.key]);
 
-  // The control that opens the drawer lives in RecipeTopBar now, which is a sibling with no
-  // common ancestor to lift this state into - hence an event rather than a prop. Open only:
-  // closing is the scrim's and the header's job, both of which are inside this component.
+  // Opened from RecipeTopBar, a sibling with no common ancestor - hence an event. Open
+  // only: closing belongs to the scrim and the header, both inside this component.
   useEffect(() => {
     const onOpen = () => setCollapsed(false);
     window.addEventListener(NAV_DRAWER_OPEN_EVENT, onOpen);

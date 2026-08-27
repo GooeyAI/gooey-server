@@ -268,8 +268,7 @@ a.nav-brand {
   padding-right: 12px !important;
 }
 
-/* The menu button, sized to RecipeTopBar's `.gooey-topbar-nav`: a 24px box holding a 1rem
-   glyph, no padding of its own. `fs-5` and `p-2` had it a third larger and 8px further in. */
+/* Sized to RecipeTopBar's `.gooey-topbar-nav`, so the control does not move between pages. */
 .nav-mobile-menu {
   flex: 0 0 auto;
   width: 24px;
@@ -287,13 +286,8 @@ a.nav-brand {
   text-align: center;
 }
 
-/* Except on a v2 page, which brings its own header - RecipeTopBar, which carries the
-   workflow's name and its own hamburger. Two headers there cost ~108px of a 669px viewport
-   before any content, which is what the mobile design collapses into one.
- 
-   Keyed off `.v2-topbar-container`, the wrapper base_v2 always renders the bar into, because
-   this component sits in the outer shell and is never told which kind of page it is wrapping.
-   Every other page - explore, history, home - keeps this bar as its only mobile header. */
+/* Except on a v2 page, which brings its own header. Keyed off `.v2-topbar-container`
+   because this component sits in the outer shell and is never told which page it wraps. */
 body:has(.v2-topbar-container) .nav-mobile-topbar {
   /* `!important` because the element carries Bootstrap's `d-flex`, which is itself
      `display: flex !important` and otherwise wins on equal specificity. */

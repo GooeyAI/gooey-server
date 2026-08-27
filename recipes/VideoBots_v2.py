@@ -121,11 +121,8 @@ MODEL_ROW_CSS = """
 # `(str, Enum)` rather than `enum.StrEnum`: this runs on 3.10, where StrEnum does not exist.
 # Matching `BulkRunnerRunState` in gooey_gui/types/bulk_progress_props.py.
 class ConfigPane(str, Enum):
-    """Stable ids for the working column's panes.
-
-    These are what session state and the About cards' deep links carry, so they must not
-    change; the labels beside them in `_config_panes()` are display-only and can.
-    """
+    """Stable ids for the working column's panes. Session state and the About cards' deep
+    links carry these, so they must not change; the labels in `_config_panes()` may."""
 
     llm_instructions = "llm-instructions"
     knowledge = "knowledge"
@@ -137,11 +134,8 @@ class ConfigPane(str, Enum):
 class VideoBotsPageV2(BasePage, VideoBotsPage):
     """The agent recipe in layout v2.
 
-    Two bases, and the order matters. `BasePage` is the v2 shell - the app frame, the top bar,
-    the workspace - and it has to come first, or v1's `render` would win and this page would
-    draw the old layout. `VideoBotsPage` brings everything that makes it *this* recipe: the
-    request and response models, the inference pipeline, the cost maths. Both descend from the
-    v1 base, so the MRO is a straight line: v2 presentation over v1 recipe over v1 base.
+    Base order matters: `BasePage` is the v2 shell and must come first, or v1's `render`
+    wins. `VideoBotsPage` supplies the models, the pipeline and the cost maths.
     """
 
     @classmethod
@@ -586,11 +580,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     DEMO_ACTION_PREFIX = "demo:"
 
     def _top_bar_integrations(self) -> list[TopBarIntegration]:
-        """v1's demo buttons, as chips in the top bar.
-
-        They open a dialog rather than navigating, so each carries an action key instead of
-        an href and comes back through the bar's menu key.
-        """
+        """Demo buttons as top bar chips. They open a dialog rather than navigating, so each
+        carries an action key instead of an href."""
         from widgets.demo_button import get_demo_bots
 
         integrations = []
@@ -609,12 +600,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         return integrations
 
     def _handle_menu_pick(self, picked: str | None):
-        """The demo chips, which come back through the same menu key the title menu uses.
-
-        Extends rather than replaces: `super()` still handles Version history, Duplicate and
-        Delete, so a chip key and a title-menu key can share one round trip without either
-        having to know about the other.
-        """
+        """The demo chips, which come back through the same menu key the title menu uses."""
         super()._handle_menu_pick(picked)
 
         from widgets.demo_button import get_demo_bots, render_demo_dialog
@@ -633,20 +619,12 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         pass
 
     def entry_tab_slug(self, tabs: list[TabSpec]) -> RecipeView:
-        """Show About to a first-time visitor and Split to everyone else.
-
-        Someone who has arrived at a workflow they do not own wants to know what it is
-        before they meet its knobs; someone opening their own run wants to work.
-        """
+        """About for a first-time visitor, Split for everyone else."""
         return RecipeView.about if self.is_unowned_example() else RecipeView.split
 
     def get_tab_spec(self) -> list[TabSpec]:
-        """The agent tab set.
-
-        Deploy is deliberately absent: it becomes a sub-tab of Config in a later slice, and
-        until then its body stays reachable through v1's `/integrations/` url via
-        `render_selected_tab()`.
-        """
+        """The agent tab set. Deploy is absent - its body is reached through the
+        `/integrations/` url via `render_selected_tab()`."""
         if self.is_unowned_example():
             return self.get_viewer_tab_spec()
         return [
@@ -664,11 +642,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 slug=RecipeView.preview,
                 label="Preview",
                 icon=icons.preview,
-                # Not immersive on a phone any more. It used to take the whole screen, which
-                # meant hiding the top bar and giving the pane a floating back pill of its own
-                # to make up for it. The bar is the app's only header now, and the design keeps
-                # it on every screen - so the pane keeps the header, and the header's back
-                # arrow is the way out. One piece of chrome instead of two.
+                # Keeps the header on a phone rather than taking the whole screen; the
+                # header's back arrow is the way out.
             ),
             TabSpec(
                 slug=RecipeView.split,
@@ -682,11 +657,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     CONFIG_PANE_KEY = "--config-subtab"
 
     def _render_about_meta(self):
-        """How this agent is put together: its model, what it knows, what it can do.
-
-        Each card is a way into the Config pane that owns the setting, so About reads as a
-        summary you can act on rather than a dead-end description.
-        """
+        """How this agent is put together. Each card links into the config pane that owns
+        the setting."""
         model = self._about_model_summary()
 
         # Knowledge and Tools read as one idea - what the agent can reach outside itself -
@@ -752,11 +724,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             )
 
     def _config_panes(self) -> list[PaneSpec]:
-        """The working column's panes, in strip order.
-
-        These regroup what v1 spread across `render_form_v2` and the Settings expander -
-        every pane composes existing widgets, none of them reimplement anything.
-        """
+        """The working column's panes, in strip order. Each composes existing widgets."""
         return [
             PaneSpec(
                 ConfigPane.llm_instructions,
@@ -772,11 +740,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         ]
 
     def _render_input_col(self):
-        """The working column, shared by Config (alone) and Split (beside the preview).
-
-        Overriding this - rather than the tabs - is what gives both of them the pane strip
-        without duplicating the layout.
-        """
+        """The working column, shared by Edit and Split. Overridden here rather than per
+        tab, so both get the pane strip without duplicating the layout."""
         with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
             # strip and submit row are fixed; only the pane between them scrolls, and only
             # when its content actually overflows
@@ -794,13 +759,9 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         return False
 
     def _render_variables_button(self):
-        """Variables live beside the prompt that references them, not on a pane of their own.
-
-        The editor is a list of name/value rows that would crowd this pane and steal height
-        from the instructions, so the button carries the count and the editing happens in a
-        dialog. The count comes from `variable_names()`, which reads the prompt directly -
-        so it is right even before the editor has ever been opened.
-        """
+        """Variables beside the prompt that references them: a count on the button, the
+        editing in a dialog. The count reads the prompt via `variable_names()`, so it is
+        right before the editor has ever been opened."""
         ref = gui.use_alert_dialog(key="variables-modal")
         # "(0)" reads as a broken counter rather than an empty list, so it is left off
         count = len(self.variable_names())
@@ -835,11 +796,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             self._render_variables_editor(heading=False)
 
     def _render_llm_instructions_pane(self):
-        """Model selector pinned on top, editor filling whatever height is left.
-
-        v1 capped the editor at `maxHeight: 50vh`, which in an app shell leaves dead space
-        below it on tall screens and still overflows on short ones.
-        """
+        """Model selector pinned on top, editor filling the height that is left."""
         with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
             # a compact row - small label left, selector right - rather than v1's full-width
             # heading and field, so the editor gets the height instead.

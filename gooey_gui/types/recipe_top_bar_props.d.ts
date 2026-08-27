@@ -3,20 +3,13 @@
 /**
  * The client-side views of the layout-v2 workspace.
  *
- * Defined here, in the props package, because these ids cross into TypeScript: the
- * generator emits them as a named `RecipeView` union in every `.d.ts` that references
- * them, and `RecipeWorkspace/paneState.ts` imports that instead of declaring its own.
- * One definition, checked by the compiler on the far side.
- *
- * `daras_ai_v2.tab_spec` re-exports this, so recipes keep importing it from there.
+ * Defined here so the generator emits it as a named TypeScript union that `paneState.ts`
+ * imports. `daras_ai_v2.tab_spec` re-exports it for recipes.
  */
 export type RecipeView = "about" | "edit" | "preview" | "split";
 /**
- * One of the two work surfaces, as opposed to one of the views.
- *
- * Not a `RecipeView`: these name panes, and only the preview is both. Defined here for
- * the same reason - `RecipeWorkspace/paneState.ts` imports the generated union rather
- * than declaring its own.
+ * One of the two work surfaces. Not a `RecipeView`: these name panes, and only the
+ * preview is both.
  */
 export type WorkPane = "editor" | "preview";
 
@@ -38,10 +31,8 @@ export interface TopBarAuthor {
   photo_url: string | null;
 }
 /**
- * A connected channel, surfaced as a shortcut chip next to Publish.
- *
- * Either a link (`href`) or a server action (`key`, echoed back through `menu_key`) -
- * VideoBots' demo buttons open a dialog rather than navigating.
+ * A connected channel, as a shortcut chip. Either a link (`href`) or a server action
+ * (`key`, echoed back through `menu_key`).
  */
 export interface TopBarIntegration {
   label: string;

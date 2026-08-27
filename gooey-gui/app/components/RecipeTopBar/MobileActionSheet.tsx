@@ -16,14 +16,8 @@ export type SheetEntry = {
 
 /** The mobile view switcher and action list, as a bottom sheet.
  *
- * Below lg this replaces the floating pill strip. The strip could only ever offer the panes -
- * About, Edit, Preview - whereas the sheet is a list, so it also carries the actions that had
- * nowhere to live once the sidebar's mobile bar went away. It is the reason the header needs
- * only two controls.
- *
- * Deliberately not a `<dialog>`: the sheet has to sit under the nav drawer in the stacking
- * order (both can be open in principle, and the drawer is the outer surface), and a top-layer
- * dialog always paints above everything regardless of z-index.
+ * Not a `<dialog>`: this has to sit under the nav drawer in the stacking order, and a
+ * top-layer dialog paints above everything regardless of z-index.
  */
 export function MobileActionSheet({
   entries,
@@ -93,9 +87,7 @@ export function MobileActionSheet({
               to={entry.href}
               className="gooey-sheet-item"
               role="menuitem"
-              // A link entry may still have side effects to run before it navigates - putting
-              // Ask Gooey away, in every current case - so `onPick` fires here too rather than
-              // being treated as the alternative to `href`.
+              // A link entry may still have side effects to run before it navigates.
               onClick={() => {
                 entry.onPick?.();
                 onDismiss();

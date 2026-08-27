@@ -34,10 +34,7 @@ export function Sidebar({
     sidebarRef.current?.setAttribute("inert", "");
   }, [isOpen]);
 
-  // An explicit `:open` / `:close` command - the rail opening a Builder chat, the panel's own
-  // close button - outranks the persisted default. Without this the storage restore below
-  // runs on mount and puts the panel straight back to whatever the user last left it at,
-  // silently dropping the command.
+  // An explicit `:open` / `:close` command outranks the persisted default below.
   const commandedRef = useRef(false);
 
   useEffect(() => {
@@ -65,15 +62,10 @@ export function Sidebar({
     }
   }, [isOpen, name]);
 
-  // This panel is the one authority on whether it is open, and says so on every settled
-  // value. The rail keeps its own copy of that fact to decide whether to offer its open
-  // button, and the `:open` / `:close` commands are not enough to keep the two agreeing:
-  // a command is fire-and-forget, so one dispatched before this component's listener exists
-  // - which is what a Builder-chat navigation intent does - is simply lost, and the storage
-  // restore below changes `isOpen` without commanding anything at all. Either way the rail
-  // went on believing the panel was open and withheld the button until a reload reset it.
-  // Announcing the value rather than the command covers both: a late listener gets the truth
-  // on its next render, and a restore is a change like any other.
+  // The panel is the authority on whether it is open, and announces every settled value.
+  // Mirrors cannot rely on the commands alone: a command is fire-and-forget and can be
+  // dispatched before a listener exists, and the storage restore below changes `isOpen`
+  // without commanding anything.
   useEffect(() => {
     if (disabled) return;
     window.dispatchEvent(
@@ -153,11 +145,8 @@ export function Sidebar({
     pageClassName = "w-100";
   }
 
-  // The width the panel settles at, published as a custom property so its content can be
-  // sized against that instead of against the panel while the panel is mid-transition. The
-  // panel animates min/max/width - layout properties - so anything at `width: 100%` inside it
-  // re-lays-out on every frame, which is what makes the chat text reflow as it slides. Held
-  // here rather than in CSS because a resized panel's width only exists in JS.
+  // The width the panel settles at, so content can size against that rather than against a
+  // panel mid-transition. In JS because a resized panel's width exists nowhere else.
   const settledWidth = sidebarWidth
     ? `${sidebarWidth}px`
     : "var(--sidebar_open_width)";

@@ -95,13 +95,8 @@ variables = '<i class="fa-solid fa-brackets-curly"></i>'
 books = '<i class="fa-light fa-books"></i>'
 
 
-# Bare FontAwesome class names, no <i> wrapper.
-#
-# Most of this module is ready-to-render html, which is what `gui.html`, `NavItemData.icon`
-# and friends want. A few React props build the element themselves - `MenuLinkData.icon`
-# (AccountMenuItem, PrimaryNavItems) and `WorkspacePaneControl.icon` both render
-# `<i className={icon}>` - so they need the class alone and cannot use the constants above.
-# Names here mirror their html counterparts.
+# Bare FontAwesome class names, no <i> wrapper, for the React props that build the element
+# themselves - `MenuLinkData.icon`, `WorkspacePaneControl.icon`. Names mirror those above.
 class cls:
     user = "fa-regular fa-user"
     credit_card = "fa-regular fa-credit-card"

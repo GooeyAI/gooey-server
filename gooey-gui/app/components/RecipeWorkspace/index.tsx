@@ -36,8 +36,7 @@ export function RecipeWorkspace({
     narrow_pane
   );
   const [aboutPane, editorPane, previewPane] = children;
-  // Roles and controls both come off the *shown* layout, never the stored one, so a pane
-  // that has taken the row cannot be handed a control that contradicts it.
+  // Both come off the shown layout, so a control can never contradict what is on screen.
   const shown = shownLayout(layout, editor_full_width);
   const roles = paneRolesForLayout(shown);
   const controls = workspaceControlsForLayout(shown, editor_full_width);

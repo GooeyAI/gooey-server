@@ -4,14 +4,8 @@ import clsx from "clsx";
 import type { WorkspacePaneControlProps } from "@gooey-types/recipe_workspace_props";
 import { GooeyTooltip } from "./GooeyTooltip";
 
-/** Field docs live on the python model this is generated from - see
- * `gooey_gui/types/recipe_workspace_props.py`.
- *
- * `Partial` because this control has two callers with different needs: python sends the
- * full prop set through the render tree, while RecipeWorkspace renders its own pane-pairing
- * controls in React and passes a handler plus a label and nothing else. Every field name is
- * still checked against the model, so renaming one there breaks the build here.
- */
+/** Field docs live on the python model. `Partial` because RecipeWorkspace renders its own
+ * controls in React with only a label and a handler, while python sends the full set. */
 export function WorkspacePaneControl({
   label,
   tooltip,
@@ -23,8 +17,7 @@ export function WorkspacePaneControl({
   className,
 }: Partial<WorkspacePaneControlProps> & {
   label: string;
-  /** React call sites dispatch nothing - they act directly. Python call sites pass
-   * `event_name` instead, because they have no handler to hand across the boundary. */
+  /** React call sites act directly; python ones pass `event_name` instead. */
   onClick?: () => void;
 }) {
   const handleClick = () => {
@@ -37,9 +30,7 @@ export function WorkspacePaneControl({
     }
   };
 
-  // The accessible name still contains the visible label - WCAG 2.5.3 requires that - but
-  // picks up the action when a tooltip adds one, so a screen reader hears what the click does
-  // and not just what the surface is called.
+  // Contains the visible label (WCAG 2.5.3), plus the action when a tooltip names one.
   const accessibleName =
     show_label && tooltip ? `${label}: ${tooltip}` : tooltip || label;
 
@@ -63,9 +54,7 @@ export function WorkspacePaneControl({
     </button>
   );
 
-  // A tooltip that only repeats a label already on screen is noise, so the labelled form drops
-  // it - unless given an explicit `tooltip`, which by definition says something the label does
-  // not. `aria-label` supplies the accessible name either way.
+  // A labelled control needs no tooltip repeating its label; an explicit one still shows.
   if (show_label && !tooltip) return button;
 
   return (

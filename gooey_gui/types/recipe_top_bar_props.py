@@ -23,11 +23,8 @@ class TopBarAuthor(pydantic.BaseModel):
 
 
 class TopBarIntegration(pydantic.BaseModel):
-    """A connected channel, surfaced as a shortcut chip next to Publish.
-
-    Either a link (`href`) or a server action (`key`, echoed back through `menu_key`) -
-    VideoBots' demo buttons open a dialog rather than navigating.
-    """
+    """A connected channel, as a shortcut chip. Either a link (`href`) or a server action
+    (`key`, echoed back through `menu_key`)."""
 
     label: str
     icon: str  # raw FontAwesome html, e.g. icons.whatsapp
@@ -91,10 +88,8 @@ class RecipeTopBarProps(pydantic.BaseModel):
     run_key: str = ""
 
     # ---------------------------------------------------------------- mobile only
-    # Below lg this bar is the app's ONLY header: the sidebar's own mobile bar is hidden and
-    # the floating pill strip is gone, so the bar inherits the controls both used to carry.
-    # Both are inert above lg. The nav drawer's own open command is not here - it is a
-    # constant in navDrawer.ts, shared by the two client components that use it, because
+    # Below lg this bar is the app's only header and carries these; both are inert above.
+    # The nav drawer's open command is not here - it is a constant in navDrawer.ts, since
     # nothing server-side changes when the drawer opens.
 
     # A visitor looking at somebody else's run: nothing here is theirs to edit, publish or

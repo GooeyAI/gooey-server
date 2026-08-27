@@ -1,16 +1,9 @@
-import type {
-  RecipeView,
-  WorkPane,
-} from "@gooey-types/recipe_workspace_props";
+import type { RecipeView, WorkPane } from "@gooey-types/recipe_workspace_props";
 
 export type { RecipeView, WorkPane };
 
-/** Every view, as a value rather than a type.
- *
- * `Record<RecipeView, true>` is the point: the generated union is the only definition of
- * what a view is, and this fails to compile if a view is added to the python enum without
- * being acknowledged here. A bare array would silently stay stale.
- */
+/** Every view, as a value. `Record<RecipeView, true>` makes the exhaustiveness a compile
+ * error rather than a stale list. */
 const RECIPE_VIEWS: Record<RecipeView, true> = {
   about: true,
   edit: true,
@@ -28,12 +21,8 @@ export type PaneLayout = {
   previewOpen: boolean;
 };
 
-/** What the workspace puts on screen, which is not always the layout the user picked.
- *
- * A config pane can ask for the whole row - Deploy does, being a wide surface that carries a
- * web preview of its own, so pairing it with the chat preview leaves both cramped. The stored
- * layout is left untouched, so leaving that pane restores whatever split was in force.
- */
+/** The layout to render when a config pane has claimed the whole row. Derived, so the
+ * stored layout still holds whatever the user picked. */
 export function shownLayout(
   layout: PaneLayout,
   editorFullWidth: boolean
@@ -44,16 +33,8 @@ export function shownLayout(
   return { ...layout, previewOpen: false };
 }
 
-/** The layout a narrow viewport can actually show.
- *
- * A two-pane arrangement has room for one below lg. Which one survives is the recipe's call
- * - see `BasePage.narrow_pane` - because it is an editorial question, not a layout one.
- *
- * Derived, not stored, and that is the point: this used to write `preview` into
- * sessionStorage, so a phone held sideways folded the split away permanently and turning
- * back never restored it. Composed with `shownLayout` for the same reason - the stored
- * layout is what the user asked for, and both of these are readings of it.
- */
+/** The layout a narrow viewport can show: one half of a two-pane arrangement, chosen by
+ * the recipe via `BasePage.narrow_pane`. Derived, so widening restores the pair. */
 export function foldForNarrowViewport(
   layout: PaneLayout,
   narrowPane: WorkPane,
@@ -73,14 +54,8 @@ export type PaneRole = "closed" | "solo" | "major" | "minor";
 
 export type PaneRoles = Record<"about" | "editor" | "preview", PaneRole>;
 
-/** Which pane takes what, for one layout.
- *
- * The preview pairs with whichever of About or Editor is showing - that one is the major
- * half, the preview the minor - and any pane without company is solo. Stated once here and
- * handed to the panes as a class, rather than left for CSS to infer from which workspace-
- * level classes are present: "the preview is alone" then reads as "the preview without the
- * editor", which is wrong the moment About is what it is sharing the row with.
- */
+/** The preview pairs with whichever of About or Editor is open - that one is major, the
+ * preview minor. A pane with no company is solo. */
 export function paneRolesForLayout(layout: PaneLayout): PaneRoles {
   const aboutOpen = layout.mode === "about";
   const editorOpen = layout.mode === "work" && layout.editorOpen;
@@ -218,15 +193,8 @@ export function selectedWorkspaceView(
   return activeView;
 }
 
-/** Which tab reads as active, given what is on screen and what the user picked.
- *
- * Normally the view on screen. But a narrow viewport folds a two-pane view down, and the
- * result need not be a view this recipe offers as a tab: a recipe whose only work tab is
- * two-pane - About plus a "How it works", or About plus a "Generate" - folds to a view that
- * is not in its tab set on every phone. Nothing matched, so no pill rendered active and the
- * crumb went blank. Falling back to what the user picked keeps the pill on the tab they are
- * on, whatever the width did to the arrangement behind it.
- */
+/** Which tab reads as active: the view on screen, or the view the user picked when a fold
+ * has landed on one this recipe does not offer as a tab. */
 export function activeTabView(
   tabSlugs: readonly RecipeView[],
   shownView: RecipeView | null,
@@ -270,8 +238,7 @@ export function workspaceControlsForLayout(
   layout: PaneLayout,
   editorFullWidth = false
 ): WorkspaceControls {
-  // A pane that has asked for the whole row is not offering to share it, so the controls
-  // that would pair it with the preview go away rather than sit there undoing the request.
+  // A pane holding the whole row is not offering to share it.
   if (editorFullWidth && layout.mode === "work" && layout.editorOpen) {
     return NO_CONTROLS;
   }

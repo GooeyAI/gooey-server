@@ -13,10 +13,7 @@ from bots.models import (
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 
-# Everything shared with v1 is imported from it, not copied. `BasePageV1` is the class this
-# one extends: the 133 members that were byte-identical copies are inherited now, so a fix to
-# any of them reaches both layouts. What is left below is only what v2 actually changes or
-# adds.
+# Shared with v1 rather than copied. This module holds only what v2 changes or adds.
 from daras_ai_v2.base import (
     MAX_SEED,
     SUBMIT_AFTER_LOGIN_Q,
@@ -72,28 +69,21 @@ from widgets.sidebar import sidebar_layout
 from widgets.workflow_share import render_share_modal
 from workspaces.models import Workspace
 
-# Reading width for the working column when it has the row to itself (the Config tab). Split
-# needs none - the preview column caps it there.
+# Reading width for the working column when it has the row to itself. Split needs none.
 SOLO_COL_MAX_WIDTH = "1420px"
 
 
 def format_credits_as_dollars(credits: int) -> str:
-    """A credit count as the price a user pays for it.
-
-    `ADDON_CREDITS_PER_DOLLAR` is the one conversion rate in the codebase - at its default of
-    100 a credit is exactly a cent - so prices shown here always agree with what billing
-    charges, whatever the rate is set to.
-    """
+    """A credit count as the price a user pays, via the one conversion rate billing uses."""
     return f"${credits / settings.ADDON_CREDITS_PER_DOLLAR:.2f}"
 
 
 class WorkflowIdentity(typing.NamedTuple):
     """How a run names and pictures itself: the pair the top bar leads with."""
 
-    # With the tab's prefix, as the bar shows it on the workspace: "Run: Farmer.AI".
+    # With the tab's prefix: "Run: Farmer.AI".
     title: str
-    # Without it. A tab that is not the workspace puts its own name in the crumb instead, and
-    # "API: Farmer.AI > API" would say it twice.
+    # Without it, for tabs that put their own name in the crumb.
     name: str
     photo_url: str | None
     circle_photo: bool
@@ -143,30 +133,20 @@ class BasePage(BasePageV1):
         tabs = self.get_tab_spec()
         assert tabs, f"{type(self).__name__}.get_tab_spec() returned no tabs"
 
-        # App shell: the bar is a fixed-height row at the top and the body takes the rest of
-        # the viewport, scrolling inside itself. The page as a whole never scrolls, so the
-        # bar cannot slide out of view.
-        #
-        # The bar's node is reserved first (so it comes first in the DOM) but filled last:
-        # _has_request_changed() - and so the publish state - is only settled once the inputs
-        # have rendered. v1 renders its header last for the same reason.
+        # App shell: a fixed-height bar over a body that scrolls inside itself. The bar's
+        # node is reserved here so it comes first in the DOM, but filled at the end of this
+        # method - the publish state is only settled once the inputs have rendered.
         top_bar_placeholder = gui.div(
             className=(
-                # v2-topbar-container makes this a CSS query container, so the bar's chips size
-                # themselves against the bar's own width rather than the viewport's - the two
-                # differ whenever the Builder is open or the rail is expanded
+                # a CSS query container, so the bar's chips size against the bar's own
+                # width rather than the viewport's
                 "v2-topbar-container flex-shrink-0 w-100 px-2 px-lg-4 py-2"
             )
         )
 
-        # The Builder sits *beside* the tab body rather than wrapping the whole page, which
-        # is what lets the bar above run the full width. v1 wraps the page instead, so the
-        # shell skips its own sidebar_layout for v2 pages.
-        # The Sidebar component's root is `h-100`, so it needs a parent with a definite
-        # height to resolve against - as a bare flex child next to the bar it would resolve
-        # to the full column and overflow by the bar's height.
-        # v2-app-shell marks this as the shell the Builder panel lives *inside*, so its CSS
-        # can drop `.gooey-sidebar`'s `height: 100dvh` - see RecipeTopBar.css
+        # The Builder sits beside the tab body rather than wrapping the page, so the bar
+        # above can run the full width. Needs a definite height for the Sidebar's `h-100`
+        # root to resolve against; `v2-app-shell` is what its CSS keys off.
         with gui.div(
             className="v2-app-shell d-flex flex-column flex-grow-1 w-100",
             style=dict(minHeight=0),
@@ -177,24 +157,14 @@ class BasePage(BasePageV1):
             body_pane,
             gui.div(
                 className=(
-                    # h-100 rather than flex-grow-1: the Sidebar puts three elements between
-                    # this and the flex column above, and the nearest parent is a plain
-                    # block, so there is no flex context left to grow into.
-                    # px-lg-3 rather than px-4: the working column adds no gutter of its own,
-                    # so the page's padding is the whole left margin the panes get.
-                    # px-0 below lg: the panes run edge to edge on a phone. Three gutters
-                    # stacked up there - this padding, `.container-xxl`'s on the workspace, and
-                    # the preview's own framed card - which left every view inset by 20px on
-                    # both sides, reading as a card floating on a background.
-                    # no `pb-*` below lg: the editor's run bar is fixed to the bottom of the
-                    # viewport there, and clearing it needs `env(safe-area-inset-bottom)`,
-                    # which no utility can express - RecipeWorkspace.css owns that edge, and
-                    # only under the editor, which is the one view with a bar to clear
+                    # h-100 not flex-grow-1: the Sidebar leaves no flex context to grow
+                    # into. px-0 below lg so the panes run edge to edge, and no `pb-*` -
+                    # clearing the run bar needs `env(safe-area-inset-bottom)`, which
+                    # RecipeWorkspace.css owns.
                     "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
                     "px-0 px-lg-3 pt-2 pt-lg-1 pb-lg-2"
                 ),
-                # without this a flex child refuses to shrink below its content, and the
-                # overflow lands on the page instead of here
+                # or a flex child refuses to shrink below its content
                 style=dict(minHeight=0),
             ),
         ):
@@ -222,9 +192,8 @@ class BasePage(BasePageV1):
                 narrow_pane=self.narrow_pane(),
             )
         ):
-            # mt-1 on the About card and the preview, not on the editor: those two are framed
-            # surfaces that would otherwise sit flush against the top bar's rule, while the
-            # editor leads with the pane strip, which brings its own spacing.
+            # framed surfaces need holding off the top bar's rule; the editor leads with
+            # the pane strip, which brings its own spacing
             with gui.div(className="mt-1"):
                 with gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
                     self._render_about_content()
@@ -235,8 +204,7 @@ class BasePage(BasePageV1):
                 else:
                     submitted = self._render_solo_input_col()
 
-            # mt-lg-1, not mt-1: below lg the preview meets the header's rule directly, so
-            # this margin was 4px of page background between the two.
+            # mt-lg-1 only: below lg the preview meets the header's rule directly
             with gui.div(className="mt-lg-1"):
                 if self.current_sr.retention_policy == RetentionPolicy.delete:
                     self.render_deleted_output()
@@ -258,30 +226,21 @@ class BasePage(BasePageV1):
         )
 
     def _editor_wants_full_width(self) -> bool:
-        """Hook: does the open config pane need the whole row to itself?
+        """Whether the open config pane needs the whole row.
 
-        Most panes are happy beside the preview. One that carries a preview of its own is
-        not - see VideoBots' Deploy. Said here rather than in CSS because the answer depends
-        on server-side session state, and both the workspace and the top bar have to agree
-        on it: the bar names the arrangement that is actually on screen.
+        Server-side, because it depends on session state and both the workspace and the top
+        bar have to agree on it.
         """
         return False
 
     def narrow_pane(self) -> WorkPane:
         """Which half of a two-pane view a phone shows.
 
-        There is room for one below lg, and which one survives is not a layout question but
-        an editorial one: a chat recipe keeps the bot, because talking to it *is* the output.
-        A media recipe would keep the form, because there the player is the result rather
-        than the work.
-
-        Said here rather than in the client, for the same reason `_editor_wants_full_width`
-        is: only the recipe knows, and both the workspace and the top bar have to fold the
-        same way or the bar names an arrangement that is not on screen.
+        Per-recipe rather than a layout rule: a chat keeps the bot, a media recipe would keep
+        the form. Both the workspace and the top bar fold on this, so it lives server-side.
         """
         if self.is_unowned_example():
-            # A visitor's one work tab is "How it works", which exists to show the
-            # configuration. Folding it to the bot drops the thing they tapped for.
+            # A visitor's one work tab is "How it works", which exists to show config.
             return WorkPane.editor
         return WorkPane.preview
 
@@ -299,11 +258,7 @@ class BasePage(BasePageV1):
         return can_launch_gooey_builder(self.request, workspace)
 
     def _builder_layout(self):
-        """(builder pane, body pane) - the Builder beside the tab body, not around it.
-
-        Returns `(None, dummy)` when the Builder is unavailable, so the body renders with
-        no extra wrapper at all rather than an empty sidebar.
-        """
+        """(builder pane, body pane), or `(None, dummy)` when the Builder is unavailable."""
         if not self._can_show_builder():
             return None, gui.dummy()
 
@@ -316,11 +271,8 @@ class BasePage(BasePageV1):
         )
 
     def _render_gooey_builder(self):
-        # The panel's own collapse control, pinned to its top-right corner at every
-        # breakpoint. Absolute against `.gooey-sidebar`, which is positioned either way
-        # (sticky on desktop, fixed below the sidebar breakpoint), so there is no app-header
-        # offset to hardcode. The shared React control supplies the same icon, dimensions,
-        # and HTML tooltip as the editor and preview controls.
+        # The panel's collapse control, positioned against `.gooey-sidebar` at every
+        # breakpoint so there is no app-header offset to hardcode.
         gui.model_component(
             WorkspacePaneControlProps(
                 label="Close Ask gooey",
@@ -329,13 +281,8 @@ class BasePage(BasePageV1):
                 className="v2-builder-close",
             )
         )
-        # The panel's title, opposite the close button. v2 hides the widget's own header, so
-        # without this the panel is unnamed and there is no way to start a fresh conversation
-        # from it. GooeyBuilderInlineEmbed turns the event into its `onNewConversation`.
-        #
-        # Hidden on an empty thread: the widget draws its own logo-and-title splash there, so
-        # this would be a second copy of the same name - and "New Chat" is a no-op on a chat
-        # that has not started.
+        # The panel's title, and its "new conversation" control - v2 hides the widget's own
+        # header. Skipped on an empty thread, where the widget draws its own splash.
         if not builder_thread_is_empty(self):
             gui.model_component(
                 WorkspacePaneControlProps(
@@ -345,9 +292,7 @@ class BasePage(BasePageV1):
                     photo_url=get_gooey_builder_photo_url(),
                     show_label=True,
                     event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new",
-                    # no Bootstrap padding utility here: `.v2-pane-control-labelled` owns
-                    # this button's padding, and `p-2` competed with it on equal
-                    # specificity, so which one won came down to stylesheet order
+                    # padding is owned by `.v2-pane-control-labelled`, not a utility class
                     className="v2-builder-new",
                 )
             )
@@ -359,7 +304,7 @@ class BasePage(BasePageV1):
         """Pop the keys RecipeTopBar wrote and act on them.
 
         The bar mutates session state and calls onChange(); the server sees the key on the
-        next render. Same contract `handle_workspace_switch` uses for the sidebar.
+        next render.
         """
         publish_ref = gui.use_alert_dialog(key="publish-modal")
 
@@ -390,19 +335,14 @@ class BasePage(BasePageV1):
         if gui.session_state.pop(self.TOP_BAR_RUN_KEY, None):
             self._handle_top_bar_run()
 
-        # Popped here, in the base, rather than left to each recipe: the base is what ships
-        # `menu_key` and `title_menu_items`, so a page that declares a menu item and forgets
-        # to override anything would otherwise drop the click on the floor.
+        # Popped in the base, which is what ships `menu_key` and `title_menu_items`.
         self._handle_menu_pick(gui.session_state.pop(self.TOP_BAR_MENU_KEY, None))
 
     def _handle_menu_pick(self, picked: str | None):
         """Act on a title-menu pick, and keep whatever dialog it opened on screen.
 
-        `picked` is only the edge - the one render where the click arrives. The dialogs are
-        entered on every pass while they are open, which is why each `is_open` check sits
-        outside its `picked ==` check rather than inside it.
-
-        Recipes extend this for their own keys and call `super()`.
+        `picked` is only the render where the click arrives, so each dialog's `is_open` check
+        sits outside its `picked ==` check. Recipes extend this and call `super()`.
         """
         history_ref = gui.use_alert_dialog(key="version-history-modal")
         if picked == self.MENU_VERSION_HISTORY:
@@ -440,10 +380,8 @@ class BasePage(BasePageV1):
     def _duplicate_and_redirect(self) -> typing.NoReturn:
         """Copy this workflow into the current workspace and open the copy.
 
-        Two paths, as in v1. Someone who can edit this run gets a straight copy of it -
-        that is "Duplicate", or "Save as New" off an older version. Someone who cannot is
-        forking a workflow that is not theirs, so the copy is named after them, which is what
-        makes it findable in their own list afterwards.
+        Someone who can edit gets a straight copy; someone who cannot is forking a workflow
+        that is not theirs, so the copy is named after them.
         """
         pr = self.current_pr
         if WorkflowAccessLevel.can_user_edit_published_run(
@@ -468,12 +406,8 @@ class BasePage(BasePageV1):
         raise gui.RedirectException(self.app_url(example_id=new_pr.published_run_id))
 
     def _handle_top_bar_run(self):
-        """Run (or Stop) pressed in the top bar.
-
-        Same behaviour v1's submit button has, minus the button: validate first, surface the
-        message and start nothing if validation fails, and let anonymous users through the
-        login redirect that `submit_and_redirect` already handles.
-        """
+        """Run (or Stop) pressed in the top bar. Validates first and starts nothing if that
+        fails; anonymous users go through `submit_and_redirect`'s login redirect."""
         if self._is_run_in_progress():
             self.current_sr.is_cancelled = True
             self.current_sr.save(update_fields=["is_cancelled", "updated_at"])
@@ -514,14 +448,10 @@ class BasePage(BasePageV1):
     MENU_DELETE = "--menu-delete"
 
     def _title_menu_items(self) -> list[TopBarMenuItem]:
-        """The chevron menu beside the workflow name - v1's Options dialog, as a menu.
+        """The chevron menu beside the workflow name.
 
-        v1 reached these from a `...` button that opened one modal holding all three: two
-        buttons and the version list stacked together. They are unrelated actions, so v2
-        lists them and opens a dialog only where one is actually needed - Version history has
-        a body to show and Delete needs confirming, while Duplicate just acts and redirects.
-
-        Same gates v1 uses, so the menu never offers something the server would refuse.
+        Gated the same way v1 gates its Options dialog, so the menu never offers something
+        the server would refuse.
         """
         if not self.is_logged_in():
             return []
@@ -529,7 +459,7 @@ class BasePage(BasePageV1):
         pr = self.current_pr
         items = []
 
-        # A root recipe has no versions of its own - it is the template every run forks from.
+        # A root recipe is the template every run forks from; it has no versions.
         if not pr.is_root():
             items.append(
                 TopBarMenuItem(
@@ -539,8 +469,7 @@ class BasePage(BasePageV1):
                 )
             )
 
-        # "Duplicate" off the latest version, "Save as New" off an older one - v1's wording,
-        # which distinguishes copying the workflow from promoting an old run to a new one.
+        # "Duplicate" off the latest version, "Save as New" off an older one.
         items.append(
             TopBarMenuItem(
                 key=self.MENU_DUPLICATE,
@@ -571,14 +500,9 @@ class BasePage(BasePageV1):
         return items
 
     def can_manage_sharing(self) -> bool:
-        """Whether this user may change who can see the workflow, rather than only copy
-        its url.
-
-        Deliberately *not* v1's condition: `render_share_button` also requires the url to
-        point at the published run itself, so v1 hides Share the moment you open a run. The
-        dialog only ever edits `pr`, which is the same object either way, and it gates its
-        own options by role - so being on a run is no reason to lose the control.
-        """
+        """Whether this user may change who can see the workflow, rather than only copy its
+        url. Unlike v1 this does not require the url to point at the published run - the
+        dialog edits `pr` either way and gates its own options by role."""
         pr = self.current_pr
         user = self.request.user
         # render_share_modal asserts both of these
@@ -595,11 +519,8 @@ class BasePage(BasePageV1):
             return False
 
     def _render_share_trigger(self, *, key: str, className: str = "mb-0"):
-        """Share, wherever it appears outside the top bar.
-
-        It only sets the key the bar's Share menu item sets - `_handle_top_bar_actions` owns
-        the one dialog, so two triggers can never render two of them.
-        """
+        """Share, outside the top bar. Sets the same key the bar's menu item sets, so
+        `_handle_top_bar_actions` still owns the one dialog."""
         if not self.can_manage_sharing():
             copy_to_clipboard_button(
                 label=f"{icons.link} Share",
@@ -618,12 +539,7 @@ class BasePage(BasePageV1):
             gui.rerun()
 
     def _top_bar_cost(self) -> tuple[str, str]:
-        """(label, hover note) for the bar's cost readout, in dollars.
-
-        The mock shows "$0.10 / 5g CO2". Only the dollars ship: credits convert exactly via
-        ADDON_CREDITS_PER_DOLLAR, whereas nothing in this codebase can produce a CO2 figure,
-        and inventing one would put a fabricated environmental claim in the product.
-        """
+        """(label, hover note) for the bar's cost readout, in dollars."""
         credits = self.get_run_cost_credits()
         if credits is None:
             # deferred pricing - show nothing rather than "$None"
@@ -657,8 +573,7 @@ class BasePage(BasePageV1):
 
         gui.model_component(
             RecipeTopBarProps(
-                # The prefixed name on the workspace, the bare one elsewhere: off the workspace
-                # the tab's label becomes the crumb, and the prefix *is* that label.
+                # Prefixed on the workspace; elsewhere the tab's label is the crumb.
                 title=identity.title if workspace_active else identity.name,
                 crumb_label="" if workspace_active else (self.tab.label or ""),
                 view_only=self.is_unowned_example(),
@@ -684,9 +599,7 @@ class BasePage(BasePageV1):
                 publish_key=self.TOP_BAR_PUBLISH_KEY,
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
                 deploy_href=self.current_app_url(RecipeTabs.integrations),
-                # Share means different things - change who can see this, or copy the link -
-                # so exactly one of these is set, and neither on a root recipe, which has no
-                # published run behind it and so nothing stable to share.
+                # Exactly one of these is set, and neither on a root recipe.
                 share_key=(
                     self.TOP_BAR_SHARE_KEY if can_share and can_manage_sharing else ""
                 ),
@@ -709,11 +622,8 @@ class BasePage(BasePageV1):
                 builder_event_key=(
                     GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else ""
                 ),
-                # Below lg the bar is the app's only header, so it carries the entries that
-                # had nowhere else to go once the sidebar's own mobile bar went away. Both are
-                # inert above lg.
-                # Same condition the panel's own control uses: "New Chat" is a no-op on a
-                # thread that has not started, and the widget draws its own splash there.
+                # Below lg the bar is the app's only header and carries these; inert above.
+                # Empty on a thread that has not started - the same gate the panel uses.
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
                     if self._can_show_builder() and not builder_thread_is_empty(self)
@@ -760,21 +670,17 @@ class BasePage(BasePageV1):
     ) -> typing.Callable[[], None]:
         """Render an in-page strip of panes and return the one to draw.
 
-        Panes are panels inside a single view, so - unlike tabs - they have no url: just an
-        ordered list of specs and a session-state key. Session state and the
-        `RecipeWorkspaceTrigger` deep links carry `PaneSpec.id`, never the label, so
-        relabelling a pane cannot break a link to it.
+        Panes are panels within one view, so they have no url - an ordered list of specs and
+        a session-state key, which carries `PaneSpec.id` rather than the label.
 
-        Only the active pane renders. That is safe because the server round-trips the whole
-        `session_state` regardless of what was drawn, so widgets on the panes that did not
-        render keep their values (see `gooey_gui/core/renderer.py`). The corollary is that a
-        pane must never depend on another pane's *return value* - read `gui.session_state`.
+        Only the active pane renders. Widgets on the others keep their values because the
+        whole `session_state` round-trips regardless of what was drawn, so a pane must read
+        `gui.session_state` rather than another pane's return value.
         """
         by_id = {pane.id: pane for pane in panes}
 
-        # A deep link from another view (About's meta cards) names its pane by writing this
-        # key directly - see `RecipeWorkspaceTrigger`'s `state_key` - so the only thing to
-        # settle here is an absent or stale value.
+        # Deep links write this key directly (see `RecipeWorkspaceTrigger.state_key`), so
+        # only an absent or stale value needs settling.
         if gui.session_state.get(key) not in by_id:
             gui.session_state[key] = panes[0].id
 
@@ -887,14 +793,9 @@ class BasePage(BasePageV1):
         ]
 
     def get_viewer_tab_spec(self) -> list[TabSpec]:
-        """What a first-time visitor sees: what this workflow is, and how it is put together.
-
-        Two entries rather than four - someone who does not own this run has nothing to edit
-        and no output of their own, so Edit/Preview/Split would be three ways of looking at
-        somebody else's settings. "How it works" is backed by `split`, not `edit`: seeing the
-        configuration next to a live preview of what it produces is the whole point for a
-        visitor deciding whether they want this workflow.
-        """
+        """What a first-time visitor sees. Two entries, since they own nothing here to edit;
+        "How it works" is backed by `split` so the configuration shows beside a live
+        preview."""
         return [
             TabSpec(
                 slug=RecipeView.about,
@@ -909,21 +810,14 @@ class BasePage(BasePageV1):
         ]
 
     def _render_about_content(self):
-        """What this workflow is. The one surface in v2 that is not a re-slice of v1.
-
-        Deliberately not here: version history, which lives in the title chevron menu, and
-        Related Workflows, which is what /explore/ is for. About is about *this* workflow,
-        and nothing on it is shown twice.
-        """
+        """What this workflow is. Version history lives in the title menu and Related
+        Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
-        # No wrapper: `.v2-about` is already the container, and the pane it sits in is already
-        # a surface. The portrait leads and is the only thing identifying the workflow here -
-        # the top bar carries the title and the "by <workspace>" line.
+        # The portrait leads; the top bar carries the title and author line.
         self._render_about_photo(pr)
-        # description and the "how it is put together" cards share one panel: they answer the
-        # same question at two levels of detail, so framing them separately split one idea
+        # description and the cards share one panel - two levels of the same answer
         with gui.div(className="v2-about-panel"):
-            # full text, unlike v1's `line_clamp=3` on the Run tab - the tab is made to be read
+            # full text: this tab is made to be read
             if pr.notes:
                 with gui.div(className="container-margin-reset v2-about-notes"):
                     gui.write(pr.notes)
@@ -931,11 +825,8 @@ class BasePage(BasePageV1):
             self._render_about_deployments()
 
     def _render_about_photo(self, pr: PublishedRun):
-        """The workflow's portrait, centred at the top of the card.
-
-        `CIRCLE_IMAGE_WORKFLOWS` (agents) get a round crop, matching the top bar and the
-        rail; anything else keeps square corners rounded off.
-        """
+        """The workflow's portrait. `CIRCLE_IMAGE_WORKFLOWS` get a round crop, matching the
+        top bar and the rail."""
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
         if not pr.photo_url:
@@ -947,23 +838,14 @@ class BasePage(BasePageV1):
         )
 
     def _render_about_meta(self):
-        """Hook: a strip of cards summarising how this workflow is put together.
-
-        What "put together" means is per-recipe - an agent has a model, a knowledge base and
-        tools; a media-gen recipe has none of those - so the base renders nothing.
-        """
+        """Hook: cards summarising how this workflow is put together. Per-recipe, so the
+        base renders nothing."""
 
     def _render_about_deployments(self):
-        """The channels this workflow is already live on.
+        """The channels this workflow is live on, as cards beside Model and Tools.
 
-        The same list the bar carries as chips, but a different claim: in the bar they are
-        shortcuts, here they answer "can I use this where I already am", which is a fact about
-        the workflow like its model is. So they read as cards beside Model and Tools rather
-        than as actions - and unlike the bar's chips they always carry their label, since
-        About has the width for it and no pill group to stay clear of.
-
-        Its own `.v2-about-groups` row rather than a group inside `_render_about_meta`'s: that
-        one is a per-recipe override, and a base surface cannot reach into it.
+        Its own `.v2-about-groups` row, since `_render_about_meta` is a per-recipe override a
+        base surface cannot reach into.
         """
         integrations = self._top_bar_integrations()
         if not integrations:
@@ -979,8 +861,7 @@ class BasePage(BasePageV1):
                         f'<span class="v2-about-meta-icon">{it.icon}</span>'
                         f'<span class="v2-about-meta-label">{html.escape(it.label)}</span>'
                     )
-                    # A channel with no url opens a dialog from the bar; there is nothing for
-                    # About to link to, so it states the fact and takes no click.
+                    # A channel with no url opens a dialog from the bar, not from here.
                     if it.href:
                         gui.html(
                             f'<a class="v2-about-meta-card"'
@@ -990,22 +871,14 @@ class BasePage(BasePageV1):
                         gui.html(f'<div class="v2-about-meta-card">{body}</div>')
 
     def _render_solo_input_col(self) -> bool:
-        """The working column on its own, in the same row/column wrapper Split uses.
-
-        Going through `gui.columns` rather than styling a bare div is what keeps Config's
-        gutters, background and pane height identical to Split's: Bootstrap's grid supplies
-        the padding and `SPLIT_PANES_CSS` the rest, so there is nothing to keep in sync by
-        hand. One column of 12, instead of Split's 3-and-2.
-        """
+        """The working column alone, through the same `gui.columns` wrapper Split uses so
+        gutters, background and pane height match without being kept in sync by hand."""
         with gui.styled(INPUT_OUTPUT_COLS_CSS + SPLIT_PANES_CSS):
             (input_col,) = gui.columns([1])
             with (
                 input_col,
-                # Centred and capped. With the whole row to itself this column would otherwise
-                # run a form and a code editor edge to edge across a wide monitor, which is
-                # both hard to read and unlike Split, where the preview caps it naturally.
-                # `d-flex flex-column` + `minHeight: 0` because everything below depends on the
-                # app shell's definite-height chain - a plain block here would break it.
+                # Centred and capped for reading width; Split needs none, the preview caps
+                # it there. Flex + `minHeight: 0` keeps the definite-height chain intact.
                 gui.div(
                     className="mx-auto w-100 h-100 d-flex flex-column px-2 px-lg-0",
                     style=dict(maxWidth=SOLO_COL_MAX_WIDTH, minHeight=0),
@@ -1014,25 +887,15 @@ class BasePage(BasePageV1):
                 return self._render_input_col()
 
     def _preview_frame(self):
-        """Frames the preview when it shares the view with something else.
-
-        Split and About put it next to a column of content, where a border separates the
-        two. Preview is the whole view, so it needs no frame - a border there would just
-        outline the viewport.
-        """
-        # Styled by class rather than inline, so the frame can be dropped below lg where the
-        # preview runs edge to edge: an inline style can only be overridden with `!important`,
-        # and a border tracing the viewport is not a frame, just an outline.
+        """Frames the preview when it shares the view. Alone it needs none - a border there
+        would just outline the viewport."""
+        # By class, not inline, so the frame can be dropped below lg where the preview runs
+        # edge to edge.
         return gui.div(className="h-100 v2-preview-frame")
 
     def _render_split_tab(self):
-        """Both columns side by side - v1's Run tab.
-
-        Unlike v1 this is *only* the two columns. v1 trailed the Debug expander, the usage
-        guide and Related Workflows below the fold; in an app shell there is no page scroll
-        to put them below, so the guide and Related Workflows live on About, and Debug
-        becomes a Config sub-tab.
-        """
+        """Both columns side by side. Only the columns: an app shell has no page scroll to
+        put anything below them, so the guide lives on About and Debug on a config pane."""
         if self._render_deleted_output_if_needed():
             return
 
@@ -1136,8 +999,7 @@ class BasePage(BasePageV1):
         url = self.get_credits_click_url()
         run_cost = self.get_run_cost_credits()
         if run_cost is not None:
-            # dollars, not credits - the same readout the top bar shows, so the two places a
-            # price appears on this page cannot disagree
+            # dollars, matching the top bar's readout
             ret = (
                 f'Run cost = <a href="{url}">{format_credits_as_dollars(run_cost)}</a>'
             )
@@ -1192,12 +1054,8 @@ class BasePage(BasePageV1):
             )
 
     def _variable_exclusions(self) -> list[str]:
-        """Names the variables editor must not offer: the request/response fields, and the
-        function slugs, which have inputs of their own.
-
-        Shared with `variable_names()` so the count beside the prompt cannot disagree with
-        what the editor actually lists.
-        """
+        """Names the variables editor must not offer: request/response fields and function
+        slugs, which have inputs of their own. Shared with `variable_names()`."""
         function_slugs = [
             slug
             for fn in gui.session_state.get("functions", [])
@@ -1206,20 +1064,12 @@ class BasePage(BasePageV1):
         return self.fields_to_save() + function_slugs
 
     def _render_variables_editor(self, *, heading: bool = True):
-        """`heading=False` where the surface already names itself - the dialog's own title.
-
-        Emptying the label also drops the help tooltip beside it: `variables_input` always
-        passes a `help=` string, but `RenderedMarkdown` returns nothing at all for an empty
-        body, so the icon never gets built. The dialog's intro says the same thing in full,
-        Learn more link included.
-        """
+        """`heading=False` where the surface already names itself. An empty label also drops
+        the help tooltip, which the dialog's own intro replaces."""
         variables_input(
             template_keys=self.template_keys,
-            # v1 gated Add on `is_functions_enabled()` - the switch inside `functions_input`,
-            # which in v1 sits directly above this editor, so the gate is at least visible.
-            # v2 puts functions on the Tools pane and variables in a dialog, so there it
-            # reads as nothing but a missing button. Adding a variable needs no function
-            # either way: the prompt is what consumes them.
+            # Ungated: a variable needs no function, and the functions switch is on
+            # another pane here, so gating on it would read as a missing button.
             allow_add=True,
             exclude=self._variable_exclusions(),
             **({} if heading else dict(label="")),
@@ -1254,18 +1104,11 @@ class BasePage(BasePageV1):
         if submitted:
             self.submit_and_redirect()
 
-        # A flex column, not a plain block. The output is often something that sizes itself
-        # to the column - the chat widget fills whatever it is given - and every one of the
-        # notices around it is a sibling: the failure box above, the cancelled warning, the
-        # spinner while a run is going. The widget used to ask for `height: 100%`, which in a
-        # block meant the full column no matter what was stacked above it, so the column
-        # overflowed by however tall the notice was and `.recipe-workspace-preview`'s
-        # `overflow: hidden` clipped the bottom off - taking the end of the widget's own
-        # scroll region and part of its composer with it.
-        #
-        # Same shape the editor column uses: notices size to themselves, the output takes
-        # what is left. `minHeight: 0` throughout, or a flex child refuses to shrink below
-        # its content and the clipping comes straight back.
+        # A flex column: the notices around the output - failure box, cancelled warning,
+        # run spinner - size to themselves, and the output takes what is left. The pane
+        # clips rather than scrolls, so a child claiming the full height would push the
+        # bottom of the output out of reach. `minHeight: 0` at every level, or a flex child
+        # refuses to shrink below its content.
         with gui.div(
             className="d-flex flex-column " + self._output_col_class_name(),
             style=dict(height="100%", minHeight=0),
@@ -1528,11 +1371,8 @@ INPUT_OUTPUT_COLS_CSS = """
 }
 """
 
-# The About tab: one card holding the title, who published it, the description, a strip of
-# "how it is put together" cards, and the usage guide last. `!important` on the buttons for
-# the same reason PANE_STRIP_CSS needs it - the app's own button styling is more specific
-# than a scoped `& button` rule.
-# The variables editor, shown in a dialog rather than on a pane of its own.
+# The About tab. `!important` on the buttons because the app's own button styling is more
+# specific than a scoped `& button` rule.
 VARIABLES_DIALOG_CSS = """
 /* `.modal-header` and `.modal-body` each bring a rem of padding, and the h4 title its own
    margin, so three lots of spacing stack up between the title and the first line. Pulled

@@ -703,10 +703,8 @@ def render_recipe_page(
     except KeyError:
         raise RecipePageNotFound
 
-    # layout v2 fork switch: gate closed (default) -> v1 page_cls above is used as-is.
-    # gate open -> swap in the v2 fork of the same recipe, if one exists yet.
-    # settings.ENABLE_LAYOUT_V2 is checked here first so the kill switch being off
-    # costs nothing beyond this one settings read.
+    # Layout v2 fork switch: swap in the v2 fork of this recipe where one exists. The
+    # settings read comes first so a closed gate costs nothing else.
     if settings.ENABLE_LAYOUT_V2:
         from daras_ai_v2.layout_v2 import can_use_layout_v2
 
@@ -770,9 +768,8 @@ def sidebar_page_wrapper(
 
     context = {"request": request, "block_incognito": True}
 
-    # v1 shows the Builder only on Run/Preview. v2's tabs and panes all live on one recipe
-    # page, so the Builder stays available across every one of them rather than vanishing
-    # when you switch pane.
+    # v2's tabs and panes all live on one page, so the Builder stays available across them;
+    # v1 offers it on Run/Preview only.
     display_gooey_builder = bool(page) and (
         _is_layout_v2_page(page) or page.tab in [RecipeTabs.run, RecipeTabs.preview]
     )
@@ -783,21 +780,15 @@ def sidebar_page_wrapper(
         default=False,
     )
 
-    # Layout v2 is an app shell: the viewport is the frame, the page never scrolls as a
-    # whole, and scrolling happens inside the tab body. That needs a *definite* height on
-    # every ancestor down to the body - `min-vh-100` only sets a floor, so content taller
-    # than the viewport grows the page and scrolls the whole thing, header included.
+    # v2 is an app shell: scrolling happens inside the tab body, which needs a definite
+    # height on every ancestor down to it. `min-vh-100` only sets a floor.
     is_v2 = _is_layout_v2_page(page)
-    # splatted so v1 keeps exactly the props it had - an empty style dict would still
-    # be emitted into the render tree
+    # splatted so v1 keeps exactly the props it had
     fill = dict(style=dict(minHeight=0)) if is_v2 else {}
     # v2's app-shell surface colour
     shell_bg = dict(style=dict(minHeight=0, backgroundColor="#FBFAF8")) if is_v2 else {}
-    # `100dvh` rather than Bootstrap's `vh-100`. On mobile Safari `100vh` is the *large*
-    # viewport - the height the page would have with the URL bar retracted - so a shell sized
-    # to it hangs below the bar by exactly the bar's height, and the page scrolls that far on
-    # every tab. `dvh` tracks the height actually on screen. The rest of the shell is `h-100`
-    # off this element, so this is the only place the viewport is measured.
+    # `100dvh`, not `vh-100`: on mobile Safari `100vh` is the viewport with the URL bar
+    # retracted. The only place the viewport is measured - the rest of the shell is `h-100`.
     viewport = dict(style=dict(height="100dvh")) if is_v2 else {}
 
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
@@ -813,15 +804,13 @@ def sidebar_page_wrapper(
             request, default_collapsed=default_collapsed, page=page
         )
 
-        # the surface colour belongs here, above `sidebar_layout`: that component separates
-        # the Builder panel from the page with a `gap-2`, and the gap paints whatever is
-        # behind it. Setting it on `page_content` (inside the Sidebar) leaves the gap white.
+        # above `sidebar_layout`, whose `gap-2` between panel and page paints whatever is
+        # behind it
         with gui.div(className="d-flex flex-column flex-grow-1 min-w-0", **shell_bg):
             if is_v2:
-                # v2 puts the Builder beside the tab body, from inside base_v2, so the top
-                # bar can span the full width above both instead of starting after it.
-                # Opening a second `sidebar_layout` here would share GOOEY_BUILDER_EVENT_KEY
-                # with that one and render an empty panel next to the real Builder.
+                # v2 opens its own `sidebar_layout` from inside the page, so the top bar
+                # can span the full width. A second one here would share
+                # GOOEY_BUILDER_EVENT_KEY and render an empty panel beside the real one.
                 sidebar, page_content = None, gui.dummy()
             else:
                 sidebar, page_content = sidebar_layout(
