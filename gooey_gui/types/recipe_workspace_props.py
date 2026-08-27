@@ -107,16 +107,3 @@ class WorkspacePaneControlProps(pydantic.BaseModel):
     # rendered by RecipeWorkspace, which hands them a React `onClick` directly.
     event_name: str = ""
     className: str = ""
-
-
-class GooeyEmbedTeardownProps(pydantic.BaseModel):
-    """Removes the stranded chat-preview widget when its pane goes away.
-
-    Renders nothing; it exists only for the unmount hook. `embed_key` identifies the
-    workflow whose widget this is, so React tears down and remounts when it changes rather
-    than leaving the previous run's preview on screen.
-    """
-
-    _component: str = "GooeyEmbedTeardown"
-
-    embed_key: str

@@ -261,7 +261,7 @@ def _load_workspaces(
         WorkspaceData(
             id=ws.id,
             name=ws.display_name(user),
-            icon_html=ws.html_icon(),
+            icon_html=ws.html_icon(size="30px"),
             subtitle=_workspace_subtitle(ws, member_counts.get(ws.id, 0)),
             is_current=current_workspace is not None and ws.id == current_workspace.id,
             is_personal=ws.is_personal,

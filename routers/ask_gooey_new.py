@@ -106,7 +106,7 @@ def render_ask_gooey_new(
     workspace: Workspace | None,
     title: str = "What will you build today?",
     highlight: str = "",
-    placeholder: str = "Ask Gooey to build an agent for farmers in Kenya",
+    placeholder: str = "Build an agent for farmers in Kenya",
 ):
     """Centered "What can I help with?" hero prompt for /explore.
 

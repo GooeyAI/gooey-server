@@ -63,13 +63,3 @@ export interface WorkspacePaneControlProps {
   event_name: string;
   className: string;
 }
-/**
- * Removes the stranded chat-preview widget when its pane goes away.
- *
- * Renders nothing; it exists only for the unmount hook. `embed_key` identifies the
- * workflow whose widget this is, so React tears down and remounts when it changes rather
- * than leaving the previous run's preview on screen.
- */
-export interface GooeyEmbedTeardownProps {
-  embed_key: string;
-}

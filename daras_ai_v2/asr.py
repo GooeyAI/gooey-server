@@ -89,6 +89,20 @@ CHIRP_SUPPORTED = {
     'pl-PL', 'hr-HR', 'lv-LV', 'ln-CD', 'ne-NP', 'lb-LU'
 }  # fmt: skip
 
+# https://docs.cloud.google.com/speech-to-text/docs/models/chirp-3
+CHIRP_3_SUPPORTED = {
+    'ca-ES', 'cmn-Hans-CN', 'hr-HR', 'da-DK', 'nl-NL', 'en-AU', 'en-IN', 'en-GB', 'en-US', 'fi-FI', 'fr-CA', 'fr-FR',
+    'de-DE', 'el-GR', 'hi-IN', 'it-IT', 'ja-JP', 'ko-KR', 'pl-PL', 'pt-BR', 'pt-PT', 'ro-RO', 'ru-RU', 'es-ES',
+    'es-US', 'sv-SE', 'tr-TR', 'uk-UA', 'vi-VN', 'af-ZA', 'sq-AL', 'am-ET', 'ar-DZ', 'ar-BH', 'ar-EG', 'ar-IL',
+    'ar-JO', 'ar-KW', 'ar-LB', 'ar-MR', 'ar-MA', 'ar-OM', 'ar-QA', 'ar-SA', 'ar-PS', 'ar-SY', 'ar-TN', 'ar-AE',
+    'ar-YE', 'ar-XA', 'hy-AM', 'as-IN', 'ast-ES', 'az-AZ', 'eu-ES', 'bn-BD', 'bn-IN', 'bg-BG', 'my-MM', 'ar-IQ',
+    'yue-Hant-HK', 'cmn-Hant-TW', 'cs-CZ', 'en-PH', 'et-EE', 'fil-PH', 'gl-ES', 'ka-GE', 'gu-IN', 'ha-NG', 'iw-IL',
+    'hu-HU', 'is-IS', 'id-ID', 'jv-ID', 'kn-IN', 'kk-KZ', 'km-KH', 'ky-KG', 'lo-LA', 'lv-LV', 'lt-LT', 'lb-LU',
+    'mk-MK', 'ms-MY', 'ml-IN', 'mt-MT', 'mi-NZ', 'mr-IN', 'mn-MN', 'ne-NP', 'nso-ZA', 'no-NO', 'or-IN', 'fa-IR',
+    'pa-Guru-IN', 'sr-RS', 'sk-SK', 'sl-SI', 'es-MX', 'sw-KE', 'sw', 'ta-IN', 'te-IN', 'th-TH', 'uz-UZ', 'cy-GB',
+    'wo-SN', 'xh-ZA', 'yo-NG', 'zu-ZA',
+}  # fmt: skip
+
 WHISPER_LARGE_V2_SUPPORTED = {
     "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "gl", "de",
     "el", "he", "hi", "hu", "is", "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi", "ne", "no",
@@ -296,14 +310,29 @@ SAARAS_V3_SUPPORTED = {
     "ml-IN", "mni-IN", "mr-IN", "ne-IN", "od-IN", "pa-IN", "sa-IN", "sat-IN", "sd-IN", "ta-IN", "te-IN", "ur-IN",
 }  # fmt: skip
 
+# SraVaani 1.0 (ARTPARK, IISc) - 65 Indian languages & dialects (ISO 639-3), auto language identification
+# https://huggingface.co/ARTPARK-IISc/SraVaani-1.0
+# (a few supported dialects have no ISO 639-3 code and are omitted here: Bearybashe, Chakhesang, Khariboli, Khortha, Malvani)
+SRAVAANI_SUPPORTED = {
+    # scheduled languages
+    "asm", "ben", "brx", "doi", "guj", "hin", "kan", "kok", "mai", "mal", "mni", "mar", "nep", "ori", "pan", "san",
+    "sat", "snd", "tam", "tel",
+    # non-scheduled languages & dialects
+    "eng", "njm", "njo", "awa", "vjk", "bgw", "bhb", "bho", "bns", "ccp", "hne", "gbm", "grt", "hlb", "bgc", "clk",
+    "dhd", "mjw", "khn", "trp", "kfy", "kyw", "lmn", "mag", "mwr", "lus", "nag", "sck", "pwr", "raj", "nre", "spv",
+    "swv", "nsm", "sgj", "sjp", "tcy", "nnp",
+}  # fmt: skip
+
 
 class AsrModels(Enum):
     whisper_large_v2 = "Whisper Large v2 (openai)"
     whisper_large_v3 = "Whisper Large v3 (openai)"
+    gpt_transcribe = "GPT Transcribe (openai)"
     gpt_4_o_audio = "GPT-4o (openai)"
     gpt_4_o_mini_audio = "GPT-4o mini (openai)"
     gcp_v1 = "Google Cloud V1"
-    usm = "Chirp / USM (Google V2)"
+    usm = "Chirp / USM [Deprecated] (Google V2)"
+    chirp_3 = "Chirp 3 (Google V2)"
     deepgram = "Deepgram"
     azure = "Azure Speech"
     elevenlabs = "ElevenLabs Scribe v1"
@@ -312,6 +341,7 @@ class AsrModels(Enum):
     seamless_m4t_v2 = "Seamless M4T v2 (Facebook Research)"
     mms_1b_all = "Massively Multilingual Speech (MMS) (Facebook Research)"
     meta_omnilingual_asr_llm_7b = "Omnilingual ASR LLM (Meta)"
+    sravaani_v1 = "SraVaani 1.0 (ARTPARK, IISc)"
     voxtral_mini = "Voxtral Mini Transcribe 2"
 
     ghana_nlp_asr_v2 = "Ghana NLP ASR v2"
@@ -344,6 +374,7 @@ class AsrModels(Enum):
     @classmethod
     def _deprecated(cls):
         return {
+            cls.usm,
             cls.seamless_m4t,
             cls.whisper_chichewa_large_v3,
             cls.nemo_english,
@@ -369,11 +400,16 @@ class AsrModels(Enum):
         }
 
     def supports_input_prompt(self) -> bool:
-        return self in {self.gpt_4_o_audio, self.gpt_4_o_mini_audio}
+        return self in {
+            self.gpt_transcribe,
+            self.gpt_4_o_audio,
+            self.gpt_4_o_mini_audio,
+        }
 
 
 asr_model_ids = {
     AsrModels.whisper_akera_large_v3: "akera/whisper-large-v3-kik-full_v2",
+    AsrModels.gpt_transcribe: "gpt-transcribe",
     AsrModels.gpt_4_o_audio: "gpt-4o-transcribe",
     AsrModels.gpt_4_o_mini_audio: "gpt-4o-mini-transcribe",
     AsrModels.whisper_large_v3: "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
@@ -387,6 +423,7 @@ asr_model_ids = {
     AsrModels.seamless_m4t_v2: "facebook/seamless-m4t-v2-large",
     AsrModels.mms_1b_all: "facebook/mms-1b-all",
     AsrModels.meta_omnilingual_asr_llm_7b: "omniASR_LLM_7B",
+    AsrModels.sravaani_v1: "ARTPARK-IISc/SraVaani-1.0",
     AsrModels.voxtral_mini: "voxtral-mini-2602",
     AsrModels.lelapa: "lelapa-vulavula",
     AsrModels.elevenlabs: "elevenlabs-scribe-v1",
@@ -408,6 +445,7 @@ forced_asr_languages = {
 asr_supported_languages = {
     AsrModels.saaras_v3: SAARAS_V3_SUPPORTED,
     AsrModels.whisper_large_v3: WHISPER_LARGE_V3_SUPPORTED,
+    AsrModels.gpt_transcribe: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.gpt_4_o_audio: WHISPER_LARGE_V2_SUPPORTED,  # https://platform.openai.com/docs/guides/speech-to-text#supported-languages
     AsrModels.gpt_4_o_mini_audio: WHISPER_LARGE_V2_SUPPORTED,
     AsrModels.whisper_large_v2: WHISPER_LARGE_V2_SUPPORTED,
@@ -419,6 +457,7 @@ asr_supported_languages = {
     AsrModels.nemo_hindi: {"hi"},
     AsrModels.gcp_v1: GCP_V1_SUPPORTED,
     AsrModels.usm: CHIRP_SUPPORTED,
+    AsrModels.chirp_3: CHIRP_3_SUPPORTED,
     AsrModels.deepgram: DEEPGRAM_SUPPORTED,
     AsrModels.elevenlabs: ELEVENLABS_SUPPORTED,
     AsrModels.intron: INTRON_SUPPORTED,
@@ -426,6 +465,7 @@ asr_supported_languages = {
     AsrModels.azure: AZURE_SUPPORTED,
     AsrModels.mms_1b_all: MMS_SUPPORTED,
     AsrModels.meta_omnilingual_asr_llm_7b: OMNILINGUAL_ASR_SUPPORTED,
+    AsrModels.sravaani_v1: SRAVAANI_SUPPORTED,
     AsrModels.voxtral_mini: VOXTRAL_SUPPORTED,
     AsrModels.ghana_nlp_asr_v2: GHANA_NLP_ASR_V2_SUPPORTED,
     AsrModels.lelapa: LELAPA_ASR_SUPPORTED,
@@ -689,9 +729,13 @@ def asr_model_selector(
     **kwargs,
 ) -> AsrModels | None:
     if language_filter:
-        supported_models = filter_models_by_language(
-            language_filter, asr_supported_languages
-        )
+        supported_models = [
+            model
+            for model in filter_models_by_language(
+                language_filter, asr_supported_languages
+            )
+            if model not in AsrModels._deprecated()
+        ]
     else:
         supported_models = AsrModels
     model = enum_selector(
@@ -1176,6 +1220,8 @@ def run_asr(
         str: Transcribed text.
     """
     import google.cloud.speech_v2 as cloud_speech
+    from google.api_core import exceptions as google_exceptions
+    from google.api_core import retry as google_retry
     from google.api_core.client_options import ClientOptions
     from google.cloud.texttospeech_v1 import AudioEncoding
     import langcodes
@@ -1295,8 +1341,8 @@ def run_asr(
         )
     elif selected_model == AsrModels.gcp_v1:
         return gcp_asr_v1(audio_url, language)
-    elif selected_model == AsrModels.usm:
-        location = settings.GCP_REGION
+    elif selected_model == AsrModels.chirp_3:
+        location = "us"
 
         # Create a client
         options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
@@ -1309,7 +1355,7 @@ def run_asr(
             language = lobj.to_tag()
             if language == "en":
                 language = "en-US"
-            assert language in CHIRP_SUPPORTED, f"Unsupported language: {language!r}"
+            assert language in CHIRP_3_SUPPORTED, f"Unsupported language: {language!r}"
         else:
             language = None
 
@@ -1320,8 +1366,8 @@ def run_asr(
         if language:
             config.language_codes = [language]
         else:
-            config.language_codes = CHIRP_SUPPORTED  # pick from supported langauges
-            config.model = "chirp"  # use chirp model
+            config.language_codes = ["auto"]
+            config.model = "chirp_3"
         config.explicit_decoding_config = cloud_speech.ExplicitDecodingConfig(
             encoding=AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
@@ -1345,7 +1391,20 @@ def run_asr(
         # Make the request
         operation = client.batch_recognize(request=request)
         # Wait for operation to complete
-        response = operation.result()  # BatchRecognizeFileResult
+        response = operation.result(
+            timeout=600,
+            retry=google_retry.Retry(
+                predicate=google_retry.if_exception_type(
+                    google_exceptions.ResourceExhausted,
+                    google_exceptions.TooManyRequests,
+                    google_exceptions.InternalServerError,
+                    google_exceptions.ServiceUnavailable,
+                ),
+                initial=2,
+                maximum=30,
+                timeout=60,
+            )
+        )  # BatchRecognizeFileResult
         # Handle the response
         return "\n\n".join(
             result.alternatives[0].transcript
@@ -1419,7 +1478,26 @@ def run_asr(
                 audio_url=audio_url, language=language
             )
         return transcription
-    elif selected_model in {AsrModels.gpt_4_o_audio, AsrModels.gpt_4_o_mini_audio}:
+    elif selected_model == AsrModels.sravaani_v1:
+        import modal
+        from modal_functions.sravaani_asr import app as modal_app
+
+        # SraVaani identifies the spoken language automatically, so the
+        # selected language is only validated, not passed to the model
+        if language:
+            normalised_lang_in_collection(language, SRAVAANI_SUPPORTED)
+
+        SraVaani = modal.Cls.from_name(modal_app.name, "SraVaani")
+        with modal.enable_output():
+            data = SraVaani().run.remote(
+                audio_url=audio_url,
+                return_timestamps=output_format != AsrOutputFormat.text,
+            )
+    elif selected_model in {
+        AsrModels.gpt_transcribe,
+        AsrModels.gpt_4_o_audio,
+        AsrModels.gpt_4_o_mini_audio,
+    }:
         from daras_ai_v2.language_model import get_openai_client
 
         audio_r = requests.get(audio_url)
@@ -1503,14 +1581,16 @@ def run_asr(
 
 
 def _get_or_create_recognizer(
-    client: "google.cloud.speech_v2.SpeechClient", language: str | None, location: str
+    client: "google.cloud.speech_v2.SpeechClient",
+    language: str | None,
+    location: str,
 ) -> str:
     import google.api_core.exceptions
     import google.cloud.speech_v2 as cloud_speech
 
     _, project = get_google_auth_session()
     if language:
-        recognizer_id = f"chirp-api--{language.lower()}"
+        recognizer_id = f"chirp-3-api--{language.lower()}"
         try:
             # check if recognizer already exists
             recognizer = client.get_recognizer(
@@ -1523,7 +1603,7 @@ def _get_or_create_recognizer(
                     parent=f"projects/{project}/locations/{location}",
                     recognizer_id=recognizer_id,
                     recognizer=cloud_speech.Recognizer(
-                        language_codes=[language], model="chirp"
+                        language_codes=[language], model="chirp_3"
                     ),
                 )
                 .result()

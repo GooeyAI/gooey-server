@@ -1,9 +1,8 @@
-from typing import Any
+from typing import Any, Iterator
 
+import gooey_gui as gui
 from bots.models import SavedRun
 from bots.models.message_thread import MessageThread
-import gooey_gui as gui
-
 from daras_ai_v2 import settings
 from daras_ai_v2.csv_lines import csv_decode_row
 from daras_ai_v2.language_model import (
@@ -61,20 +60,29 @@ def chat_widget_input_to_request_body(
     )
     prev_output = (state.get("raw_output_text") or [""])[0]
     if prev_chat_input and prev_output:
+        user_entry = format_chat_entry(
+            role=CHATML_ROLE_USER,
+            content_text=prev_input,
+            input_images=prev_input_images,
+            # input_audio=prev_input_audio,
+            input_documents=prev_input_documents,
+        )
+        extra_content = user_extra_content(
+            state, get_entry_text(user_entry), prev_input_audio, prev_input_documents
+        )
+        if extra_content:
+            user_entry["extra_content"] = extra_content
+
+        assistant_entry = format_chat_entry(
+            role=CHATML_ROLE_ASSISTANT,
+            content_text=prev_output,
+        ) | {"run_url": sr.get_app_url()}
+        extra_content = assistant_extra_content(state, prev_output)
+        if extra_content:
+            assistant_entry["extra_content"] = extra_content
+
         # append previous input to the history
-        ret["messages"] = state.get("messages", []) + [
-            format_chat_entry(
-                role=CHATML_ROLE_USER,
-                content_text=prev_input,
-                input_images=prev_input_images,
-                # input_audio=prev_input_audio,
-                input_documents=prev_input_documents,
-            ),
-            format_chat_entry(
-                role=CHATML_ROLE_ASSISTANT,
-                content_text=prev_output,
-            ),
-        ]
+        ret["messages"] = state.get("messages", []) + [user_entry, assistant_entry]
 
     any_prev_input = prev_chat_input or state.get("input_prompt")
     if any_prev_input and sr.message_thread and sr.message_thread.last_run_id == sr.id:
@@ -85,9 +93,40 @@ def chat_widget_input_to_request_body(
     return ret, message_thread
 
 
+def user_extra_content(
+    state: dict,
+    raw_input_text: str,
+    input_audio: str | None,
+    input_documents: list[str] | None,
+) -> dict[str, Any]:
+    ret = {}
+    input_prompt = state.get("input_prompt")
+    if input_prompt is not None and input_prompt != raw_input_text:
+        ret["display_content"] = input_prompt
+    if input_audio:
+        ret["audio"] = input_audio
+    if input_documents:
+        ret["documents"] = input_documents
+    return ret
+
+
+def assistant_extra_content(state: dict, raw_output_text: str) -> dict[str, Any]:
+    ret = {}
+    output_text = (state.get("output_text") or [""])[0]
+    if output_text and output_text != raw_output_text:
+        ret["display_content"] = output_text
+    output_video = state.get("output_video")
+    if output_video:
+        ret["video"] = output_video
+    output_audio = state.get("output_audio")
+    if output_audio:
+        ret["audio"] = output_audio
+    return ret
+
+
 def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[Any]:
-    from daras_ai_v2.bots import parse_bot_html
     from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
+    from daras_ai_v2.bots import parse_bot_html
 
     messages = []  # chat widget internal mishmash format
     input_audio = state.get("input_audio") or ""
@@ -100,32 +139,10 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
     else:
         entries = state.get("messages", []).copy()
 
-    for entry in entries:
-        role = entry.get("role")
-        if role == CHATML_ROLE_USER:
-            messages.append(
-                dict(
-                    role=role,
-                    input_prompt=get_entry_text(entry),
-                    input_images=get_entry_images(entry) or [],
-                )
-            )
-        elif role == CHATML_ROLE_ASSISTANT:
-            messages.append(
-                dict(
-                    role=role,
-                    type="final_response",
-                    status="completed",
-                    output_text=[parse_bot_html(get_entry_text(entry))[1]],
-                )
-            )
+    messages.extend(history_entries_to_widget_messages(entries))
 
     # add last input to history if present
-    show_raw_msgs = False
-    if show_raw_msgs:
-        input_prompt = state.get("raw_input_text") or ""
-    else:
-        input_prompt = state.get("input_prompt") or ""
+    input_prompt = state.get("input_prompt") or ""
 
     if input_prompt or input_images or input_audio or input_documents:
         messages.append(
@@ -176,21 +193,73 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                 event_type = "final_response"
                 status = "completed"
 
-        messages.append(
-            dict(
-                role=CHATML_ROLE_ASSISTANT,
-                type=event_type,
-                status=status,
-                detail=state.get(StateKeys.run_status) or "",
-                raw_output_text=raw_output_text,
-                output_text=[text],
-                text=text,
-                output_video=output_video,
-                output_audio=output_audio,
-                references=state.get("references") or [],
-                buttons=buttons,
-                final_prompt=state.get("final_prompt"),
-                web_url=web_url,
+        # An unsettled run is always sent: starting/running has no output yet but its message is
+        # what draws the widget's progress state, and failed carries the error text appended
+        # above. A settled run with nothing to show is not sent - the builder clears every
+        # ResponseModel field when it edits a workflow, since the old answer may no longer apply,
+        # while input_prompt is a request field and survives. That pairing left the widget
+        # rendering an empty assistant bubble under an input it had already answered.
+        run_settled = run_status in (RecipeRunState.completed, RecipeRunState.standby)
+        if text or output_video or output_audio or not run_settled:
+            messages.append(
+                dict(
+                    role=CHATML_ROLE_ASSISTANT,
+                    type=event_type,
+                    status=status,
+                    detail=state.get(StateKeys.run_status) or "",
+                    raw_output_text=raw_output_text,
+                    output_text=[text],
+                    text=text,
+                    output_video=output_video,
+                    output_audio=output_audio,
+                    references=state.get("references") or [],
+                    buttons=buttons,
+                    final_prompt=state.get("final_prompt"),
+                    web_url=web_url,
+                )
             )
-        )
     return messages
+
+
+def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
+    from daras_ai_v2.bots import parse_bot_html
+
+    for entry in entries:
+        role = entry.get("role")
+
+        run_url = entry.get("run_url")
+        extra_content = entry.get("extra_content") or {}
+        text = extra_content.get("display_content", get_entry_text(entry)) or ""
+        audio = extra_content.get("audio")
+        video = extra_content.get("video")
+        documents = extra_content.get("documents")
+
+        if role == CHATML_ROLE_USER:
+            msg = dict(
+                role=role,
+                input_prompt=text,
+                input_images=get_entry_images(entry) or [],
+            )
+            if audio:
+                msg["input_audio"] = audio
+            if documents:
+                msg["input_documents"] = documents
+            yield msg
+
+        elif role == CHATML_ROLE_ASSISTANT:
+            text = parse_bot_html(text)[1]
+            # buttons, text = parse_bot_html(text)[:2]
+            msg = dict(
+                role=role,
+                type="final_response",
+                status="completed",
+                output_text=[text],
+                buttons=[],
+            )
+            if run_url:
+                msg["web_url"] = run_url
+            if audio:
+                msg["output_audio"] = audio
+            if video:
+                msg["output_video"] = video
+            yield msg

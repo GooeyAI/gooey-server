@@ -804,7 +804,7 @@ def sidebar_page_wrapper(
     # row on desktop (rail beside content).
     with gui.div(
         className=(
-            "d-flex flex-column flex-lg-row w-100 "
+            "gooey-app-shell d-flex flex-column flex-lg-row w-100 "
             + ("overflow-hidden" if is_v2 else "min-vh-100")
         ),
         **viewport,

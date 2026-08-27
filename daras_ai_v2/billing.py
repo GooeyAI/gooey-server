@@ -2,7 +2,6 @@ import typing
 from datetime import datetime
 from functools import partial
 
-import gooey_gui as gui
 import sentry_sdk
 import stripe
 from django.contrib.humanize.templatetags.humanize import ordinal
@@ -13,13 +12,14 @@ from django.utils.translation import ngettext
 from furl import furl
 from loguru import logger
 
+import gooey_gui as gui
 from app_users.models import (
     AppUser,
     AppUserTransaction,
     PaymentProvider,
     TransactionReason,
 )
-from daras_ai_v2 import icons, settings, paypal
+from daras_ai_v2 import icons, paypal, settings
 from daras_ai_v2.fastapi_tricks import get_app_route_url, get_route_path
 from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.html_spinner_widget import html_spinner
@@ -32,7 +32,6 @@ from scripts.migrate_existing_subscriptions import available_subscriptions
 from widgets.author import render_author_from_workspace
 from workspaces.models import Workspace, WorkspaceRole
 from workspaces.widgets import open_create_workspace_popup_js, set_current_workspace
-
 
 rounded_border = "w-100 border shadow-sm rounded p-3"
 SeatSelection = tuple[SeatType, int]
@@ -256,12 +255,10 @@ def billing_page(
         return
 
     with gui.div(className="mb-5"):
-        selected_payment_provider = render_all_plans(
-            workspace, user=user, session=session, plans_tab=plans_tab
-        )
+        render_addon_section(workspace)
 
     with gui.div(className="mb-5"):
-        render_addon_section(workspace, selected_payment_provider)
+        render_all_plans(workspace, user=user, session=session, plans_tab=plans_tab)
 
     if workspace.subscription:
         if (
@@ -1254,8 +1251,7 @@ def change_subscription(
     new_selection: SeatSelection | None = None,
     **kwargs,
 ) -> typing.NoReturn | None:
-    from routers.account import account_route
-    from routers.account import payment_processing_route
+    from routers.account import account_route, payment_processing_route
 
     current_plan = PricingPlan.from_sub(workspace.subscription)
 
@@ -1375,9 +1371,7 @@ def payment_provider_radio(**props) -> str | None:
         )
 
 
-def render_addon_section(
-    workspace: Workspace, selected_payment_provider: PaymentProvider
-):
+def render_addon_section(workspace: Workspace):
     # Check if workspace is allowed to purchase topups - hide entire section if not
     if not workspace.allow_credit_topups():
         return
@@ -1399,7 +1393,7 @@ def render_addon_section(
     if workspace.subscription and workspace.subscription.payment_provider:
         provider = PaymentProvider(workspace.subscription.payment_provider)
     else:
-        provider = selected_payment_provider
+        provider = PaymentProvider.STRIPE
     match provider:
         case PaymentProvider.STRIPE:
             render_stripe_addon_buttons(workspace)
@@ -1502,8 +1496,7 @@ This is a one-time purchase and your account will be credited once the payment i
 def stripe_addon_checkout_redirect(
     workspace: Workspace, dollat_amt: int, save_pm: bool
 ):
-    from routers.account import account_route
-    from routers.account import payment_processing_route
+    from routers.account import account_route, payment_processing_route
 
     line_item = available_subscriptions["addon"]["stripe"].copy()
     line_item["quantity"] = dollat_amt * settings.ADDON_CREDITS_PER_DOLLAR
@@ -1585,8 +1578,7 @@ def stripe_subscription_create(
     plan: PricingPlan,
     seat_selection: SeatSelection | None = None,
 ):
-    from routers.account import account_route
-    from routers.account import payment_processing_route
+    from routers.account import account_route, payment_processing_route
 
     # check for existing subscriptions on stripe
     customer = workspace.get_or_create_stripe_customer()
@@ -1737,8 +1729,7 @@ This will cancel your subscription and remove your saved payment method.
 
 
 def change_payment_method(workspace: Workspace):
-    from routers.account import payment_processing_route
-    from routers.account import account_route
+    from routers.account import account_route, payment_processing_route
 
     match workspace.subscription.payment_provider:
         case PaymentProvider.STRIPE:

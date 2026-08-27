@@ -74,10 +74,7 @@ from functions.base_llm_tool import (
 from functions.models import FunctionTrigger
 from functions.workflow_tools import DynamicLLMToolLoader
 from gooey_gui.types.recipe_top_bar_props import TopBarIntegration
-from gooey_gui.types.recipe_workspace_props import (
-    GooeyEmbedTeardownProps,
-    RecipeWorkspaceTriggerProps,
-)
+from gooey_gui.types.recipe_workspace_props import RecipeWorkspaceTriggerProps
 
 # Extends the v1 recipe rather than copying it: the 33 members that were byte-identical are
 # inherited now, and so are the module-level helpers below. What is left in this file is the
@@ -508,62 +505,18 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
 
             config["apiUrl"] = get_api_route_url(stream_create)
 
-        gui.div(
-            # fill the scrolling body area, not the viewport: the top bar sits above this,
-            # so `100vh` would overflow by exactly the bar's height
-            style=dict(height="100%", minHeight=0),
-            id="gooey-embed",
-        )
-        # Owns the widget's teardown when this preview disappears or a different workflow
-        # replaces it client-side.
-        gui.model_component(
-            GooeyEmbedTeardownProps(
-                embed_key=str(self.current_pr.published_run_id),
-            )
-        )
         load_chat_widget_lib()
-        gui.js(
-            """
-async function loadGooeyEmbed() {
-    await window.waitUntilHydrated;
-    let embedTarget = document.getElementById("gooey-embed");
-    if (typeof GooeyEmbed === "undefined" || !embedTarget || embedTarget.children.length) {
-        return;
-    }
-    let controller = {
-        messages,
-        onSendMessage: (payload) => {
-            let btn = document.getElementById("onSendMessage");
-            if (!btn) return;
-            btn.value = JSON.stringify(payload);
-            btn.click();
-        },
-        onNewConversation() {
-          document.getElementById("onNewConversation").click();
-        },
-        fetchConversations: () => gui.fetchServerAPI("/__/agent/fetch-conversations", { run_url }),
-    };
-    GooeyEmbed.copilotPreviewControl = controller;
-    GooeyEmbed.mount(config, controller);
-}
-
-const script = document.getElementById("gooey-embed-script");
-if (script) script.onload = loadGooeyEmbed;
-loadGooeyEmbed();
-window.addEventListener("hydrated", loadGooeyEmbed);
-// once the widget is already mounted, update the messages and branding to latest
-if (typeof GooeyEmbed !== "undefined" && GooeyEmbed.copilotPreviewControl) {
-    GooeyEmbed.copilotPreviewControl.setMessages?.(messages);
-    GooeyEmbed.copilotPreviewControl.updateConfig?.({
-        theme: config.theme,
-        branding: config.branding,
-        showHeader: config.showHeader,
-    });
-}
-            """,
+        # Master's component: it renders #gooey-embed and mounts the widget into it once,
+        # with theme, branding and messages reaching it through the controller afterwards.
+        # v2 differs only in sizing - it fills the scrolling body area rather than the
+        # viewport, because the top bar sits above this and `100vh` would overflow by
+        # exactly the bar's height.
+        gui.component(
+            "GooeyEmbedPreview",
             config=config,
             messages=messages,
             run_url=str(self.request.url),
+            style=dict(height="100%", minHeight=0),
         )
 
     @cached_property

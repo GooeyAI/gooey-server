@@ -185,6 +185,7 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
         if sr:
             state = sr.state
             properties = page_cls.get_tool_call_schema(state)
+            additional_properties = False
 
             try:
                 request = page_cls.RequestModel.model_validate(state)
@@ -211,6 +212,7 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
             )
         else:
             properties = {}
+            additional_properties = True
             description = (
                 "Call this tool to update a workflow's state without running it.\n\n"
                 "There is no currently selected workflow, so you MUST pass `run_url`. "
@@ -231,6 +233,7 @@ class UpdateWorkflowStateLLMTool(GooeyBuilderLLMTool):
             label="Update Workflow State",
             description=description,
             properties=properties,
+            additional_properties=additional_properties,
         )
 
     def call(

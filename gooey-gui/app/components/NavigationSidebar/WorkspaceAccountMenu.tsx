@@ -33,7 +33,7 @@ const WORKSPACE_SWITCHER_POPPER_OPTIONS = {
 const MENU_PANEL_CLASS =
   "account-menu-panel bg-body border shadow p-1 rounded-3";
 const MENU_ROW_BASE_CLASS =
-  "d-flex align-items-center gap-2 w-100 px-3 py-2 text-body text-decoration-none text-start border-0 rounded bg-hover-light";
+  "d-flex align-items-center gap-1 w-100 px-2 py-2 text-body text-decoration-none text-start border-0 rounded bg-hover-light";
 const MENU_ROW_ACTION_CLASS = clsx(
   MENU_ROW_BASE_CLASS,
   "bg-transparent bg-hover-light"
@@ -98,7 +98,7 @@ export function WorkspaceAccountMenu({
               <i className="fa-regular fa-chevron-right text-body-secondary flex-shrink-0 small" />
             </button>
           </Tippy>
-          <hr className="my-1" />
+          <hr className="my-1 text-muted" />
         </>
       )}
 
@@ -115,14 +115,11 @@ export function WorkspaceAccountMenu({
 
       {account.logout_href && (
         <>
-          <hr className="my-1" />
-          <AccountMenuItem
-            href={account.logout_href}
-            icon="fa-regular fa-arrow-right-from-bracket"
-            onClick={closeMenu}
-          >
-            Log out
-          </AccountMenuItem>
+          <hr className="my-1 text-muted" />
+          <a href={account.logout_href} className={MENU_ROW_ACTION_CLASS}>
+            <MenuIcon icon="fa-regular fa-arrow-right-from-bracket" />
+            <span className="flex-grow-1 text-truncate min-w-0">Log out</span>
+          </a>
         </>
       )}
     </div>
@@ -167,7 +164,7 @@ export function WorkspaceAccountMenu({
         )}
         {!compact && (
           <>
-            <span className="flex-grow-1 text-start overflow-hidden min-w-0">
+            <span className="flex-grow-1 text-start overflow-hidden min-w-0 small">
               <span className="d-block text-truncate fw-semibold">
                 {account.user.name}
               </span>
@@ -211,7 +208,7 @@ function WorkspaceSwitcher({
       ))}
       {account.add_workspace_url && (
         <>
-          <hr className="my-1" />
+          <hr className="my-1 text-muted" />
           <AccountMenuItem
             icon="fa-regular fa-plus"
             href={account.add_workspace_url}
