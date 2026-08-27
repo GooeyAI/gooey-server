@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from django.utils import timezone
 
 from app_users.models import AppUser
-from bots.models import Conversation, PublishedRun, SavedRun, Workflow
+from bots.models import PublishedRun, SavedRun, Workflow
 from bots.models.bot_integration import Platform
 from bots.models.workflow import WorkflowMetadata
 from daras_ai.image_input import truncate_text_words
@@ -31,23 +31,12 @@ if TYPE_CHECKING:
 CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
 
-# Nothing kills a celery worker on a clock, so a run whose status stopped moving
-# is indistinguishable from one still working. Past this, the card stops claiming
-# it's running - a permanent spinner on a dead run is worse than calling it early.
+# nothing kills a celery worker on a clock, so a run whose status stopped moving
+# looks exactly like one still working - past this the card stops claiming it is
 RUN_STALE_AFTER = datetime.timedelta(minutes=10)
 
-# the badge shares the preview's top edge with the workflow icon, so a long
-# status line gets cut here rather than growing across it
+# the badge shares the preview's top edge with the workflow icon
 RUN_STATUS_MAXLEN = 28
-
-# `BasePage.STARTING_STATE`, normalised the way that page compares it. Copied
-# rather than imported: base_v2 imports this module.
-STARTING_STATE = "starting"
-
-# An id is masked to first-3 + last-4. Anything shorter would leak most of
-# itself to the mask, so it's shown whole instead - a display name like @seanb
-# is meant to be read anyway.
-MASK_MIN_LEN = len("123") + len("1233") + 1
 
 
 def author_from_user(
@@ -105,26 +94,16 @@ def sr_to_card(
     metadata = sr.get_workflow_metadata()
     sender = sender_from_run(sr)
     return WorkflowCardData(
-        title=_run_title(sr, (parent_pr and parent_pr.title) or workflow.label),
+        title=f"{sr.get_surface_display()}: "
+        + ((parent_pr and parent_pr.title) or workflow.label),
         href=sr.get_app_url(),
         workflow_icon=(metadata and (metadata.fa_icon or metadata.emoji)) or "",
         description=(parent_pr and parent_pr.notes) or None,
         preview=_sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata),
-        # whoever owns the integration didn't send the message, so the sender
-        # takes the author's place rather than sitting next to it
-        author=None if sender else author,
+        author=author,
         sender=sender,
         run_status=run_status_from_run(sr),
     )
-
-
-def _run_title(sr: SavedRun, title: str) -> str:
-    """Name the surface a run came from, so a deployment doesn't read like a playground run."""
-    try:
-        surface = SavedRun.Surface(sr.surface)
-    except ValueError:
-        return title
-    return f"{surface.label}: {title}"
 
 
 def run_status_from_run(sr: SavedRun) -> RunStatusData | None:
@@ -143,7 +122,7 @@ def run_status_from_run(sr: SavedRun) -> RunStatusData | None:
         return None
     if sr.updated_at and timezone.now() - sr.updated_at > RUN_STALE_AFTER:
         return RunStatusData(state="failed", label="Timed out")
-    if sr.run_status.lower().strip(". ") == STARTING_STATE:
+    if sr.run_status.lower().strip(". ") == "starting":  # BasePage.STARTING_STATE
         return RunStatusData(state="starting", label="Starting")
     return RunStatusData(
         state="running",
@@ -161,41 +140,20 @@ def sender_from_run(sr: SavedRun) -> SenderData | None:
     try:
         platform = Platform(sr.platform)
     except ValueError:
-        # a run recorded on a platform this deploy doesn't know about - the card
-        # is worth rendering without its origin, a 500 isn't
-        return None
+        return None  # a platform this deploy doesn't define: no origin, but no 500
     convo = sr.message_thread and sr.message_thread.bot_conversation
+    # a run can carry a platform without a conversation behind it - the icon
+    # alone still says where it came from
     return SenderData(
         icon=platform.get_icon(),
-        # a run can carry a platform without a conversation behind it (an older
-        # run, or a thread since deleted) - the icon alone still says where it
-        # came from, so fall back to that rather than dropping the row's origin
-        label=_sender_label(platform, convo) if convo else "",
-        title=platform.get_title(),
+        label=mask_user_id(convo.get_display_name() or "") if convo else "",
     )
-
-
-def _sender_label(platform: Platform, convo: Conversation) -> str:
-    match platform:
-        case Platform.WHATSAPP if convo.wa_phone_number:
-            return mask_user_id(convo.wa_phone_number.as_international)
-        case Platform.TWILIO if convo.twilio_phone_number:
-            return mask_user_id(convo.twilio_phone_number.as_international)
-        case Platform.SLACK if convo.slack_user_name:
-            return "@" + mask_user_id(convo.slack_user_name)
-        case Platform.INSTAGRAM if convo.ig_username:
-            return "@" + mask_user_id(convo.ig_username)
-        case Platform.FACEBOOK if convo.fb_page_name:
-            return "@" + mask_user_id(convo.fb_page_name)
-        case Platform.TELEGRAM if convo.telegram_user_name:
-            return "@" + mask_user_id(convo.telegram_user_name)
-    return mask_user_id(convo.unique_user_id() or "")
 
 
 def mask_user_id(value: str) -> str:
     """Keep enough of an id to recognise a returning sender, not enough to reach them."""
     value = value.strip()
-    if len(value) < MASK_MIN_LEN:
+    if len(value) < len("123xxx1233"):
         return value
     return f"{value[:3]}xxx{value[-4:]}"
 

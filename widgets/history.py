@@ -13,7 +13,6 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.urls import paginate_queryset
 from gooey_gui.types.history_page_props import (
     HistoryPageProps,
-    OwnerFilterOption,
     SurfaceTabData,
     WorkflowFilterOption,
 )
@@ -40,8 +39,7 @@ HISTORY_PAGE_SIZE = 24
 app = CustomAPIRouter()
 
 
-# "just me" is the default, so the param only ever appears as ?for=all - a bare
-# /history/ url means your own runs.
+# "just me" is the default, so the param only ever appears as ?for=all
 OWNER_PARAM = "for"
 OWNER_ALL = "all"
 OWNER_ME = "me"
@@ -73,7 +71,7 @@ def render(
         raise gui.RedirectException(_surface_href(DEFAULT_SURFACE, workflow))
 
     workspace = get_current_workspace(user, request.session)
-    mine_only = _is_mine_only(request)
+    mine_only = request.query_params.get(OWNER_PARAM, OWNER_ME) != OWNER_ALL
     cards, load_more_href = _load_history(
         user=user,
         workspace=workspace,
@@ -85,7 +83,6 @@ def render(
 
     gui.model_component(
         HistoryPageProps(
-            title_icon=icons.history,
             owner_options=_build_owner_options(
                 user, workspace, surface, workflow, mine_only
             ),
@@ -98,32 +95,28 @@ def render(
     )
 
 
-def _is_mine_only(request: Request) -> bool:
-    return request.query_params.get(OWNER_PARAM, OWNER_ME) != OWNER_ALL
-
-
 def _build_owner_options(
     user: AppUser,
     workspace: Workspace,
     surface: SavedRun.Surface,
     workflow: Workflow | None,
     mine_only: bool,
-) -> list[OwnerFilterOption]:
+) -> list[SurfaceTabData]:
     return [
-        OwnerFilterOption(
+        SurfaceTabData(
             id=OWNER_ME,
-            label="Just me",
-            icon_html=(
+            title="Just me",
+            icon=(
                 f'<img src="{user.get_photo()}" alt=""'
                 f' style="width: 20px; height: 20px; border-radius: 50%;">'
             ),
             href=_surface_href(surface, workflow, mine_only=True),
             active=mine_only,
         ),
-        OwnerFilterOption(
+        SurfaceTabData(
             id=OWNER_ALL,
-            label=workspace.display_name(user),
-            icon_html=workspace.html_icon(size="20px"),
+            title=workspace.display_name(user),
+            icon=workspace.html_icon(size="20px"),
             href=_surface_href(surface, workflow, mine_only=False),
             active=not mine_only,
         ),
@@ -245,7 +238,7 @@ def _surface_href(
     *,
     mine_only: bool = True,
 ) -> str:
-    """Every control on the page rebuilds the whole url, so no filter drops the others."""
+    """Every control rebuilds the whole url, so no filter drops the others."""
     href = furl(get_route_path(history_page, path_params={"surface": surface.name}))
     if workflow is not None:
         href.args["workflow"] = workflow.page_cls.canonical_slug()

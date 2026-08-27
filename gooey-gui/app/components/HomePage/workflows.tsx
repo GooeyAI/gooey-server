@@ -25,13 +25,9 @@ function CardRunStatus({ runStatus }: { runStatus: RunStatusData }) {
     <span
       className={`recent-card-run-status recent-card-run-status--${runStatus.state} position-absolute top-0 end-0 m-2 shadow-sm z-1`}
     >
-      {/* a stopped run gets the stop glyph, everything else the marker dot -
-          same two markers BulkProgressCard uses for the same three states */}
+      {/* the same two markers BulkProgressCard uses for these states */}
       {runStatus.state === "cancelled" ? (
-        <i
-          className="fa-solid fa-circle-stop recent-card-run-status-icon"
-          aria-hidden="true"
-        />
+        <i className="fa-solid fa-circle-stop" aria-hidden="true" />
       ) : (
         <span className="recent-card-run-status-dot" />
       )}
@@ -45,8 +41,7 @@ function CardSender({ sender }: { sender: SenderData }) {
     <span className="d-inline-flex align-items-center gap-2 min-w-0 text-muted">
       <span
         className="flex-shrink-0 d-inline-flex align-items-center"
-        title={sender.title ?? undefined}
-        aria-label={sender.title ?? undefined}
+        aria-hidden="true"
         dangerouslySetInnerHTML={{ __html: sender.icon }}
       />
       {sender.label && (
@@ -156,9 +151,7 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
 }
 
 export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
-  // a sender always renders (the icon carries the platform even with no label),
-  // so it stands in for the author when deciding whether the dot separator earns
-  // its place
+  // a sender always renders - its icon carries the platform even with no label
   const hasByline = !!(
     card.sender ||
     card.author?.photo_url ||

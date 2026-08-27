@@ -25,8 +25,7 @@ export interface OwnerFilterOption {
 }
 export interface HistoryPageProps {
   title: string;
-  title_icon: string;
-  owner_options: OwnerFilterOption[];
+  owner_options: SurfaceTabData[];
   workflow_options: WorkflowFilterOption[];
   surface_tabs: SurfaceTabData[];
   cards: WorkflowCardData[];
@@ -57,7 +56,6 @@ export interface AuthorData {
 export interface SenderData {
   icon: string;
   label: string;
-  title: string | null;
 }
 /**
  * A run's state, when it's worth saying out loud - a finished run says nothing.

@@ -37,7 +37,6 @@ export interface RunStatusData {
 export interface SenderData {
   icon: string;
   label: string;
-  title: string | null;
 }
 export interface WorkflowCardData {
   title: string;

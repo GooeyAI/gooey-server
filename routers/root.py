@@ -416,26 +416,18 @@ def api_route(
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    # v2 has one History, not one per recipe - send this slug's runs to it as a
-    # filter. v1 pages keep their own tab.
-    redirect_url = global_history_url_for_slug(request, page_slug)
-    if redirect_url:
-        return RedirectResponse(redirect_url, status_code=301)
-    return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
-
-
-def global_history_url_for_slug(request: Request, page_slug: str) -> str | None:
-    """The global History url filtered to this recipe, or None if v1 owns the page."""
     from daras_ai_v2.all_pages import normalize_slug, page_slug_map
     from daras_ai_v2.layout_v2 import can_use_layout_v2
     from widgets.history import history_href_for_workflow
 
-    if not settings.ENABLE_LAYOUT_V2 or not can_use_layout_v2(request):
-        return None
+    # v2 has one History, not one per recipe - send this slug's runs to it as a
+    # filter. v1 pages keep their own tab.
     page_cls = page_slug_map.get(normalize_slug(page_slug))
-    if page_cls is None:
-        return None
-    return history_href_for_workflow(page_cls.workflow)
+    if page_cls and can_use_layout_v2(request):
+        return RedirectResponse(
+            history_href_for_workflow(page_cls.workflow), status_code=301
+        )
+    return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
 
 
 @gui.route(

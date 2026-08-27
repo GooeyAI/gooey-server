@@ -51,7 +51,6 @@ class SenderData(pydantic.BaseModel):
 
     icon: str
     label: str
-    title: str | None = None
 
 
 class WorkflowCardData(pydantic.BaseModel):

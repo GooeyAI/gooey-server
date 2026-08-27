@@ -18,7 +18,7 @@ from time import sleep
 
 import sentry_sdk
 import yarl
-from django.db.models import Q, QuerySet, Sum
+from django.db.models import Q, Sum
 from django.utils.text import slugify
 from fastapi import HTTPException
 from furl import furl
@@ -2944,24 +2944,23 @@ class BasePage:
         paginate_button(url=self.request.url, cursor=cursor)
 
     def _usage_tab(self):
-        qs = SavedRun.objects.filter(
-            workflow=self.workflow, workspace=self._usage_workspace()
-        ).filter(
-            Q(surface=SavedRun.Surface.deployment)
-            | Q(parent_version__published_run=self.current_pr)
-        )
-
-        self._render_run_grid(qs, empty_message="No usage yet.")
-
-    def _render_run_grid(self, qs: QuerySet[SavedRun], *, empty_message: str):
-        """The card grid behind History and Usage - same rows, different question."""
-        runs, next_cursor = paginate_queryset(
-            qs=qs.select_related(
+        qs = (
+            SavedRun.objects.filter(
+                workflow=self.workflow, workspace=self._usage_workspace()
+            )
+            .filter(
+                Q(surface=SavedRun.Surface.deployment)
+                | Q(parent_version__published_run=self.current_pr)
+            )
+            .select_related(
                 "parent_version__published_run",
                 "workflow_metadata",
                 "created_by",
                 "message_thread__bot_conversation",
-            ),
+            )
+        )
+        runs, next_cursor = paginate_queryset(
+            qs=qs,
             ordering=["-updated_at"],
             cursor=self.request.query_params,
             page_size=RUN_GRID_PAGE_SIZE,
@@ -2975,7 +2974,7 @@ class BasePage:
                     for sr in runs
                 ],
                 load_more_href=self._run_grid_load_more_href(next_cursor),
-                empty_message=empty_message,
+                empty_message="No usage yet.",
             )
         )
 

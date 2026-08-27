@@ -15,14 +15,12 @@ import { ClientOnlySuspense } from "~/lazyImports";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 import type {
   HistoryPageProps,
-  OwnerFilterOption,
   SurfaceTabData,
   WorkflowFilterOption,
 } from "@gooey-types/history_page_props";
 
 export function HistoryPage({
   title,
-  title_icon,
   owner_options,
   workflow_options,
   surface_tabs,
@@ -32,18 +30,14 @@ export function HistoryPage({
 }: CustomComponentProps & HistoryPageProps) {
   return (
     <div className="container-xxl my-4">
-      {/* the heading keeps the surface tabs and the owner filter company on one
-          line, and gives them up to its own row below once there's no width for it */}
+      {/* tabs and owner filter share the heading's line, dropping below it when narrow */}
       <div className="d-flex flex-column flex-xl-row align-items-xl-center justify-content-xl-between gap-3 mb-4">
         <h1 className="mb-0 d-flex align-items-center gap-2 flex-shrink-0">
           <span>{title}</span>
-          {title_icon && (
-            <span
-              className="text-muted fs-5"
-              aria-hidden="true"
-              dangerouslySetInnerHTML={{ __html: title_icon }}
-            />
-          )}
+          <i
+            className="fa-regular fa-history text-muted fs-5"
+            aria-hidden="true"
+          />
         </h1>
 
         <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-xl-end gap-2 min-w-0">
@@ -101,7 +95,7 @@ export function HistoryCardGrid({
   );
 }
 
-function OwnerFilter({ options }: { options: OwnerFilterOption[] }) {
+function OwnerFilter({ options }: { options: SurfaceTabData[] }) {
   if (options.length === 0) return null;
   return (
     <div className="btn-group flex-shrink-0" role="group">
@@ -114,12 +108,14 @@ function OwnerFilter({ options }: { options: OwnerFilterOption[] }) {
             (option.active ? "btn-secondary" : "btn-outline-secondary")
           }
         >
-          <span
-            className="d-inline-flex align-items-center"
-            aria-hidden="true"
-            dangerouslySetInnerHTML={{ __html: option.icon_html }}
-          />
-          <span className="text-truncate">{option.label}</span>
+          {option.icon && (
+            <span
+              className="d-inline-flex align-items-center"
+              aria-hidden="true"
+              dangerouslySetInnerHTML={{ __html: option.icon }}
+            />
+          )}
+          <span className="text-truncate">{option.title}</span>
         </Link>
       ))}
     </div>

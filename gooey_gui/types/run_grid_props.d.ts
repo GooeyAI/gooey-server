@@ -32,7 +32,6 @@ export interface AuthorData {
 export interface SenderData {
   icon: string;
   label: string;
-  title: string | null;
 }
 /**
  * A run's state, when it's worth saying out loud - a finished run says nothing.
