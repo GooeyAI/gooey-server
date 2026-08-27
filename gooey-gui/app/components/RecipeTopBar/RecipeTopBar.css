@@ -10,6 +10,8 @@
    not grow to fit content - so the cluster has to stay narrow enough to fit. That is what the
    chip-label rules below are for, not decoration. */
 .gooey-topbar {
+  /* One height for every control in the right cluster - see the shared rule below. */
+  --topbar-control-h: 36px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -167,13 +169,26 @@ a.gooey-topbar-author:hover {
   min-width: 0;
 }
 
+/* One height and one box model for the right cluster.
+   These were built from three different sizing models: the icon chips were a fixed 32px
+   square, while Publish and Run sized to their content. Publish carries a 1px border and Run
+   does not, so the same `padding: 6px` left them 35px and 33px - three heights in one row,
+   with 10px / 12px / 14px of horizontal padding to match. Height is set here and the
+   vertical padding removed, so a border can no longer change how tall a control is. */
+.gooey-topbar-integration,
+.gooey-topbar-overflow-btn,
+.gooey-topbar-publish,
+.gooey-topbar-run {
+  box-sizing: border-box;
+  height: var(--topbar-control-h);
+}
+
 .gooey-topbar-integration {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  width: 32px;
-  height: 32px;
+  width: var(--topbar-control-h);
   border-radius: 9px;
   /* default: a neutral chip. Only platforms with a brand colour get white-on-colour -
      otherwise the icon is white on a near-white surface and disappears. */
@@ -195,14 +210,16 @@ a.gooey-topbar-author:hover {
    into) is the query container. */
 .gooey-topbar-integration-label {
   display: none;
-  font-size: 0.8125rem;
+  /* matches Publish; 0.8125rem read visibly smaller beside it */
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
 @container topbar (min-width: 1150px) {
   .gooey-topbar-integration--labelled {
     width: auto;
-    padding: 0 10px;
+    /* the same 12px Publish uses - these sit side by side */
+    padding: 0 12px;
   }
 
   .gooey-topbar-integration--labelled .gooey-topbar-integration-label {
@@ -236,8 +253,7 @@ a.gooey-topbar-author:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--topbar-control-h);
   border: 1px solid #e0ddd7;
   border-radius: 9px;
   background: #fff;
@@ -262,7 +278,7 @@ a.gooey-topbar-author:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 0 12px;
   border: 1px solid #e0ddd7;
   border-radius: 9px;
   font-size: 0.875rem;
@@ -311,7 +327,8 @@ a.gooey-topbar-cost:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
+  /* wider than Publish on purpose - it is the primary action */
+  padding: 0 14px;
   border: 0;
   border-radius: 9px;
   background: #111;
