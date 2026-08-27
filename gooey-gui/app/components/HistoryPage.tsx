@@ -70,7 +70,9 @@ export function HistoryCardGrid({
       {cards.length === 0 ? (
         <p className="text-muted">{emptyMessage}</p>
       ) : (
-        <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
+        // one card per row on a phone: two makes each ~173px wide, and a 16:10
+        // preview of that is too short for a chat to fit without clipping
+        <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
           {cards.map((card, i) => (
             <div key={`${card.href}-${i}`} className="col">
               <HistoryWorkflowCard card={card} />
