@@ -416,7 +416,8 @@ def _load_gooey_builder_data(
     # offers it on Run/Preview.
     if page is None:
         return None
-    if not _is_layout_v2_page(page) and page.tab not in (
+    is_v2 = _is_layout_v2_page(page)
+    if not is_v2 and page.tab not in (
         RecipeTabs.run,
         RecipeTabs.preview,
     ):
@@ -441,6 +442,7 @@ def _load_gooey_builder_data(
         photo_url=get_gooey_builder_photo_url(bi),
         name=bi.name,
         event_key=GOOEY_BUILDER_EVENT_KEY,
+        storage_key=(f"{page._workspace_storage_key()}:builder" if is_v2 else None),
     )
 
 

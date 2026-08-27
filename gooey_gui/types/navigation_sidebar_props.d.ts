@@ -39,6 +39,7 @@ export interface GooeyBuilderData {
   photo_url: string;
   name: string;
   event_key: string;
+  storage_key: string | null;
 }
 export interface NavAccountData {
   user: NavUserData | null;

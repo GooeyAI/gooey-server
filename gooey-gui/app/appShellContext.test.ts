@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   panelOpenForStorage,
+  shouldAdoptPanelCommand,
   shouldRestorePanel,
   type PanelEntry,
 } from "./appShellContext";
@@ -22,5 +23,11 @@ describe("panel storage isolation", () => {
   it("restores defaults when the workflow storage key changes", () => {
     expect(panelOpenForStorage(commandedOpen, "workflow-b", false)).toBe(false);
     expect(shouldRestorePanel(commandedOpen, "workflow-b")).toBe(true);
+  });
+
+  it("adopts a command issued before the workflow panel hydrates", () => {
+    const earlyCommand = { ...commandedOpen, storageKey: null };
+
+    expect(shouldAdoptPanelCommand(earlyCommand, "workflow-a")).toBe(true);
   });
 });

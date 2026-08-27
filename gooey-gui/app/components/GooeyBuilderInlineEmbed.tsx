@@ -44,6 +44,9 @@ export function GooeyBuilderInlineEmbed(
       if (!propsRef.current.builder_only) {
         config.onClose = function () {
           setPanelOpen(propsRef.current.event_key, false);
+          window.dispatchEvent(
+            new CustomEvent(`${propsRef.current.event_key}:close`)
+          );
         };
       }
 

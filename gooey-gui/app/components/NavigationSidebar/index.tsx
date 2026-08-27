@@ -9,7 +9,7 @@ import type {
   NavigationSidebarProps,
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
-import { useAppShellPanelValue, useNavDrawer } from "~/appShellContext";
+import { useAppShellPanel, useNavDrawer } from "~/appShellContext";
 import { AccountSection } from "./AccountSection";
 import { clearBuilderIntent, readBuilderIntent } from "./builderIntent";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
@@ -37,7 +37,11 @@ export function NavigationSidebar({
   const builderInitiallyOpen = Boolean(
     builderEventKey && state[builderEventKey]
   );
-  const builder = useAppShellPanelValue(builderEventKey, builderInitiallyOpen);
+  const builder = useAppShellPanel(
+    builderEventKey,
+    builderInitiallyOpen,
+    gooey_builder?.storage_key ?? null
+  );
   const navDrawer = useNavDrawer();
   const [collapsed, setCollapsed] = useState(
     builderInitiallyOpen || default_collapsed
@@ -64,6 +68,22 @@ export function NavigationSidebar({
       setCollapsed(true);
     }
   }, [builder.open]);
+
+  useEffect(() => {
+    if (!builderEventKey) {
+      return;
+    }
+    const onChanged = (event: Event) => {
+      const open = (event as CustomEvent<{ open?: boolean }>).detail?.open;
+      if (typeof open === "boolean") {
+        builder.setOpen(open);
+      }
+    };
+    window.addEventListener(`${builderEventKey}:changed`, onChanged);
+    return () => {
+      window.removeEventListener(`${builderEventKey}:changed`, onChanged);
+    };
+  }, [builderEventKey]);
 
   useEffect(() => {
     const mq = window.matchMedia(MOBILE_MEDIA_QUERY);

@@ -198,6 +198,11 @@ export function useAppShellPanel(
       return;
     }
     const current = context.panels[key];
+    if (shouldAdoptPanelCommand(current, storageKey)) {
+      persistPanelOpen(storageKey, current.open);
+      context.setPanel(key, { ...current, storageKey });
+      return;
+    }
     if (!shouldRestorePanel(current, storageKey)) {
       return;
     }
@@ -246,21 +251,6 @@ export function useAppShellPanelActions() {
   return { setPanelOpen: context.setPanelOpen };
 }
 
-export function useAppShellPanelValue(
-  key: string | null | undefined,
-  defaultOpen = false
-) {
-  const context = useAppShellContext();
-  return {
-    open: key ? (context.panels[key]?.open ?? defaultOpen) : false,
-    setOpen: (open: boolean) => {
-      if (key) {
-        context.setPanelOpen(key, open);
-      }
-    },
-  };
-}
-
 export function panelOpenForStorage(
   entry: PanelEntry | undefined,
   storageKey: string | null,
@@ -277,6 +267,13 @@ export function shouldRestorePanel(
   storageKey: string | null
 ): boolean {
   return !entry || entry.storageKey !== storageKey || !entry.commanded;
+}
+
+export function shouldAdoptPanelCommand(
+  entry: PanelEntry | undefined,
+  storageKey: string | null
+): entry is PanelEntry {
+  return Boolean(entry?.commanded && entry.storageKey === null && storageKey);
 }
 
 function useAppShellContext(): AppShellContextValue {

@@ -24,6 +24,9 @@ export function GooeyBuilderButton({
       onClick={(e) => {
         e.stopPropagation();
         onOpen();
+        window.dispatchEvent(
+          new CustomEvent(`${gooey_builder.event_key}:open`)
+        );
       }}
     >
       <img

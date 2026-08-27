@@ -59,6 +59,7 @@ class GooeyBuilderData(pydantic.BaseModel):
     photo_url: str
     name: str
     event_key: str
+    storage_key: str | None = None
 
 
 class NavAccountData(pydantic.BaseModel):
