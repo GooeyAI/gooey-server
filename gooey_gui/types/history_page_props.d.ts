@@ -13,8 +13,20 @@ export interface WorkflowFilterOption {
   href: string;
   active: boolean;
 }
+/**
+ * "Just me" vs the whole workspace.
+ */
+export interface OwnerFilterOption {
+  id: string;
+  label: string;
+  icon_html: string;
+  href: string;
+  active: boolean;
+}
 export interface HistoryPageProps {
   title: string;
+  title_icon: string;
+  owner_options: OwnerFilterOption[];
   workflow_options: WorkflowFilterOption[];
   surface_tabs: SurfaceTabData[];
   cards: WorkflowCardData[];

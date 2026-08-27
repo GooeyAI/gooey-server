@@ -13,6 +13,7 @@ from daras_ai_v2.meta_content import raw_build_meta_tags
 from daras_ai_v2.urls import paginate_queryset
 from gooey_gui.types.history_page_props import (
     HistoryPageProps,
+    OwnerFilterOption,
     SurfaceTabData,
     WorkflowFilterOption,
 )
@@ -24,6 +25,7 @@ from widgets.surface_filters import (
     DEFAULT_SURFACE,
     SURFACE_ICONS,
     parse_surface,
+    surface_label,
     visible_surfaces,
 )
 from widgets.workflow_cards import author_from_user, history_card
@@ -36,6 +38,13 @@ META_DESCRIPTION = "Your run history on Gooey.AI"
 HISTORY_PAGE_SIZE = 24
 
 app = CustomAPIRouter()
+
+
+# "just me" is the default, so the param only ever appears as ?for=all - a bare
+# /history/ url means your own runs.
+OWNER_PARAM = "for"
+OWNER_ALL = "all"
+OWNER_ME = "me"
 
 
 @gui.route(app, "/history/", "/history/{surface}/")
@@ -64,23 +73,61 @@ def render(
         raise gui.RedirectException(_surface_href(DEFAULT_SURFACE, workflow))
 
     workspace = get_current_workspace(user, request.session)
+    mine_only = _is_mine_only(request)
     cards, load_more_href = _load_history(
         user=user,
         workspace=workspace,
         surface=surface,
         workflow=workflow,
+        mine_only=mine_only,
         request=request,
     )
 
     gui.model_component(
         HistoryPageProps(
-            workflow_options=_build_workflow_options(surface, workflow),
-            surface_tabs=_build_surface_tabs(surface, surfaces, workflow),
+            title_icon=icons.history,
+            owner_options=_build_owner_options(
+                user, workspace, surface, workflow, mine_only
+            ),
+            workflow_options=_build_workflow_options(surface, workflow, mine_only),
+            surface_tabs=_build_surface_tabs(surface, surfaces, workflow, mine_only),
             cards=cards,
             load_more_href=load_more_href,
-            empty_message=f"No {surface.label} history yet.",
+            empty_message=f"No {surface_label(surface).lower()} yet.",
         )
     )
+
+
+def _is_mine_only(request: Request) -> bool:
+    return request.query_params.get(OWNER_PARAM, OWNER_ME) != OWNER_ALL
+
+
+def _build_owner_options(
+    user: AppUser,
+    workspace: Workspace,
+    surface: SavedRun.Surface,
+    workflow: Workflow | None,
+    mine_only: bool,
+) -> list[OwnerFilterOption]:
+    return [
+        OwnerFilterOption(
+            id=OWNER_ME,
+            label="Just me",
+            icon_html=(
+                f'<img src="{user.get_photo()}" alt=""'
+                f' style="width: 20px; height: 20px; border-radius: 50%;">'
+            ),
+            href=_surface_href(surface, workflow, mine_only=True),
+            active=mine_only,
+        ),
+        OwnerFilterOption(
+            id=OWNER_ALL,
+            label=workspace.display_name(user),
+            icon_html=workspace.html_icon(size="20px"),
+            href=_surface_href(surface, workflow, mine_only=False),
+            active=not mine_only,
+        ),
+    ]
 
 
 def parse_workflow(slug: str) -> Workflow | None:
@@ -113,6 +160,7 @@ def _load_history(
     workspace: Workspace,
     surface: SavedRun.Surface,
     workflow: Workflow | None,
+    mine_only: bool,
     request: Request,
 ) -> tuple[list[WorkflowCardData], str | None]:
     # uses the ["workspace", "surface", "-updated_at"] index on SavedRun
@@ -124,6 +172,8 @@ def _load_history(
     )
     if workflow is not None:
         qs = qs.filter(workflow=workflow)
+    if mine_only:
+        qs = qs.filter(uid=user.uid)
 
     runs, next_cursor = paginate_queryset(
         qs=qs,
@@ -141,12 +191,13 @@ def _load_history(
 def _build_workflow_options(
     surface: SavedRun.Surface,
     active_workflow: Workflow | None,
+    mine_only: bool,
 ) -> list[WorkflowFilterOption]:
     options = [
         WorkflowFilterOption(
             id="",
             title=f"{icons.example}&nbsp; Any",
-            href=_surface_href(surface),
+            href=_surface_href(surface, mine_only=mine_only),
             active=active_workflow is None,
         )
     ]
@@ -156,7 +207,7 @@ def _build_workflow_options(
             WorkflowFilterOption(
                 id=workflow.page_cls.canonical_slug(),
                 title=f"{metadata.emoji} {metadata.short_title}",
-                href=_surface_href(surface, workflow),
+                href=_surface_href(surface, workflow, mine_only=mine_only),
                 active=workflow == active_workflow,
             )
         )
@@ -167,13 +218,14 @@ def _build_surface_tabs(
     active: SavedRun.Surface,
     surfaces: list[SavedRun.Surface],
     workflow: Workflow | None,
+    mine_only: bool,
 ) -> list[SurfaceTabData]:
     return [
         SurfaceTabData(
             id=surface.name,
-            title=surface.label,
+            title=surface_label(surface),
             icon=SURFACE_ICONS.get(surface),
-            href=_surface_href(surface, workflow),
+            href=_surface_href(surface, workflow, mine_only=mine_only),
             active=surface == active,
         )
         for surface in surfaces
@@ -190,10 +242,15 @@ def history_href_for_workflow(workflow: Workflow) -> str:
 def _surface_href(
     surface: SavedRun.Surface,
     workflow: Workflow | None = None,
+    *,
+    mine_only: bool = True,
 ) -> str:
+    """Every control on the page rebuilds the whole url, so no filter drops the others."""
     href = furl(get_route_path(history_page, path_params={"surface": surface.name}))
     if workflow is not None:
         href.args["workflow"] = workflow.page_cls.canonical_slug()
+    if not mine_only:
+        href.args[OWNER_PARAM] = OWNER_ALL
     return str(href)
 
 
