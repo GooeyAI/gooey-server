@@ -69,9 +69,6 @@ from widgets.sidebar import sidebar_layout
 from widgets.workflow_share import render_share_modal
 from workspaces.models import Workspace
 
-# Reading width for the working column when it has the row to itself. Split needs none.
-SOLO_COL_MAX_WIDTH = "1420px"
-
 
 def format_credits_as_dollars(credits: int) -> str:
     """A credit count as the price a user pays, via the one conversion rate billing uses."""
@@ -162,7 +159,7 @@ class BasePage(BasePageV1):
                     # clearing the run bar needs `env(safe-area-inset-bottom)`, which
                     # RecipeWorkspace.css owns.
                     "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
-                    "px-0 px-lg-3 pt-2 pt-lg-1 pb-lg-2"
+                    "px-0 pt-2 pt-lg-0 pb-lg-2"
                 ),
                 # or a flex child refuses to shrink below its content
                 style=dict(minHeight=0),
@@ -880,8 +877,8 @@ class BasePage(BasePageV1):
                 # Centred and capped for reading width; Split needs none, the preview caps
                 # it there. Flex + `minHeight: 0` keeps the definite-height chain intact.
                 gui.div(
-                    className="mx-auto w-100 h-100 d-flex flex-column px-2 px-lg-0",
-                    style=dict(maxWidth=SOLO_COL_MAX_WIDTH, minHeight=0),
+                    className="v2-reading-col h-100 d-flex flex-column px-2 px-lg-0",
+                    style=dict(minHeight=0),
                 ),
             ):
                 return self._render_input_col()
@@ -926,7 +923,8 @@ class BasePage(BasePageV1):
                 self._history_tab()
 
             case RecipeTabs.run_as_api:
-                self.run_as_api_tab()
+                with gui.div(className="v2-reading-col"):
+                    self.run_as_api_tab()
 
             case RecipeTabs.saved:
                 self._saved_tab()
@@ -1251,7 +1249,7 @@ PANE_STRIP_CSS = """
        keeps the line off the pills - and it doubles as room for the active pill's shadow,
        which `overflow-y: hidden` was clipping. */
     padding-bottom: 12px;
-    border-bottom: 1px solid #e6e6e6;
+    border-bottom: 1px solid var(--gooey-line-soft);
 }
 
 & button {
@@ -1262,26 +1260,27 @@ PANE_STRIP_CSS = """
     align-items: center;
     white-space: nowrap !important;
     margin: 0 !important;
-    padding: 6px 14px !important;
-    border: 1px solid #e6e6e6 !important;
+    padding: 8px 12px !important;
+    border: 1px solid var(--gooey-line-soft) !important;
     border-radius: 10px !important;
-    background: #fff !important;
-    color: #6b6b6b !important;
+    background: var(--gooey-bg-page) !important;
+    color: var(--gooey-ink-muted) !important;
     font-weight: 500 !important;
-    line-height: 1.4 !important;
-    font-size: 0.875rem !important;
+    line-height: 120% !important;
+    font-size: 14px !important;
 }
 
 & button:hover {
-    background: #fff !important;
-    border-color: #d0d0d0 !important;
-    color: #1a1a1a !important;
+    background: var(--gooey-bg-page) !important;
+    border-color: var(--gooey-line-strong) !important;
+    color: var(--gooey-ink) !important;
 }
 
 & button.pane-active {
-    border-color: #c9c9c9 !important;
-    color: #111 !important;
+    border-color: var(--gooey-line-strong) !important;
+    color: var(--gooey-ink) !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    background: var(--gooey-surface-100) !important;
 }
 
 & button.pane-active::before {
@@ -1291,7 +1290,7 @@ PANE_STRIP_CSS = """
     height: 6px;
     margin-right: 8px;
     border-radius: 50%;
-    background: #111;
+    background: var(--gooey-ink);
 }
 
 /* Below lg the strip is the first thing under the app header, and the editor's surface starts
@@ -1430,13 +1429,13 @@ ABOUT_CSS = """
 /* Description and the meta groups share one tinted panel - they answer "what is this" at two
    levels of detail. Only the cards inside carry their own surface. */
 & .v2-about-panel {
-    background: #f5f4f0;
+    background: var(--gooey-surface-100);
     border-radius: 16px;
     padding: 1.5rem;
 }
 
 & .v2-about-notes {
-    color: #333;
+    color: var(--gooey-ink);
     margin-bottom: 1.5rem;
 }
 
@@ -1460,7 +1459,7 @@ ABOUT_CSS = """
     /* names the group - plain and dark, since it labels content rather than decorating it */
     font-size: 0.9375rem;
     font-weight: 500;
-    color: #111;
+    color: var(--gooey-ink);
     margin: 0 0 0.5rem 0;
 }
 
@@ -1487,18 +1486,18 @@ ABOUT_CSS = """
     flex: 0 0 11rem;
     min-width: 0;
     padding: 0.875rem;
-    border: 1px solid #e6e3dd;
+    border: 1px solid var(--gooey-line-default);
     border-radius: 12px;
-    background: #fbfaf8;
-    color: #111;
+    background: var(--gooey-surface-50);
+    color: var(--gooey-ink);
     text-decoration: none;
     transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 & .v2-about-meta-card:hover {
-    border-color: #d6d1c7;
+    border-color: var(--gooey-line-strong);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-    color: #111;
+    color: var(--gooey-ink);
 }
 
 /* No chip behind it: at this size the glyph and a model creator's colour logo both read
@@ -1509,7 +1508,7 @@ ABOUT_CSS = """
     align-items: center;
     font-size: 1.5rem;
     line-height: 1;
-    color: #3d3a34;
+    color: var(--gooey-ink);
 }
 
 & .v2-about-meta-icon img {

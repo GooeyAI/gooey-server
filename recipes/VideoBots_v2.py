@@ -654,7 +654,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             ),
         ]
 
-    CONFIG_PANE_KEY = "--config-subtab"
+    CONFIG_PANE_KEY = "--edit-subtab"
 
     def _render_about_meta(self):
         """How this agent is put together. Each card links into the config pane that owns
@@ -768,10 +768,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         if gui.button(
             f"{icons.variables} Variables" + (f" ({count})" if count else ""),
             type="tertiary",
-            # ms-auto pushes it to the far end of the row, opposite the model selector.
-            # fw-normal + small because `.btn.btn-theme` is bold at body size, and a
-            # secondary action next to a form field should not shout louder than the field's
-            # own label.
             className="mb-0 p-2 text-nowrap ms-auto fw-normal small",
             key="open-variables",
         ):

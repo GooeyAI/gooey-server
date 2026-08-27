@@ -59,7 +59,7 @@
 .recipe-workspace-pane--minor {
   flex: 0 0 calc(40% - var(--recipe-pane-half-gap));
   max-width: calc(40% - var(--recipe-pane-half-gap));
-  border: 1px solid #e0ddd7;
+  border: 1px solid var(--gooey-line-default);
   border-radius: 0.75rem;
 }
 
@@ -131,7 +131,7 @@
 
 .v2-pane-control:hover {
   color: var(--bs-body-color);
-  background: var(--bs-white);
+  background: var(--gooey-bg-page);
 }
 
 /* A labelled control is a pill rather than the square above: it carries a portrait and a
@@ -167,7 +167,20 @@
 }
 
 .v2-workspace-body {
-  background-color: #fbfaf8 !important;
+  /* Reading width for any surface that has the whole row: the solo working column and the
+     document tabs. Wider than prose, because these carry forms and code rather than
+     paragraphs. One definition, used from both css and `_render_solo_input_col`. */
+  --v2-reading-max: 1420px;
+  background-color: var(--gooey-bg-page) !important;
+}
+
+/* A full-row surface is centred and capped rather than run edge to edge. Split needs none -
+   the preview caps the working column there. */
+.v2-reading-col {
+  width: 100%;
+  max-width: var(--v2-reading-max);
+  padding: var(--gooey-space-1) 0;
+  margin-inline: auto;
 }
 
 /* A document tab - History, API, Deploy - scrolls in one direction only. `overflow-auto` on
@@ -177,6 +190,33 @@
   overflow-x: hidden;
   min-width: 0;
   overflow-wrap: anywhere;
+  /* A document tab - API, Deploy, History - has no `.recipe-workspace` to bring the
+     `.container-xxl` gutter, so it carries its own. At every width: the workspace's own
+     gutter is not width-dependent either. */
+  padding-left: var(--gooey-space-3);
+  padding-right: var(--gooey-space-3);
+}
+
+/* Wide content scrolls inside its own box. The body clips sideways on purpose - that is what
+   stops the whole page dragging under a fixed header - so anything that cannot wrap needs its
+   own scroller, or it is simply cut off. The API tab's curl and json blocks are the case. */
+.v2-workspace-body:not(:has(.recipe-workspace)) :is(pre, table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* The document tab's own content, capped the same way the working column is. On the body
+   rather than an inner wrapper because these tabs render straight into it.
+
+   Desktop only: below lg the viewport is narrower than the cap anyway, so all this would do
+   is impose a width and a centring on every child for no effect. The gutter above is what
+   holds the content off the edge there. */
+@media (min-width: 992px) {
+  .v2-workspace-body:not(:has(.recipe-workspace)) > * {
+    width: 100%;
+    max-width: var(--v2-reading-max);
+    margin-inline: auto;
+  }
 }
 
 /* The editor is framed like the preview - white, hairline, 12px - so the two read as
@@ -184,10 +224,17 @@
 
    No `overflow: hidden` here, unlike the preview's frame: the model selector's menu has to
    be able to leave this box. */
-.recipe-workspace-editor > .recipe-workspace-pane-content {
-  background: #fff;
-  border: 1px solid #e0ddd7;
+/* On the pane, not its content box, so the shadow is not clipped: `overflow: hidden` clips an
+   element's children, never its own shadow. The preview's frame sits on the pane for the same
+   reason. Room for it comes from `.container-xxl`'s gutter - `overflow` clips at the padding
+   box, so the shadow has that gutter to paint into. */
+.recipe-workspace-editor {
+  background: var(--gooey-bg-page);
   border-radius: 12px;
+  box-shadow: 0 0 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.recipe-workspace-editor > .recipe-workspace-pane-content {
   /* An inset, now that the surface has an edge to sit off. The working column's `pe-lg-3` is
      on top of this, not instead of it. */
   padding: 0.75rem;
@@ -199,7 +246,7 @@
 .v2-preview-frame {
   min-height: 0;
   overflow: hidden;
-  border: 1px solid #e0ddd7;
+  border: 1px solid var(--gooey-line-default);
   border-radius: 12px;
 }
 
@@ -236,11 +283,6 @@
   /* A tab body that is not the workspace - API, Deploy, History - is a document, not a pane, so
      it keeps a gutter. The markup carries `px-0` at this width for the workspace views, which
      do run edge to edge; without this the API tab's text sat flush against both edges. */
-  .v2-workspace-body:not(:has(.recipe-workspace)) {
-    padding-left: var(--gooey-space-3);
-    padding-right: var(--gooey-space-3);
-  }
-
   .recipe-workspace {
     position: relative;
   }
@@ -260,7 +302,12 @@
   }
 
   /* A plain white field at this width: every edge of the frame is either off-screen or under
-     something else, so the border, corners and inset all go. */
+     something else, so the corners, shadow and inset all go. */
+  .recipe-workspace-editor {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   .recipe-workspace-editor > .recipe-workspace-pane-content {
     border: 0;
     border-radius: 0;

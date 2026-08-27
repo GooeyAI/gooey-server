@@ -785,8 +785,6 @@ def sidebar_page_wrapper(
     is_v2 = _is_layout_v2_page(page)
     # splatted so v1 keeps exactly the props it had
     fill = dict(style=dict(minHeight=0)) if is_v2 else {}
-    # v2's app-shell surface colour
-    shell_bg = dict(style=dict(minHeight=0, backgroundColor="#FBFAF8")) if is_v2 else {}
     # `100dvh`, not `vh-100`: on mobile Safari `100vh` is the viewport with the URL bar
     # retracted. The only place the viewport is measured - the rest of the shell is `h-100`.
     viewport = dict(style=dict(height="100dvh")) if is_v2 else {}
@@ -806,7 +804,7 @@ def sidebar_page_wrapper(
 
         # above `sidebar_layout`, whose `gap-2` between panel and page paints whatever is
         # behind it
-        with gui.div(className="d-flex flex-column flex-grow-1 min-w-0", **shell_bg):
+        with gui.div(className="d-flex flex-column flex-grow-1 min-w-0", **fill):
             if is_v2:
                 # v2 opens its own `sidebar_layout` from inside the page, so the top bar
                 # can span the full width. A second one here would share

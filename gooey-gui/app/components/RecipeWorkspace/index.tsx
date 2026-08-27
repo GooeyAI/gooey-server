@@ -44,7 +44,7 @@ export function RecipeWorkspace({
   return (
     <div
       style={{ visibility: paneVisibility(hydrated) }}
-      className="recipe-workspace container-xxl"
+      className="recipe-workspace container-xxl py-lg-2"
     >
       <WorkspacePane
         className="recipe-workspace-about"

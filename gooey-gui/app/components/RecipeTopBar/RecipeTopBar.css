@@ -16,16 +16,20 @@
    so the bar's height still comes from its content and the menus still overflow it. */
 .v2-topbar-container {
   container: topbar / inline-size;
+  background-color: var(--gooey-bg-page);
 }
 
 /* ---------------------------------------------------------------- left */
 
+/* No `justify-self`, deliberately. `start` sizes a grid item to its content and lets it
+   overflow its track, so the `minmax(0, 1fr)` floor never applied and the title never
+   truncated - it ran under the pill group instead. Stretched, the track bounds it and the
+   inner flex still left-aligns everything. */
 .gooey-topbar-left {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  justify-self: start;
 }
 
 .gooey-topbar-avatar {
@@ -58,7 +62,7 @@
   background: none;
   font-size: 1rem;
   font-weight: 600;
-  color: #111;
+  color: var(--gooey-ink);
   line-height: 1.25;
   min-width: 0;
 }
@@ -75,13 +79,13 @@
 
 .gooey-topbar-chevron {
   font-size: 0.7em;
-  color: #6b6b6b;
+  color: var(--gooey-ink-muted);
   flex: 0 0 auto;
 }
 
 .gooey-topbar-author {
   font-size: 0.8125rem;
-  color: #6b6b6b;
+  color: var(--gooey-ink-muted);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -89,7 +93,7 @@
 }
 
 a.gooey-topbar-author:hover {
-  color: #111;
+  color: var(--gooey-ink);
   text-decoration: underline;
 }
 
@@ -101,11 +105,9 @@ a.gooey-topbar-author:hover {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid #ececec;
+  padding: var(--gooey-space-1);
   border-radius: 12px;
-  background: #f1f2f4;
+  background: var(--gooey-surface-200);
   justify-self: center;
   min-width: 0;
   overflow-x: auto;
@@ -119,42 +121,46 @@ a.gooey-topbar-author:hover {
 .gooey-topbar-tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
+  gap: var(--gooey-space-2);
   border: 0;
   border-radius: 8px;
   background: none;
-  color: #5f5f5f;
+  color: var(--gooey-ink-muted);
   font-weight: 500;
-  font-size: 0.875rem;
-  line-height: 1.4;
+  font-size: 14px;
+  line-height: 16px;
   text-decoration: none;
   white-space: nowrap;
   flex: 0 0 auto;
+  padding: var(--gooey-space-2) var(--gooey-space-3);
 }
 
 .gooey-topbar-tab:hover {
-  color: #111;
+  color: var(--gooey-ink);
 }
 
 .gooey-topbar-tab-active {
-  background: #fff;
-  color: #111;
+  background: var(--gooey-bg-page);
+  color: var(--gooey-ink);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .gooey-topbar-tab-icon {
+  height: 16px;
+  width: 16px;
   font-size: 0.9em;
   opacity: 0.85;
 }
 
 /* --------------------------------------------------------------- right */
 
+/* Right-aligned by the inner flex rather than by `justify-self: end`, for the same reason
+   as the left cluster: a non-stretch alignment escapes the track. */
 .gooey-topbar-right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
-  justify-self: end;
   min-width: 0;
 }
 
@@ -176,9 +182,9 @@ a.gooey-topbar-author:hover {
   width: var(--topbar-control-h);
   border-radius: 9px;
   /* neutral by default; only platforms with a brand colour get white-on-colour */
-  border: 1px solid #e0ddd7;
-  background: #fff;
-  color: #111;
+  border: 1px solid var(--gooey-line-default);
+  background: var(--gooey-bg-page);
+  color: var(--gooey-ink);
   font-size: 0.95rem;
   text-decoration: none;
   white-space: nowrap;
@@ -211,20 +217,20 @@ a.gooey-topbar-author:hover {
 }
 
 .gooey-topbar-integration:hover {
-  background: #fbfaf8;
-  border-color: #cfcbc3;
-  color: #111;
+  background: var(--gooey-surface-50);
+  border-color: var(--gooey-line-strong);
+  color: var(--gooey-ink);
 }
 
 .gooey-topbar-integration-brand {
   border-color: transparent;
-  color: #fff;
+  color: var(--gooey-bg-page);
 }
 
 .gooey-topbar-integration-brand:hover {
   filter: brightness(0.95);
   border-color: transparent;
-  color: #fff;
+  color: var(--gooey-bg-page);
 }
 
 .gooey-topbar-overflow-wrap {
@@ -237,17 +243,17 @@ a.gooey-topbar-author:hover {
   align-items: center;
   justify-content: center;
   width: var(--topbar-control-h);
-  border: 1px solid #e0ddd7;
+  border: 1px solid var(--gooey-line-default);
   border-radius: 9px;
-  background: #fff;
-  color: #111;
+  background: var(--gooey-bg-page);
+  color: var(--gooey-ink);
   font-size: 0.95rem;
 }
 
 .gooey-topbar-overflow-btn:hover {
-  background: #fbfaf8;
-  border-color: #cfcbc3;
-  color: #111;
+  background: var(--gooey-surface-50);
+  border-color: var(--gooey-line-strong);
+  color: var(--gooey-ink);
 }
 
 /* the cluster sits at the right edge, so its menu opens leftwards */
@@ -262,24 +268,24 @@ a.gooey-topbar-author:hover {
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  border: 1px solid #e0ddd7;
+  border: 1px solid var(--gooey-line-default);
   border-radius: 9px;
   font-size: 0.875rem;
-  background: #fff;
-  color: #111;
+  background: var(--gooey-bg-page);
+  color: var(--gooey-ink);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .gooey-topbar-publish:hover {
-  background: #fbfaf8;
-  border-color: #cfcbc3;
-  color: #111;
+  background: var(--gooey-surface-50);
+  border-color: var(--gooey-line-strong);
+  color: var(--gooey-ink);
 }
 
 /* the "/" between the cost and Run */
 .gooey-topbar-sep {
-  color: #b5b0a6;
+  color: var(--gooey-ink-muted);
   font-weight: 400;
   user-select: none;
 }
@@ -290,12 +296,12 @@ a.gooey-topbar-author:hover {
   height: 6px;
   margin-left: 6px;
   border-radius: 50%;
-  background: #f0a020;
+  background: var(--gooey-warn);
   vertical-align: middle;
 }
 
 .gooey-topbar-cost {
-  color: #111;
+  color: var(--gooey-ink);
   font-weight: 600;
   font-size: 0.875rem;
   text-decoration: none;
@@ -314,16 +320,16 @@ a.gooey-topbar-cost:hover {
   padding: 0 14px;
   border: 0;
   border-radius: 9px;
-  background: #111;
+  background: var(--gooey-ink);
   font-size: 0.875rem;
-  color: #fff;
+  color: var(--gooey-bg-page);
   font-weight: 600;
   white-space: nowrap;
 }
 
 .gooey-topbar-run:hover {
-  background: #000;
-  color: #fff;
+  background: var(--gooey-ink);
+  color: var(--gooey-bg-page);
 }
 
 .gooey-topbar-run:disabled {
@@ -331,11 +337,11 @@ a.gooey-topbar-cost:hover {
 }
 
 .gooey-topbar-run-stop {
-  background: #c0392b;
+  background: var(--gooey-danger);
 }
 
 .gooey-topbar-run-stop:hover {
-  background: #a93226;
+  background: var(--gooey-danger);
 }
 
 /* --------------------------------------------------------------- menus */
@@ -347,9 +353,9 @@ a.gooey-topbar-cost:hover {
   z-index: 1000;
   min-width: 200px;
   padding: 6px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid var(--gooey-line-soft);
   border-radius: 12px;
-  background: #fff;
+  background: var(--gooey-bg-page);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
@@ -362,7 +368,7 @@ a.gooey-topbar-cost:hover {
   border: 0;
   border-radius: 8px;
   background: none;
-  color: #111;
+  color: var(--gooey-ink);
   font-size: 0.9375rem;
   text-align: left;
   text-decoration: none;
@@ -370,15 +376,15 @@ a.gooey-topbar-cost:hover {
 }
 
 .gooey-topbar-menu-item:hover {
-  background: #fbfaf8;
+  background: var(--gooey-surface-50);
 }
 
 /* A section label, not a control. Its top rule is what separates the group. */
 .gooey-topbar-menu-heading {
   margin-top: 6px;
   padding: 8px 10px 4px;
-  border-top: 1px solid #ececec;
-  color: #6b6b6b;
+  border-top: 1px solid var(--gooey-line-soft);
+  color: var(--gooey-ink-muted);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -394,7 +400,7 @@ a.gooey-topbar-cost:hover {
 
 .gooey-topbar-menu-icon {
   width: 16px;
-  color: #6b6b6b;
+  color: var(--gooey-ink-muted);
 }
 
 /* -------------------------------------------------------------- mobile */
@@ -577,15 +583,12 @@ a.gooey-topbar-cost:hover {
 
 /* ---------------------------------------------------- gooey builder close
 
-   The Builder's collapse control, on the panel's own top-right corner at every breakpoint.
-   It belongs to the panel, not to the workflow, so it sits on the panel's right edge rather
-   than in the top bar next to the title. Below the *sidebar's* breakpoint - 1140px, not
-   Bootstrap's lg - the panel goes full-screen fixed and covers the top bar entirely, which
-   is the other reason this cannot live up there. v2 only: v1 keeps the widget's own header
-   and never renders this. */
+   The Builder's collapse control, on the panel's own top-right corner. It belongs to the
+   panel, not to the workflow, so it sits on the panel's edge rather than in the top bar.
+   v2 only: v1 keeps the widget's own header and never renders this. */
 .v2-builder-close {
-  /* absolute against `.gooey-sidebar` - sticky on desktop, fixed below 1140px, positioned
-     either way - so there is no app-header offset to hardcode */
+  /* absolute against `.gooey-sidebar`, which is positioned at every width, so there is no
+     app-header offset to hardcode */
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
@@ -601,10 +604,18 @@ a.gooey-topbar-cost:hover {
   z-index: 5;
 }
 
+/* The shell paints the ground the Builder panel and the tab body sit on. Without it the
+   `gap-2` between the two shows whatever is behind the shell instead. */
+.v2-app-shell {
+  background-color: var(--gooey-bg-page);
+}
+
 /* v2 mounts the panel inside the app shell, below the top bar, so `100dvh` would overrun
    its container by the bar's height. Scoped so v1's full-height sidebar is untouched. */
 .v2-app-shell .gooey-sidebar {
   height: 100%;
+  /* Panels and rails share one surface; `#f9f9f9` is v1's and stays there. */
+  background-color: var(--gooey-surface-50);
 }
 
 /* Ask Gooey is a surface *below* the header in v2, not a takeover of it.
@@ -621,17 +632,38 @@ a.gooey-topbar-cost:hover {
    workspace to nothing beside it instead of replacing it. Selecting a view from the sheet
    closes the panel, which brings that pane straight back.
 
-   1140px, not lg: this mirrors `--sidebar_desktop_breakpoint`, which is what decides the
-   takeover in the first place. Scoped to `.v2-app-shell`, so v1 keeps the behaviour. */
+   Scoped to `.v2-app-shell`, so v1 keeps its own behaviour. */
 @media (max-width: 1140px) {
+  /* v1 turns the panel into a fixed, full-viewport takeover below this width, because there
+     it flanks the whole page. v2 mounts it inside the shell, below the header, so it stays in
+     flow at every width - otherwise it covers the one piece of chrome that gets you back out.
+     Still a rail down to lg; only below that does it replace what sits beside it. */
   .v2-app-shell .gooey-sidebar-open {
-    position: static;
+    position: relative;
     z-index: auto;
+    height: 100%;
+    border-left: 0;
+    min-width: var(--sidebar_open_width);
+    width: var(--sidebar_open_width);
+    max-width: var(--sidebar_open_width);
+  }
+
+  /* The panel is a box inside the body's padding here, not the viewport, so the widget fills
+     the panel rather than `--sidebar_mobile_width`. */
+  .v2-app-shell .gooey-sidebar #gooey-builder-embed {
+    width: 100%;
+  }
+}
+
+/* Below lg the shell shows one surface at a time, so Ask Gooey takes the row. Same threshold
+   as the top bar's navigation stack and the pane fold - the panel used to switch at the
+   sidebar's own 1140 instead, which left it covering the screen while the bar above it was
+   still in its desktop arrangement. */
+@media (max-width: 991.98px) {
+  .v2-app-shell .gooey-sidebar-open {
     min-width: 0;
     width: 100%;
     max-width: 100%;
-    height: 100%;
-    border-left: 0;
   }
 
   /* ...and the workspace behind it steps aside. `:has()` rather than a descendant match,
@@ -648,18 +680,9 @@ a.gooey-topbar-cost:hover {
     display: none !important;
   }
 
-  /* The panel is a box inside the body's padding here, not the viewport, so the widget
-     fills the panel rather than `--sidebar_mobile_width`. */
-  .v2-app-shell .gooey-sidebar #gooey-builder-embed {
-    width: 100%;
-  }
-
-  /* Both floating controls go at this width - the header names the surface and the sheet
-     carries "New Chat". No close either: at the root there is no view to leave. */
-  .v2-builder-new {
-    display: none !important;
-  }
-
+  /* The close control goes - at the root of the stack there is no view to close back to.
+     The title pill stays: it names the surface and starts a new conversation, and the panel
+     is the whole screen here, so there is nothing beside it for the label to crowd. */
   .v2-builder-close {
     /* `!important`: the control renders with Bootstrap display utilities. */
     display: none !important;
@@ -697,7 +720,7 @@ a.gooey-topbar-cost:hover {
   gap: var(--gooey-space-1);
   padding: 6px var(--gooey-space-2);
   border-radius: var(--gooey-radius-xs);
-  background: #eaf6ee;
+  background: var(--gooey-ok-wash);
   color: var(--gooey-ink);
   font-size: 0.875rem;
   font-weight: 600;
@@ -721,7 +744,7 @@ a.gooey-topbar-cost:hover {
   border: 0;
   border-radius: var(--gooey-radius-xs);
   background: var(--gooey-ink);
-  color: #fff;
+  color: var(--gooey-bg-page);
   font-size: 1rem;
 }
 
@@ -730,7 +753,7 @@ a.gooey-topbar-cost:hover {
 }
 
 .gooey-topbar-runbar-run-stop {
-  background: #c0392b;
+  background: var(--gooey-danger);
 }
 
 /* ------------------------------------------------------- mobile action sheet
@@ -759,7 +782,7 @@ a.gooey-topbar-cost:hover {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  background: #fff;
+  background: var(--gooey-bg-page);
   border-radius: var(--gooey-radius-pill) var(--gooey-radius-pill) 0 0;
   /* the home indicator sits under the last row, so the bottom inset carries `env()`; it is 0
      on a phone without one, leaving the design's plain 16px */
@@ -830,15 +853,14 @@ a.gooey-topbar-cost:hover {
    it. Below lg one surface replaces another outright, so the same transitions read as the
    whole screen sliding. Scoped to the surfaces that move, not a blanket rule. */
 @media (max-width: 991.98px) {
-  /* Cut at lg, not the panel's 1140: between the two the layout is still two columns. */
   .recipe-workspace-pane {
     transition: none !important;
   }
 }
 
-@media (max-width: 1140px) {
-  /* The panel's own breakpoint - where it stops being a rail beside the content and becomes
-     the content. There is nothing for a slide to reveal once it fills the shell. */
+@media (max-width: 991.98px) {
+  /* Where the panel stops being a rail beside the content and becomes the content. There is
+     nothing for a slide to reveal once it fills the shell. */
   .nav-sidebar,
   .gooey-sidebar,
   .gooey-sidebar #gooey-builder-embed {

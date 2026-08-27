@@ -54,10 +54,14 @@ function Menu({
   items,
   open,
   onPick,
+  onNavigate,
 }: {
   items: MenuEntry[];
   open: boolean;
   onPick: (item: TopBarMenuItem) => void;
+  /** A link navigates client-side, so the component is never unmounted and the menu would
+   * otherwise stay open behind the page it opened. */
+  onNavigate: () => void;
 }) {
   if (!open || !items.length) return null;
   return (
@@ -77,6 +81,7 @@ function Menu({
           <Link
             key={item.key}
             to={item.href}
+            onClick={onNavigate}
             className={clsx(
               "gooey-topbar-menu-item",
               item.is_danger && "text-danger",
@@ -167,11 +172,8 @@ export function RecipeTopBar({
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { layout, storedLayout, hydrated, selectView } = usePaneLayout(
-    storage_key,
-    initial_view,
-    narrow_pane
-  );
+  const { layout, storedLayout, hydrated, isNarrow, selectView } =
+    usePaneLayout(storage_key, initial_view, narrow_pane);
   // The shown layout, so the bar names the arrangement actually on screen.
   const activeView = viewForLayout(shownLayout(layout, editor_full_width));
   const selectedView = selectedWorkspaceView(activeView, workspace_active);
@@ -217,14 +219,14 @@ export function RecipeTopBar({
 
   // On a phone a workflow opens on Ask Gooey, so the panel shows itself until this session
   // has picked a view - an absent stored layout being what "has not picked" means.
-  // 1140px is the panel's own breakpoint, not lg: above it the panel shares the screen.
+  // lg, the same threshold the panel's takeover uses: above it the panel shares the screen.
   useEffect(() => {
     if (!builder_event_key) return;
     // Only on the workspace; elsewhere the panel would cover a page the user navigated to.
     if (!workspace_active) return;
     // A visitor lands on About; Remix is how they opt into a chat.
     if (view_only) return;
-    if (window.innerWidth >= 1140) return;
+    if (window.innerWidth >= 992) return;
     let chosen: string | null = null;
     try {
       chosen = window.sessionStorage.getItem(storage_key);
@@ -417,13 +419,22 @@ export function RecipeTopBar({
           ? [
               {
                 key: "--sheet-history",
-                label: "Version History",
+                // "History" rather than "Version History": this is the tab listing runs of
+                // this workflow, while the title menu's entry lists the published versions.
+                label: "History",
                 iconClass: "fa-regular fa-clock-rotate-left",
                 href: history_href,
                 onPick: () => setBuilder(false),
               },
             ]
           : []),
+        // The title's chevron menu is not rendered at this width, so its entries come here.
+        ...title_menu_items.map((item) => ({
+          key: item.key,
+          label: item.label,
+          iconHtml: item.icon,
+          onPick: () => pickMenuItem(item),
+        })),
         // Update is dropped - it already has a button in the header at this width.
         ...overflowEntries
           .filter((item) => item.key !== PUBLISH_ITEM_KEY)
@@ -440,10 +451,14 @@ export function RecipeTopBar({
           })),
       ];
 
-  const pickMenuItem = (item: TopBarMenuItem) => {
+  const closeMenus = () => {
     setTitleMenuOpen(false);
     setOverflowOpen(false);
     setPublishMenuOpen(false);
+  };
+
+  const pickMenuItem = (item: TopBarMenuItem) => {
+    closeMenus();
     // the component's own entries, so they go straight to their keys
     if (item.key === PUBLISH_ITEM_KEY) return fire(publish_key);
     if (item.key === SHARE_ITEM_KEY) {
@@ -493,10 +508,10 @@ export function RecipeTopBar({
             type="button"
             className="gooey-topbar-title"
             onClick={() => setTitleMenuOpen((v) => !v)}
-            disabled={!title_menu_items.length}
+            disabled={!title_menu_items.length || isNarrow}
           >
             <span className="gooey-topbar-title-text">{title}</span>
-            {!!title_menu_items.length && (
+            {!!title_menu_items.length && !isNarrow && (
               <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
             )}
             {/* Which level of the stack is on screen; above lg the active pill says so. */}
@@ -520,8 +535,9 @@ export function RecipeTopBar({
             ))}
           <Menu
             items={title_menu_items}
-            open={titleMenuOpen}
+            open={titleMenuOpen && !isNarrow}
             onPick={pickMenuItem}
+            onNavigate={closeMenus}
           />
         </div>
       </div>
@@ -627,6 +643,7 @@ export function RecipeTopBar({
               items={overflowEntries}
               open={overflowOpen}
               onPick={pickMenuItem}
+              onNavigate={closeMenus}
             />
           </div>
         )}
@@ -717,6 +734,7 @@ export function RecipeTopBar({
               items={publishEntries}
               open={publishMenuOpen}
               onPick={pickMenuItem}
+              onNavigate={closeMenus}
             />
           </div>
         )}
