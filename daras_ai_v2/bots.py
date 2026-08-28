@@ -1,39 +1,40 @@
 import mimetypes
 import random
+import re
 import traceback
 import typing
 from datetime import datetime
 
-from bots.models.message_thread import MessageThread
-import gooey_gui as gui
 import requests
-from django.db import transaction, IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from sentry_sdk import capture_exception
 
+import gooey_gui as gui
 from app_users.models import AppUser
 from bots.models import (
-    Platform,
-    Message,
+    BotIntegration,
     Conversation,
     Feedback,
+    Message,
+    MessageAttachment,
+    Platform,
     SavedRun,
     Workflow,
-    MessageAttachment,
-    BotIntegration,
     db_msgs_to_entries,
 )
 from bots.models.convo_msg import ConvoBlockedStatus
+from bots.models.message_thread import MessageThread
 from daras_ai_v2 import settings
 from daras_ai_v2.asr import run_google_translate, should_translate_lang
 from daras_ai_v2.base import BasePage, RecipeRunState, StateKeys
-from daras_ai_v2.csv_lines import csv_encode_row, csv_decode_row
+from daras_ai_v2.csv_lines import csv_decode_row, csv_encode_row
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.language_model import (
-    CHATML_ROLE_USER,
     CHATML_ROLE_ASSISTANT,
+    CHATML_ROLE_USER,
     ConversationEntry,
 )
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
@@ -540,6 +541,7 @@ def _process_and_send_msg(
         capture_exception(e)
 
     send_feedback_buttons = bot.show_feedback_buttons
+    should_strip_thinking = bot.platform != Platform.WEB
 
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
@@ -570,6 +572,8 @@ def _process_and_send_msg(
                 prev_final_prompt = final_prompt
 
                 text = state.get("output_text") and state.get("output_text")[0]
+                if should_strip_thinking:
+                    text = strip_thinking(text)
                 if not text:
                     # if no text, send the run status as text
                     update_msg_id = bot.send_run_status(
@@ -615,6 +619,8 @@ def _process_and_send_msg(
         return
 
     text = state.get("output_text") and state.get("output_text")[0]
+    if should_strip_thinking:
+        text = strip_thinking(text)
     audio = state.get("output_audio")
     video = state.get("output_video")
     documents = state.get("output_documents")
@@ -654,6 +660,23 @@ def _process_and_send_msg(
         # bot output for human
         bot_msg_display_content=state.get("output_text") and state["output_text"][0],
     )
+
+
+def strip_thinking(text: str | None) -> str:
+    """
+    Remove `<think>...</think>` blocks from the text, leaving everything else -
+    including `<button>` and any other markup - byte-for-byte in its original order.
+    """
+    if not text:
+        return ""
+    return THINKING_TAG_RE.sub("", text).strip()
+
+
+# an unterminated block is matched till the end of the text, so that thinking
+# isn't leaked to the user while the response is still streaming in
+THINKING_TAG_RE = re.compile(
+    r"<think\b[^>]*>.*?(?:</think\s*>|\Z)", flags=re.IGNORECASE | re.DOTALL
+)
 
 
 def compute_prompt_delta(
