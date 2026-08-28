@@ -602,9 +602,9 @@ class BasePage(BasePageV1):
                 integrations=self._top_bar_integrations(),
                 run_intent=StopIntent() if is_running else RunIntent(),
                 cost_label=None if usage_active else (cost_label or None),
-                cost_href=None
-                if usage_active
-                else (self.get_credits_click_url() or None),
+                cost_href=(
+                    None if usage_active else (self.get_credits_click_url() or None)
+                ),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
                     GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else None
