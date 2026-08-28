@@ -1,4 +1,10 @@
 import type { NavWorkflowItem } from "@gooey-types/navigation_sidebar_props";
+import {
+  clearNavigationStateKey,
+  navigationStateWithout,
+} from "~/navigationState";
+
+const BUILDER_STATE_KEY = "builderIntent";
 
 // Opening a Builder chat from the rail is a one-time command, not a place the
 // user can link to, so it travels as Remix navigation state instead of a url
@@ -23,26 +29,12 @@ export function readBuilderIntent(state: unknown): BuilderIntent | null {
   return builderIntent;
 }
 
-// React Router stores `location.state` under `history.state.usr`. Remove only the
-// consumed Builder intent so layout-v2 navigation state survives regardless of
-// effect ordering.
 export function clearBuilderIntent() {
-  const historyState = window.history.state;
-  if (!historyState?.usr) return;
-  const nextUserState = navigationStateWithoutBuilderIntent(historyState.usr);
-  window.history.replaceState({ ...historyState, usr: nextUserState }, "");
+  clearNavigationStateKey(BUILDER_STATE_KEY);
 }
 
 export function navigationStateWithoutBuilderIntent(
   state: unknown
 ): Record<string, unknown> | null {
-  if (!state || typeof state !== "object") {
-    return null;
-  }
-  const nextState = { ...(state as Record<string, unknown>) };
-  delete nextState.builderIntent;
-  if (!Object.keys(nextState).length) {
-    return null;
-  }
-  return nextState;
+  return navigationStateWithout(state, BUILDER_STATE_KEY);
 }

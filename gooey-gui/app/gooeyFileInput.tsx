@@ -5,6 +5,7 @@ import { Dashboard } from "@uppy/react";
 import Url from "@uppy/url";
 import Webcam from "@uppy/webcam";
 import XHR from "@uppy/xhr-upload";
+import type { XHRUploadOptions } from "@uppy/xhr-upload";
 import mime from "mime-types";
 import { useEffect, useRef, useState } from "react";
 import type { TooltipPlacement } from "./components/GooeyTooltip";
@@ -204,6 +205,15 @@ function initializeUppy({
     .use(Url, { companionUrl: "/__/file-upload/" })
     .use(XHR, {
       endpoint: "/__/file-upload/",
+      // Retry only what a retry can fix. `@uppy/utils`' fetcher defaults to retrying every
+      // non-2xx three times, which turns a 413 or a 403 into four rejected uploads and a
+      // ~2s wait before the user is told. `shouldRetry` reaches the fetcher through the
+      // plugin's options, but @uppy/xhr-upload v3 leaves it out of XHRUploadOptions - hence
+      // the cast rather than a plain property.
+      ...({
+        shouldRetry: (xhr: XMLHttpRequest) =>
+          [408, 429, 502, 503].includes(xhr.status),
+      } as Partial<XHRUploadOptions>),
     })
     .on("file-added", onFileAdded)
     .on("upload-success", onFileUploaded)

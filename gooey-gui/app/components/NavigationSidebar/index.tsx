@@ -9,16 +9,16 @@ import type {
   NavigationSidebarProps,
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
-import { useAppShellPanel, useNavDrawer } from "~/appShellContext";
+import {
+  useAppShellPanel,
+  useIsNarrowViewport,
+  useNavDrawer,
+} from "~/appShellContext";
 import { AccountSection } from "./AccountSection";
 import { clearBuilderIntent, readBuilderIntent } from "./builderIntent";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
 import { PrimaryNavItems } from "./PrimaryNavItems";
-
-// Below this width the rail becomes an off-canvas drawer (matches the CSS
-// breakpoint in NavigationSidebar.css).
-const MOBILE_MEDIA_QUERY = "(max-width: 991.98px)";
 
 export function NavigationSidebar({
   logo_image_url,
@@ -46,7 +46,9 @@ export function NavigationSidebar({
   const [collapsed, setCollapsed] = useState(
     builderInitiallyOpen || default_collapsed
   );
-  const [isMobile, setIsMobile] = useState(false);
+  // Below this width the rail is an off-canvas drawer (the breakpoint the shell shares with
+  // NavigationSidebar.css).
+  const isMobile = useIsNarrowViewport();
   const mounted = useRef(false);
 
   const railCollapsed = !isMobile && collapsed;
@@ -84,19 +86,6 @@ export function NavigationSidebar({
       window.removeEventListener(`${builderEventKey}:changed`, onChanged);
     };
   }, [builderEventKey]);
-
-  useEffect(() => {
-    const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
-    const update = () => {
-      setIsMobile(mq.matches);
-      if (mq.matches) {
-        navDrawer.setOpen(false);
-      }
-    };
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
 
   // The mobile drawer covers the page, so navigating out of it has to close it:
   // a nav item, a history row, a link in the account menu. Taps that navigate

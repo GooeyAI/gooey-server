@@ -162,7 +162,6 @@
 /* One height and one box model for the right cluster. Height is set here and the vertical
    padding left off each control, so a border cannot change how tall a control is. */
 .gooey-topbar-integration,
-.gooey-topbar-overflow-btn,
 .gooey-topbar-publish,
 .gooey-topbar-run {
   box-sizing: border-box;
@@ -228,27 +227,10 @@
   color: var(--gooey-bg-page);
 }
 
+/* Positioning context for the Publish dropdown. */
 .gooey-topbar-overflow-wrap {
   position: relative;
   flex: 0 0 auto;
-}
-
-.gooey-topbar-overflow-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--topbar-control-h);
-  border: 1px solid var(--gooey-line-default);
-  border-radius: 9px;
-  background: var(--gooey-bg-page);
-  color: var(--gooey-ink);
-  font-size: 0.95rem;
-}
-
-.gooey-topbar-overflow-btn:hover {
-  background: var(--gooey-surface-50);
-  border-color: var(--gooey-line-strong);
-  color: var(--gooey-ink);
 }
 
 /* the cluster sits at the right edge, so its menu opens leftwards */
@@ -372,25 +354,6 @@ a.gooey-topbar-cost:hover {
 
 .gooey-topbar-menu-item:hover {
   background: var(--gooey-surface-50);
-}
-
-/* A section label, not a control. Its top rule is what separates the group. */
-.gooey-topbar-menu-heading {
-  margin-top: 6px;
-  padding: 8px 10px 4px;
-  border-top: 1px solid var(--gooey-line-soft);
-  color: var(--gooey-ink-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* nothing above it to separate from */
-.gooey-topbar-menu-heading:first-child {
-  margin-top: 0;
-  border-top: 0;
 }
 
 .gooey-topbar-menu-icon {
@@ -537,7 +500,6 @@ a.gooey-topbar-cost:hover {
 
   .gooey-topbar-publish,
   .gooey-topbar-run,
-  .gooey-topbar-overflow-btn,
   .gooey-topbar-integration {
     width: auto;
     height: auto;

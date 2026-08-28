@@ -10,7 +10,10 @@ import type {
   RecipeWorkspaceProps,
   RecipeWorkspaceTriggerProps,
 } from "@gooey-types/recipe_workspace_props";
-import { useWorkspaceLayout } from "~/appShellContext";
+import {
+  useWorkspaceLayout,
+  useWorkspaceLayoutActions,
+} from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
 import { RenderedChildren } from "~/renderer";
 import type { TreeNode } from "~/renderer";
@@ -18,6 +21,7 @@ import type { TreeNode } from "~/renderer";
 import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
   collapsePane,
+  type PaneRole,
   paneRolesForLayout,
   paneVisibility,
   workspaceControlsForLayout,
@@ -121,7 +125,7 @@ export function RecipeWorkspaceTrigger({
   className,
 }: CustomComponentProps & RecipeWorkspaceTriggerProps) {
   const config = useRecipeWorkspaceConfig();
-  const { selectLayout } = useWorkspaceLayout(config);
+  const { selectLayout } = useWorkspaceLayoutActions(config);
   const handleClick = () => {
     selectLayout(layout);
     if (state_update && state[state_update.key] !== state_update.value) {
@@ -160,7 +164,7 @@ function WorkspacePane({
   rightControls,
 }: {
   className: string;
-  role: "closed" | "solo" | "major" | "minor";
+  role: PaneRole;
   node: TreeNode;
   onChange: CustomComponentProps["onChange"];
   state: CustomComponentProps["state"];

@@ -5,8 +5,11 @@ import type {
   SurfaceId,
   WorkspaceView,
 } from "@gooey-types/recipe_workspace_props";
+import { clearNavigationStateKey } from "~/navigationState";
 
 export type WorkspaceLayout = SingleLayout | SplitLayout;
+
+const LAYOUT_STATE_KEY = "workspaceLayout";
 
 export type PersistedWorkspaceState = {
   version: 1;
@@ -75,23 +78,7 @@ export function workspaceLayoutFromNavigationState(
 }
 
 export function clearWorkspaceLayoutNavigationState() {
-  const historyState = window.history.state;
-  const userState = historyState?.usr;
-  if (
-    !userState ||
-    typeof userState !== "object" ||
-    !("workspaceLayout" in userState)
-  ) {
-    return;
-  }
-  const remainingUserState = {
-    ...(userState as Record<string, unknown>),
-  };
-  delete remainingUserState.workspaceLayout;
-  const nextUserState = Object.keys(remainingUserState).length
-    ? remainingUserState
-    : null;
-  window.history.replaceState({ ...historyState, usr: nextUserState }, "");
+  clearNavigationStateKey(LAYOUT_STATE_KEY);
 }
 
 export function revealRunLayout(
@@ -140,7 +127,7 @@ export function paneRolesForLayout(layout: WorkspaceLayout): PaneRoles {
   return roles;
 }
 
-export function viewForLayout(
+function viewForLayout(
   views: readonly WorkspaceView[],
   layout: WorkspaceLayout
 ): WorkspaceView | null {

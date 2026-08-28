@@ -2,6 +2,7 @@ import "./RecipeTopBar.css";
 
 import clsx from "clsx";
 import { Fragment, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type {
   LinkTarget,
   RecipeTopBarProps,
@@ -32,8 +33,6 @@ type MenuEntry = {
   iconHtml?: string | null;
   target?: TopBarTarget;
   isDanger?: boolean;
-  mobileOnly?: boolean;
-  heading?: boolean;
   onPick?: () => void;
 };
 
@@ -96,7 +95,6 @@ export function RecipeTopBar({
     builder_panel_key ? `${config.storage_key}:builder` : null
   );
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
-  const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
   const {
@@ -164,6 +162,7 @@ export function RecipeTopBar({
       builder.setOpen(open);
     }
   };
+  const closeBuilder = () => setBuilder(false);
 
   const goBack = () => {
     if (!config.workspace_active) {
@@ -191,7 +190,6 @@ export function RecipeTopBar({
   };
 
   const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
-  const overflowRef = useDismissOnOutsideClick(() => setOverflowOpen(false));
   const publishMenuRef = useDismissOnOutsideClick(() =>
     setPublishMenuOpen(false)
   );
@@ -236,39 +234,40 @@ export function RecipeTopBar({
   }
 
   const titleEntries = title_menu_items.map(menuEntryFromTopBarItem);
-  const overflowEntries: MenuEntry[] = [
-    ...publishEntries.map((it) => ({ ...it, mobileOnly: true })),
+
+  // Publish, Share, API, Deploy and the demo chips: everything the desktop bar shows as its
+  // own control, which below lg the sheet has to carry instead.
+  const deploymentEntries: SheetEntry[] = [
+    ...publishEntries.map(sheetEntryFromMenuEntry),
     ...(integrations.length
       ? [
           {
             key: "--topbar-heading-deployments",
             label: "Deployments",
-            mobileOnly: true,
             heading: true,
           },
         ]
       : []),
-    ...integrations.map((it) => ({
-      key: it.key,
-      label: it.label,
-      iconHtml: it.icon_html,
-      target: it.target,
-      mobileOnly: true,
-    })),
-  ];
+    ...integrations.map((it) =>
+      sheetEntryFromMenuEntry({
+        key: it.key,
+        label: it.label,
+        iconHtml: it.icon_html,
+        target: it.target,
+      })
+    ),
+    // picking any of these leaves the workspace, so the Builder panel closes behind it
+  ].map((entry) => ({ ...entry, onPick: entry.onPick ?? closeBuilder }));
+
+  const sheetEntryForView = (view: WorkspaceView): SheetEntry => ({
+    key: `--sheet-view-${view.key}`,
+    label: view.label,
+    iconHtml: view.icon_html ?? undefined,
+    onPick: () => showView(view),
+  });
   const viewEntry = (key: string): SheetEntry[] => {
     const view = config.views.find((candidate) => candidate.key === key);
-    if (!view) {
-      return [];
-    }
-    return [
-      {
-        key: `--sheet-view-${view.key}`,
-        label: view.label,
-        iconHtml: view.icon_html ?? undefined,
-        onPick: () => showView(view),
-      },
-    ];
+    return view ? [sheetEntryForView(view)] : [];
   };
 
   // Usage is a page, not a pane, so it is a link rather than a view - but it belongs in the
@@ -281,7 +280,7 @@ export function RecipeTopBar({
             label: "Usage",
             iconClass: "fa-regular fa-chart-line",
             href: usage_href,
-            onPick: () => setBuilder(false),
+            onPick: closeBuilder,
           },
         ]
       : [];
@@ -292,12 +291,7 @@ export function RecipeTopBar({
     ? [
         ...config.views
           .filter((view) => !view.desktop_only)
-          .map((view) => ({
-            key: `--sheet-view-${view.key}`,
-            label: view.label,
-            iconHtml: view.icon_html ?? undefined,
-            onPick: () => showView(view),
-          })),
+          .map(sheetEntryForView),
         ...usageEntry,
         ...(builder_panel_key
           ? [
@@ -331,36 +325,18 @@ export function RecipeTopBar({
                 label: "History",
                 iconClass: "fa-regular fa-clock-rotate-left",
                 href: history_href,
-                onPick: () => setBuilder(false),
+                onPick: closeBuilder,
               },
             ]
           : []),
         ...usageEntry,
-        ...titleEntries.map((item) => ({
-          key: item.key,
-          label: item.label,
-          iconHtml: item.iconHtml ?? undefined,
-          href: item.target?.kind === "link" ? item.target.href : undefined,
-          submitIntent:
-            item.target?.kind === "submit" ? item.target.intent : undefined,
-        })),
-        ...overflowEntries
-          .filter((item) => item.key !== PUBLISH_ITEM_KEY)
-          .map((item) => ({
-            key: item.key,
-            label: item.label,
-            iconHtml: item.iconHtml ?? undefined,
-            href: item.target?.kind === "link" ? item.target.href : undefined,
-            submitIntent:
-              item.target?.kind === "submit" ? item.target.intent : undefined,
-            heading: item.heading,
-            onPick: item.onPick ?? (() => setBuilder(false)),
-          })),
+        ...titleEntries.map(sheetEntryFromMenuEntry),
+        // Publish is the bar's own control below lg, beside the ... button
+        ...deploymentEntries.filter((item) => item.key !== PUBLISH_ITEM_KEY),
       ];
 
   const closeMenus = () => {
     setTitleMenuOpen(false);
-    setOverflowOpen(false);
     setPublishMenuOpen(false);
   };
 
@@ -464,7 +440,7 @@ export function RecipeTopBar({
                 "gooey-topbar-tab",
                 usage_active && "gooey-topbar-tab-active"
               )}
-              onClick={() => setBuilder(false)}
+              onClick={closeBuilder}
               aria-current={usage_active ? "page" : undefined}
             >
               <i className="fa-regular fa-chart-line gooey-topbar-tab-icon" />
@@ -528,28 +504,6 @@ export function RecipeTopBar({
                 )}
               </button>
             )}
-
-        {!!overflowEntries.length && (
-          <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
-            <button
-              type="button"
-              className="gooey-topbar-overflow-btn d-lg-none"
-              onClick={() => setOverflowOpen((v) => !v)}
-              title="More actions"
-              aria-label="More actions"
-              aria-haspopup="menu"
-              aria-expanded={overflowOpen}
-            >
-              <i className="fa-solid fa-ellipsis" />
-            </button>
-            <Menu
-              items={overflowEntries}
-              open={overflowOpen}
-              submitIntentKey={submit_intent_key}
-              onDismiss={closeMenus}
-            />
-          </div>
-        )}
 
         {/* At most one chip is labelled, none past two: the centred pill group leaves the
             right cluster half the bar's slack. Unlabelled chips keep their name in the
@@ -643,33 +597,12 @@ export function RecipeTopBar({
           </div>
         )}
 
-        {/* The tooltip names the price and appends any per-recipe note; a bare "$0.05"
-            read aloud in a row of controls means nothing. */}
-        {!!cost_label &&
-          (() => {
-            const costName = `Run cost: ${cost_label}`;
-            const costTip = cost_title
-              ? `${costName} (${cost_title})`
-              : costName;
-            return cost_href ? (
-              <a
-                className="gooey-topbar-cost"
-                href={cost_href}
-                title={costTip}
-                aria-label={costTip}
-              >
-                {cost_label}
-              </a>
-            ) : (
-              <span
-                className="gooey-topbar-cost"
-                title={costTip}
-                aria-label={costTip}
-              >
-                {cost_label}
-              </span>
-            );
-          })()}
+        <CostReadout
+          className="gooey-topbar-cost"
+          label={cost_label}
+          href={cost_href}
+          note={cost_title}
+        />
 
         {!!cost_label && (
           <span className="gooey-topbar-sep" aria-hidden="true">
@@ -677,27 +610,15 @@ export function RecipeTopBar({
           </span>
         )}
 
-        <button
-          type="submit"
-          name={submit_intent_key}
-          value={encodeSubmitIntent(run_intent)}
-          className={clsx(
-            "gooey-topbar-run",
-            isRunning && "gooey-topbar-run-stop"
-          )}
+        <RunButton
+          className="gooey-topbar-run"
+          stopClassName="gooey-topbar-run-stop"
+          isRunning={isRunning}
+          intent={run_intent}
+          submitIntentKey={submit_intent_key}
           onClick={handleRun}
-          title={isRunning ? "Stop this run" : "Run"}
-          aria-label={isRunning ? "Stop this run" : "Run"}
-        >
-          {isRunning ? (
-            <i className="fa-regular fa-xmark-large" />
-          ) : (
-            <i className="fa-solid fa-play" />
-          )}
-          <span className="gooey-topbar-btn-label">
-            {isRunning ? "Stop" : "Run"}
-          </span>
-        </button>
+          showLabel
+        />
       </div>
 
       {/* The editor's bottom bar, below lg only - above it cost and Run sit in the right
@@ -706,56 +627,22 @@ export function RecipeTopBar({
           Ask Gooey covers the workspace without changing which view is selected behind it. */}
       {!atRoot && activeViewSpec?.key === "edit" && (
         <div className="gooey-topbar-runbar d-lg-none">
-          {!!cost_label &&
-            (() => {
-              const costName = `Run cost: ${cost_label}`;
-              const costTip = cost_title
-                ? `${costName} (${cost_title})`
-                : costName;
-              const inner = (
-                <>
-                  <span className="gooey-topbar-runbar-est">Est.</span>
-                  {cost_label}
-                </>
-              );
-              return cost_href ? (
-                <a
-                  className="gooey-topbar-runbar-cost"
-                  href={cost_href}
-                  title={costTip}
-                  aria-label={costTip}
-                >
-                  {inner}
-                </a>
-              ) : (
-                <span
-                  className="gooey-topbar-runbar-cost"
-                  title={costTip}
-                  aria-label={costTip}
-                >
-                  {inner}
-                </span>
-              );
-            })()}
+          <CostReadout
+            className="gooey-topbar-runbar-cost"
+            label={cost_label}
+            href={cost_href}
+            note={cost_title}
+            prefix={<span className="gooey-topbar-runbar-est">Est.</span>}
+          />
 
-          <button
-            type="submit"
-            name={submit_intent_key}
-            value={encodeSubmitIntent(run_intent)}
-            className={clsx(
-              "gooey-topbar-runbar-run",
-              isRunning && "gooey-topbar-runbar-run-stop"
-            )}
+          <RunButton
+            className="gooey-topbar-runbar-run"
+            stopClassName="gooey-topbar-runbar-run-stop"
+            isRunning={isRunning}
+            intent={run_intent}
+            submitIntentKey={submit_intent_key}
             onClick={handleRun}
-            title={isRunning ? "Stop this run" : "Run"}
-            aria-label={isRunning ? "Stop this run" : "Run"}
-          >
-            {isRunning ? (
-              <i className="fa-regular fa-xmark-large" />
-            ) : (
-              <i className="fa-solid fa-play" />
-            )}
-          </button>
+          />
         </div>
       )}
 
@@ -770,6 +657,89 @@ export function RecipeTopBar({
   );
 }
 
+/** The run price, as a link to the billing page when there is one to link to.
+ *
+ * The tooltip names the price and appends any per-recipe note: a bare "$0.05" read aloud in
+ * a row of controls means nothing. */
+function CostReadout({
+  className,
+  label,
+  href,
+  note,
+  prefix,
+}: {
+  className: string;
+  label?: string | null;
+  href?: string | null;
+  note?: string | null;
+  prefix?: ReactNode;
+}) {
+  if (!label) return null;
+  const name = `Run cost: ${label}`;
+  const tip = note ? `${name} (${note})` : name;
+  const content = (
+    <>
+      {prefix}
+      {label}
+    </>
+  );
+  return href ? (
+    <a className={className} href={href} title={tip} aria-label={tip}>
+      {content}
+    </a>
+  ) : (
+    <span className={className} title={tip} aria-label={tip}>
+      {content}
+    </span>
+  );
+}
+
+/** Run, or Stop while a run is in flight. Rendered twice - once in the bar's right cluster
+ *  above lg, once in the editor's bottom bar below it - so the two cannot drift apart. */
+function RunButton({
+  className,
+  stopClassName,
+  isRunning,
+  intent,
+  submitIntentKey,
+  onClick,
+  showLabel = false,
+}: {
+  className: string;
+  stopClassName: string;
+  isRunning: boolean;
+  intent: RecipeTopBarProps["run_intent"];
+  submitIntentKey: string;
+  onClick: () => void;
+  showLabel?: boolean;
+}) {
+  const name = isRunning ? "Stop this run" : "Run";
+  return (
+    <button
+      type="submit"
+      name={submitIntentKey}
+      value={encodeSubmitIntent(intent)}
+      className={clsx(className, isRunning && stopClassName)}
+      onClick={onClick}
+      title={name}
+      aria-label={name}
+    >
+      {isRunning ? (
+        <i className="fa-regular fa-xmark-large" />
+      ) : (
+        <i className="fa-solid fa-play" />
+      )}
+      {showLabel && (
+        <span className="gooey-topbar-btn-label">
+          {isRunning ? "Stop" : "Run"}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** A dropdown under the title or the Publish button. Above lg only: below it the same
+ *  actions are listed by `MobileActionSheet` instead. */
 function Menu({
   items,
   open,
@@ -785,25 +755,14 @@ function Menu({
   return (
     <div className="gooey-topbar-menu">
       {items.map((item) =>
-        item.heading ? (
-          <div
-            key={item.key}
-            className={clsx(
-              "gooey-topbar-menu-heading",
-              item.mobileOnly && "d-lg-none"
-            )}
-          >
-            {item.label}
-          </div>
-        ) : item.target?.kind === "link" ? (
+        item.target?.kind === "link" ? (
           <Link
             key={item.key}
             to={item.target.href}
             onClick={onDismiss}
             className={clsx(
               "gooey-topbar-menu-item",
-              item.isDanger && "text-danger",
-              item.mobileOnly && "d-lg-none"
+              item.isDanger && "text-danger"
             )}
           >
             <Icon
@@ -824,8 +783,7 @@ function Menu({
             }
             className={clsx(
               "gooey-topbar-menu-item",
-              item.isDanger && "text-danger",
-              item.mobileOnly && "d-lg-none"
+              item.isDanger && "text-danger"
             )}
             onClick={() => {
               item.onPick?.();
@@ -856,14 +814,33 @@ function Icon({ html, className }: { html?: string; className?: string }) {
 
 function useDismissOnOutsideClick(onDismiss: () => void) {
   const ref = useRef<HTMLDivElement>(null);
+  // Held in a ref so the listener is bound once. Callers pass an inline closure, which is a
+  // new function every render, and depending on it directly would tear the listener down
+  // and rebuild it on each one.
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
   useEffect(() => {
     const handle = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onDismissRef.current();
+      }
     };
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
-  }, [onDismiss]);
+  }, []);
   return ref;
+}
+
+function sheetEntryFromMenuEntry(item: MenuEntry): SheetEntry {
+  return {
+    key: item.key,
+    label: item.label,
+    iconHtml: item.iconHtml ?? undefined,
+    href: item.target?.kind === "link" ? item.target.href : undefined,
+    submitIntent:
+      item.target?.kind === "submit" ? item.target.intent : undefined,
+    onPick: item.onPick,
+  };
 }
 
 function menuEntryFromTopBarItem(item: TopBarMenuItem): MenuEntry {

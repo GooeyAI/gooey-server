@@ -42,6 +42,7 @@ type AppShellContextValue = {
   setPanelOpen: (key: string, open: boolean) => void;
   navDrawerOpen: boolean;
   setNavDrawerOpen: (open: boolean) => void;
+  isNarrow: boolean;
 };
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
@@ -55,6 +56,20 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   );
   const [panels, setPanels] = useState<Record<string, PanelEntry>>({});
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+
+  // One matchMedia subscription for the whole shell. Every consumer of the breakpoint - the
+  // top bar, the workspace, the nav rail - reads this, so they cannot disagree about which
+  // side of it the viewport is on, and none of them binds a listener of its own.
+  // False until mounted: the server cannot know the viewport, and the panes stay hidden
+  // until hydration anyway.
+  const [isNarrow, setIsNarrow] = useState(false);
+  useHydrationEffect(() => {
+    const wide = window.matchMedia(WIDE_QUERY);
+    const sync = () => setIsNarrow(!wide.matches);
+    sync();
+    wide.addEventListener("change", sync);
+    return () => wide.removeEventListener("change", sync);
+  }, []);
 
   const setWorkspace = useCallback((key: string, entry: WorkspaceEntry) => {
     setWorkspaces((current) => ({ ...current, [key]: entry }));
@@ -101,6 +116,7 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
         setPanelOpen,
         navDrawerOpen,
         setNavDrawerOpen,
+        isNarrow,
       }}
     >
       {children}
@@ -108,17 +124,47 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useWorkspaceLayout(config: PageShellConfig) {
+/** The current state of one workspace, and the one way to change it.
+ *
+ * Read-and-write, but it does not hydrate: a component that only needs to switch the layout
+ * (a deep link, a card that opens a pane) uses this and leaves the reading of storage and
+ * navigation state to the components that own the workspace. */
+export function useWorkspaceLayoutActions(config: PageShellConfig) {
   const context = useAppShellContext();
-  const location = useLocation();
   const entry = context.workspaces[config.storage_key];
-  const fallback: PersistedWorkspaceState = {
+  const current: PersistedWorkspaceState = entry?.value ?? {
     version: 1,
     layout: config.route_layout ?? config.initial_layout,
     handled_run_id: null,
   };
-  const current = entry?.value ?? fallback;
-  const [isNarrow, setIsNarrow] = useState(false);
+
+  const selectLayout = useCallback(
+    (layout: WorkspaceLayout) => {
+      const next = { ...current, layout };
+      persistWorkspaceState(config.storage_key, next);
+      context.setWorkspace(config.storage_key, {
+        value: next,
+        hydrated: true,
+        hydrationToken: entry?.hydrationToken ?? "",
+        hadStoredLayout: true,
+      });
+    },
+    [config.storage_key, context, current, entry?.hydrationToken]
+  );
+
+  return { entry, current, selectLayout };
+}
+
+/** The full workspace hook: everything `useWorkspaceLayoutActions` gives, plus the effect
+ *  that seeds the layout from storage, the url and navigation state on each navigation.
+ *
+ *  Only the components that render the workspace itself - the top bar and the pane grid -
+ *  should call this. */
+export function useWorkspaceLayout(config: PageShellConfig) {
+  const context = useAppShellContext();
+  const location = useLocation();
+  const { entry, current, selectLayout } = useWorkspaceLayoutActions(config);
+  const isNarrow = context.isNarrow;
 
   useHydrationEffect(() => {
     const hydrationToken = [
@@ -145,29 +191,7 @@ export function useWorkspaceLayout(config: PageShellConfig) {
     if (workspaceLayoutNavigationStatePresent(location.state)) {
       clearWorkspaceLayoutNavigationState();
     }
-    setIsNarrow(!window.matchMedia(WIDE_QUERY).matches);
   }, [config.storage_key, config.active_run_id, location.key, location.state]);
-
-  useEffect(() => {
-    const wide = window.matchMedia(WIDE_QUERY);
-    const sync = () => setIsNarrow(!wide.matches);
-    wide.addEventListener("change", sync);
-    return () => wide.removeEventListener("change", sync);
-  }, []);
-
-  const selectLayout = useCallback(
-    (layout: WorkspaceLayout) => {
-      const next = { ...current, layout };
-      persistWorkspaceState(config.storage_key, next);
-      context.setWorkspace(config.storage_key, {
-        value: next,
-        hydrated: true,
-        hydrationToken: entry?.hydrationToken ?? "",
-        hadStoredLayout: true,
-      });
-    },
-    [config.storage_key, context, current]
-  );
 
   return {
     layout: foldForNarrowViewport(
@@ -236,6 +260,12 @@ export function useAppShellPanel(
     hydrated: Boolean(matchesStorage && entry?.hydrated),
     setOpen,
   };
+}
+
+/** True below the shell's breakpoint, where the rail becomes a drawer and split panes fold
+ *  to one. Backed by the provider's single matchMedia subscription. */
+export function useIsNarrowViewport(): boolean {
+  return useAppShellContext().isNarrow;
 }
 
 export function useNavDrawer() {
