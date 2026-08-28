@@ -64,6 +64,13 @@ INVALID_INPUT_FORMAT = (
     "⚠️ Sorry! I don't understand {} messsages. Please try with text or audio."
 )
 
+THINKING_HIDDEN_PLATFORMS = {
+    Platform.WHATSAPP,
+    Platform.SLACK,
+    Platform.TELEGRAM,
+    Platform.TWILIO,
+}
+
 
 ERROR_MSG = """
 ⚠️ Sorry, I ran into an error while processing your request. Please try again, or send "Reset" to start over.
@@ -235,6 +242,8 @@ class BotInterface:
         self,
         *,
         text: str | None = None,
+        buttons: list[ReplyButton] | None = None,
+        parsed: bool = False,
         audio: list[str] | None = None,
         video: list[str] | None = None,
         send_feedback_buttons: bool = False,
@@ -246,6 +255,9 @@ class BotInterface:
         Send a message response to the user using the bot's platform API
 
         :param text: The text to send
+        :param buttons: The buttons to send, already parsed by the caller
+        :param parsed: Whether text & buttons already went through parse_bot_html() -
+            parsing twice re-interprets escaped markup as real markup
         :param audio: The audio URL to send
         :param video: The video URL to send
         :param send_feedback_buttons: Whether to send feedback buttons with the message
@@ -258,9 +270,12 @@ class BotInterface:
         if should_translate:
             text = self.translate_response(text)
 
-        buttons, text, thinking, disable_feedback = parse_bot_html(text)
-        if disable_feedback:
-            send_feedback_buttons = False
+        if parsed:
+            buttons = buttons or []
+        else:
+            buttons, text, thinking, disable_feedback = parse_bot_html(text)
+            if disable_feedback:
+                send_feedback_buttons = False
 
         if buttons and send_feedback_buttons and self.platform != Platform.SLACK:
             update_msg_id = self._send_msg(
@@ -543,7 +558,10 @@ def _process_and_send_msg(
 
     update_msg_id = None  # this is the message id to update during streaming
     sent_msg_id = None  # this is the message id to record in the db
-    last_idx = 0  # this is the last index of the text sent to the user
+    last_idx = 0  # how much of the text the user has already been sent
+    prev_len = 0  # length of the text in the previous update
+    buttons_sent = False  # did the buttons go out with the last chunk
+    hide_thinking = bot.platform in THINKING_HIDDEN_PLATFORMS
     prev_final_prompt = []  # this is the last final_prompt sent to the user
     if bot.streaming_enabled:
         # subscribe to the realtime channel for updates
@@ -569,31 +587,66 @@ def _process_and_send_msg(
                     )
                 prev_final_prompt = final_prompt
 
-                text = state.get("output_text") and state.get("output_text")[0]
-                if not text:
+                # strip to match the recipe's end-of-run strip - last_idx must
+                # index the same text the final send slices, or chars get eaten
+                text = ((state.get("output_text") or [None])[0] or "").strip()
+                buttons = None
+                if hide_thinking:
+                    # parse before slicing, so a delta can't start inside <think>
+                    buttons, text, _, disable_feedback = parse_bot_html(text)
+                    if disable_feedback:
+                        send_feedback_buttons = False
+                if not text.strip():
+                    # whitespace is truthy but shows as an empty message
                     # if no text, send the run status as text
                     update_msg_id = bot.send_run_status(
                         update_msg_id=update_msg_id, references=state.get("references")
                     )
                     continue  # no text, wait for the next update
                 streaming_done = state.get("finish_reason")
+                if not streaming_done:
+                    # a half-streamed <button> parses as a complete one with a
+                    # truncated title - only send them once the run is done
+                    buttons = None
                 # send the response to the user
                 if bot.can_update_message:
+                    # the whole text is re-sent each time, so the buttons the final
+                    # send adds always land on a message with a body
                     update_msg_id = bot.send_msg(
                         text=text.strip() + "...",
+                        parsed=hide_thinking,
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
-                    last_idx = len(text)
+                    # NOTE: load-bearing - the platform can downgrade to
+                    # can_update_message=False mid-run, and the delta resumes here
+                    last_idx = prev_len = len(text)
                 else:
-                    next_chunk = text[last_idx:]
-                    last_idx = len(text)
-                    if not next_chunk:
-                        continue  # no chunk, wait for the next update
+                    if streaming_done or not hide_thinking:
+                        # nothing held back once the buttons aren't either
+                        end = len(text)
+                    else:
+                        # hold the newest delta back, so the buttons have a body to
+                        # ride out with when the run finishes
+                        end = prev_len
+                    next_chunk = text[last_idx:end]
+                    if not last_idx:
+                        # starts the answer, so leading blank lines are padding
+                        next_chunk = next_chunk.lstrip()
+                    prev_len = len(text)
+                    if not (next_chunk.strip() or buttons):
+                        # last_idx stays put, so the whitespace goes out with the
+                        # next real text instead of as a message of its own
+                        continue
+                    last_idx = end
                     update_msg_id = bot.send_msg(
-                        text=next_chunk,
+                        text=next_chunk or None,
+                        buttons=buttons,
+                        parsed=hide_thinking,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
                     )
+                    if buttons is not None:
+                        buttons_sent = True
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
                     sent_msg_id = update_msg_id
@@ -614,21 +667,41 @@ def _process_and_send_msg(
         bot.send_msg(text=ERROR_MSG.format(err_msg))
         return
 
-    text = state.get("output_text") and state.get("output_text")[0]
+    # same read as the streaming loop above - [] must come back as "", not as a
+    # list, and the strip has to match or last_idx indexes the wrong text
+    text = ((state.get("output_text") or [None])[0] or "").strip()
+    buttons = None
+    disable_feedback = False
+    if hide_thinking:
+        buttons, text, _, disable_feedback = parse_bot_html(text)
+        if buttons_sent:
+            # already sent with the last chunk
+            buttons = []
+    if disable_feedback:
+        send_feedback_buttons = False
     audio = state.get("output_audio")
     video = state.get("output_video")
     documents = state.get("output_documents")
     # check for empty response
-    if not (text or audio or video or documents or send_feedback_buttons):
+    if not (text or buttons or audio or video or documents or send_feedback_buttons):
         bot.send_msg(text=DEFAULT_RESPONSE)
         return
     # if in-place updates are enabled, update the message, otherwise send the remaining text
     if text and not bot.can_update_message:
         text = text[last_idx:]
+    if hide_thinking:
+        # removing the thinking leaves its blank lines behind as padding
+        text = (text or "").rstrip()
+        if bot.can_update_message or not last_idx:
+            # only when this starts the answer - otherwise it's the remainder, and
+            # its leading space joins it to what was already sent
+            text = text.lstrip()
     # send the response to the user if there is any remaining
-    if text or audio or video or documents or send_feedback_buttons:
+    if text or buttons or audio or video or documents or send_feedback_buttons:
         update_msg_id = bot.send_msg(
             text=text or None,
+            buttons=buttons,
+            parsed=hide_thinking,
             audio=audio or None,
             video=video or None,
             documents=documents or None,
