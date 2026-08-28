@@ -70,11 +70,17 @@ from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspaceProps,
     WorkspacePaneControlProps,
 )
+from daras_ai_v2.urls import paginate_queryset
+from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
+from widgets.history import history_href_for_workflow, load_more_href
 from widgets.publish_form import clear_publish_form
 from widgets.sidebar import sidebar_layout
+from widgets.workflow_cards import author_from_user, history_card
 from widgets.workflow_share import render_share_modal
 from workspaces.models import Workspace
+
+RUN_GRID_PAGE_SIZE = 24
 
 
 def format_credits_as_dollars(credits: int) -> str:
@@ -326,6 +332,12 @@ class BasePage(BasePageV1):
         )
 
     def _handle_top_bar_actions(self):
+        if self.tab == RecipeTabs.usage:
+            # nothing on this tab submits, and a stale key from the workspace would fire
+            # against a run the reader is not looking at
+            gui.session_state.pop(self.SUBMIT_INTENT_KEY, None)
+            return
+
         intent = self._pop_submit_intent()
         publish_ref = gui.use_alert_dialog(key="publish-modal")
 
@@ -589,6 +601,8 @@ class BasePage(BasePageV1):
 
         is_running = self._is_run_in_progress()
 
+        usage_active = self.tab == RecipeTabs.usage
+
         gui.model_component(
             RecipeTopBarProps(
                 config=config,
@@ -610,9 +624,9 @@ class BasePage(BasePageV1):
                 title_menu_items=self._title_menu_items(),
                 integrations=self._top_bar_integrations(),
                 run_intent=StopIntent() if is_running else RunIntent(),
-                cost_label=cost_label or None,
-                cost_href=self.get_credits_click_url() or None,
-                cost_title=cost_title or None,
+                cost_label=None if usage_active else (cost_label or None),
+                cost_href=None if usage_active else (self.get_credits_click_url() or None),
+                cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
                     GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else None
                 ),
@@ -621,7 +635,15 @@ class BasePage(BasePageV1):
                     if self._can_show_builder() and not builder_thread_is_empty(self)
                     else None
                 ),
-                history_href=self.current_app_url(RecipeTabs.history),
+                history_href=history_href_for_workflow(self.workflow),
+                # a route rather than a pane, and empty for anyone who cannot read the
+                # workflow's run data
+                usage_href=(
+                    self.current_app_url(RecipeTabs.usage)
+                    if self.can_view_usage()
+                    else None
+                ),
+                usage_active=usage_active,
             )
         )
 
@@ -838,12 +860,74 @@ class BasePage(BasePageV1):
             case RecipeTabs.history:
                 self._history_tab()
 
+            case RecipeTabs.usage:
+                self._usage_tab()
+
             case RecipeTabs.run_as_api:
                 with gui.div(className="v2-reading-col"):
                     self.run_as_api_tab()
 
             case RecipeTabs.saved:
                 self._saved_tab()
+
+    def _usage_tab(self):
+        # the bar only offers this tab to those who can read it, so anyone arriving without
+        # the right is doing it by URL - `is_user_authorized` cannot answer for them, since a
+        # public app is viewable by anyone while its run list is not
+        if not self.can_view_usage():
+            self.render_unauthorized(owner_workspace=self._usage_workspace())
+            return
+
+        qs = SavedRun.objects.filter(
+            workflow=self.workflow,
+            workspace=self._usage_workspace(),
+            parent_version__published_run=self.current_pr,
+        ).select_related(
+            "parent_version__published_run",
+            "workflow_metadata",
+            "created_by",
+            "message_thread__bot_conversation",
+        )
+        runs, next_cursor = paginate_queryset(
+            qs=qs,
+            ordering=["-updated_at"],
+            cursor=self.request.query_params,
+            page_size=RUN_GRID_PAGE_SIZE,
+        )
+        gui.model_component(
+            RunGridProps(
+                cards=[
+                    history_card(
+                        sr, author=author_from_user(sr.created_by, self.request.user)
+                    )
+                    for sr in runs
+                ],
+                load_more_href=load_more_href(self.request, next_cursor),
+                empty_message="No usage yet.",
+            )
+        )
+
+    def can_view_usage(self) -> bool:
+        """The tab lists one workspace's runs, so seeing it means belonging to that workspace.
+
+        Deliberately not "owns the current run": a run of somebody else's app belongs to the
+        viewer, but the list it unlocks is scoped to the app's workspace, not theirs. The
+        publisher and the workspace members are the same people as `cached_workspaces`, so
+        there is nothing left for a `created_by` clause to admit.
+        """
+        user = self.request.user
+        if self.is_user_admin(user):
+            return True
+        if not user or user.is_anonymous:
+            return False
+        return self._usage_workspace() in user.cached_workspaces
+
+    def _usage_workspace(self) -> Workspace:
+        """Whose runs the tab lists: the app's workspace, or the viewer's on a root recipe."""
+        published_run = self.current_pr
+        if not published_run.is_root() and published_run.workspace_id:
+            return published_run.workspace
+        return self.current_workspace
 
     def render_related_workflows(self):
         page_clses = self.related_workflows()

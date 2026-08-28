@@ -416,7 +416,39 @@ def api_route(
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
+    from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+    from widgets.history import history_href_for_workflow
+
+    normalized_slug = normalize_slug(page_slug)
+    page_cls = page_slug_map.get(normalized_slug)
+    if page_cls and can_use_layout_v2(request):
+        # a v2 fork keeps this tab, renamed Usage
+        if normalized_slug in page_slug_map_v2:
+            return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
+        # otherwise v2 has one History for every recipe - 302, since which page you get
+        # depends on the user
+        return RedirectResponse(
+            history_href_for_workflow(page_cls.workflow), status_code=302
+        )
     return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
+
+
+@gui.route(
+    app,
+    "/{page_slug}/usage/",
+    "/{page_slug}/{run_slug}/usage/",
+    "/{page_slug}/{run_slug}-{example_id}/usage/",
+)
+def usage_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+
+    if not can_use_layout_v2(request):
+        raise HTTPException(status_code=404)
+    return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
 
 
 @gui.route(
@@ -921,6 +953,11 @@ class RecipeTabs(TabData, Enum):
         title=f"{icons.history} History",
         label="History",
         route=history_route,
+    )
+    usage = TabData(
+        title='<i class="fa-regular fa-chart-line"></i> Usage',
+        label="Usage",
+        route=usage_route,
     )
     integrations = TabData(
         title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Deploy',

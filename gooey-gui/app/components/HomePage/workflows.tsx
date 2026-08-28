@@ -9,6 +9,8 @@ import type {
   ChatPreview,
   IconPreview,
   MediaPreview,
+  RunStatusData,
+  SenderData,
   WorkflowCardData,
   WorkflowTabData,
 } from "@gooey-types/home_page_props";
@@ -16,6 +18,40 @@ import type {
 import { GooeyTooltip } from "../GooeyTooltip";
 
 export type CardPreview = ChatPreview | MediaPreview | IconPreview;
+
+function CardRunStatus({ runStatus }: { runStatus: RunStatusData }) {
+  return (
+    // sits opposite the workflow icon, so neither badge covers the other
+    <span
+      className={`recent-card-run-status recent-card-run-status--${runStatus.state} position-absolute top-0 end-0 m-2 shadow-sm`}
+    >
+      {/* the same two markers BulkProgressCard uses for these states */}
+      {runStatus.state === "cancelled" ? (
+        <i className="fa-solid fa-circle-stop" aria-hidden="true" />
+      ) : (
+        <span className="recent-card-run-status-dot" />
+      )}
+      <span className="text-truncate">{runStatus.label}</span>
+    </span>
+  );
+}
+
+function CardSender({ sender }: { sender: SenderData }) {
+  return (
+    <span className="d-inline-flex align-items-center gap-2 min-w-0 text-muted">
+      <span
+        className="flex-shrink-0 d-inline-flex align-items-center"
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: sender.icon }}
+      />
+      {sender.label && (
+        <span className="card-byline-name text-break text-truncate">
+          {sender.label}
+        </span>
+      )}
+    </span>
+  );
+}
 
 function CardAuthor({ author }: { author: AuthorData | null }) {
   if (!author?.photo_url && !author?.name) return null;
@@ -29,7 +65,9 @@ function CardAuthor({ author }: { author: AuthorData | null }) {
         />
       )}
       {author?.name && (
-        <span className="text-break text-truncate">{author?.name}</span>
+        <span className="card-byline-name text-break text-truncate">
+          {author?.name}
+        </span>
       )}
     </span>
   );
@@ -117,7 +155,12 @@ export function PreviewContent({ preview }: { preview: CardPreview }) {
 }
 
 export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
-  const hasAuthor = !!(card.author?.photo_url || card.author?.name);
+  // a sender always renders - its icon carries the platform even with no label
+  const hasByline = !!(
+    card.sender ||
+    card.author?.photo_url ||
+    card.author?.name
+  );
   return (
     <a
       href={card.href}
@@ -125,23 +168,28 @@ export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
     >
       <div className="position-relative recent-card-preview bg-light p-0">
         {card.workflow_icon && (
-          <span className="badge bg-white text-body rounded-pill px-2 py-1 small d-inline-flex align-items-center gap-1 fw-normal position-absolute top-0 start-0 m-2 shadow-lg z-1">
+          <span className="recent-card-workflow-badge badge bg-white text-body rounded-pill px-2 py-1 small d-inline-flex align-items-center gap-1 fw-normal position-absolute top-0 start-0 m-2 shadow-lg">
             <span
               aria-hidden="true"
               dangerouslySetInnerHTML={{ __html: card.workflow_icon }}
             />
           </span>
         )}
+        {card.run_status && <CardRunStatus runStatus={card.run_status} />}
         {card.preview && <PreviewContent preview={card.preview} />}
       </div>
 
       <div className="d-flex flex-column p-3 gap-2 border-top">
-        <span className="text-break text-truncate line-clamp-1 m-0">
+        <span className="bold text-break text-truncate line-clamp-1 m-0">
           {card.title}
         </span>
-        <div className="d-flex align-items-center gap-1 small">
-          <CardAuthor author={card.author} />
-          {hasAuthor && card.updated_at && <span>·</span>}
+        <div className="history-card-byline d-flex align-items-center gap-1 small">
+          {card.sender ? (
+            <CardSender sender={card.sender} />
+          ) : (
+            <CardAuthor author={card.author} />
+          )}
+          {hasByline && card.updated_at && <span>·</span>}
           {card.updated_at && (
             <span className="text-nowrap text-muted">{card.updated_at}</span>
           )}

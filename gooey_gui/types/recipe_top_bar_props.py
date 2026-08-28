@@ -123,6 +123,10 @@ class RecipeTopBarProps(StrictComponentModel):
     builder_panel_key: str | None = None
     builder_new_event: str | None = None
     history_href: str | None = None
+    # Usage is a route rather than a client-side pane, but it shares the bar's view
+    # selector. None hides it for viewers who cannot inspect the workflow's run data.
+    usage_href: str | None = None
+    usage_active: bool = False
 
     run_intent: RunControlIntent
     cost_label: str | None = None

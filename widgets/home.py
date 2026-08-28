@@ -118,7 +118,9 @@ def _load_recent_workflows(
     return [
         history_card(sr, author=author_from_user(user, current_user=user))
         for sr in SavedRun.objects.select_related(
-            "parent_version__published_run", "workflow_metadata"
+            "parent_version__published_run",
+            "workflow_metadata",
+            "message_thread__bot_conversation",
         )
         .filter(id__in=ids)
         .order_by("-updated_at")

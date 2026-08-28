@@ -77,6 +77,8 @@ export interface RecipeTopBarProps {
   builder_panel_key: string | null;
   builder_new_event: string | null;
   history_href: string | null;
+  usage_href: string | null;
+  usage_active: boolean;
   run_intent: RunIntent | StopIntent;
   cost_label: string | null;
   cost_href: string | null;

@@ -346,6 +346,33 @@ button .gui-html-container,
   --gooey-radius-full: 99px; /* radius/full - avatars, grab handle */
 }
 
+/* Run state, as the history card's status pill reports it (HomePage.css). The warn and
+   error values are BulkProgressCard's, so a cancelled or failed run reads the same in both
+   places; that card deliberately keeps its own copy of them for now, so the two are kept in
+   step by hand until it is converted. Only the pill's values are tokens - a token nothing
+   references is a claim the codebase has not earned. */
+:root {
+  --gooey-status-ink: #070b1a;      /* settled states - queued, completed, neutral text */
+  --gooey-status-muted: #59617d;    /* captions, and the "starting" accent */
+  --gooey-status-line: #e4e4e7;     /* the neutral card/pill border */
+
+  /* in-flight, in the brand cyan (the spinner accent in custom.css). The cyan itself
+     is the marker; text uses the darkened -ink, which the cyan is far too light to do
+     legibly at 0.75rem on its own tint. */
+  --gooey-status-running: #03dac5;
+  --gooey-status-running-ink: #0a6d63;
+  --gooey-status-running-bg: #e6faf7;
+  --gooey-status-running-line: #a6ebe2;
+
+  --gooey-status-warn: #9d7b1f;     /* cancelled / stopped */
+  --gooey-status-warn-bg: #fff7d8;
+  --gooey-status-warn-line: #f0dc92;
+
+  --gooey-status-error: #b42318;    /* failed */
+  --gooey-status-error-bg: #fff4f2;
+  --gooey-status-error-line: #f5b8b0;
+}
+
 :root {
   --sidebar_open_width: 460px;
   --sidebar_closed_width: 0;

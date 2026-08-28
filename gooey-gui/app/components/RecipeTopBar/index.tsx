@@ -67,6 +67,8 @@ export function RecipeTopBar({
   builder_panel_key,
   builder_new_event,
   history_href,
+  usage_href,
+  usage_active,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
   const [shareCopied, setShareCopied] = useState(false);
@@ -269,6 +271,21 @@ export function RecipeTopBar({
     ];
   };
 
+  // Usage is a page, not a pane, so it is a link rather than a view - but it belongs in the
+  // same list the panes do. Hidden while you are already looking at it.
+  const usageEntry: SheetEntry[] =
+    usage_href && !usage_active
+      ? [
+          {
+            key: "--sheet-usage",
+            label: "Usage",
+            iconClass: "fa-regular fa-chart-line",
+            href: usage_href,
+            onPick: () => setBuilder(false),
+          },
+        ]
+      : [];
+
   const otherWorkView = activeViewSpec?.key === "edit" ? "preview" : "edit";
 
   const sheetEntries: SheetEntry[] = view_only
@@ -281,6 +298,7 @@ export function RecipeTopBar({
             iconHtml: view.icon_html ?? undefined,
             onPick: () => showView(view),
           })),
+        ...usageEntry,
         ...(builder_panel_key
           ? [
               {
@@ -317,6 +335,7 @@ export function RecipeTopBar({
               },
             ]
           : []),
+        ...usageEntry,
         ...titleEntries.map((item) => ({
           key: item.key,
           label: item.label,
@@ -414,8 +433,8 @@ export function RecipeTopBar({
         </div>
       </div>
 
-      {/* A single-view recipe does not need a selector. */}
-      {config.views.length > 1 && (
+      {/* A single-view recipe does not need a selector unless Usage is available. */}
+      {(config.views.length > 1 || !!usage_href) && (
         <div
           className="gooey-topbar-tabs"
           style={{ visibility: paneVisibility(hydrated) }}
@@ -438,6 +457,20 @@ export function RecipeTopBar({
               {view.label}
             </button>
           ))}
+          {usage_href && (
+            <Link
+              to={usage_href}
+              className={clsx(
+                "gooey-topbar-tab",
+                usage_active && "gooey-topbar-tab-active"
+              )}
+              onClick={() => setBuilder(false)}
+              aria-current={usage_active ? "page" : undefined}
+            >
+              <i className="fa-regular fa-chart-line gooey-topbar-tab-icon" />
+              Usage
+            </Link>
+          )}
         </div>
       )}
 

@@ -372,6 +372,7 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
     "api",
     "examples",
     "history",
+    "usage",
     "saved",
     "integrations",
     # other

@@ -22,6 +22,7 @@ import { LoginForm } from "./components/LoginForm";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { PaymentRequired } from "./components/PaymentRequired";
 import { RecipeTopBar } from "./components/RecipeTopBar";
+import { RunGrid } from "./components/RunGrid";
 import {
   RecipeSurface,
   RecipeWorkspace,
@@ -65,6 +66,7 @@ export const customComponentRegistry = {
   LoginForm,
   NavigationSidebar,
   PaymentRequired,
+  RunGrid,
   ...generatedV2Components,
   ToolPage,
   WorkspaceMemoryTable,
