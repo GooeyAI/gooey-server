@@ -121,3 +121,39 @@ def _merge_recent_run_ids(
 
     picked.sort(key=lambda row: row[0], reverse=True)
     return [id_ for _, id_ in picked[:limit]]
+
+
+# What counts as somebody using a published app: an end user over an integration,
+# somebody opening the app and pressing Run, or an API caller. Deliberately not
+# the machinery a run spawns (tool_call, internal, analysis, export) nor the
+# builder runs from authoring the app - those are the owner at work, not usage,
+# and they'd inflate any count built on top of this.
+USAGE_SURFACES = [
+    SavedRun.Surface.deployment,
+    SavedRun.Surface.run,
+    SavedRun.Surface.api,
+]
+
+
+def usage_runs(
+    *,
+    workflow: int,
+    workspace: Workspace,
+    published_run: PublishedRun,
+):
+    """Every run one published app produced, whoever triggered it.
+
+    The subject is the app, not the recipe: two copilots in a workspace share a
+    workflow, so filtering on `workflow` alone pools their runs together.
+    """
+    return SavedRun.objects.filter(
+        # redundant against the published run, which pins one workflow, but it
+        # heads the ["workflow", "workspace", "-updated_at"] index this list is
+        # ordered by
+        workflow=workflow,
+        # not redundant: the root published run parents every playground run on
+        # the platform, so this is what keeps a root-pr Usage tab to one workspace
+        workspace=workspace,
+        parent_version__published_run=published_run,
+        surface__in=USAGE_SURFACES,
+    )

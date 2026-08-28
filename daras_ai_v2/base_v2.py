@@ -112,6 +112,7 @@ from widgets.workflow_image import (
 )
 from widgets.history import history_href_for_workflow, load_more_href
 from widgets.workflow_cards import author_from_user, history_card
+from widgets.workflow_queries import usage_runs
 from widgets.workflow_share import render_share_button, render_share_modal
 from workspaces.models import Workspace, WorkspaceMembership
 from workspaces.widgets import (
@@ -2944,20 +2945,15 @@ class BasePage:
         paginate_button(url=self.request.url, cursor=cursor)
 
     def _usage_tab(self):
-        qs = (
-            SavedRun.objects.filter(
-                workflow=self.workflow, workspace=self._usage_workspace()
-            )
-            .filter(
-                Q(surface=SavedRun.Surface.deployment)
-                | Q(parent_version__published_run=self.current_pr)
-            )
-            .select_related(
-                "parent_version__published_run",
-                "workflow_metadata",
-                "created_by",
-                "message_thread__bot_conversation",
-            )
+        qs = usage_runs(
+            workflow=self.workflow,
+            workspace=self._usage_workspace(),
+            published_run=self.current_pr,
+        ).select_related(
+            "parent_version__published_run",
+            "workflow_metadata",
+            "created_by",
+            "message_thread__bot_conversation",
         )
         runs, next_cursor = paginate_queryset(
             qs=qs,
@@ -2979,13 +2975,18 @@ class BasePage:
         )
 
     def can_view_usage(self) -> bool:
+        """The tab lists one workspace's runs, so seeing it means belonging to that workspace.
+
+        Deliberately not "owns the current run": a run of somebody else's app belongs to the
+        viewer, but the list it unlocks is scoped to the app's workspace, not theirs. The
+        publisher and the workspace members are the same people as `cached_workspaces`, so
+        there is nothing left for a `created_by` clause to admit.
+        """
         user = self.request.user
-        if not user or user.is_anonymous:
-            return False
         if self.is_user_admin(user):
             return True
-        if self.current_sr_user == user or self.current_pr.created_by_id == user.id:
-            return True
+        if not user or user.is_anonymous:
+            return False
         return self._usage_workspace() in user.cached_workspaces
 
     def _usage_workspace(self) -> Workspace:

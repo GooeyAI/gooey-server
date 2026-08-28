@@ -170,10 +170,10 @@
   }
 }
 
-/* 4px around a 30px pill makes 38 - FILTER_HEIGHT in HistoryPage.tsx, the height
-   of the workflow selector beside it */
+/* 6px around a 30px pill makes 42. The strip has the row to itself, so it is not
+   held to FILTER_HEIGHT the way the controls above it are. */
 .surface-tabs {
-  padding: 4px !important;
+  padding: 6px !important;
   position: relative;
 }
 
@@ -288,9 +288,9 @@
 }
 
 .surface-tabs-prev {
-  left: 4px;
+  left: 6px;
 }
 
 .surface-tabs-next {
-  right: 4px;
+  right: 6px;
 }
