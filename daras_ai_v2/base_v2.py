@@ -1,10 +1,10 @@
 import html
 import inspect
 import typing
-from textwrap import dedent
+
+import pydantic
 
 import gooey_gui as gui
-import pydantic
 from bots.models import (
     PublishedRun,
     RetentionPolicy,
@@ -13,13 +13,12 @@ from bots.models import (
 )
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
-
+from daras_ai_v2.base import (
+    BasePage as BasePageV1,
+)
 from daras_ai_v2.base import (
     RecipeRunState,
     StateKeys,
-)
-from daras_ai_v2.base import (
-    BasePage as BasePageV1,
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
@@ -40,9 +39,9 @@ from daras_ai_v2.tab_spec import (
     TabSpec,
     WorkspaceLayout,
 )
+from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
 from functions.base_llm_tool import functions_input
-
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     LinkTarget,
@@ -50,8 +49,8 @@ from gooey_gui.types.recipe_top_bar_props import (
     MenuIntent,
     NoShare,
     PublishIntent,
-    RecipeTopBarProps,
     RecipeSubmitIntent,
+    RecipeTopBarProps,
     RunIntent,
     ShareIntent,
     StopIntent,
@@ -70,7 +69,6 @@ from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspaceProps,
     WorkspacePaneControlProps,
 )
-from daras_ai_v2.urls import paginate_queryset
 from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
 from widgets.history import history_href_for_workflow, load_more_href
@@ -100,27 +98,6 @@ class WorkflowIdentity(typing.NamedTuple):
 
 
 class BasePage(BasePageV1):
-    def render_unauthorized(self, owner_workspace: Workspace | None = None):
-        with gui.div(className="d-flex flex-column align-items-center"):
-            gui.write(f"# {icons.lock}", unsafe_allow_html=True)
-            gui.caption("Welcome to Gooey.AI")
-            gui.write("# You need access")
-            if not self.request.user or self.request.user.is_anonymous:
-                gui.write(f"[Sign in]({self.get_auth_url()}) to view this resource.")
-            else:
-                if owner_workspace is None:
-                    if self.current_pr.saved_run == self.current_sr:
-                        owner_workspace = self.current_pr.workspace
-                    else:
-                        owner_workspace = self.current_sr.workspace
-                gui.write(
-                    dedent(f"""
-                You currently don't have access to this resource. Please request access from the
-                {owner_workspace.display_name(current_user=self.request.user)} admin or sign in with another account. 
-                You are logged in as {self.request.user.email or self.request.user.phone_number}.
-                """)
-                )
-
     def render(self):
         if not self.is_user_authorized(self.request.user):
             self.render_unauthorized()
@@ -625,7 +602,9 @@ class BasePage(BasePageV1):
                 integrations=self._top_bar_integrations(),
                 run_intent=StopIntent() if is_running else RunIntent(),
                 cost_label=None if usage_active else (cost_label or None),
-                cost_href=None if usage_active else (self.get_credits_click_url() or None),
+                cost_href=None
+                if usage_active
+                else (self.get_credits_click_url() or None),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
                     GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else None
@@ -929,31 +908,6 @@ class BasePage(BasePageV1):
             return published_run.workspace
         return self.current_workspace
 
-    def render_related_workflows(self):
-        page_clses = self.related_workflows()
-        if not page_clses:
-            return
-
-        with gui.link(to="/explore/"):
-            gui.html("<h2>Related Workflows</h2>")
-
-        def _render(page_cls: type[BasePage]):
-            page = page_cls()
-            root_run = page.get_root_pr()
-            preview_image = page.get_explore_image()
-
-            with gui.link(to=page.app_url(), className="text-decoration-none"):
-                gui.html(
-                    # language=html
-                    f"""
-<div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
-                    """
-                )
-                gui.markdown(f"###### {root_run.title or page.title}")
-                gui.caption(truncate_text_words(root_run.notes, maxlen=210))
-
-        grid_layout(2, page_clses, _render)
-
     def _render_functions(self):
         if not self.functions_in_settings:
             functions_input(
@@ -1045,33 +999,6 @@ class BasePage(BasePageV1):
             return
 
         raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
-
-    def call_runner_task(
-        self,
-        sr: SavedRun,
-        deduct_credits: bool = True,
-        unsaved_state: dict[str, typing.Any] = None,
-    ):
-        from celeryapp.tasks import runner_task
-
-        result = runner_task.delay(
-            page_cls=self.get_runner_page_cls(),
-            user_id=self.request.user.id,
-            run_id=sr.run_id,
-            uid=sr.uid,
-            channel=self.realtime_channel_name(sr.run_id, sr.uid),
-            unsaved_state=unsaved_state,
-            deduct_credits=deduct_credits,
-        )
-        # persist task id so a Stop click can revoke it mid-run
-        sr.celery_task_id = result.id
-        sr.save(update_fields=["celery_task_id", "updated_at"])
-        return result
-
-    @classmethod
-    def get_runner_page_cls(cls):
-        """The stable page class serialized into Celery jobs."""
-        return cls
 
 
 FILL_HEIGHT_EDITOR_CSS = """
