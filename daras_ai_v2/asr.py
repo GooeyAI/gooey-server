@@ -1403,7 +1403,7 @@ def run_asr(
                 initial=2,
                 maximum=30,
                 timeout=60,
-            )
+            ),
         )  # BatchRecognizeFileResult
         # Handle the response
         return "\n\n".join(
