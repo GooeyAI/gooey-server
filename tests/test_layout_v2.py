@@ -5,6 +5,8 @@ import pytest
 
 import gooey_gui as gui
 from daras_ai_v2.base import BasePage as BasePageV1
+from daras_ai_v2.base import StateKeys
+from daras_ai_v2.base_v2 import BasePage as BasePageV2
 from daras_ai_v2.tab_spec import TabSpec
 from gooey_gui.types.recipe_top_bar_props import (
     MenuIntent,
@@ -81,6 +83,59 @@ def test_video_bots_v2_inherits_business_logic():
         VideoBotsPageV2._render_regenerate_button
         is VideoBotsPage._render_regenerate_button
     )
+
+
+def test_v2_leaves_the_runner_to_the_base_page():
+    """v1 owns how a run is scheduled. v2 picks the class, and nothing else."""
+    assert "call_runner_task" not in vars(BasePageV2)
+    assert "get_runner_page_cls" not in vars(BasePageV2)
+    assert "submit_and_redirect" not in vars(BasePageV2)
+    assert BasePageV2.call_runner_task is BasePageV1.call_runner_task
+    assert BasePageV2.submit_and_redirect is BasePageV1.submit_and_redirect
+
+
+def test_v2_does_not_fork_methods_it_only_reuses():
+    """A v2 override has to change behaviour. These once existed as near-identical copies of
+    v1's, which is how the two drift apart."""
+    for name in [
+        "render_unauthorized",
+        "render_related_workflows",
+        "render_functions",
+        "variable_exclusions",
+        "duplicate_and_redirect",
+        "delete_and_redirect",
+    ]:
+        assert name not in vars(BasePageV2), f"{name} is v1's to own"
+        assert getattr(BasePageV2, name) is getattr(BasePageV1, name)
+
+    for name in ["render_output", "on_send"]:
+        assert name not in vars(VideoBotsPageV2), f"{name} is v1's to own"
+        assert getattr(VideoBotsPageV2, name) is getattr(VideoBotsPage, name)
+
+
+def test_submit_redirect_tab_is_a_hook_v2_overrides():
+    """v1 sends some recipes to their preview route after a run; v2 has no such route - the
+    workspace reveals the preview pane instead."""
+    assert BasePageV2.submit_redirect_tab is not BasePageV1.submit_redirect_tab
+
+    page = object.__new__(VideoBotsPageV2)
+    assert page.submit_redirect_tab() is None
+
+
+def test_randomize_press_still_submits_under_v2():
+    """The seed button is v1's; a layout that forgot to consume it would silently drop it."""
+    assert BasePageV2._render_output_col is not BasePageV1._render_output_col
+    assert "consume_randomize_press" not in vars(BasePageV2)
+
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+    assert page.consume_randomize_press(False) is False
+
+    gui.session_state[StateKeys.pressed_randomize] = True
+    assert page.consume_randomize_press(False) is True
+    assert StateKeys.pressed_randomize not in gui.session_state
+    assert isinstance(gui.session_state["seed"], int)
+    gui.session_state.clear()
 
 
 def test_generated_v2_component_names_match_registry():

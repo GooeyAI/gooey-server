@@ -1,12 +1,10 @@
 import html
-import json
 from enum import Enum
-from functools import cached_property
 
 import gooey_gui as gui
 from ai_models.models import AIModelSpec
-from bots.models import BotIntegration, Platform
-from daras_ai_v2 import icons, settings
+from bots.models import Platform
+from daras_ai_v2 import icons
 from daras_ai_v2.base_v2 import (
     FILL_HEIGHT_EDITOR_CSS,
     VARIABLES_DIALOG_CSS,
@@ -23,7 +21,6 @@ from daras_ai_v2.doc_search_settings_widgets import (
     keyword_instructions_widget,
     query_instructions_widget,
 )
-from daras_ai_v2.fastapi_tricks import get_api_route_url
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_model_settings_widgets import (
@@ -36,10 +33,6 @@ from daras_ai_v2.tab_spec import (
     SurfaceId,
     TabSpec,
     WorkspaceLayout,
-)
-from daras_ai_v2.web_widget_embed import (
-    get_chat_widget_messages,
-    load_chat_widget_lib,
 )
 from functions.base_llm_tool import render_called_functions
 from functions.models import FunctionTrigger
@@ -114,108 +107,19 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         # the v2 app shell keeps its header outside the body scroller.
         return
 
-    def render_output(self):
-        gui.tag(
-            "button",
-            type="submit",
-            name="onSendMessage",
-            hidden=True,
-            id="onSendMessage",
-        )
-        input_payload = gui.session_state.pop("onSendMessage", None)
-        if input_payload:
-            try:
-                input_data = json.loads(input_payload)
-            except (json.JSONDecodeError, TypeError):
-                pass
-            else:
-                self.on_send(input_data)
+    # the v2 top bar already names the run and links to it, so the widget repeating that
+    # under every reply is noise
+    chat_widget_show_run_link = False
 
-        gui.tag(
-            "button",
-            type="submit",
-            name="onNewConversation",
-            value="yes",
-            hidden=True,
-            id="onNewConversation",
-        )
-        if gui.session_state.pop("onNewConversation", None):
-            gui.session_state["messages"] = []
-            gui.session_state["input_prompt"] = ""
-            gui.session_state["input_images"] = None
-            gui.session_state["input_audio"] = None
-            gui.session_state["input_documents"] = None
-            gui.session_state["raw_input_text"] = ""
-            self.clear_outputs()
-            gui.session_state["final_keyword_query"] = ""
-            gui.session_state["final_search_query"] = ""
-            gui.rerun()
+    def chat_widget_web_url(self) -> None:
+        return None
 
-        messages = get_chat_widget_messages(gui.session_state)
-
-        # fill branding with bot integration data if available
-        bot_integration = (
-            BotIntegration.objects.filter(
-                published_run=self.current_pr,
-                platform=Platform.WEB,
-            )
-            .order_by("-updated_at")
-            .first()
-        )
-        if bot_integration:
-            bot_branding = bot_integration.get_web_widget_branding()
-        else:
-            bot_branding = dict(
-                name=self.current_pr.title,
-                title=self.current_pr.title,
-            )
-        if self.current_pr.photo_url:
-            bot_branding["photoUrl"] = self.current_pr.photo_url
-        bot_branding["showPoweredByGooey"] = False
-
-        config = dict(
-            integration_id="magic",
-            target="#gooey-embed",
-            mode="inline",
-            enableAudioMessage=True,
-            enablePhotoUpload=True,
-            enableConversations=True,
-            showToolCalls=True,
-            branding=bot_branding,
-            fillParent=True,
-            enableSourcePreview=False,
-            secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
-        )
-        # the page's own top bar already names the agent, so the widget never needs its own
-        config["showHeader"] = False
-        if self._has_whatsapp_integration:
-            config["theme"] = "whatsapp"
-        if settings.DEBUG:
-            from routers.bots_api import stream_create
-
-            config["apiUrl"] = get_api_route_url(stream_create)
-
-        load_chat_widget_lib()
-        # Fill the remaining preview area below the top bar.
-        gui.component(
-            "GooeyEmbedPreview",
-            config=config,
-            messages=messages,
-            run_url=str(self.request.url),
-            # Sized by the flex column in `_render_output_col`, not by `height: 100%`: the
-            # widget shares that column with the failure box, the cancelled notice and the
-            # run spinner, and a percentage height would claim the whole column regardless of
-            # what is above it. `minHeight: 0` so it can shrink when one of them appears.
-            className="flex-grow-1",
-            style=dict(minHeight=0),
-        )
-
-    @cached_property
-    def _has_whatsapp_integration(self) -> bool:
-        return BotIntegration.objects.filter(
-            published_run=self.current_pr,
-            platform=Platform.WHATSAPP,
-        ).exists()
+    def chat_widget_embed_props(self) -> dict:
+        """Sized by the flex column in `_render_output_col`, not by a height of its own: the
+        widget shares that column with the failure box, the cancelled notice and the run
+        spinner, and a fixed height would claim the whole column regardless of what is above
+        it. `minHeight: 0` so it can shrink when one of them appears."""
+        return dict(className="flex-grow-1", style=dict(minHeight=0))
 
     DEMO_ACTION_PREFIX = "demo:"
 

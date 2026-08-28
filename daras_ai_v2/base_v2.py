@@ -1,7 +1,6 @@
 import html
 import inspect
 import typing
-from textwrap import dedent
 
 import gooey_gui as gui
 import pydantic
@@ -11,7 +10,6 @@ from bots.models import (
     SavedRun,
     WorkflowAccessLevel,
 )
-from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 
 from daras_ai_v2.base import (
@@ -22,7 +20,6 @@ from daras_ai_v2.base import (
     BasePage as BasePageV1,
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
-from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
     GOOEY_BUILDER_TITLE,
@@ -31,7 +28,6 @@ from daras_ai_v2.gooey_builder import (
     get_gooey_builder_photo_url,
     render_gooey_builder,
 )
-from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.tab_spec import (
     PaneSpec,
     SingleLayout,
@@ -41,7 +37,6 @@ from daras_ai_v2.tab_spec import (
     WorkspaceLayout,
 )
 from daras_ai_v2.variables_widget import variables_input
-from functions.base_llm_tool import functions_input
 
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
@@ -100,26 +95,13 @@ class WorkflowIdentity(typing.NamedTuple):
 
 
 class BasePage(BasePageV1):
-    def render_unauthorized(self, owner_workspace: Workspace | None = None):
-        with gui.div(className="d-flex flex-column align-items-center"):
-            gui.write(f"# {icons.lock}", unsafe_allow_html=True)
-            gui.caption("Welcome to Gooey.AI")
-            gui.write("# You need access")
-            if not self.request.user or self.request.user.is_anonymous:
-                gui.write(f"[Sign in]({self.get_auth_url()}) to view this resource.")
-            else:
-                if owner_workspace is None:
-                    if self.current_pr.saved_run == self.current_sr:
-                        owner_workspace = self.current_pr.workspace
-                    else:
-                        owner_workspace = self.current_sr.workspace
-                gui.write(
-                    dedent(f"""
-                You currently don't have access to this resource. Please request access from the
-                {owner_workspace.display_name(current_user=self.request.user)} admin or sign in with another account. 
-                You are logged in as {self.request.user.email or self.request.user.phone_number}.
-                """)
-                )
+    # the workspace is half a screen at most, so four cards across would be four slivers
+    related_workflows_columns = 2
+
+    def submit_redirect_tab(self) -> None:
+        """A v2 run stays where it was submitted: the workspace reveals the preview pane
+        itself, so there is no separate preview route to send it to."""
+        return None
 
     def render(self):
         if not self.is_user_authorized(self.request.user):
@@ -418,39 +400,10 @@ class BasePage(BasePageV1):
                     "This will also delete all the associated versions."
                 )
         if delete_ref.pressed_confirm:
-            self.current_pr.delete()
-            raise gui.RedirectException(self.app_url())
+            self.delete_and_redirect()
 
         if picked == self.MENU_DUPLICATE:
-            self._duplicate_and_redirect()
-
-    def _duplicate_and_redirect(self) -> typing.NoReturn:
-        """Copy this workflow into the current workspace and open the copy.
-
-        Someone who can edit gets a straight copy; someone who cannot is forking a workflow
-        that is not theirs, so the copy is named after them.
-        """
-        pr = self.current_pr
-        if WorkflowAccessLevel.can_user_edit_published_run(
-            workspace=self.current_workspace, user=self.request.user, pr=pr
-        ):
-            new_pr = self.create_published_run(
-                published_run_id=get_random_doc_id(),
-                saved_run=self.current_sr,
-                user=self.request.user,
-                workspace=self.current_workspace,
-                tags=list(pr.tags.all()),
-                title=f"{pr.title} (Copy)",
-                notes="" if pr.is_root() else pr.notes,
-            )
-        else:
-            new_pr = pr.duplicate(
-                user=self.request.user,
-                workspace=self.current_workspace,
-                title=f"{self.request.user.first_name_possesive()} {pr.title}",
-                notes=pr.notes,
-            )
-        raise gui.RedirectException(self.app_url(example_id=new_pr.published_run_id))
+            self.duplicate_and_redirect()
 
     def _handle_top_bar_run(self, intent: RunIntent | StopIntent):
         if isinstance(intent, StopIntent):
@@ -625,7 +578,9 @@ class BasePage(BasePageV1):
                 integrations=self._top_bar_integrations(),
                 run_intent=StopIntent() if is_running else RunIntent(),
                 cost_label=None if usage_active else (cost_label or None),
-                cost_href=None if usage_active else (self.get_credits_click_url() or None),
+                cost_href=None
+                if usage_active
+                else (self.get_credits_click_url() or None),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
                     GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else None
@@ -929,49 +884,6 @@ class BasePage(BasePageV1):
             return published_run.workspace
         return self.current_workspace
 
-    def render_related_workflows(self):
-        page_clses = self.related_workflows()
-        if not page_clses:
-            return
-
-        with gui.link(to="/explore/"):
-            gui.html("<h2>Related Workflows</h2>")
-
-        def _render(page_cls: type[BasePage]):
-            page = page_cls()
-            root_run = page.get_root_pr()
-            preview_image = page.get_explore_image()
-
-            with gui.link(to=page.app_url(), className="text-decoration-none"):
-                gui.html(
-                    # language=html
-                    f"""
-<div class="w-100 mb-2" style="height:150px; background-image: url({preview_image}); background-size:cover; background-position-x:center; background-position-y:30%; background-repeat:no-repeat;"></div>
-                    """
-                )
-                gui.markdown(f"###### {root_run.title or page.title}")
-                gui.caption(truncate_text_words(root_run.notes, maxlen=210))
-
-        grid_layout(2, page_clses, _render)
-
-    def _render_functions(self):
-        if not self.functions_in_settings:
-            functions_input(
-                workspace=self.request.user and self.current_workspace,
-                user=self.request.user,
-                published_run=self.current_pr,
-            )
-
-    def _variable_exclusions(self) -> list[str]:
-        """Names the variables editor must not offer: request/response fields and function
-        slugs, which have inputs of their own. Shared with `variable_names()`."""
-        function_slugs = [
-            slug
-            for fn in gui.session_state.get("functions", [])
-            if (slug := fn.get("slug"))
-        ]
-        return self.fields_to_save() + function_slugs
-
     def _render_variables_editor(self, *, heading: bool = True):
         """`heading=False` where the surface already names itself. An empty label also drops
         the help tooltip, which the dialog's own intro replaces."""
@@ -980,7 +892,7 @@ class BasePage(BasePageV1):
             # Ungated: a variable needs no function, and the functions switch is on
             # another pane here, so gating on it would read as a missing button.
             allow_add=True,
-            exclude=self._variable_exclusions(),
+            exclude=self.variable_exclusions(),
             **({} if heading else dict(label="")),
         )
 
@@ -999,12 +911,13 @@ class BasePage(BasePageV1):
         return (
             (template_var_names | set(explicit))
             - set(context_globals())
-            - set(self._variable_exclusions())
+            - set(self.variable_exclusions())
         )
 
     def _render_output_col(self, *, submitted: bool = False, is_deleted: bool = False):
         assert inspect.isgeneratorfunction(self.run)
 
+        submitted = self.consume_randomize_press(submitted)
         if submitted:
             self.submit_and_redirect()
 
@@ -1034,44 +947,6 @@ class BasePage(BasePageV1):
                 self._render_running_output()
             elif not is_deleted:
                 self._render_after_output()
-
-    def submit_and_redirect(
-        self,
-        unsaved_state: dict[str, typing.Any] | None = None,
-        **defaults,
-    ):
-        sr = self.on_submit(unsaved_state=unsaved_state, **defaults)
-        if not sr:
-            return
-
-        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid))
-
-    def call_runner_task(
-        self,
-        sr: SavedRun,
-        deduct_credits: bool = True,
-        unsaved_state: dict[str, typing.Any] = None,
-    ):
-        from celeryapp.tasks import runner_task
-
-        result = runner_task.delay(
-            page_cls=self.get_runner_page_cls(),
-            user_id=self.request.user.id,
-            run_id=sr.run_id,
-            uid=sr.uid,
-            channel=self.realtime_channel_name(sr.run_id, sr.uid),
-            unsaved_state=unsaved_state,
-            deduct_credits=deduct_credits,
-        )
-        # persist task id so a Stop click can revoke it mid-run
-        sr.celery_task_id = result.id
-        sr.save(update_fields=["celery_task_id", "updated_at"])
-        return result
-
-    @classmethod
-    def get_runner_page_cls(cls):
-        """The stable page class serialized into Celery jobs."""
-        return cls
 
 
 FILL_HEIGHT_EDITOR_CSS = """

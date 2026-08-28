@@ -415,7 +415,7 @@ class BasePage:
 
     def render_unauthorized(self, owner_workspace: Workspace | None = None):
         with gui.div(className="d-flex flex-column align-items-center"):
-            gui.write('# <i class="fa-solid fa-lock"></i>', unsafe_allow_html=True)
+            gui.write(f"# {icons.lock}", unsafe_allow_html=True)
             gui.caption("Welcome to Gooey.AI")
             gui.write("# You need access")
             if not self.request.user or self.request.user.is_anonymous:
@@ -1060,6 +1060,50 @@ class BasePage:
         else:
             return False
 
+    def duplicate_and_redirect(self) -> typing.NoReturn:
+        """Copy this workflow into the current workspace and open the copy.
+
+        An editor gets their own copy of it; anyone else is forking a workflow that is not
+        theirs, so the copy is named after them instead.
+        """
+        if WorkflowAccessLevel.can_user_edit_published_run(
+            workspace=self.current_workspace, user=self.request.user, pr=self.current_pr
+        ):
+            self.save_as_new_and_redirect()
+        else:
+            self.fork_and_redirect()
+
+    def save_as_new_and_redirect(self) -> typing.NoReturn:
+        """Publish the run on screen as a new workflow of the current workspace."""
+        pr = self.current_pr
+        new_pr = self.create_published_run(
+            published_run_id=get_random_doc_id(),
+            saved_run=self.current_sr,
+            user=self.request.user,
+            workspace=self.current_workspace,
+            tags=list(pr.tags.all()),
+            title=f"{pr.title} (Copy)",
+            # a root recipe's notes describe the recipe, not this copy of it
+            notes="" if pr.is_root() else pr.notes,
+        )
+        raise gui.RedirectException(self.app_url(example_id=new_pr.published_run_id))
+
+    def fork_and_redirect(self) -> typing.NoReturn:
+        """Take somebody else's workflow into the current workspace, under the user's name."""
+        pr = self.current_pr
+        new_pr = pr.duplicate(
+            user=self.request.user,
+            workspace=self.current_workspace,
+            title=f"{self.request.user.first_name_possesive()} {pr.title}",
+            notes=pr.notes,
+        )
+        raise gui.RedirectException(self.app_url(example_id=new_pr.published_run_id))
+
+    def delete_and_redirect(self) -> typing.NoReturn:
+        """Delete this workflow, its versions with it, and fall back to the recipe."""
+        self.current_pr.delete()
+        raise gui.RedirectException(self.app_url())
+
     def _saved_options_modal(self):
         assert self.is_logged_in()
 
@@ -1099,28 +1143,10 @@ class BasePage:
                     confirm_className="border-danger bg-danger text-white",
                 )
                 if ref.pressed_confirm:
-                    self.current_pr.delete()
-                    raise gui.RedirectException(self.app_url())
-
-        title = f"{self.current_pr.title} (Copy)"
-        if self.current_pr.is_root():
-            notes = ""
-        else:
-            notes = self.current_pr.notes
+                    self.delete_and_redirect()
 
         if save_as_new_button:
-            new_pr = self.create_published_run(
-                published_run_id=get_random_doc_id(),
-                saved_run=self.current_sr,
-                user=self.request.user,
-                workspace=self.current_workspace,
-                tags=list(self.current_pr.tags.all()),
-                title=title,
-                notes=notes,
-            )
-            raise gui.RedirectException(
-                self.app_url(example_id=new_pr.published_run_id)
-            )
+            self.save_as_new_and_redirect()
 
         with gui.div(className="mt-4"):
             with gui.div(className="mb-4"):
@@ -1135,16 +1161,7 @@ class BasePage:
         )
         duplicate_button = gui.button(f"{icons.fork} Duplicate", className="w-100")
         if duplicate_button:
-            pr = self.current_pr
-            duplicate_pr = pr.duplicate(
-                user=self.request.user,
-                workspace=self.current_workspace,
-                title=f"{self.request.user.first_name_possesive()} {pr.title}",
-                notes=pr.notes,
-            )
-            raise gui.RedirectException(
-                self.app_url(example_id=duplicate_pr.published_run_id)
-            )
+            self.fork_and_redirect()
 
         gui.write("You can then collaborate on it by creating a Team Workspace.")
 
@@ -1337,6 +1354,9 @@ class BasePage:
                 elif older_version and older_version.title != version.title:
                     gui.caption(f"Renamed to: {version.title}")
 
+    # how many Related Workflows fit across; a narrower layout lowers it
+    related_workflows_columns: int = 4
+
     def render_related_workflows(self):
         page_clses = self.related_workflows()
         if not page_clses:
@@ -1360,7 +1380,7 @@ class BasePage:
                 gui.markdown(f"###### {root_run.title or page.title}")
                 gui.caption(truncate_text_words(root_run.notes, maxlen=210))
 
-        grid_layout(4, page_clses, _render)
+        grid_layout(self.related_workflows_columns, page_clses, _render)
 
     def related_workflows(self) -> list:
         return []
@@ -1916,11 +1936,7 @@ class BasePage:
                 with gui.div(className="bg-white mt-2"), gui.expander("⚙️ Settings"):
                     self.render_settings()
                     if self.functions_in_settings:
-                        functions_input(
-                            workspace=self.request.user and self.current_workspace,
-                            user=self.request.user,
-                            published_run=self.current_pr,
-                        )
+                        self.render_functions()
 
             with placeholder:
                 self.render_variables()
@@ -1937,23 +1953,30 @@ class BasePage:
 
     def render_variables(self):
         if not self.functions_in_settings:
-            functions_input(
-                workspace=self.request.user and self.current_workspace,
-                user=self.request.user,
-                published_run=self.current_pr,
-            )
+            self.render_functions()
 
+        variables_input(
+            template_keys=self.template_keys,
+            allow_add=is_functions_enabled(),
+            exclude=self.variable_exclusions(),
+        )
+
+    def render_functions(self):
+        functions_input(
+            workspace=self.request.user and self.current_workspace,
+            user=self.request.user,
+            published_run=self.current_pr,
+        )
+
+    def variable_exclusions(self) -> list[str]:
+        """Names the variables editor must not offer: request and response fields, and
+        function slugs, each of which has an input of its own already."""
         function_slugs = [
             slug
             for fn in gui.session_state.get("functions", [])
             if (slug := fn.get("slug"))
         ]
-
-        variables_input(
-            template_keys=self.template_keys,
-            allow_add=is_functions_enabled(),
-            exclude=self.fields_to_save() + function_slugs,
-        )
+        return self.fields_to_save() + function_slugs
 
     @classmethod
     def get_run_state(cls, state: dict[str, typing.Any]) -> RecipeRunState:
@@ -1982,13 +2005,22 @@ class BasePage:
             gui.newline()
             self.render_run_cost()
 
+    def consume_randomize_press(self, submitted: bool) -> bool:
+        """Reroll the seed and submit, when the randomize button was the thing pressed.
+
+        Its own method so every layout that draws an output column honours the button,
+        rather than each one remembering to re-implement it.
+        """
+        if not gui.session_state.get(StateKeys.pressed_randomize):
+            return submitted
+        gui.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
+        gui.session_state.pop(StateKeys.pressed_randomize, None)
+        return True
+
     def _render_output_col(self, *, submitted: bool = False, is_deleted: bool = False):
         assert inspect.isgeneratorfunction(self.run)
 
-        if gui.session_state.get(StateKeys.pressed_randomize):
-            gui.session_state["seed"] = int(gooey_rng.randrange(MAX_SEED))
-            gui.session_state.pop(StateKeys.pressed_randomize, None)
-            submitted = True
+        submitted = self.consume_randomize_press(submitted)
 
         if submitted:
             self.submit_and_redirect()
@@ -2092,11 +2124,15 @@ class BasePage:
         sr = self.on_submit(unsaved_state=unsaved_state, **defaults)
         if not sr:
             return
+        raise gui.RedirectException(
+            self.app_url(run_id=sr.run_id, uid=sr.uid, tab=self.submit_redirect_tab())
+        )
+
+    def submit_redirect_tab(self) -> typing.Optional["RecipeTabs"]:
+        """Which tab a fresh run lands on. `None` keeps the tab the submit came from."""
         if self.workflow in PREVIEW_ROUTE_WORKFLOWS:
-            tab = RecipeTabs.preview
-        else:
-            tab = None
-        raise gui.RedirectException(self.app_url(run_id=sr.run_id, uid=sr.uid, tab=tab))
+            return RecipeTabs.preview
+        return None
 
     def publish_and_redirect(self) -> typing.NoReturn | None:
         assert self.is_logged_in()
@@ -2242,6 +2278,16 @@ class BasePage:
             }
         )
 
+    @classmethod
+    def get_runner_page_cls(cls) -> typing.Type["BasePage"]:
+        """The page class serialized into Celery jobs.
+
+        Its own class by default. A fork that only changes how the page is drawn overrides
+        this with the class that owns the pipeline, so existing workers keep running the
+        recipe they already know.
+        """
+        return cls
+
     def call_runner_task(
         self,
         sr: SavedRun,
@@ -2251,7 +2297,7 @@ class BasePage:
         from celeryapp.tasks import runner_task
 
         result = runner_task.delay(
-            page_cls=self.__class__,
+            page_cls=self.get_runner_page_cls(),
             user_id=self.request.user.id,
             run_id=sr.run_id,
             uid=sr.uid,

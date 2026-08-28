@@ -1,6 +1,7 @@
 import json
 import math
 import typing
+from functools import cached_property
 
 import typing_extensions
 from pydantic import BaseModel, Field
@@ -1114,7 +1115,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             gui.rerun()
 
         messages = get_chat_widget_messages(
-            gui.session_state, web_url=self.current_app_url()
+            gui.session_state, web_url=self.chat_widget_web_url()
         )
 
         # fill branding with bot integration data if available
@@ -1137,12 +1138,6 @@ Translation Glossary for LLM Language (English) -> User Langauge
             bot_branding["photoUrl"] = self.current_pr.photo_url
         bot_branding["showPoweredByGooey"] = False
 
-        # a copilot that is deployed to WhatsApp is previewed as WhatsApp renders it
-        has_whatsapp_deployed = BotIntegration.objects.filter(
-            published_run=self.current_pr,
-            platform=Platform.WHATSAPP,
-        ).exists()
-
         config = dict(
             integration_id="magic",
             target="#gooey-embed",
@@ -1151,14 +1146,15 @@ Translation Glossary for LLM Language (English) -> User Langauge
             enablePhotoUpload=True,
             enableConversations=True,
             showToolCalls=True,
-            showRunLink=True,
+            showRunLink=self.chat_widget_show_run_link,
             showHeader=False,
             branding=bot_branding,
             fillParent=True,
             enableSourcePreview=False,
             secrets=dict(GOOGLE_MAPS_API_KEY=settings.GOOGLE_MAPS_API_KEY),
         )
-        if has_whatsapp_deployed:
+        # a copilot that is deployed to WhatsApp is previewed as WhatsApp renders it
+        if self.has_whatsapp_integration:
             config["theme"] = "whatsapp"
         if settings.DEBUG:
             from routers.bots_api import stream_create
@@ -1174,9 +1170,28 @@ Translation Glossary for LLM Language (English) -> User Langauge
             config=config,
             messages=messages,
             run_url=str(self.request.url),
-            className="mb-3",
-            style=dict(height="calc(100vh - 1rem)"),
+            **self.chat_widget_embed_props(),
         )
+
+    # Whether each reply carries a link back to its own run. The v1 page has nowhere else to
+    # offer that; a layout whose own chrome names the run turns it off.
+    chat_widget_show_run_link = True
+
+    def chat_widget_web_url(self) -> str | None:
+        """The url the widget links its messages to, or None to leave them unlinked."""
+        return self.current_app_url()
+
+    def chat_widget_embed_props(self) -> dict:
+        """How the preview is sized. v1 stacks it in a scrolling page, so it takes a fixed
+        viewport-relative height of its own."""
+        return dict(className="mb-3", style=dict(height="calc(100vh - 1rem)"))
+
+    @cached_property
+    def has_whatsapp_integration(self) -> bool:
+        return BotIntegration.objects.filter(
+            published_run=self.current_pr,
+            platform=Platform.WHATSAPP,
+        ).exists()
 
     def on_send(self, input_data: dict):
         request_body, message_thread = chat_widget_input_to_request_body(
