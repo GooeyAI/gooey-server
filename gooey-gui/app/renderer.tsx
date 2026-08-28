@@ -16,15 +16,13 @@ import {
 } from "~/gooeyInput";
 import { RenderedHTML } from "~/renderedHTML";
 import type { OnChange } from "./app";
+import * as allComponents from "./components";
+import type { CustomComponentProps } from "./components";
 import CountdownTimer from "./components/countdown";
 import GooeySelect from "./components/GooeySelect";
 import GooeySwitch from "./components/GooeySwitch";
 import { GooeyTooltip } from "./components/GooeyTooltip";
 import { GooeyImg, GooeyVideo } from "./components/MediaTags";
-import {
-  getCustomComponent,
-  isCustomComponentName,
-} from "./customComponentRegistry";
 import { lazyImport } from "./lazyImports";
 
 const { DataTable } = lazyImport(() => import("~/dataTable"));
@@ -477,8 +475,12 @@ function RenderedTreeNode({
         </GooeyTooltip>
       );
     default: {
-      if (isCustomComponentName(name)) {
-        const CustomComponent = getCustomComponent(name);
+      let CustomComponent = allComponents[
+        name as keyof typeof allComponents
+      ] as
+        | React.ComponentType<CustomComponentProps & Record<string, any>>
+        | undefined;
+      if (CustomComponent) {
         return (
           <CustomComponent
             {...props}
