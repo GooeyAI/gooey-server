@@ -216,18 +216,41 @@ def _load_menu_links(
     if is_anonymous:
         return public_links
 
-    from routers.account import account_route, profile_route
+    from routers.account import (
+        account_route,
+        api_keys_route,
+        members_route,
+        profile_route,
+    )
 
     links = []
-    # Profile settings are per-user, so only surface them in a personal workspace.
-    if workspace is not None and workspace.is_personal:
-        links.append(
-            MenuLinkData(
-                label="Profile",
-                href=get_route_path(profile_route),
-                icon=icons.cls.user,
+    # One slot, filled by whichever the current workspace answers to: a personal workspace's
+    # settings are its owner's profile, an org's are its people. The two routes redirect to
+    # one another, so offering the wrong one would bounce.
+    if workspace is not None:
+        if workspace.is_personal:
+            links.append(
+                MenuLinkData(
+                    label="Profile",
+                    href=get_route_path(profile_route),
+                    icon=icons.cls.user,
+                )
             )
+        else:
+            links.append(
+                MenuLinkData(
+                    label="Members",
+                    href=get_route_path(members_route),
+                    icon=icons.cls.company,
+                )
+            )
+    links.append(
+        MenuLinkData(
+            label="API",
+            href=get_route_path(api_keys_route),
+            icon=icons.cls.code,
         )
+    )
     links.append(
         MenuLinkData(
             label="Billing",
@@ -235,8 +258,10 @@ def _load_menu_links(
             icon=icons.cls.credit_card,
         )
     )
-    # Pricing targets logged-out visitors; signed-in users manage spend via Billing.
-    links += [link for link in public_links if link.label != "Pricing"]
+    # The public API docs and Pricing are written for logged-out visitors; a signed-in user
+    # wants their own workspace's keys and spend, which the two links above go to. Docs still
+    # reaches the reference material.
+    links += [link for link in public_links if link.label not in ("API", "Pricing")]
     return links
 
 

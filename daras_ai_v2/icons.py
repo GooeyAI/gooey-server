@@ -99,5 +99,7 @@ books = '<i class="fa-light fa-books"></i>'
 # themselves - `MenuLinkData.icon`, `WorkspacePaneControl.icon`. Names mirror those above.
 class cls:
     user = "fa-regular fa-user"
+    company = "fa-regular fa-buildings"
+    code = "fa-regular fa-code"
     credit_card = "fa-regular fa-credit-card"
     cancel = "fa-regular fa-xmark"
