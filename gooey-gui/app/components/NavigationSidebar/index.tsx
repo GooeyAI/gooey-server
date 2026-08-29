@@ -67,9 +67,14 @@ export function NavigationSidebar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, isMobile, collapsed_state_key]);
 
+  // Ask Gooey takes the room the nav was in: the rail collapses, and the drawer - which is
+  // the whole screen below lg, and above the panel in the stack - goes entirely, or the
+  // panel it just opened would be behind it. Only on the change, so reopening the nav over
+  // an open panel to navigate somewhere still works.
   useEffect(() => {
     if (builder.open) {
       setCollapsed(true);
+      navDrawer.setOpen(false);
     }
   }, [builder.open]);
 
@@ -106,11 +111,17 @@ export function NavigationSidebar({
   // a nav item, a history row, a link in the account menu. Taps that navigate
   // nowhere -- opening the account menu, switching workspace, toggling a section
   // open -- leave the drawer where it is.
+  //
+  // Watched on the url rather than on `location.key`, which is minted afresh by every
+  // navigation - and this app posts its whole form as one, on every edit and on every tick
+  // of a streaming run. Each of those shut the drawer, so it could not be held open at all
+  // while a run was going.
+  const route = `${location.pathname}${location.search}`;
   useEffect(() => {
     if (isMobile) {
       navDrawer.setOpen(false);
     }
-  }, [isMobile, location.key]);
+  }, [isMobile, route]);
 
   const builderIntent = readBuilderIntent(location.state);
   useEffect(() => {
