@@ -78,7 +78,24 @@
      width below stops applying. 40cqw is the narrowest any pane gets. */
   min-width: var(--pane-minor-w);
   min-height: 0;
-  overflow: auto;
+  /* One axis only. `overflow: auto` gave the pane a horizontal scroll as well, and every
+     `gui.columns()` in the form below is a Bootstrap `.row` - which carries `margin-inline:
+     -12px` for a container gutter to absorb. Below lg there is no gutter to absorb it
+     (`.recipe-workspace.container-xxl` and the editor's own content box both drop their side
+     padding), so the row sat 12px past the pane and the whole pane - pane strip, form and run
+     bar together - could be dragged sideways and left parked there, clipping the first
+     character of every label. The 12px is the column's own padding, so there is nothing in it
+     to lose by clipping. Same rule the document tabs already keep, for the same reason. */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ...and anything that genuinely cannot wrap scrolls inside its own box rather than being cut
+   off by the line above. Tables are the case that needs it here - app.css already gives every
+   `pre` its own scroller and wraps it. Same escape hatch the document tabs keep. */
+.recipe-workspace-pane-content table {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* Same role, so the width a pane's content is pinned to and the width the pane settles at
@@ -99,12 +116,18 @@
   overflow: hidden;
 }
 
-/* The failure notice above the output. A flex item's automatic minimum size would hold it at
-   its full content height, which the clipping pane above then cuts off - so it is allowed to
-   shrink (`min-height: 0`), bounded (`max-height`) and given the scrollbar itself. */
+/* The failure notice above the output. It sizes to itself and is never squeezed by what
+   follows it: `flex: 0 1 auto` with `min-height: 0` let the chat widget below - which fills
+   whatever box it is given - shrink the notice to a single clipped line, so a notice with an
+   action in it (Composio's "Access Required", whose button and explanation are below its
+   heading) read as a strip laid across the conversation, and a touch that started on that
+   strip scrolled the strip rather than the chat.
+
+   The cap and the scroller stay for the one case that needs them: a message too long to sit
+   above the output whole - a traceback, a provider's error body. Anything that fits is shown
+   whole and has no scroll of its own to catch. */
 .v2-run-error {
-  flex: 0 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   max-height: 45%;
   overflow-y: auto;
 }
@@ -339,13 +362,16 @@
 }
 
 @media (max-width: 991.98px) {
-  /* Both work views start at the header's rule, so the page's top gutter showed as a strip of
-     background between the two. `!important` to beat `pt-2`. About keeps its gutter - it is a
-     card, and sits off the rule. */
-  .v2-workspace-body:has(.recipe-workspace-editor.recipe-workspace-pane--solo),
-  .v2-workspace-body:has(
-      .recipe-workspace-preview.recipe-workspace-pane--solo
-    ) {
+  /* The pane owns the scrolling at this width, so the body's top padding sits *outside* the
+     scroller: not a gutter around the content but a fixed band between the header's rule and
+     a surface sliding under it. Zeroed for every pane the workspace shows, About included -
+     it was the one exception, on the reading that its card should sit off the rule, but the
+     card is full-bleed here (`.recipe-workspace.container-xxl` drops the side gutters below),
+     so the band only ever showed above it and read as a seam once anything scrolled. The 4px
+     `mt-1` inside the pane still holds it off the rule at rest, and scrolls away with it.
+
+     `!important` to beat `pt-2`. */
+  .v2-workspace-body:has(.recipe-workspace) {
     padding-top: 0 !important;
   }
 

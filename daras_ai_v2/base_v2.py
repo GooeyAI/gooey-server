@@ -1442,11 +1442,5 @@ ABOUT_CSS = """
         flex: 1 1 0;
         max-width: var(--v2-about-card-width);
     }
-
-    /* clears the tab pills, which below lg float over the bottom of the viewport rather than
-       sitting in the top bar */
-    & .v2-about-panel {
-        margin-bottom: 4.5rem;
-    }
 }
 """
