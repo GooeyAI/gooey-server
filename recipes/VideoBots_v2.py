@@ -8,6 +8,7 @@ from ai_models.models import AIModelSpec
 from bots.models import BotIntegration, Platform
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base_v2 import (
+    ABOUT_META_ICON_SIZE,
     FILL_HEIGHT_EDITOR_CSS,
     VARIABLES_DIALOG_CSS,
     BasePage,
@@ -342,7 +343,11 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         if not spec:
             # a model that has since been removed - its name is still better than nothing
             return icons.sparkles, name
-        return (spec.creator and spec.creator.html_icon()) or icons.sparkles, spec.label
+        # `html_icon` writes the size inline, which beats any stylesheet, so the card's size
+        # is asked for here - left to its 1.1rem default the logo sat small beside the
+        # FontAwesome glyphs on the cards next to it.
+        icon = spec.creator and spec.creator.html_icon(size=ABOUT_META_ICON_SIZE)
+        return icon or icons.sparkles, spec.label
 
     def _render_about_meta_card(self, *, icon: str, label: str, pane: ConfigPane):
         with gui.model_component(

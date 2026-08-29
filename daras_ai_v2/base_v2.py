@@ -825,17 +825,27 @@ class BasePage(BasePageV1):
             gui.html('<div class="v2-about-section-title">Deployments</div>')
             with gui.div(className="v2-about-meta"):
                 for it in integrations:
-                    body = (
-                        f'<span class="v2-about-meta-icon">{it.icon_html}</span>'
-                        f'<span class="v2-about-meta-label">{html.escape(it.label)}</span>'
-                    )
-                    if isinstance(it.target, LinkTarget):
-                        gui.html(
-                            f'<a class="v2-about-meta-card"'
-                            f' href="{html.escape(it.target.href)}">{body}</a>'
-                        )
-                    else:
-                        gui.html(f'<div class="v2-about-meta-card">{body}</div>')
+                    gui.html(self._about_deployment_card(it))
+
+    def _about_deployment_card(self, it: TopBarIntegration) -> str:
+        """One channel, carrying the same target as its chip in the bar."""
+        body = (
+            f'<span class="v2-about-meta-icon">{it.icon_html}</span>'
+            f'<span class="v2-about-meta-label">{html.escape(it.label)}</span>'
+        )
+        if isinstance(it.target, LinkTarget):
+            return (
+                f'<a class="v2-about-meta-card"'
+                f' href="{html.escape(it.target.href)}">{body}</a>'
+            )
+        # The page's form copies its submitter's name and value into the state it posts, so
+        # a plain submit button reaches `_pop_submit_intent` by the same route the chip does
+        # and `_handle_menu_pick` opens the same dialog.
+        return (
+            f'<button type="submit" class="v2-about-meta-card"'
+            f' name="{html.escape(self.SUBMIT_INTENT_KEY)}"'
+            f' value="{html.escape(it.target.intent.model_dump_json())}">{body}</button>'
+        )
 
     def _render_solo_input_col(self) -> bool:
         """The working column alone, through the same `gui.columns` wrapper Split uses so
@@ -1236,6 +1246,10 @@ VARIABLES_DIALOG_CSS = """
 }
 """
 
+# Matches `.v2-about-meta-icon` below. Icon html that carries its own inline size - a model
+# creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
+ABOUT_META_ICON_SIZE = "1.5rem"
+
 ABOUT_CSS = """
 /* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
    here scrolls unless this does - a description longer than the viewport is simply clipped.
@@ -1328,7 +1342,8 @@ ABOUT_CSS = """
        `min-width: 0` is what makes that stick: a flex item defaults to `min-width: auto`,
        which resolves to the label's min-content width, and a min-width beats a max-width -
        so without it each card grew to fit its own text and no two matched. */
-    flex: 0 0 11rem;
+    --v2-about-card-width: 11rem;
+    flex: 0 0 var(--v2-about-card-width);
     min-width: 0;
     padding: 0.875rem;
     border: 1px solid var(--gooey-line-default);
@@ -1356,6 +1371,8 @@ ABOUT_CSS = """
     color: var(--gooey-ink);
 }
 
+/* For icon html that arrives without a size of its own; anything carrying an inline one
+   wins here and has to be asked for ABOUT_META_ICON_SIZE instead. */
 & .v2-about-meta-icon img {
     height: 1.5rem;
     width: 1.5rem;
@@ -1386,9 +1403,11 @@ ABOUT_CSS = """
     }
 
     /* `1 1 0` rather than a basis: the cards share the row evenly instead of each taking its
-       own content width, so they stay equal here too */
+       own content width, so they stay equal here too. Capped at the width they have above
+       lg, or a group holding one card stretched it the whole width of the panel. */
     & .v2-about-meta-card {
         flex: 1 1 0;
+        max-width: var(--v2-about-card-width);
     }
 
     /* clears the tab pills, which below lg float over the bottom of the viewport rather than

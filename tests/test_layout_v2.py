@@ -1,3 +1,5 @@
+import html
+import re
 from types import SimpleNamespace
 
 import pydantic
@@ -7,10 +9,13 @@ import gooey_gui as gui
 from daras_ai_v2.base import BasePage as BasePageV1
 from daras_ai_v2.tab_spec import TabSpec
 from gooey_gui.types.recipe_top_bar_props import (
+    LinkTarget,
     MenuIntent,
     RecipeTopBarProps,
     RecipeSubmitIntent,
     RunIntent,
+    SubmitTarget,
+    TopBarIntegration,
 )
 from gooey_gui.types.sidebar_props import SidebarProps
 from gooey_gui.types.recipe_workspace_props import (
@@ -257,6 +262,39 @@ def test_submit_intent_is_consumed_once():
 
     assert page._pop_submit_intent() == RunIntent()
     assert page._pop_submit_intent() is None
+
+
+def test_about_deployment_cards_carry_the_chips_targets():
+    """A channel card in About is the same action as its chip in the bar - a link where the
+    chip navigates, and otherwise a submit carrying the intent that opens the chip's dialog,
+    since the page's form posts its submitter's name and value."""
+    page = object.__new__(VideoBotsPageV2)
+
+    link = page._about_deployment_card(
+        TopBarIntegration(
+            key="web",
+            label="Try in Web",
+            icon_html="<i></i>",
+            target=LinkTarget(href="/chat/agent/"),
+        )
+    )
+    assert '<a class="v2-about-meta-card" href="/chat/agent/">' in link
+
+    intent = MenuIntent(item_key="demo:7")
+    submit = page._about_deployment_card(
+        TopBarIntegration(
+            key="demo:7",
+            label="Try in WhatsApp",
+            icon_html="<i></i>",
+            target=SubmitTarget(intent=intent),
+        )
+    )
+    assert 'type="submit"' in submit
+    assert f'name="{page.SUBMIT_INTENT_KEY}"' in submit
+
+    posted = re.search(r'value="([^"]*)"', submit).group(1)
+    gui.session_state[page.SUBMIT_INTENT_KEY] = html.unescape(posted)
+    assert page._pop_submit_intent() == intent
 
 
 def test_narrow_surface_keeps_the_editor_for_a_visitor(monkeypatch):
