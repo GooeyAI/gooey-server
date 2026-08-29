@@ -592,7 +592,7 @@ a.gooey-topbar-cost:hover {
     margin: 0;
   }
 
-  /* keep truncating: with the pills gone to the bottom bar the header is one row of
+  /* keep truncating: with the pills gone to the action sheet the header is one row of
      title + actions, and an untruncated title would push the actions off screen */
   .gooey-topbar-titleblock {
     max-width: 100%;

@@ -99,12 +99,18 @@
   overflow: hidden;
 }
 
-/* The failure notice above the output. A flex item's automatic minimum size would hold it at
-   its full content height, which the clipping pane above then cuts off - so it is allowed to
-   shrink (`min-height: 0`), bounded (`max-height`) and given the scrollbar itself. */
+/* The failure notice above the output. It sizes to itself and is never squeezed by what
+   follows it: `flex: 0 1 auto` with `min-height: 0` let the chat widget below - which fills
+   whatever box it is given - shrink the notice to a single clipped line, so a notice with an
+   action in it (Composio's "Access Required", whose button and explanation are below its
+   heading) read as a strip laid across the conversation, and a touch that started on that
+   strip scrolled the strip rather than the chat.
+
+   The cap and the scroller stay for the one case that needs them: a message too long to sit
+   above the output whole - a traceback, a provider's error body. Anything that fits is shown
+   whole and has no scroll of its own to catch. */
 .v2-run-error {
-  flex: 0 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   max-height: 45%;
   overflow-y: auto;
 }
