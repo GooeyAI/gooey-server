@@ -255,10 +255,13 @@
 
 /* ------------------------------------------------------------ editor run bar
 
-   The foot of the form, inside the editor's own column rather than pinned to the viewport:
-   bounded by the pane at any width, and nothing behind it has height to reserve. Last child
-   of a `h-100` flex column, so `margin-top: auto` drops it to the bottom of a short form and
-   `sticky` holds it in sight under a long one. */
+   The foot of the form below lg, where the bar above hides its own Run and cost. Inside the
+   editor's column rather than pinned to the viewport: bounded by the pane, and nothing
+   behind it has height to reserve. Last child of a `h-100` flex column, so `margin-top: auto`
+   drops it to the bottom of a short form and `sticky` holds it in sight under a long one.
+
+   `display` is left to `d-lg-none` above lg; it is only ever `flex` where that does not
+   apply. */
 .v2-editor-runbar {
   position: sticky;
   bottom: 0;

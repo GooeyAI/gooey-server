@@ -872,8 +872,8 @@ class BasePage(BasePageV1):
         """Run, and what it will cost, at the foot of the form that submits.
 
         In the editor's own column rather than pinned to the viewport, so it is bounded by
-        the pane and needs no height reserved behind it. The bar above draws its Run from lg
-        up only, where this one is off the bottom of a tall form.
+        the pane and needs no height reserved behind it. Drawn below lg only, which is where
+        the bar above hides its own Run and cost; the component decides that.
         """
         cost_label, cost_title = self._top_bar_cost()
         # after `_render_input_col`, so a run this very request started already reads as
