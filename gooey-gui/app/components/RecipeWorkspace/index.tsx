@@ -152,9 +152,12 @@ export function RecipeSurface({
   );
 }
 
-/** Run, and the estimate, at the foot of the editor's column. Rendered by Python as the last
- *  child of the editor surface, which is what scopes it: it is there whenever the pane is,
- *  at every width, without the top bar having to work out which view is on screen. */
+/** Run, and the estimate, at the foot of the editor's column. Below lg only - above it the
+ *  top bar's right cluster carries both, and two of each on one screen is one too many.
+ *
+ *  Rendered by Python as the last child of the editor surface, which is what scopes it to
+ *  the editor: it is there whenever that pane is, without the top bar having to work out
+ *  which view is on screen. */
 export function EditorRunBar({
   submit_intent_key,
   run_intent,
@@ -174,7 +177,7 @@ export function EditorRunBar({
     }
   };
   return (
-    <div className="v2-editor-runbar">
+    <div className="v2-editor-runbar d-lg-none">
       {!!cost_label && (
         <CostReading label={cost_label} href={cost_href} title={cost_title} />
       )}
