@@ -196,6 +196,49 @@ def test_page_shell_config_is_built_once_from_typed_layouts(monkeypatch):
     assert preview_config.active_run_id == "run-1"
 
 
+def test_entry_layout_introduces_the_workflow_only_to_a_visitor(monkeypatch):
+    """A saved workflow's own url introduces it, so a visitor opens on About - which a phone
+    shows on its own. Whoever can edit it came to change the thing, so they open on the work
+    view, as every other url does; that folds to the preview on a phone."""
+    about = SplitLayout(primary=SurfaceId.about, secondary=SurfaceId.preview)
+    work = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
+    tabs = [TabSpec(key="about", label="About", layout=about)]
+
+    page = object.__new__(VideoBotsPageV2)
+    page.tab = RecipeTabs.run
+    page.request = SimpleNamespace(query_params={})
+
+    monkeypatch.setattr(VideoBotsPageV2, "can_edit_current_pr", lambda self: False)
+    assert page.entry_layout(tabs) == about
+
+    monkeypatch.setattr(VideoBotsPageV2, "can_edit_current_pr", lambda self: True)
+    assert page.entry_layout(tabs) == work
+
+    # A run, or a return from a document tab, never introduces anything.
+    monkeypatch.setattr(VideoBotsPageV2, "can_edit_current_pr", lambda self: False)
+    page.request.query_params = {"run_id": "run-1"}
+    assert page.entry_layout(tabs) == work
+
+    page.request.query_params = {}
+    page.tab = RecipeTabs.run_as_api
+    assert page.entry_layout(tabs) == work
+
+
+def test_document_tabs_drop_the_bootstrap_overflow_and_gutter_utilities():
+    """Both are `!important`, so on API or Deploy they beat the one-axis scrolling and the
+    gutter RecipeWorkspace.css gives a body with no workspace in it."""
+    page = object.__new__(VideoBotsPageV2)
+
+    workspace = page._workspace_body_class(SimpleNamespace(workspace_active=True))
+    assert "overflow-auto" in workspace
+    assert "px-0" in workspace
+
+    document = page._workspace_body_class(SimpleNamespace(workspace_active=False))
+    assert "overflow-auto" not in document
+    assert "px-0" not in document
+    assert "v2-workspace-body" in document
+
+
 def test_submit_intent_is_discriminated_and_strict():
     adapter = pydantic.TypeAdapter(RecipeSubmitIntent)
 
@@ -228,6 +271,26 @@ def test_narrow_surface_keeps_the_editor_for_a_visitor(monkeypatch):
     assert page.narrow_surface() == SurfaceId.preview
 
 
+def test_usage_is_kept_out_of_a_visitors_bar(monkeypatch):
+    """A visitor gets About and How it works, which present the workflow. A list of its runs
+    is an owner's tool, so it does not belong beside them - even for an admin, who may read
+    the run data of an app that is not theirs."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "can_view_usage", lambda self: True)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab: "/agent/usage/"
+    )
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
+    assert page._usage_href() is None
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: False)
+    assert page._usage_href() == "/agent/usage/"
+
+    monkeypatch.setattr(VideoBotsPageV2, "can_view_usage", lambda self: False)
+    assert page._usage_href() is None
+
+
 def test_title_menu_offers_v1s_options(monkeypatch):
     """The chevron menu is v1's Options dialog, gated the same way."""
     from bots.models import WorkflowAccessLevel
@@ -248,7 +311,7 @@ def test_title_menu_offers_v1s_options(monkeypatch):
     page.request = SimpleNamespace(user=object())
 
     labels = [item.label for item in page._title_menu_items()]
-    assert labels == ["Version history", "Duplicate", "Delete"]
+    assert labels == ["Versions", "Duplicate", "Delete"]
 
     # off an older version, duplicating means promoting that version to a new workflow
     monkeypatch.setattr(VideoBotsPageV2, "current_sr", property(lambda self: "older"))

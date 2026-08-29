@@ -60,6 +60,7 @@ export interface ManageShare {
 export interface RecipeTopBarProps {
   config: PageShellConfig;
   title: string;
+  title_href: string | null;
   photo_url: string | null;
   circle_photo: boolean;
   author: TopBarAuthor | null;
@@ -76,7 +77,6 @@ export interface RecipeTopBarProps {
   crumb_label: string | null;
   builder_panel_key: string | null;
   builder_new_event: string | null;
-  history_href: string | null;
   usage_href: string | null;
   usage_active: boolean;
   run_intent: RunIntent | StopIntent;

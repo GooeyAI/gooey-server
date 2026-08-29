@@ -108,6 +108,18 @@ export function revealRunLayout(
   };
 }
 
+export function isRootLayout(
+  shown: WorkspaceLayout,
+  initial: WorkspaceLayout,
+  narrowSurface: SurfaceId,
+  isNarrow: boolean
+): boolean {
+  return layoutsEqual(
+    shown,
+    foldForNarrowViewport(initial, narrowSurface, isNarrow)
+  );
+}
+
 export function foldForNarrowViewport(
   layout: WorkspaceLayout,
   narrowSurface: SurfaceId,

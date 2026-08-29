@@ -99,6 +99,16 @@
   overflow: hidden;
 }
 
+/* The failure notice above the output. A flex item's automatic minimum size would hold it at
+   its full content height, which the clipping pane above then cuts off - so it is allowed to
+   shrink (`min-height: 0`), bounded (`max-height`) and given the scrollbar itself. */
+.v2-run-error {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 45%;
+  overflow-y: auto;
+}
+
 .recipe-workspace-controls {
   position: absolute;
   top: 13px;
@@ -183,11 +193,14 @@
   margin-inline: auto;
 }
 
-/* A document tab - History, API, Deploy - scrolls in one direction only. `overflow-auto` on
-   the body gives it both axes, and a long title or url pushes a card row wider than the
-   phone, which made the page draggable sideways under a fixed header. */
+/* A document tab - History, API, Deploy - scrolls in one direction only: a long title or url
+   pushes a card row wider than the phone, which made the page draggable sideways under a
+   fixed header. Both axes are set here rather than left to a `overflow-auto` class on the
+   element, because Bootstrap's utilities are `!important` and would take the other axis
+   back - see `_workspace_body_class`, which leaves that class off for these tabs. */
 .v2-workspace-body:not(:has(.recipe-workspace)) {
   overflow-x: hidden;
+  overflow-y: auto;
   min-width: 0;
   overflow-wrap: anywhere;
   /* A document tab - API, Deploy, History - has no `.recipe-workspace` to bring the

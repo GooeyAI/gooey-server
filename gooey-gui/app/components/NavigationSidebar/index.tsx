@@ -52,6 +52,10 @@ export function NavigationSidebar({
   const railCollapsed = !isMobile && collapsed;
   const drawerOpen = isMobile && navDrawer.open;
 
+  // `builder.open` is read here but is deliberately not a dependency. `onChange` posts the
+  // whole form, and a post started in the same tick as a link click supersedes that link's
+  // navigation - listed, this ran on every close of Ask Gooey, so clicking Usage closed the
+  // panel and went nowhere. Only a change of `collapsed` itself should persist anything.
   useEffect(() => {
     if (isMobile || builder.open) return;
     if (!mounted.current) {
@@ -61,7 +65,7 @@ export function NavigationSidebar({
     state[collapsed_state_key] = collapsed;
     onChange();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapsed, isMobile, builder.open, collapsed_state_key]);
+  }, [collapsed, isMobile, collapsed_state_key]);
 
   useEffect(() => {
     if (builder.open) {

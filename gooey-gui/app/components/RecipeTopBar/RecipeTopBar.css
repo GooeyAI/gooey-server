@@ -53,6 +53,15 @@
   max-width: 100%;
 }
 
+/* The heading and the menu chevron are separate controls once the heading is a link, so they
+   share a row inside the block that stacks the author line under them. */
+.gooey-topbar-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .gooey-topbar-title {
   display: flex;
   align-items: center;
@@ -69,6 +78,24 @@
 
 .gooey-topbar-title:disabled {
   cursor: default;
+}
+
+.gooey-topbar-title-link {
+  text-decoration: none;
+}
+
+/* On the name only - the crumb names the level you are on, which is not where this goes. */
+.gooey-topbar-title-link:hover .gooey-topbar-title-text {
+  text-decoration: underline;
+}
+
+.gooey-topbar-title-menu {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
 }
 
 .gooey-topbar-title-text {

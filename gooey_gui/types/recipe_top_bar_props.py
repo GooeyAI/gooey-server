@@ -103,6 +103,9 @@ class RecipeTopBarProps(StrictComponentModel):
 
     config: PageShellConfig
     title: str
+    # Where the heading points, from `get_title_breadcrumbs` - the workflow this run belongs
+    # to. None when the title already names the page you are on.
+    title_href: str | None = None
     photo_url: str | None = None
     circle_photo: bool = False
     author: TopBarAuthor | None = None
@@ -122,7 +125,6 @@ class RecipeTopBarProps(StrictComponentModel):
     crumb_label: str | None = None
     builder_panel_key: str | None = None
     builder_new_event: str | None = None
-    history_href: str | None = None
     # Usage is a route rather than a client-side pane, but it shares the bar's view
     # selector. None hides it for viewers who cannot inspect the workflow's run data.
     usage_href: str | None = None

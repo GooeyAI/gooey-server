@@ -35,7 +35,6 @@ from daras_ai_v2.tab_spec import (
     SplitLayout,
     SurfaceId,
     TabSpec,
-    WorkspaceLayout,
 )
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
@@ -254,11 +253,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 ref.set_open(True)
             if ref.is_open:
                 render_demo_dialog(ref, bi_id)
-
-    def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        if self.is_unowned_example():
-            return tabs[0].layout
-        return next(tab.layout for tab in tabs if tab.key == "split")
 
     def get_tab_spec(self) -> list[TabSpec]:
         """The agent tab set. Deploy is absent - its body is reached through the

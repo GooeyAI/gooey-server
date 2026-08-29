@@ -6,6 +6,7 @@ import {
   collapsePane,
   foldForNarrowViewport,
   initialWorkspaceState,
+  isRootLayout,
   layoutsEqual,
   normalizeWorkspaceLayout,
   paneRolesForLayout,
@@ -170,6 +171,17 @@ describe("responsive layout", () => {
   it("leaves wide and single layouts unchanged", () => {
     expect(foldForNarrowViewport(split, "preview", false)).toEqual(split);
     expect(foldForNarrowViewport(edit, "preview", true)).toEqual(edit);
+  });
+
+  it("calls the root what the fold shows, not what is stored", () => {
+    // The work split folds to Preview, so Preview chosen on its own is the same screen and
+    // has to count as the root too - otherwise Back sits there offering to swap one for the
+    // other, which the fold then draws identically.
+    expect(isRootLayout(preview, split, "preview", true)).toBe(true);
+    expect(isRootLayout(edit, split, "preview", true)).toBe(false);
+    // Wide, the two are different arrangements again.
+    expect(isRootLayout(preview, split, "preview", false)).toBe(false);
+    expect(isRootLayout(split, split, "preview", false)).toBe(true);
   });
 });
 

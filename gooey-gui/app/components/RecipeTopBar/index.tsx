@@ -18,6 +18,7 @@ import {
 import type { CustomComponentProps } from "~/components";
 import {
   activeViewForLayouts,
+  isRootLayout,
   layoutsEqual,
   paneVisibility,
   workspaceTargetForLayout,
@@ -37,6 +38,18 @@ type MenuEntry = {
   onPick?: () => void;
 };
 
+// The bot itself as a destination, for tab sets that do not name it as a view of their own.
+// A visitor's does not: About and How it works each pair with the preview on a wide screen,
+// so it never needed a pill. Below lg both fold to a single pane, and then the header's eye
+// is the only route to the bot - hence a view here rather than a missing one.
+const PREVIEW_VIEW: WorkspaceView = {
+  key: "preview",
+  label: "Preview",
+  icon_html: null,
+  layout: { kind: "single", surface: "preview" },
+  desktop_only: false,
+};
+
 // the Publish menu's own entries, distinguishable from anything the server declares
 const PUBLISH_ITEM_KEY = "--topbar-item-publish";
 const SHARE_ITEM_KEY = "--topbar-item-share";
@@ -46,6 +59,7 @@ const DEPLOY_ITEM_KEY = "--topbar-item-deploy";
 export function RecipeTopBar({
   config,
   title,
+  title_href,
   photo_url,
   circle_photo,
   author,
@@ -66,7 +80,6 @@ export function RecipeTopBar({
   deploy_href,
   builder_panel_key,
   builder_new_event,
-  history_href,
   usage_href,
   usage_active,
   state,
@@ -99,16 +112,18 @@ export function RecipeTopBar({
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const {
-    layout,
-    storedLayout,
-    hydrated,
-    hadStoredLayout,
-    isNarrow,
-    selectLayout,
-  } = useWorkspaceLayout(config);
+  const { layout, storedLayout, hydrated, isNarrow, selectLayout } =
+    useWorkspaceLayout(config);
+  const previewView =
+    config.views.find((view) => view.key === "preview") ?? PREVIEW_VIEW;
+  // Used wherever a layout has to be named. Not `config.views`, which is what the desktop
+  // pill strip draws - the supplied Preview is reachable from the header, not from a pill.
+  const views =
+    previewView === PREVIEW_VIEW
+      ? [...config.views, PREVIEW_VIEW]
+      : config.views;
   const activeViewSpec = activeViewForLayouts(
-    config.views,
+    views,
     layout,
     storedLayout,
     config.workspace_active
@@ -129,33 +144,36 @@ export function RecipeTopBar({
     }
   };
 
-  useEffect(() => {
-    if (!builder_panel_key || !config.workspace_active || view_only) {
-      return;
-    }
-    if (window.innerWidth >= 992) {
-      return;
-    }
-    if (!hadStoredLayout) {
-      builder.setOpen(true);
-    }
-  }, [
-    builder_panel_key,
-    config.storage_key,
-    config.workspace_active,
-    hadStoredLayout,
-    view_only,
-  ]);
+  // Ask Gooey covers the workspace without changing which view is selected behind it, so it
+  // is a level of the mobile stack in its own right. Only over the workspace: on API or
+  // Deploy the panel is not shown at all, and Back there has to leave the tab.
+  const builderOpen =
+    !!builder_panel_key && config.workspace_active && builder.open;
 
+  // The bottom of the mobile stack: the view the server opens the workspace on, as it is
+  // *shown*. The fold maps a split onto one of its panes, so Preview chosen on its own and
+  // the work split folded to Preview are the same screen. Comparing the stored layouts
+  // instead called only one of them the root: Back out of the other swapped a layout the
+  // fold then drew identically, so it read as doing nothing but dropping the back arrow.
+  // Before hydration the root is the safe guess - it is the only state whose left control,
+  // the drawer, is always right.
   const atRoot =
     config.workspace_active &&
+    !builderOpen &&
     (!hydrated ||
-      (builder_panel_key
-        ? builder.open
-        : layoutsEqual(storedLayout, config.initial_layout)));
-  const crumb = crumb_label || activeViewSpec?.label || "";
-  const previewView = config.views.find((view) => view.key === "preview");
-  const editView = config.views.find((view) => view.key === "edit");
+      isRootLayout(
+        layout,
+        config.initial_layout,
+        config.narrow_surface,
+        isNarrow
+      ));
+  // Ask Gooey carries its own title pill, so the bar neither repeats it nor goes on naming
+  // the view underneath the panel.
+  const crumb = builderOpen ? "" : crumb_label || activeViewSpec?.label || "";
+  // The two surfaces that talk *about* the bot rather than being it, so from either the eye
+  // is the way to it. Not on the work views: Edit pairs with the preview on a wide screen and
+  // swaps to it from the sheet, and Preview is already there - the slot gives way to Update.
+  const canShowPreview = builderOpen || activeViewSpec?.key === "about";
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
   const isRunning = run_intent.kind === "stop";
 
@@ -166,28 +184,37 @@ export function RecipeTopBar({
   };
 
   const goBack = () => {
-    if (!config.workspace_active) {
+    // Ask Gooey sits over a view rather than replacing it, so closing it uncovers whatever
+    // was behind and that is already the level below.
+    if (builderOpen) {
       setBuilder(false);
-      if (editView) {
-        chooseView(editView);
-      }
       return;
     }
-    if (builder_panel_key) {
-      setBuilder(true);
-      return;
-    }
-    const initialView = config.views.find((view) =>
+    const initialView = views.find((view) =>
       layoutsEqual(view.layout, config.initial_layout)
     );
     if (initialView) {
-      chooseView(initialView);
+      showView(initialView);
     }
   };
 
   const showView = (view: WorkspaceView) => {
     setBuilder(false);
     chooseView(view);
+  };
+
+  const showBuilder = () => {
+    setBuilder(true);
+    // Usage is a page rather than a pane and does not draw the panel, so it has to be left
+    // behind first. The panel is commanded open before the navigation and stays open across
+    // it, so it is up when the workspace arrives.
+    const target = workspaceTargetForLayout(
+      config.workspace_active,
+      config.workspace_href
+    );
+    if (target) {
+      navigate(target);
+    }
   };
 
   const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
@@ -286,6 +313,25 @@ export function RecipeTopBar({
         ]
       : [];
 
+  // The way into Ask Gooey from the surfaces it is not already covering. Not from About,
+  // whose header offers the preview instead, and not while the panel is up, where the sheet
+  // offers New Chat. Nor from API or Deploy, which do not show the panel at all.
+  const builderEntry: SheetEntry[] =
+    !builderOpen &&
+    !!builder_panel_key &&
+    (usage_active ||
+      activeViewSpec?.key === "edit" ||
+      activeViewSpec?.key === "preview")
+      ? [
+          {
+            key: "--sheet-builder",
+            label: "Ask Gooey",
+            iconClass: "fa-regular fa-sparkles",
+            onPick: showBuilder,
+          },
+        ]
+      : [];
+
   const otherWorkView = activeViewSpec?.key === "edit" ? "preview" : "edit";
 
   const sheetEntries: SheetEntry[] = view_only
@@ -312,7 +358,8 @@ export function RecipeTopBar({
       ]
     : [
         ...viewEntry("about"),
-        ...(builder_new_event && atRoot
+        // A control on the Ask Gooey panel, so it is only offered while that panel is up.
+        ...(builder_new_event && builderOpen
           ? [
               {
                 key: "--sheet-new-chat",
@@ -324,17 +371,7 @@ export function RecipeTopBar({
             ]
           : []),
         ...viewEntry(otherWorkView),
-        ...(history_href
-          ? [
-              {
-                key: "--sheet-history",
-                label: "History",
-                iconClass: "fa-regular fa-clock-rotate-left",
-                href: history_href,
-                onPick: () => setBuilder(false),
-              },
-            ]
-          : []),
+        ...builderEntry,
         ...usageEntry,
         ...titleEntries.map((item) => ({
           key: item.key,
@@ -357,6 +394,24 @@ export function RecipeTopBar({
             onPick: item.onPick ?? (() => setBuilder(false)),
           })),
       ];
+
+  // Shared by the two forms the heading takes. The crumb sits inside it so a long name
+  // ellipsises against it rather than pushing it off the row.
+  const titleContent = (
+    <>
+      <span className="gooey-topbar-title-text">{title}</span>
+      {/* Which level of the stack is on screen; above lg the active pill says so. */}
+      {!atRoot && !!crumb && (
+        <span className="gooey-topbar-crumb d-lg-none">
+          <i
+            className="fa-regular fa-chevron-right gooey-topbar-crumb-sep"
+            aria-hidden="true"
+          />
+          {crumb}
+        </span>
+      )}
+    </>
+  );
 
   const closeMenus = () => {
     setTitleMenuOpen(false);
@@ -400,27 +455,47 @@ export function RecipeTopBar({
         )}
 
         <div className="gooey-topbar-titleblock" ref={titleMenuRef}>
-          <button
-            type="button"
-            className="gooey-topbar-title"
-            onClick={() => setTitleMenuOpen((v) => !v)}
-            disabled={!title_menu_items.length || isNarrow}
-          >
-            <span className="gooey-topbar-title-text">{title}</span>
-            {!!title_menu_items.length && !isNarrow && (
-              <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+          <div className="gooey-topbar-titlerow">
+            {/* A heading that names another page is a link to it - a run points at the
+                workflow it came from. Where it names this page the server sends no href and
+                it stays the menu's trigger, as it is on the workflow's own url. */}
+            {title_href ? (
+              <Link
+                to={title_href}
+                className="gooey-topbar-title gooey-topbar-title-link"
+                title={title}
+              >
+                {titleContent}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="gooey-topbar-title"
+                onClick={() => setTitleMenuOpen((v) => !v)}
+                disabled={!title_menu_items.length || isNarrow}
+              >
+                {titleContent}
+                {!!title_menu_items.length && !isNarrow && (
+                  <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+                )}
+              </button>
             )}
-            {/* Which level of the stack is on screen; above lg the active pill says so. */}
-            {!atRoot && !!crumb && (
-              <span className="gooey-topbar-crumb d-lg-none">
-                <i
-                  className="fa-regular fa-chevron-right gooey-topbar-crumb-sep"
-                  aria-hidden="true"
-                />
-                {crumb}
-              </span>
+            {/* Above lg the chevron is the only way to Versions, Duplicate and Delete, so
+                once the title itself navigates the menu needs a trigger of its own. */}
+            {!!title_href && !!title_menu_items.length && !isNarrow && (
+              <button
+                type="button"
+                className="gooey-topbar-title-menu"
+                onClick={() => setTitleMenuOpen((v) => !v)}
+                title="Workflow options"
+                aria-label="Workflow options"
+                aria-haspopup="menu"
+                aria-expanded={titleMenuOpen}
+              >
+                <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+              </button>
             )}
-          </button>
+          </div>
           {author && (
             <span className="gooey-topbar-author">{author.label}</span>
           )}
@@ -491,43 +566,51 @@ export function RecipeTopBar({
           </button>
         )}
 
-        {/* Preview at the root, Update below it. The sheet never lists Preview, so this is
-            the only way to reach it. */}
-        {atRoot
-          ? previewView && (
-              <button
-                type="button"
-                className="gooey-topbar-action d-lg-none"
-                onClick={() => showView(previewView)}
-                title="Preview"
-                aria-label="Preview"
-              >
-                <i className="fa-regular fa-eye" />
-              </button>
-            )
-          : !!publish_label &&
-            !!publish_intent && (
-              <button
-                type="submit"
-                name={submit_intent_key}
-                value={encodeSubmitIntent(publish_intent)}
-                className="gooey-topbar-action d-lg-none"
-                title={
-                  has_unpublished_changes
-                    ? `${publish_label} (unpublished changes)`
-                    : publish_label
-                }
-                aria-label={publish_label}
-              >
-                <i className="fa-regular fa-floppy-disk" />
-                {has_unpublished_changes && (
-                  <span
-                    className="gooey-topbar-dot"
-                    title="Unpublished changes"
-                  />
-                )}
-              </button>
-            )}
+        {/* Preview from About and from Ask Gooey, Update from the work views.
+
+            `preventDefault` because the two share a slot: choosing Preview leaves About, so
+            React patches this very node into the submit button below before the browser runs
+            the click's activation behaviour, and the form was posting the publish intent -
+            the save dialog opened on top of the preview. Cancelling the default action is
+            immune to that ordering; re-keying the pair would not be. */}
+        {canShowPreview ? (
+          <button
+            type="button"
+            className="gooey-topbar-action d-lg-none"
+            onClick={(e) => {
+              e.preventDefault();
+              showView(previewView);
+            }}
+            title="Preview"
+            aria-label="Preview"
+          >
+            <i className="fa-regular fa-eye" />
+          </button>
+        ) : (
+          !!publish_label &&
+          !!publish_intent && (
+            <button
+              type="submit"
+              name={submit_intent_key}
+              value={encodeSubmitIntent(publish_intent)}
+              className="gooey-topbar-action d-lg-none"
+              title={
+                has_unpublished_changes
+                  ? `${publish_label} (unpublished changes)`
+                  : publish_label
+              }
+              aria-label={publish_label}
+            >
+              <i className="fa-regular fa-floppy-disk" />
+              {has_unpublished_changes && (
+                <span
+                  className="gooey-topbar-dot"
+                  title="Unpublished changes"
+                />
+              )}
+            </button>
+          )
+        )}
 
         {!!overflowEntries.length && (
           <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
@@ -702,9 +785,10 @@ export function RecipeTopBar({
 
       {/* The editor's bottom bar, below lg only - above it cost and Run sit in the right
           cluster. Scoped to the editor, the one view with something to submit; Preview and
-          Ask Gooey both put a composer at this edge. `!atRoot` as well as the view, since
-          Ask Gooey covers the workspace without changing which view is selected behind it. */}
-      {!atRoot && activeViewSpec?.key === "edit" && (
+          Ask Gooey both put a composer at this edge. `!builderOpen` as well as the view,
+          since Ask Gooey covers the workspace without changing which view is selected
+          behind it. */}
+      {!builderOpen && activeViewSpec?.key === "edit" && (
         <div className="gooey-topbar-runbar d-lg-none">
           {!!cost_label &&
             (() => {

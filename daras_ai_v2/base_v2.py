@@ -11,7 +11,6 @@ from bots.models import (
     SavedRun,
     WorkflowAccessLevel,
 )
-from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import (
     BasePage as BasePageV1,
@@ -30,7 +29,6 @@ from daras_ai_v2.gooey_builder import (
     get_gooey_builder_photo_url,
     render_gooey_builder,
 )
-from daras_ai_v2.grid_layout_widget import grid_layout
 from daras_ai_v2.tab_spec import (
     PaneSpec,
     SingleLayout,
@@ -71,7 +69,7 @@ from gooey_gui.types.recipe_workspace_props import (
 )
 from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
-from widgets.history import history_href_for_workflow, load_more_href
+from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
 from widgets.sidebar import sidebar_layout
 from widgets.workflow_cards import author_from_user, history_card
@@ -93,6 +91,8 @@ class WorkflowIdentity(typing.NamedTuple):
     title: str
     # Without it, for tabs that put their own name in the crumb.
     name: str
+    # The workflow this run belongs to, or None when the heading already names this page.
+    href: str | None
     photo_url: str | None
     circle_photo: bool
 
@@ -140,19 +140,12 @@ class BasePage(BasePageV1):
         with (
             body_pane,
             gui.div(
-                className=(
-                    # h-100 not flex-grow-1: the Sidebar leaves no flex context to grow
-                    # into. px-0 below lg so the panes run edge to edge, and no `pb-*` -
-                    # clearing the run bar needs `env(safe-area-inset-bottom)`, which
-                    # RecipeWorkspace.css owns.
-                    "v2-workspace-body d-flex flex-column h-100 w-100 overflow-auto "
-                    "px-0 pt-2 pt-lg-0 pb-lg-2"
-                ),
+                className=self._workspace_body_class(shell_config),
                 # or a flex child refuses to shrink below its content
                 style=dict(minHeight=0),
             ),
         ):
-            if self.tab in {RecipeTabs.run, RecipeTabs.preview}:
+            if shell_config.workspace_active:
                 self._render_workspace(shell_config)
             else:
                 self.render_selected_tab()
@@ -179,10 +172,7 @@ class BasePage(BasePageV1):
         return PageShellConfig(
             storage_key=self._workspace_storage_key(),
             initial_layout=self.entry_layout(tabs),
-            run_layout=SplitLayout(
-                primary=SurfaceId.editor,
-                secondary=SurfaceId.preview,
-            ),
+            run_layout=self.work_layout(),
             route_layout=route_layout,
             views=tabs,
             narrow_surface=self.narrow_surface(),
@@ -190,6 +180,12 @@ class BasePage(BasePageV1):
             workspace_active=workspace_active,
             active_run_id=active_run_id,
         )
+
+    def _workspace_body_class(self, config: PageShellConfig) -> str:
+        body = "v2-workspace-body d-flex flex-column h-100 w-100 pt-2 pt-lg-0 pb-lg-2"
+        if config.workspace_active:
+            return f"{body} overflow-auto px-0"
+        return body
 
     def _render_workspace(self, config: PageShellConfig):
         """Render each reusable work surface once; React controls their arrangement."""
@@ -232,6 +228,10 @@ class BasePage(BasePageV1):
         return WorkflowIdentity(
             title=tbreadcrumbs.title_with_prefix() or fallback,
             name=(tbreadcrumbs.h1_title and tbreadcrumbs.h1_title.title) or fallback,
+            # v1 draws this as the linked half of its breadcrumb, and leaves it empty on the
+            # page the heading names - so a run points at its workflow, and the workflow's
+            # own page points nowhere.
+            href=(tbreadcrumbs.h1_title and tbreadcrumbs.h1_title.url) or None,
             photo_url=pr.photo_url or None,
             circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
         )
@@ -374,7 +374,7 @@ class BasePage(BasePageV1):
         if history_ref.is_open:
             with gui.alert_dialog(
                 ref=history_ref,
-                modal_title=f"#### {icons.time} Version History",
+                modal_title=f"#### {icons.time} Versions",
                 large=True,
                 unsafe_allow_html=True,
             ):
@@ -449,7 +449,33 @@ class BasePage(BasePageV1):
         self.submit_and_redirect()
 
     def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        return tabs[0].layout
+        if self.at_workflow_root() and not self.can_edit_current_pr():
+            return tabs[0].layout
+        return self.work_layout()
+
+    def work_layout(self) -> WorkspaceLayout:
+        """The two-pane working view: the editor with its preview beside it."""
+        return SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
+
+    def at_workflow_root(self) -> bool:
+        """The saved workflow's own page, rather than a run of it or one of its url tabs."""
+        if self.tab not in {RecipeTabs.run, RecipeTabs.preview}:
+            return False
+        return not self.request.query_params.get("run_id")
+
+    def can_edit_current_pr(self) -> bool:
+        """Whether this workflow is the viewer's to change: its creator, an editor in its
+        workspace, or an admin. A root recipe belongs to nobody, so it answers False.
+        """
+        if not self.request.user:
+            return False
+        try:
+            workspace = self.current_workspace
+        except Workspace.DoesNotExist:
+            return False
+        return WorkflowAccessLevel.can_user_edit_published_run(
+            workspace=workspace, user=self.request.user, pr=self.current_pr
+        )
 
     def is_unowned_example(self) -> bool:
         """The url points at a published workflow the viewer does not own, rather than at a
@@ -478,7 +504,7 @@ class BasePage(BasePageV1):
             items.append(
                 TopBarMenuItem(
                     key=self.MENU_VERSION_HISTORY,
-                    label="Version history",
+                    label="Versions",
                     icon_html=icons.history,
                     target=SubmitTarget(
                         intent=MenuIntent(item_key=self.MENU_VERSION_HISTORY)
@@ -585,6 +611,7 @@ class BasePage(BasePageV1):
                 config=config,
                 # Prefixed on the workspace; elsewhere the tab's label is the crumb.
                 title=identity.title if config.workspace_active else identity.name,
+                title_href=identity.href,
                 crumb_label=None if config.workspace_active else self.tab.label,
                 view_only=self.is_unowned_example(),
                 photo_url=identity.photo_url,
@@ -614,17 +641,24 @@ class BasePage(BasePageV1):
                     if self._can_show_builder() and not builder_thread_is_empty(self)
                     else None
                 ),
-                history_href=history_href_for_workflow(self.workflow),
                 # a route rather than a pane, and empty for anyone who cannot read the
                 # workflow's run data
-                usage_href=(
-                    self.current_app_url(RecipeTabs.usage)
-                    if self.can_view_usage()
-                    else None
-                ),
+                usage_href=self._usage_href(),
                 usage_active=usage_active,
             )
         )
+
+    def _usage_href(self) -> str | None:
+        """The Usage tab's url, or None to leave it out of the bar.
+
+        Out for a visitor even when they may read the run data - an admin looking at somebody
+        else's app is the case. `get_viewer_tab_spec` gives them About and How it works,
+        which present the workflow; a list of its runs is an owner's tool and does not belong
+        beside them. The route itself stays open, so a link to it still resolves.
+        """
+        if self.is_unowned_example() or not self.can_view_usage():
+            return None
+        return self.current_app_url(RecipeTabs.usage)
 
     def _top_bar_author(self):
         """The "by <someone>" line. Workspace when there is one, else the run's user."""
@@ -645,11 +679,7 @@ class BasePage(BasePageV1):
         """Permission-derived label for the publish action."""
         if not self.is_logged_in():
             return "Save"
-        if WorkflowAccessLevel.can_user_edit_published_run(
-            workspace=self.current_workspace,
-            user=self.request.user,
-            pr=self.current_pr,
-        ):
+        if self.can_edit_current_pr():
             return "Update"
         elif self._has_request_changed():
             return "Save and Run"
@@ -973,7 +1003,11 @@ class BasePage(BasePageV1):
         ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
-                self._render_failed_output()
+                # Its own scroller: the pane clips rather than scrolls, so a long message -
+                # a traceback, a provider's error body - ran off the bottom with no way to
+                # reach the rest of it. Capped so it cannot crowd out the output either.
+                with gui.div(className="v2-run-error"):
+                    self._render_failed_output()
 
             # render outputs
             if not is_deleted:

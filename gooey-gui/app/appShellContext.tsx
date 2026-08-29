@@ -16,14 +16,12 @@ import {
   initialWorkspaceState,
   type PersistedWorkspaceState,
   type WorkspaceLayout,
-  workspaceLayoutFromNavigationState,
 } from "./components/RecipeWorkspace/paneState";
 
 type WorkspaceEntry = {
   value: PersistedWorkspaceState;
   hydrated: boolean;
   hydrationToken: string;
-  hadStoredLayout: boolean;
 };
 
 export type PanelEntry = {
@@ -126,10 +124,6 @@ export function useWorkspaceLayout(config: PageShellConfig) {
       config.active_run_id ?? "",
       config.route_layout ? JSON.stringify(config.route_layout) : "",
     ].join(":");
-    const hadStoredLayout =
-      hasStoredWorkspaceState(config.storage_key) ||
-      Boolean(config.route_layout) ||
-      Boolean(workspaceLayoutFromNavigationState(location.state));
     const next = initialWorkspaceState(
       config,
       window.sessionStorage,
@@ -140,7 +134,6 @@ export function useWorkspaceLayout(config: PageShellConfig) {
       value: next,
       hydrated: true,
       hydrationToken,
-      hadStoredLayout,
     });
     if (workspaceLayoutNavigationStatePresent(location.state)) {
       clearWorkspaceLayoutNavigationState();
@@ -163,7 +156,6 @@ export function useWorkspaceLayout(config: PageShellConfig) {
         value: next,
         hydrated: true,
         hydrationToken: entry?.hydrationToken ?? "",
-        hadStoredLayout: true,
       });
     },
     [config.storage_key, context, current]
@@ -177,7 +169,6 @@ export function useWorkspaceLayout(config: PageShellConfig) {
     ),
     storedLayout: current.layout,
     hydrated: Boolean(entry?.hydrated),
-    hadStoredLayout: Boolean(entry?.hadStoredLayout),
     isNarrow,
     selectLayout,
   };
@@ -294,14 +285,6 @@ function persistWorkspaceState(
     window.sessionStorage.setItem(storageKey, JSON.stringify(state));
   } catch {
     // The in-memory context remains usable when browser storage is unavailable.
-  }
-}
-
-function hasStoredWorkspaceState(storageKey: string): boolean {
-  try {
-    return window.sessionStorage.getItem(storageKey) !== null;
-  } catch {
-    return false;
   }
 }
 

@@ -1,3 +1,4 @@
+import { Link } from "@remix-run/react";
 import { useState } from "react";
 
 import { GooeyImg, GooeyVideo } from "~/components/MediaTags";
@@ -162,8 +163,11 @@ export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
     card.author?.name
   );
   return (
-    <a
-      href={card.href}
+    // `Link` rather than an anchor: these open a page of the same app, and a full load would
+    // rebuild the shell around it. The server sends absolute urls, which react-router
+    // navigates client-side when they are same-origin.
+    <Link
+      to={card.href}
       className="d-flex flex-column h-100 border rounded-4 overflow-hidden text-decoration-none text-body border-hover"
     >
       <div className="position-relative recent-card-preview bg-light p-0">
@@ -195,7 +199,7 @@ export function HistoryWorkflowCard({ card }: { card: WorkflowCardData }) {
           )}
         </div>
       </div>
-    </a>
+    </Link>
   );
 }
 
