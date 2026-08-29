@@ -407,8 +407,15 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             )
             with gui.div(
                 # pe-3 keeps the scrollbar off the content when the pane overflows
-                className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3",
-                style=dict(minHeight=0),
+                className="flex-grow-1 pt-2 pe-1 pe-lg-3",
+                # One axis, and not Bootstrap's `overflow-auto`: that is `overflow: auto
+                # !important` on *both* axes, so this pane scrolled sideways too - every
+                # `gui.columns()` inside a pane is a `.row` carrying `margin-inline: -12px`
+                # for a container gutter to absorb, and there is none to absorb it here. That
+                # left the form draggable by 12px and parked there, clipping the first
+                # character of every label. Written as a style rather than a utility because
+                # the utility's `!important` would win over it.
+                style=dict(minHeight=0, overflowY="auto", overflowX="hidden"),
             ):
                 render_pane()
 
