@@ -111,3 +111,16 @@ export interface WorkspaceView {
   layout: SingleLayout | SplitLayout;
   desktop_only: boolean;
 }
+/**
+ * The same Run control, at the foot of the editor pane rather than in the bar.
+ *
+ * Here rather than beside the workspace's own props for `RunControlIntent`: that module is
+ * imported by this one, so reaching back for the intents would close a cycle.
+ */
+export interface EditorRunBarProps {
+  submit_intent_key: string;
+  run_intent: RunIntent | StopIntent;
+  cost_label: string | null;
+  cost_href: string | null;
+  cost_title: string | null;
+}

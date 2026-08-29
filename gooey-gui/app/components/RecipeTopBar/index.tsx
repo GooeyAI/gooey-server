@@ -45,7 +45,9 @@ type MenuEntry = {
 const PREVIEW_VIEW: WorkspaceView = {
   key: "preview",
   label: "Preview",
-  icon_html: null,
+  // The eye, same as `icons.preview` on the Preview tab an owner is given and same as the
+  // header button beside it - one destination should not be drawn two ways.
+  icon_html: '<i class="fa-solid fa-eye"></i>',
   layout: { kind: "single", surface: "preview" },
   desktop_only: false,
 };
@@ -117,7 +119,8 @@ export function RecipeTopBar({
   const previewView =
     config.views.find((view) => view.key === "preview") ?? PREVIEW_VIEW;
   // Used wherever a layout has to be named. Not `config.views`, which is what the desktop
-  // pill strip draws - the supplied Preview is reachable from the header, not from a pill.
+  // pill strip draws - the supplied Preview is reachable from the header and the sheet, both
+  // of which are the narrow layout's, and a pill for it would be redundant beside them.
   const views =
     previewView === PREVIEW_VIEW
       ? [...config.views, PREVIEW_VIEW]
@@ -336,7 +339,10 @@ export function RecipeTopBar({
 
   const sheetEntries: SheetEntry[] = view_only
     ? [
-        ...config.views
+        // `views`, so a tab set that names no Preview of its own still offers the bot here.
+        // A visitor's does not, and the header's eye only appears from About - which left
+        // How it works with no route to the thing it is describing.
+        ...views
           .filter((view) => !view.desktop_only)
           .map((view) => ({
             key: `--sheet-view-${view.key}`,
@@ -782,66 +788,6 @@ export function RecipeTopBar({
           </span>
         </button>
       </div>
-
-      {/* The editor's bottom bar, below lg only - above it cost and Run sit in the right
-          cluster. Scoped to the editor, the one view with something to submit; Preview and
-          Ask Gooey both put a composer at this edge. `!builderOpen` as well as the view,
-          since Ask Gooey covers the workspace without changing which view is selected
-          behind it. */}
-      {!builderOpen && activeViewSpec?.key === "edit" && (
-        <div className="gooey-topbar-runbar d-lg-none">
-          {!!cost_label &&
-            (() => {
-              const costName = `Run cost: ${cost_label}`;
-              const costTip = cost_title
-                ? `${costName} (${cost_title})`
-                : costName;
-              const inner = (
-                <>
-                  <span className="gooey-topbar-runbar-est">Est.</span>
-                  {cost_label}
-                </>
-              );
-              return cost_href ? (
-                <a
-                  className="gooey-topbar-runbar-cost"
-                  href={cost_href}
-                  title={costTip}
-                  aria-label={costTip}
-                >
-                  {inner}
-                </a>
-              ) : (
-                <span
-                  className="gooey-topbar-runbar-cost"
-                  title={costTip}
-                  aria-label={costTip}
-                >
-                  {inner}
-                </span>
-              );
-            })()}
-
-          <button
-            type="submit"
-            name={submit_intent_key}
-            value={encodeSubmitIntent(run_intent)}
-            className={clsx(
-              "gooey-topbar-runbar-run",
-              isRunning && "gooey-topbar-runbar-run-stop"
-            )}
-            onClick={handleRun}
-            title={isRunning ? "Stop this run" : "Run"}
-            aria-label={isRunning ? "Stop this run" : "Run"}
-          >
-            {isRunning ? (
-              <i className="fa-regular fa-xmark-large" />
-            ) : (
-              <i className="fa-solid fa-play" />
-            )}
-          </button>
-        </div>
-      )}
 
       {sheetOpen && (
         <MobileActionSheet

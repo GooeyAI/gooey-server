@@ -201,10 +201,11 @@ def test_page_shell_config_is_built_once_from_typed_layouts(monkeypatch):
     assert preview_config.active_run_id == "run-1"
 
 
-def test_entry_layout_introduces_the_workflow_only_to_a_visitor(monkeypatch):
-    """A saved workflow's own url introduces it, so a visitor opens on About - which a phone
-    shows on its own. Whoever can edit it came to change the thing, so they open on the work
-    view, as every other url does; that folds to the preview on a phone."""
+def test_entry_layout_lands_on_the_tab_set_it_was_given(monkeypatch):
+    """`is_unowned_example` picks both the tabs and the view they open on, so the two cannot
+    disagree. A visitor's tabs are About and How it works, and How it works is a config form
+    they have no way to save - so About. Everyone else works, and folds to the preview on a
+    phone."""
     about = SplitLayout(primary=SurfaceId.about, secondary=SurfaceId.preview)
     work = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
     tabs = [TabSpec(key="about", label="About", layout=about)]
@@ -213,20 +214,21 @@ def test_entry_layout_introduces_the_workflow_only_to_a_visitor(monkeypatch):
     page.tab = RecipeTabs.run
     page.request = SimpleNamespace(query_params={})
 
-    monkeypatch.setattr(VideoBotsPageV2, "can_edit_current_pr", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
     assert page.entry_layout(tabs) == about
 
-    monkeypatch.setattr(VideoBotsPageV2, "can_edit_current_pr", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: False)
     assert page.entry_layout(tabs) == work
 
-    # A run, or a return from a document tab, never introduces anything.
-    monkeypatch.setattr(VideoBotsPageV2, "can_edit_current_pr", lambda self: False)
+    # The url has no say: an admin reading somebody else's published run is a visitor to it,
+    # gets their tab set, and so lands where that tab set starts.
+    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
     page.request.query_params = {"run_id": "run-1"}
-    assert page.entry_layout(tabs) == work
+    assert page.entry_layout(tabs) == about
 
     page.request.query_params = {}
     page.tab = RecipeTabs.run_as_api
-    assert page.entry_layout(tabs) == work
+    assert page.entry_layout(tabs) == about
 
 
 def test_document_tabs_drop_the_bootstrap_overflow_and_gutter_utilities():

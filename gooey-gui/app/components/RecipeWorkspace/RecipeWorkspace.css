@@ -253,6 +253,78 @@
   padding: 0.75rem;
 }
 
+/* ------------------------------------------------------------ editor run bar
+
+   The foot of the form, inside the editor's own column rather than pinned to the viewport:
+   bounded by the pane at any width, and nothing behind it has height to reserve. Last child
+   of a `h-100` flex column, so `margin-top: auto` drops it to the bottom of a short form and
+   `sticky` holds it in sight under a long one. */
+.v2-editor-runbar {
+  position: sticky;
+  bottom: 0;
+  /* over the form it follows, which is the earlier sibling and would otherwise win */
+  z-index: 1;
+  flex: 0 0 auto;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gooey-space-2);
+  /* no side padding: the reading column it sits in brings its own */
+  padding: var(--gooey-space-2) 0;
+  /* clears the home indicator where the pane runs to the screen's edge; `env()` is 0 elsewhere */
+  padding-bottom: calc(var(--gooey-space-2) + env(safe-area-inset-bottom));
+  background: var(--gooey-bg-page);
+  border-top: 0.33px solid var(--gooey-line-default);
+}
+
+/* Pushes Run to the far edge and takes the near one. Done from the reading rather than with
+   `space-between`, which would leave Run on the left on a recipe that quotes no cost. */
+.v2-editor-runbar-cost {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gooey-space-1);
+  padding: 6px var(--gooey-space-2);
+  border-radius: var(--gooey-radius-xs);
+  /* green-tinted, because it reads as a quantity rather than a control - the only thing on
+     this bar that is not a button */
+  background: var(--gooey-ok-wash);
+  color: var(--gooey-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* "Est." qualifies the number rather than being part of it, so it steps back a weight. */
+.v2-editor-runbar-est {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.v2-editor-runbar-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--gooey-radius-xs);
+  background: var(--gooey-ink);
+  color: var(--gooey-bg-page);
+  font-size: 1rem;
+}
+
+.v2-editor-runbar-run:disabled {
+  opacity: 0.5;
+}
+
+.v2-editor-runbar-run-stop {
+  background: var(--gooey-danger);
+}
+
 /* Frames the preview where it shares the view with something else - Split, About - so the two
    read as separate surfaces. Was an inline style on the div; moved here so the media query
    below can drop it. */
@@ -264,9 +336,6 @@
 }
 
 @media (max-width: 991.98px) {
-  /* Room for the editor's bottom run bar, which is fixed to the viewport edge. Only where
-     that bar exists - the `env()` term is the home indicator, 0 elsewhere, which is why the
-     markup carries no `pb-*` at this width. */
   /* Both work views start at the header's rule, so the page's top gutter showed as a strip of
      background between the two. `!important` to beat `pt-2`. About keeps its gutter - it is a
      card, and sits off the rule. */
@@ -275,11 +344,6 @@
       .recipe-workspace-preview.recipe-workspace-pane--solo
     ) {
     padding-top: 0 !important;
-  }
-
-  /* Only the editor has a run bar under it to clear. */
-  .v2-workspace-body:has(.recipe-workspace-editor.recipe-workspace-pane--solo) {
-    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
   }
 
   /* The widget's own rounded corners are right beside the editor and wrong when it is the

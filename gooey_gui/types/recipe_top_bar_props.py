@@ -134,3 +134,19 @@ class RecipeTopBarProps(StrictComponentModel):
     cost_label: str | None = None
     cost_href: str | None = None
     cost_title: str | None = None
+
+
+class EditorRunBarProps(StrictComponentModel):
+    """The same Run control, at the foot of the editor pane rather than in the bar.
+
+    Here rather than beside the workspace's own props for `RunControlIntent`: that module is
+    imported by this one, so reaching back for the intents would close a cycle.
+    """
+
+    _component: ClassVar[Literal["EditorRunBar"]] = "EditorRunBar"
+
+    submit_intent_key: str
+    run_intent: RunControlIntent
+    cost_label: str | None = None
+    cost_href: str | None = None
+    cost_title: str | None = None

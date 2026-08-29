@@ -42,6 +42,7 @@ from daras_ai_v2.variables_widget import variables_input
 from functions.base_llm_tool import functions_input
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
+    EditorRunBarProps,
     LinkTarget,
     ManageShare,
     MenuIntent,
@@ -449,19 +450,21 @@ class BasePage(BasePageV1):
         self.submit_and_redirect()
 
     def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        if self.at_workflow_root() and not self.can_edit_current_pr():
+        """The view the workspace opens on. About for a visitor, the work split otherwise.
+
+        Read off the same answer `get_tab_spec` reads, so the landing view and the tabs
+        offered cannot disagree: a visitor is given About and How it works, and How it works
+        is a config form they have no way to save. About is what their half of the tab set
+        is for, so it is where they start - the root of a recipe and a published run they do
+        not own alike.
+        """
+        if self.is_unowned_example():
             return tabs[0].layout
         return self.work_layout()
 
     def work_layout(self) -> WorkspaceLayout:
         """The two-pane working view: the editor with its preview beside it."""
         return SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
-
-    def at_workflow_root(self) -> bool:
-        """The saved workflow's own page, rather than a run of it or one of its url tabs."""
-        if self.tab not in {RecipeTabs.run, RecipeTabs.preview}:
-            return False
-        return not self.request.query_params.get("run_id")
 
     def can_edit_current_pr(self) -> bool:
         """Whether this workflow is the viewer's to change: its creator, an editor in its
@@ -861,7 +864,30 @@ class BasePage(BasePageV1):
                     style=dict(minHeight=0),
                 ),
             ):
-                return self._render_input_col()
+                submitted = self._render_input_col()
+                self._render_editor_run_bar()
+                return submitted
+
+    def _render_editor_run_bar(self):
+        """Run, and what it will cost, at the foot of the form that submits.
+
+        In the editor's own column rather than pinned to the viewport, so it is bounded by
+        the pane and needs no height reserved behind it. The bar above draws its Run from lg
+        up only, where this one is off the bottom of a tall form.
+        """
+        cost_label, cost_title = self._top_bar_cost()
+        # after `_render_input_col`, so a run this very request started already reads as
+        # running and the button offers Stop - the point in the cycle the bar reads it at too
+        is_running = self._is_run_in_progress()
+        gui.model_component(
+            EditorRunBarProps(
+                submit_intent_key=self.SUBMIT_INTENT_KEY,
+                run_intent=StopIntent() if is_running else RunIntent(),
+                cost_label=cost_label or None,
+                cost_href=self.get_credits_click_url() or None,
+                cost_title=cost_title or None,
+            )
+        )
 
     def _render_deleted_output_if_needed(self) -> bool:
         """True if this run's data is gone, in which case that is all there is to render."""

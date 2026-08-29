@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { createContext, useContext, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 
+import type { EditorRunBarProps } from "@gooey-types/recipe_top_bar_props";
 import type {
   PageShellConfig,
   RecipeSurfaceProps,
@@ -15,6 +16,7 @@ import type { CustomComponentProps } from "~/components";
 import { RenderedChildren } from "~/renderer";
 import type { TreeNode } from "~/renderer";
 
+import { encodeSubmitIntent } from "../RecipeTopBar/submitIntent";
 import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
   collapsePane,
@@ -147,6 +149,98 @@ export function RecipeSurface({
 }: CustomComponentProps & RecipeSurfaceProps) {
   return (
     <RenderedChildren children={children} onChange={onChange} state={state} />
+  );
+}
+
+/** Run, and the estimate, at the foot of the editor's column. Rendered by Python as the last
+ *  child of the editor surface, which is what scopes it: it is there whenever the pane is,
+ *  at every width, without the top bar having to work out which view is on screen. */
+export function EditorRunBar({
+  submit_intent_key,
+  run_intent,
+  cost_label,
+  cost_href,
+  cost_title,
+}: CustomComponentProps & EditorRunBarProps) {
+  const config = useRecipeWorkspaceConfig();
+  const { selectLayout } = useWorkspaceLayout(config);
+  const isRunning = run_intent.kind === "stop";
+  const runLabel = isRunning ? "Stop this run" : "Run";
+  // Show the output the moment a run starts, as the bar above does. A tick late, so the form
+  // this button submits has posted before the layout moves under it.
+  const handleRun = () => {
+    if (run_intent.kind === "run") {
+      window.setTimeout(() => selectLayout(config.run_layout), 0);
+    }
+  };
+  return (
+    <div className="v2-editor-runbar">
+      {!!cost_label && (
+        <CostReading label={cost_label} href={cost_href} title={cost_title} />
+      )}
+      <button
+        type="submit"
+        name={submit_intent_key}
+        value={encodeSubmitIntent(run_intent)}
+        className={clsx(
+          "v2-editor-runbar-run",
+          isRunning && "v2-editor-runbar-run-stop"
+        )}
+        onClick={handleRun}
+        title={runLabel}
+        aria-label={runLabel}
+      >
+        {isRunning ? (
+          <i className="fa-regular fa-xmark-large" />
+        ) : (
+          <i className="fa-solid fa-play" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+/** The estimate, as a link to top-ups where there is one. "Est." qualifies the number rather
+ *  than being part of it, so it is left out of what gets read aloud. */
+function CostReading({
+  label,
+  href,
+  title,
+}: {
+  label: string;
+  href: string | null;
+  title: string | null;
+}) {
+  let tooltip = `Run cost: ${label}`;
+  if (title) {
+    tooltip = `${tooltip} (${title})`;
+  }
+  const inner = (
+    <>
+      <span className="v2-editor-runbar-est">Est.</span>
+      {label}
+    </>
+  );
+  if (href) {
+    return (
+      <a
+        className="v2-editor-runbar-cost"
+        href={href}
+        title={tooltip}
+        aria-label={tooltip}
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <span
+      className="v2-editor-runbar-cost"
+      title={tooltip}
+      aria-label={tooltip}
+    >
+      {inner}
+    </span>
   );
 }
 
