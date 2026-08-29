@@ -642,6 +642,27 @@ a.gooey-topbar-cost:hover {
   background-color: var(--gooey-bg-page);
 }
 
+/* v2 is an app frame: the document *is* the viewport, and every scroll belongs to a pane.
+   That was asserted only by the shell's own height, and a viewport unit can disagree with the
+   viewport the browser actually scrolls - iOS keeps the layout viewport at the toolbar-
+   expanded height while `dvh` follows the retracted one. A single pixel of disagreement makes
+   the whole app draggable, which carries the header (a flow element at the top of the shell)
+   off the top and leaves the page parked there, since `<ScrollRestoration>` hands a client-
+   side navigation the offset back. Enforced here instead of assumed: with no scroll axis on
+   the document, neither a mismatched unit nor a stray box can reintroduce it, and scroll
+   restoration has nothing to restore.
+
+   `:has()` on both `html` and `body` because the scroll can land on either, keyed off the
+   wrapper `.nav-mobile-topbar` already keys off. The background is the page's own ground, so
+   the strip `100svh` leaves when the toolbar retracts reads as the page rather than as
+   Bootstrap's white. */
+html:has(.v2-topbar-container),
+body:has(.v2-topbar-container) {
+  overflow: hidden;
+  overscroll-behavior: none;
+  background-color: var(--gooey-bg-page);
+}
+
 /* v2 mounts the panel inside the app shell, below the top bar, so `100dvh` would overrun
    its container by the bar's height. Scoped so v1's full-height sidebar is untouched. */
 .v2-app-shell .gooey-sidebar {
