@@ -1095,6 +1095,13 @@ FILL_HEIGHT_EDITOR_CSS = """
     min-height: 0;
 }
 
+/* `.gui-input` spaces one field from the next, which an editor told to fill its parent has
+   no use for - there is nothing after it inside the pane. It showed as a strip of white
+   between the editor and the run bar below it, the bar having moved into the flow. */
+& .code-editor-wrapper {
+    margin-bottom: 0;
+}
+
 & .cm-editor {
     flex: 1 1 auto;
     min-height: 0;

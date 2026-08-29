@@ -75,6 +75,14 @@ MODEL_ROW_CSS = """
     font-size: 0.875rem;
 }
 
+/* The Variables button, to the same size. It carried Bootstrap's `.small`, which is 0.875
+   *em* - a share of the button's own font-size rather than the root's - so beside a control
+   pinned to 0.875rem it still read a step larger. The row holds no other button; scoped
+   under the styled class, so it outranks `.btn` without `!important`. */
+& button {
+    font-size: 0.875rem;
+}
+
 /* ...and the pills' 10px corners. `gui.selectbox` renders react-select with no
    `classNamePrefix`, so its control has only emotion-generated classes (`css-xxxxx-control`) -
    hence the attribute match on the one stable part of that name. Scoped under two classes, so
@@ -412,7 +420,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         if gui.button(
             f"{icons.variables} Variables" + (f" ({count})" if count else ""),
             type="tertiary",
-            className="mb-0 p-2 text-nowrap ms-auto fw-normal small",
+            className="mb-0 p-2 text-nowrap ms-auto fw-normal",
             key="open-variables",
         ):
             ref.set_open(True)
