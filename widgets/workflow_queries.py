@@ -121,4 +121,3 @@ def _merge_recent_run_ids(
 
     picked.sort(key=lambda row: row[0], reverse=True)
     return [id_ for _, id_ in picked[:limit]]
-
