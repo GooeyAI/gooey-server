@@ -318,11 +318,8 @@ body:has(.v2-topbar-container) .nav-mobile-topbar {
     left: 0;
     width: 70vw;
     max-width: 85vw;
-    /* `svh`, the toolbar-expanded height: the drawer is fixed, so a `dvh`/`vh` height ran it
-       a toolbar past the screen and put its own footer - the account row - under the browser's
-       chrome. The plain `100vh` above it is the fallback. */
     height: 100vh;
-    height: 100svh;
+    height: 100dvh;
     z-index: 9999;
     transform: translateX(-100%);
     transition: transform 200ms ease;

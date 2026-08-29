@@ -215,12 +215,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             # run spinner, and a percentage height would claim the whole column regardless of
             # what is above it. `minHeight: 0` so it can shrink when one of them appears.
             className="flex-grow-1",
-            # `position: relative` so `fillParent` fills *this* box. The widget's root is
-            # absolutely positioned, and the nearest positioned ancestor is otherwise
-            # `.recipe-workspace-pane` - so it spanned the whole pane and painted over the
-            # failure notice above it, which is what put the conversation both above and
-            # below that notice.
-            style=dict(minHeight=0, position="relative"),
+            style=dict(minHeight=0),
         )
 
     @cached_property
