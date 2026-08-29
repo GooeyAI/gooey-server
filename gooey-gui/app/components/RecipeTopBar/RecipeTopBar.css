@@ -84,9 +84,19 @@
   text-decoration: none;
 }
 
-/* On the name only - the crumb names the level you are on, which is not where this goes. */
-.gooey-topbar-title-link:hover .gooey-topbar-title-text {
+/* On the name only - the crumb names the level you are on, which is not where this goes.
+   Always drawn rather than on hover: a phone has no hover, and nothing else in the bar says
+   the heading of a run leads anywhere. Muted and offset so it reads as a link without
+   competing with the heading it underlines; hover brings it up to the text's own colour. */
+.gooey-topbar-title-link .gooey-topbar-title-text {
   text-decoration: underline;
+  text-decoration-color: var(--gooey-line-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.gooey-topbar-title-link:hover .gooey-topbar-title-text {
+  text-decoration-color: currentColor;
 }
 
 .gooey-topbar-title-menu {
