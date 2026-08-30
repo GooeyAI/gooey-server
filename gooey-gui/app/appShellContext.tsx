@@ -6,7 +6,6 @@ import {
   useEffect,
   useLayoutEffect,
   useState,
-  useSyncExternalStore,
 } from "react";
 import type { ReactNode } from "react";
 
@@ -281,25 +280,29 @@ const WIDE_QUERY = "(min-width: 992px)";
 /** The one answer to "is this a phone", shared by everything that folds on it.
  *
  *  It used to be `useState(false)` inside `useWorkspaceLayout`, which every consumer calls
- *  separately - the top bar, the workspace, each pane trigger and the run bar - so each held
- *  its own copy, corrected by its own listener from its own effect. They could disagree, and
- *  then the bar reasoned about one layout while the workspace drew another.
+ *  separately - the top bar, the workspace, each pane trigger, the run bar - so each held its
+ *  own copy, corrected by its own listener from its own effect. They could disagree, and then
+ *  the bar reasoned about one layout while the workspace drew another.
  *
- *  `useSyncExternalStore` rather than state and an effect: every consumer reads the same value
- *  in the same render, and the server snapshot is explicit (wide, which is what the markup is
- *  authored for) instead of an initial `false` each copy corrects on its own schedule. */
+ *  Called once, by the provider, and handed down: one listener, and one value every consumer
+ *  reads in the same render. `false` until the effect runs, which is the wide layout the
+ *  markup is authored for and what the server renders.
+ *
+ *  Plain state and an effect rather than `useSyncExternalStore`: this app is on React 17,
+ *  where that hook does not exist - importing it yields `undefined` and calling it throws
+ *  while rendering on the server. */
 function useNarrowViewport(): boolean {
-  return useSyncExternalStore(
-    subscribeToViewport,
-    () => !window.matchMedia(WIDE_QUERY).matches,
-    () => false
-  );
-}
+  const [isNarrow, setIsNarrow] = useState(false);
 
-function subscribeToViewport(onChange: () => void) {
-  const wide = window.matchMedia(WIDE_QUERY);
-  wide.addEventListener("change", onChange);
-  return () => wide.removeEventListener("change", onChange);
+  useEffect(() => {
+    const wide = window.matchMedia(WIDE_QUERY);
+    const sync = () => setIsNarrow(!wide.matches);
+    sync();
+    wide.addEventListener("change", sync);
+    return () => wide.removeEventListener("change", sync);
+  }, []);
+
+  return isNarrow;
 }
 
 function persistWorkspaceState(
