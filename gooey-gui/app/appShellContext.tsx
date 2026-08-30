@@ -6,6 +6,7 @@ import {
   useEffect,
   useLayoutEffect,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { ReactNode } from "react";
 
@@ -40,6 +41,7 @@ type AppShellContextValue = {
   setPanelOpen: (key: string, open: boolean) => void;
   navDrawerOpen: boolean;
   setNavDrawerOpen: (open: boolean) => void;
+  isNarrow: boolean;
 };
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
@@ -53,6 +55,7 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   );
   const [panels, setPanels] = useState<Record<string, PanelEntry>>({});
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+  const isNarrow = useNarrowViewport();
 
   const setWorkspace = useCallback((key: string, entry: WorkspaceEntry) => {
     setWorkspaces((current) => ({ ...current, [key]: entry }));
@@ -99,6 +102,7 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
         setPanelOpen,
         navDrawerOpen,
         setNavDrawerOpen,
+        isNarrow,
       }}
     >
       {children}
@@ -116,7 +120,7 @@ export function useWorkspaceLayout(config: PageShellConfig) {
     handled_run_id: null,
   };
   const current = entry?.value ?? fallback;
-  const [isNarrow, setIsNarrow] = useState(false);
+  const isNarrow = context.isNarrow;
 
   useHydrationEffect(() => {
     const hydrationToken = [
@@ -138,15 +142,7 @@ export function useWorkspaceLayout(config: PageShellConfig) {
     if (workspaceLayoutNavigationStatePresent(location.state)) {
       clearWorkspaceLayoutNavigationState();
     }
-    setIsNarrow(!window.matchMedia(WIDE_QUERY).matches);
   }, [config.storage_key, config.active_run_id, location.key, location.state]);
-
-  useEffect(() => {
-    const wide = window.matchMedia(WIDE_QUERY);
-    const sync = () => setIsNarrow(!wide.matches);
-    wide.addEventListener("change", sync);
-    return () => wide.removeEventListener("change", sync);
-  }, []);
 
   const selectLayout = useCallback(
     (layout: WorkspaceLayout) => {
@@ -229,6 +225,11 @@ export function useAppShellPanel(
   };
 }
 
+/** The shared breakpoint, for components outside the workspace that fold on the same width. */
+export function useIsNarrowViewport(): boolean {
+  return useAppShellContext().isNarrow;
+}
+
 export function useNavDrawer() {
   const context = useAppShellContext();
   return {
@@ -276,6 +277,30 @@ function useAppShellContext(): AppShellContextValue {
 }
 
 const WIDE_QUERY = "(min-width: 992px)";
+
+/** The one answer to "is this a phone", shared by everything that folds on it.
+ *
+ *  It used to be `useState(false)` inside `useWorkspaceLayout`, which every consumer calls
+ *  separately - the top bar, the workspace, each pane trigger and the run bar - so each held
+ *  its own copy, corrected by its own listener from its own effect. They could disagree, and
+ *  then the bar reasoned about one layout while the workspace drew another.
+ *
+ *  `useSyncExternalStore` rather than state and an effect: every consumer reads the same value
+ *  in the same render, and the server snapshot is explicit (wide, which is what the markup is
+ *  authored for) instead of an initial `false` each copy corrects on its own schedule. */
+function useNarrowViewport(): boolean {
+  return useSyncExternalStore(
+    subscribeToViewport,
+    () => !window.matchMedia(WIDE_QUERY).matches,
+    () => false
+  );
+}
+
+function subscribeToViewport(onChange: () => void) {
+  const wide = window.matchMedia(WIDE_QUERY);
+  wide.addEventListener("change", onChange);
+  return () => wide.removeEventListener("change", onChange);
+}
 
 function persistWorkspaceState(
   storageKey: string,

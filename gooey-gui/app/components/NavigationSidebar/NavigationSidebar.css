@@ -287,9 +287,16 @@ a.nav-brand {
   text-align: center;
 }
 
-/* Except on a v2 page, which brings its own header. Keyed off `.v2-topbar-container`
-   because this component sits in the outer shell and is never told which page it wraps. */
-body:has(.v2-topbar-container) .nav-mobile-topbar {
+/* Except on a v2 page, which brings its own header. Keyed off `.gooey-topbar` - the bar
+   itself - rather than `.v2-topbar-container`, the wrapper it renders into: the wrapper is
+   there whether or not the bar rendered, and below lg it collapses to 0px (it hands its
+   padding and rule to the bar), so keying off it meant a bar that failed to render took the
+   rail's header down with it and left the page with no chrome at all. This component sits in
+   the outer shell and is never told which page it wraps, so it still has to ask the DOM -
+   but it now asks about the thing it is standing aside for.
+
+   Above lg none of this applies: the element carries `d-lg-none`. */
+body:has(.gooey-topbar) .nav-mobile-topbar {
   /* `!important` because the element carries Bootstrap's `d-flex`, which is itself
      `display: flex !important` and otherwise wins on equal specificity. */
   display: none !important;
