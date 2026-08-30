@@ -23,11 +23,26 @@ export function readBuilderIntent(state: unknown): BuilderIntent | null {
   return builderIntent;
 }
 
-// React Router stores `location.state` under `history.state.usr`, and the
-// browser hands that back on reload. Clear only that slot, leaving the router's
-// own `key`/`idx` bookkeeping intact.
+// React Router stores `location.state` under `history.state.usr`. Remove only the
+// consumed Builder intent so layout-v2 navigation state survives regardless of
+// effect ordering.
 export function clearBuilderIntent() {
   const historyState = window.history.state;
   if (!historyState?.usr) return;
-  window.history.replaceState({ ...historyState, usr: null }, "");
+  const nextUserState = navigationStateWithoutBuilderIntent(historyState.usr);
+  window.history.replaceState({ ...historyState, usr: nextUserState }, "");
+}
+
+export function navigationStateWithoutBuilderIntent(
+  state: unknown
+): Record<string, unknown> | null {
+  if (!state || typeof state !== "object") {
+    return null;
+  }
+  const nextState = { ...(state as Record<string, unknown>) };
+  delete nextState.builderIntent;
+  if (!Object.keys(nextState).length) {
+    return null;
+  }
+  return nextState;
 }

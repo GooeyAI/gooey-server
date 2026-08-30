@@ -122,7 +122,7 @@ def meta_title_for_page(
                 page=page, metadata=metadata, sr=sr, pr=pr, tab=RecipeTabs.run
             )
             return f"{tab.label} for {page_title}"
-        case RecipeTabs.history | RecipeTabs.saved:
+        case RecipeTabs.history | RecipeTabs.saved | RecipeTabs.usage:
             ret = f"{tab.label} for {metadata.short_title}"
         case _ if pr and pr.saved_run == sr and pr.is_root():
             # for root page
@@ -245,6 +245,8 @@ def robots_tag_for_page(
             case RecipeTabs.integrations:
                 no_follow, no_index = True, True
             case RecipeTabs.history:
+                no_follow, no_index = True, True
+            case RecipeTabs.usage:
                 no_follow, no_index = True, True
             case RecipeTabs.saved:
                 no_follow, no_index = True, True

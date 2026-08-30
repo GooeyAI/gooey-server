@@ -1,7 +1,12 @@
 .nav-sidebar {
   width: 264px;
   flex: none;
+  background-color: var(--gooey-surface-50);
+  /* Same pair the drawer below lg already uses: on a browser with a retracting URL bar
+     `100vh` is the height without it, so the rail would stand taller than the shell beside
+     it. `100dvh` is the height on screen; the plain `100vh` above it is the fallback. */
   height: 100vh;
+  height: 100dvh;
   position: sticky;
   top: 0;
   overflow: hidden;
@@ -141,9 +146,6 @@ a.nav-brand {
   font-size: 14px;
 }
 
-.nav-item-link.dense {
-  min-height: 28px;
-}
 .nav-item-link--active {
   background-color: rgba(0, 0, 0, 0.08);
 }
@@ -253,12 +255,44 @@ a.nav-brand {
 
 /* ── Mobile: rail becomes an off-canvas drawer below lg (992px) ────────── */
 
-/* Slim top bar (hamburger + logo); hidden on desktop via d-lg-none. */
+/* Slim top bar (hamburger + logo); hidden on desktop via d-lg-none.
+   56px and a 12px inset, matching `.gooey-topbar` exactly - a v2 page swaps this bar for that
+   one, and any difference in height or gutter reads as the page jolting on navigation. The
+   markup's `px-2` is overridden here rather than changed there, because the same 12px is not
+   expressible on Bootstrap's 4/8/16/24 scale. */
 .nav-mobile-topbar {
   height: 56px;
   width: 100vw;
   top: 0;
   z-index: 1030;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* Sized to RecipeTopBar's `.gooey-topbar-nav`, so the control does not move between pages. */
+.nav-mobile-menu {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--gooey-ink);
+}
+
+.nav-mobile-menu > i {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+/* Except on a v2 page, which brings its own header. Keyed off `.v2-topbar-container`
+   because this component sits in the outer shell and is never told which page it wraps. */
+body:has(.v2-topbar-container) .nav-mobile-topbar {
+  /* `!important` because the element carries Bootstrap's `d-flex`, which is itself
+     `display: flex !important` and otherwise wins on equal specificity. */
+  display: none !important;
 }
 
 /* Scrim behind the open drawer, split in two on purpose.

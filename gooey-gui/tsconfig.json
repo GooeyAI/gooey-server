@@ -10,6 +10,10 @@
     "target": "ES2019",
     "strict": true,
     "allowJs": true,
+    // Dependencies' own .d.ts files are not ours to fix, and checking them buried the five
+    // real errors in this app under nine from `@remix-run/node`, `@types/glob` and friends.
+    // `npm run typecheck` reports on our code now.
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {

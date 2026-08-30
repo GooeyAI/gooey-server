@@ -1,6 +1,8 @@
 import type { CustomComponentProps } from "~/components";
 import { RenderedChildren } from "~/renderer";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { useAppShellPanel } from "~/appShellContext";
+import type { SidebarProps } from "@gooey-types/sidebar_props";
 import SidebarResizer from "./SidebarResizer";
 
 export function Sidebar({
@@ -8,34 +10,39 @@ export function Sidebar({
   children,
   onChange,
   state,
-  defaultOpen,
+  default_open,
   disabled,
-  enableResize = true,
-}: CustomComponentProps & {
-  name: string;
-  defaultOpen: boolean;
-  disabled: boolean;
-  enableResize?: boolean;
-}) {
-  const [isOpen, setOpen] = useState(defaultOpen);
+  enable_resize,
+  client_only,
+  storage_key,
+}: CustomComponentProps & SidebarProps) {
+  const [legacyOpen, setLegacyOpen] = useState(default_open);
+  const managedPanel = useAppShellPanel(
+    client_only ? name : null,
+    default_open,
+    client_only ? storage_key : null
+  );
+  const isOpen = client_only ? managedPanel.open : legacyOpen;
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      sidebarRef.current?.removeAttribute("inert");
+      return;
+    }
+    sidebarRef.current?.setAttribute("inert", "");
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (client_only) {
+      return;
+    }
     function handleOpen() {
-      setOpen(true);
-      for (const openBtn of document.getElementsByClassName(
-        name + "-button"
-      ) as HTMLCollectionOf<HTMLButtonElement>) {
-        openBtn.style.display = "none";
-      }
+      setLegacyOpen(true);
     }
     function handleClose() {
-      setOpen(false);
-      for (const openBtn of document.getElementsByClassName(
-        name + "-button"
-      ) as HTMLCollectionOf<HTMLButtonElement>) {
-        openBtn.style.display = "inline-block";
-      }
+      setLegacyOpen(false);
     }
     window.addEventListener(name + ":open", handleOpen);
     window.addEventListener(name + ":close", handleClose);
@@ -43,9 +50,29 @@ export function Sidebar({
       window.removeEventListener(name + ":open", handleOpen);
       window.removeEventListener(name + ":close", handleClose);
     };
-  }, [name]);
+  }, [client_only, name]);
 
   useEffect(() => {
+    for (const openBtn of document.getElementsByClassName(
+      name + "-button"
+    ) as HTMLCollectionOf<HTMLButtonElement>) {
+      openBtn.style.display = isOpen ? "none" : "inline-flex";
+    }
+  }, [isOpen, name]);
+
+  useEffect(() => {
+    if (client_only || disabled) {
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent(name + ":changed", { detail: { open: isOpen } })
+    );
+  }, [client_only, disabled, isOpen, name]);
+
+  useEffect(() => {
+    if (client_only) {
+      return;
+    }
     if (state[name] != isOpen) {
       state[name] = isOpen;
       if (isDesktop()) {
@@ -55,7 +82,7 @@ export function Sidebar({
       }
       onChange();
     }
-  }, [isOpen, name, state]);
+  }, [client_only, isOpen, name, onChange, state]);
 
   let [sidebarDiv, pageDiv] = children;
 
@@ -83,23 +110,40 @@ export function Sidebar({
     pageClassName = "w-100";
   }
 
-  const sidebarContainerStyles = sidebarWidth
-    ? { width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth }
-    : undefined;
+  // The width the panel settles at, so content can size against that rather than against a
+  // panel mid-transition. In JS because a resized panel's width exists nowhere else.
+  const settledWidth = sidebarWidth
+    ? `${sidebarWidth}px`
+    : "var(--sidebar_open_width)";
+
+  const sidebarContainerStyles = {
+    ...(isOpen && sidebarWidth
+      ? { width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth }
+      : {}),
+    "--sidebar-settled-width": settledWidth,
+  } as CSSProperties;
 
   const sidebarContainerClassName = `flex-column flex-grow-1 gooey-sidebar ${sidebarClassName} ${
-    enableResize ? "gooey-sidebar-resizable" : "gooey-sidebar-bordered"
+    enable_resize ? "gooey-sidebar-resizable" : "gooey-sidebar-bordered"
   }`;
 
   return (
-    <div className="d-flex w-100 h-100 position-relative gap-2">
-      <div className={sidebarContainerClassName} style={sidebarContainerStyles}>
+    <div
+      className={`d-flex w-100 h-100 position-relative ${
+        isOpen ? "gap-2" : "gap-0"
+      }`}
+    >
+      <div
+        ref={sidebarRef}
+        className={sidebarContainerClassName}
+        style={sidebarContainerStyles}
+      >
         <RenderedChildren
           children={sidebarDiv.children}
           onChange={onChange}
           state={state}
         />
-        {!!enableResize && !!isOpen && (
+        {!!enable_resize && !!isOpen && (
           <SidebarResizer
             minWidth={340}
             maxWidth={800}

@@ -2251,7 +2251,7 @@ class BasePage:
         from celeryapp.tasks import runner_task
 
         result = runner_task.delay(
-            page_cls=self.__class__,
+            page_cls=self.get_runner_page_cls(),
             user_id=self.request.user.id,
             run_id=sr.run_id,
             uid=sr.uid,
@@ -2263,6 +2263,11 @@ class BasePage:
         sr.celery_task_id = result.id
         sr.save(update_fields=["celery_task_id", "updated_at"])
         return result
+
+    @classmethod
+    def get_runner_page_cls(cls):
+        """The stable page class serialized into Celery jobs."""
+        return cls
 
     @classmethod
     def realtime_channel_name(cls, run_id: str, uid: str) -> str:

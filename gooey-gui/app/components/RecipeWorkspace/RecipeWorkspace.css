@@ -1,0 +1,425 @@
+.recipe-workspace {
+  --recipe-pane-gap: 0.75rem;
+  --recipe-pane-half-gap: 0.375rem;
+
+  /* Widths a pane's CONTENT settles at, in container units so they resolve against this
+     element rather than against the pane that is mid-animation. Only ever used on
+     `.recipe-workspace-pane-content`, whose nearest container is this. */
+  --pane-major-w: calc(60cqw - var(--recipe-pane-half-gap));
+  /* the paired preview carries a 1px border, and Bootstrap's global border-box takes that
+     out of its content box */
+  --pane-minor-w: calc(40cqw - var(--recipe-pane-half-gap) - 2px);
+
+  container-type: inline-size;
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.recipe-workspace-pane {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(1rem);
+  transition:
+    flex-basis 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.recipe-workspace-pane--closed {
+  flex: 0 0 0;
+  max-width: 0;
+  margin-right: 0;
+}
+
+.recipe-workspace-pane--open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+/* A pane's share of the row comes from the role React gives it - major, minor or solo -
+   rather than from reading which panes are open off the workspace's own classes, which
+   cannot distinguish "alone" from "not beside the editor". */
+.recipe-workspace-pane--major {
+  flex: 0 0 calc(60% - var(--recipe-pane-half-gap));
+  max-width: calc(60% - var(--recipe-pane-half-gap));
+  margin-right: var(--recipe-pane-gap);
+}
+
+.recipe-workspace-pane--minor {
+  flex: 0 0 calc(40% - var(--recipe-pane-half-gap));
+  max-width: calc(40% - var(--recipe-pane-half-gap));
+  border: 1px solid var(--gooey-line-default);
+  border-radius: 0.75rem;
+}
+
+.recipe-workspace-pane--solo {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+/* The pane animates `flex-basis`/`max-width`, so anything sized off the pane re-lays-out on
+   every frame of the transition - the editor re-wraps its lines, the chat widget its bubbles.
+   The rules below pin the content to the width it will settle at. */
+.recipe-workspace-pane-content {
+  width: 100%;
+  height: 100%;
+  /* A floor rather than `min-width: 0`, for the moment a pane starts closing and the explicit
+     width below stops applying. 40cqw is the narrowest any pane gets. */
+  min-width: var(--pane-minor-w);
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Same role, so the width a pane's content is pinned to and the width the pane settles at
+   cannot disagree - they are two readings of one class. */
+.recipe-workspace-pane--major > .recipe-workspace-pane-content {
+  width: var(--pane-major-w);
+}
+
+.recipe-workspace-pane--minor > .recipe-workspace-pane-content {
+  width: var(--pane-minor-w);
+}
+
+.recipe-workspace-pane--solo > .recipe-workspace-pane-content {
+  width: 100cqw;
+}
+
+.recipe-workspace-preview .recipe-workspace-pane-content {
+  overflow: hidden;
+}
+
+/* The failure notice above the output. A flex item's automatic minimum size would hold it at
+   its full content height, which the clipping pane above then cuts off - so it is allowed to
+   shrink (`min-height: 0`), bounded (`max-height`) and given the scrollbar itself. */
+.v2-run-error {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 45%;
+  overflow-y: auto;
+}
+
+.recipe-workspace-controls {
+  position: absolute;
+  top: 13px;
+  z-index: 5;
+  display: flex;
+  gap: 0.375rem;
+}
+
+.recipe-workspace-controls--left {
+  left: 0.5rem;
+}
+
+.recipe-workspace-controls--right {
+  right: 0.5rem;
+}
+
+.v2-pane-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--bs-secondary-color);
+  background: rgb(255 255 255 / 88%);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+}
+
+.v2-pane-control:hover {
+  color: var(--bs-body-color);
+  background: var(--gooey-bg-page);
+}
+
+/* A labelled control is a pill rather than the square above: it carries a portrait and a
+   name, so it sizes to them. */
+.v2-pane-control-labelled {
+  width: auto;
+  height: auto;
+  gap: 0.375rem;
+  /* anchored to the panel's top-left corner, so it is bounded rather than allowed to run past
+     the far edge */
+  max-width: calc(100% - 1rem);
+  padding: 0.25rem 0.625rem 0.25rem 0.375rem;
+  color: var(--bs-body-color);
+  font-size: 0.875rem;
+  font-weight: 500;
+  /* One line. The control sits over the content below it, so growing downwards would cover the
+     first thing it is meant to be labelling. */
+  white-space: nowrap;
+}
+
+.v2-pane-control-photo {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.v2-pane-control-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.v2-workspace-body {
+  /* Reading width for any surface that has the whole row: the solo working column and the
+     document tabs. Wider than prose, because these carry forms and code rather than
+     paragraphs. One definition, used from both css and `_render_solo_input_col`. */
+  --v2-reading-max: 1420px;
+  background-color: var(--gooey-bg-page) !important;
+}
+
+/* A full-row surface is centred and capped rather than run edge to edge. Split needs none -
+   the preview caps the working column there. */
+.v2-reading-col {
+  width: 100%;
+  max-width: var(--v2-reading-max);
+  padding: var(--gooey-space-1) 0;
+  margin-inline: auto;
+}
+
+/* A document tab - History, API, Deploy - scrolls in one direction only: a long title or url
+   pushes a card row wider than the phone, which made the page draggable sideways under a
+   fixed header. Both axes are set here rather than left to a `overflow-auto` class on the
+   element, because Bootstrap's utilities are `!important` and would take the other axis
+   back - see `_workspace_body_class`, which leaves that class off for these tabs. */
+.v2-workspace-body:not(:has(.recipe-workspace)) {
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  /* A document tab - API, Deploy, History - has no `.recipe-workspace` to bring the
+     `.container-xxl` gutter, so it carries its own. At every width: the workspace's own
+     gutter is not width-dependent either. */
+  padding-left: var(--gooey-space-3);
+  padding-right: var(--gooey-space-3);
+}
+
+/* Wide content scrolls inside its own box. The body clips sideways on purpose - that is what
+   stops the whole page dragging under a fixed header - so anything that cannot wrap needs its
+   own scroller, or it is simply cut off. The API tab's curl and json blocks are the case. */
+.v2-workspace-body:not(:has(.recipe-workspace)) :is(pre, table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* The document tab's own content, capped the same way the working column is. On the body
+   rather than an inner wrapper because these tabs render straight into it.
+
+   Desktop only: below lg the viewport is narrower than the cap anyway, so all this would do
+   is impose a width and a centring on every child for no effect. The gutter above is what
+   holds the content off the edge there. */
+@media (min-width: 992px) {
+  .v2-workspace-body:not(:has(.recipe-workspace)) > * {
+    width: 100%;
+    max-width: var(--v2-reading-max);
+    margin-inline: auto;
+  }
+}
+
+/* The editor is framed like the preview - white, hairline, 12px - so the two read as
+   siblings. On the content box rather than the pane, which animates its width.
+
+   No `overflow: hidden` here, unlike the preview's frame: the model selector's menu has to
+   be able to leave this box. */
+/* On the pane, not its content box, so the shadow is not clipped: `overflow: hidden` clips an
+   element's children, never its own shadow. The preview's frame sits on the pane for the same
+   reason. Room for it comes from `.container-xxl`'s gutter - `overflow` clips at the padding
+   box, so the shadow has that gutter to paint into. */
+.recipe-workspace-editor {
+  background: var(--gooey-bg-page);
+  border-radius: 12px;
+  box-shadow: 0 0 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.recipe-workspace-editor > .recipe-workspace-pane-content {
+  /* An inset, now that the surface has an edge to sit off. The working column's `pe-lg-3` is
+     on top of this, not instead of it. */
+  padding: 0.75rem;
+}
+
+/* ------------------------------------------------------------ editor run bar
+
+   The foot of the form below lg, where the bar above hides its own Run and cost. Inside the
+   editor's column rather than pinned to the viewport: bounded by the pane, and nothing
+   behind it has height to reserve. Last child of a `h-100` flex column, so `margin-top: auto`
+   drops it to the bottom of a short form and `sticky` holds it in sight under a long one.
+
+   `display` is left to `d-lg-none` above lg; it is only ever `flex` where that does not
+   apply. */
+.v2-editor-runbar {
+  position: sticky;
+  bottom: 0;
+  /* over the form it follows, which is the earlier sibling and would otherwise win */
+  z-index: 1;
+  flex: 0 0 auto;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gooey-space-2);
+  /* no side padding: the reading column it sits in brings its own */
+  padding: var(--gooey-space-2) 0;
+  /* clears the home indicator where the pane runs to the screen's edge; `env()` is 0 elsewhere */
+  padding-bottom: calc(var(--gooey-space-2) + env(safe-area-inset-bottom));
+  background: var(--gooey-bg-page);
+  border-top: 0.33px solid var(--gooey-line-default);
+}
+
+/* Pushes Run to the far edge and takes the near one. Done from the reading rather than with
+   `space-between`, which would leave Run on the left on a recipe that quotes no cost. */
+.v2-editor-runbar-cost {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gooey-space-1);
+  padding: 6px var(--gooey-space-2);
+  border-radius: var(--gooey-radius-xs);
+  /* green-tinted, because it reads as a quantity rather than a control - the only thing on
+     this bar that is not a button */
+  background: var(--gooey-ok-wash);
+  color: var(--gooey-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* "Est." qualifies the number rather than being part of it, so it steps back a weight. */
+.v2-editor-runbar-est {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.v2-editor-runbar-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--gooey-radius-xs);
+  background: var(--gooey-ink);
+  color: var(--gooey-bg-page);
+  font-size: 1rem;
+}
+
+.v2-editor-runbar-run:disabled {
+  opacity: 0.5;
+}
+
+.v2-editor-runbar-run-stop {
+  background: var(--gooey-danger);
+}
+
+/* Frames the preview where it shares the view with something else - Split, About - so the two
+   read as separate surfaces. Was an inline style on the div; moved here so the media query
+   below can drop it. */
+.v2-preview-frame {
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--gooey-line-default);
+  border-radius: 12px;
+}
+
+@media (max-width: 991.98px) {
+  /* Both work views start at the header's rule, so the page's top gutter showed as a strip of
+     background between the two. `!important` to beat `pt-2`. About keeps its gutter - it is a
+     card, and sits off the rule. */
+  .v2-workspace-body:has(.recipe-workspace-editor.recipe-workspace-pane--solo),
+  .v2-workspace-body:has(
+      .recipe-workspace-preview.recipe-workspace-pane--solo
+    ) {
+    padding-top: 0 !important;
+  }
+
+  /* The widget's own rounded corners are right beside the editor and wrong when it is the
+     whole screen. Two levels deep and no further: the radius belongs to the outer container,
+     not the message bubbles inside it. */
+  .recipe-workspace-preview.recipe-workspace-pane--solo
+    > .recipe-workspace-pane-content,
+  .recipe-workspace-preview.recipe-workspace-pane--solo
+    > .recipe-workspace-pane-content
+    > div {
+    border-radius: 0 !important;
+  }
+
+  /* A tab body that is not the workspace - API, Deploy, History - is a document, not a pane, so
+     it keeps a gutter. The markup carries `px-0` at this width for the workspace views, which
+     do run edge to edge; without this the API tab's text sat flush against both edges. */
+  .recipe-workspace {
+    position: relative;
+  }
+
+  /* `.container-xxl` brings half a gutter on each side. Beaten on specificity - two classes
+     to Bootstrap's one - rather than with `!important`. */
+  .recipe-workspace.container-xxl {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* One pane fills the screen at this width, so there is no second surface to be separated
+     from - and a border hugging the viewport reads as an outline, not a frame. */
+  .v2-preview-frame {
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* A plain white field at this width: every edge of the frame is either off-screen or under
+     something else, so the corners, shadow and inset all go. */
+  .recipe-workspace-editor {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .recipe-workspace-editor > .recipe-workspace-pane-content {
+    border: 0;
+    border-radius: 0;
+    /* The only gap between the header's rule and the pills at this width - the page's top
+       gutter and the strip's own margin are both zeroed here. */
+    padding: 0.5rem 0 0;
+  }
+
+  .recipe-workspace-pane--open {
+    flex-basis: 100% !important;
+    max-width: 100% !important;
+    margin-right: 0 !important;
+  }
+
+  /* Nothing pairs at this width, so the minor half is not shown. About is the only view that
+     reaches here holding two panes. Done by role rather than by collapsing the layout, so
+     widening brings the pane straight back. */
+  .recipe-workspace-pane--minor {
+    display: none;
+  }
+
+  /* One pane holds the screen here, so content settles at the full width rather than the
+     60/40 pinning above. Still `cqw`, not `100%`, which would be a percentage of the pane
+     and so re-lay-out on every frame of the slide. */
+  .recipe-workspace-pane > .recipe-workspace-pane-content {
+    width: 100cqw;
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recipe-workspace-pane {
+    transition: none;
+  }
+}

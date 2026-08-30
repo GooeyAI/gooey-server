@@ -1,6 +1,10 @@
 import type { NavWorkflowItem } from "@gooey-types/navigation_sidebar_props";
 import { Link, useLocation } from "@remix-run/react";
 import clsx from "clsx";
+import {
+  splitLayout,
+  workspaceLayoutNavigationState,
+} from "../RecipeWorkspace/paneState";
 import { builderNavigationState } from "./builderIntent";
 
 type WorkflowListProps = {
@@ -39,7 +43,10 @@ function WorkflowRowItem({
   return (
     <Link
       to={item.href}
-      state={builderNavigationState(item)}
+      state={{
+        ...builderNavigationState(item),
+        ...workspaceLayoutNavigationState(splitLayout("editor", "preview")),
+      }}
       aria-current={isActive ? "page" : undefined}
       className={
         "d-flex align-items-center gap-2 py-2 px-2 sidebar-recent-item rounded" +

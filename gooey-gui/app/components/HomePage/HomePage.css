@@ -88,6 +88,11 @@
   display: block;
 }
 
+/* same reason as .recent-card-run-status: the badge has to clear the preview */
+.recent-card-workflow-badge {
+  z-index: 2;
+}
+
 .recent-card-icon-img {
   max-width: 60%;
   max-height: 60%;
@@ -97,4 +102,217 @@
 .recent-card-chat-bubble {
   max-width: 85%;
   font-size: 0.85rem;
+}
+
+/* Run state on a history card. Palette, marker dot and pulse are BulkProgressCard's,
+   so a run reads the same in both places. */
+.recent-card-run-status {
+  --run-status-accent: var(--gooey-status-ink);
+  /* over the preview beneath it: bootstrap 5.2 has no .z-1 utility, so the chat
+     bubbles - later in the document - were painting through the badge */
+  z-index: 2;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--gooey-status-line);
+  border-radius: 999px;
+  color: var(--run-status-accent);
+  display: inline-flex;
+  font-size: 0.75rem;
+  gap: 0.4rem;
+  /* leaves the workflow icon on the opposite corner uncovered */
+  max-width: calc(100% - 4rem);
+  padding: 0.2rem 0.55rem;
+}
+
+.recent-card-run-status--starting {
+  --run-status-accent: var(--gooey-status-muted);
+}
+
+/* the one state that is still moving says so in colour, not just with the dot */
+.recent-card-run-status--running {
+  --run-status-accent: var(--gooey-status-running-ink);
+  background: var(--gooey-status-running-bg);
+  border-color: var(--gooey-status-running-line);
+}
+
+.recent-card-run-status--running .recent-card-run-status-dot {
+  background: var(--gooey-status-running);
+}
+
+.recent-card-run-status--cancelled {
+  --run-status-accent: var(--gooey-status-warn);
+  background: var(--gooey-status-warn-bg);
+  border-color: var(--gooey-status-warn-line);
+}
+
+.recent-card-run-status--failed {
+  --run-status-accent: var(--gooey-status-error);
+  background: var(--gooey-status-error-bg);
+  border-color: var(--gooey-status-error-line);
+}
+
+.recent-card-run-status > i {
+  font-size: 0.6rem;
+}
+
+.recent-card-run-status-dot {
+  /* every state's dot is its own accent, so the pill needs no per-state rule */
+  background: var(--run-status-accent);
+  border-radius: 999px;
+  flex-shrink: 0;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+.recent-card-run-status--running .recent-card-run-status-dot {
+  animation: recent-card-run-status-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes recent-card-run-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recent-card-run-status--running .recent-card-run-status-dot {
+    animation: none;
+  }
+}
+
+/* 6px around a 30px pill makes 42. The strip has the row to itself, so it is not
+   held to FILTER_HEIGHT the way the controls above it are. */
+.surface-tabs {
+  padding: 6px !important;
+  position: relative;
+}
+
+.surface-tabs .workflow-tab-pill {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  min-height: 30px;
+  padding: 0 0.75rem !important;
+}
+
+/* the fade and chevrons signal overflow instead of a scrollbar, which would cut
+   across the rounded track */
+.surface-tabs-scroll {
+  gap: 2px !important;
+  scrollbar-width: none;
+}
+
+.surface-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.history-type-filter {
+  width: 240px;
+}
+
+/* .gui-input's stacked-form margin lifts the dropdown off this row's line */
+.history-type-filter .gui-input {
+  margin-bottom: 0;
+}
+
+/* the owner toggle shares the line with that dropdown, so it takes the same
+   height - FILTER_HEIGHT in HistoryPage.tsx */
+.history-header-controls .btn-group .btn {
+  min-height: 38px;
+}
+
+/* Phone: the controls take the full row and centre. `safe` drops the tabs back to
+   flex-start once they overflow - centred overflow can't be scrolled back. */
+@media (max-width: 425px) {
+  .surface-tabs-scroll {
+    justify-content: safe center;
+  }
+
+  .history-header-controls {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .history-type-filter {
+    width: 100%;
+  }
+
+  .history-header-controls .btn-group {
+    width: 100%;
+  }
+}
+
+/* Fade the edge that has more tabs beyond it, in the track's own colour. */
+.surface-tabs--more::after,
+.surface-tabs--less::before {
+  bottom: 0;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 4rem;
+}
+
+.surface-tabs--more::after {
+  background: linear-gradient(
+    to right,
+    rgba(242, 242, 242, 0),
+    rgba(242, 242, 242, 0.85) 40%,
+    #f2f2f2 60%
+  );
+  border-bottom-right-radius: inherit;
+  border-top-right-radius: inherit;
+  right: 0;
+}
+
+.surface-tabs--less::before {
+  background: linear-gradient(
+    to left,
+    rgba(242, 242, 242, 0),
+    rgba(242, 242, 242, 0.85) 40%,
+    #f2f2f2 60%
+  );
+  border-bottom-left-radius: inherit;
+  border-top-left-radius: inherit;
+  left: 0;
+}
+
+.surface-tabs-scroll-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #6c757d;
+  display: flex;
+  font-size: 0.8rem;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  z-index: 1;
+}
+
+.surface-tabs-scroll-btn:hover {
+  color: #212529;
+}
+
+.surface-tabs-prev {
+  left: 6px;
+}
+
+.surface-tabs-next {
+  right: 6px;
+}
+
+/* the phone number / handle / name a run is filed under carries the card's
+   identity, so it sits a step above the timestamp beside it - bootstrap 5.2 has
+   no .fw-medium to say this with */
+.history-card-byline .card-byline-name {
+  font-weight: 600;
 }

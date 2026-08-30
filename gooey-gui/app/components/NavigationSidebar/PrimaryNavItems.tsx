@@ -151,9 +151,9 @@ function NavItemChildren({
   const showSkeleton = isFetching && items.length === 0;
 
   if (items.length === 0 && !showSkeleton) {
-    // A fetched section has no href of its own, so an empty result means there's
-    // nothing to link to — drop the whole section instead of a dead label.
-    if (item.items_url) return null;
+    // A fetched section with no href of its own has nothing to link to once the
+    // result comes back empty — drop it instead of leaving a dead label.
+    if (item.items_url && !item.href) return null;
     // No children → behaves like a plain nav item (label links to href).
     return (
       <NavItem

@@ -372,6 +372,7 @@ DISALLOWED_TITLE_SLUGS = config("DISALLOWED_TITLE_SLUGS", cast=Csv(), default=""
     "api",
     "examples",
     "history",
+    "usage",
     "saved",
     "integrations",
     # other
@@ -390,6 +391,7 @@ QR_BOT_EXAMPLE_ID = config("QR_BOT_EXAMPLE_ID", "ah6ozro2whyc")
 BOT_GENERATOR_EXAMPLE_ID = config("BOT_GENERATOR_EXAMPLE_ID", "jlxi6h8nfmbb")
 GOOEY_BUILDER_INTEGRATION_ID = config("GOOEY_BUILDER_INTEGRATION_ID", "")
 CONVERSATION_TITLE_EXAMPLE_ID = config("CONVERSATION_TITLE_EXAMPLE_ID", "")
+ENABLE_LAYOUT_V2 = config("ENABLE_LAYOUT_V2", default=True, cast=bool)
 
 CREDITS_TO_DEDUCT_PER_RUN = config("CREDITS_TO_DEDUCT_PER_RUN", 5, cast=int)
 

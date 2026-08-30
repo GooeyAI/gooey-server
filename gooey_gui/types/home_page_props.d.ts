@@ -24,12 +24,25 @@ export interface AuthorData {
   name: string;
   photo_url: string | null;
 }
+export interface RunStatusData {
+  state: "starting" | "running" | "failed" | "cancelled";
+  label: string;
+}
+/**
+ * Who a deployment run was for, as opposed to who owns the integration.
+ */
+export interface SenderData {
+  icon: string;
+  label: string;
+}
 export interface WorkflowCardData {
   title: string;
   href: string;
   workflow_icon: string | null;
   description: string | null;
   author: AuthorData | null;
+  sender: SenderData | null;
+  run_status: RunStatusData | null;
   preview: (ChatPreview | MediaPreview | IconPreview) | null;
   updated_at: string | null;
   run_count: number | null;

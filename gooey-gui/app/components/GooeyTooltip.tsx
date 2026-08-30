@@ -22,14 +22,20 @@ export function GooeyTooltip({
   content,
   children,
   placement,
+  fitContent = false,
 }: {
   content: string;
   children: React.ReactElement;
   placement?: TooltipPlacement;
+  fitContent?: boolean;
 }) {
   const [source, target] = useSingleton({
-    overrides: ["placement"],
+    overrides: ["placement", "theme"],
   });
+  let theme: string | undefined;
+  if (fitContent) {
+    theme = "gooey-fit-content";
+  }
   return (
     <>
       <Tippy
@@ -42,6 +48,7 @@ export function GooeyTooltip({
       <Tippy
         singleton={target}
         placement={placement || "auto"}
+        theme={theme}
         content={
           <div className="bg-dark p-2 b-1 shadow rounded container-margin-reset gooey-tooltip-box">
             <RenderedMarkdown body={content} />

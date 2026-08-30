@@ -6,7 +6,7 @@ import type {
   SingleValueProps,
 } from "react-select";
 import Select, { components } from "react-select";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@remix-run/react";
 
 import { HistoryWorkflowCard } from "./HomePage/workflows";
@@ -19,8 +19,23 @@ import type {
   WorkflowFilterOption,
 } from "@gooey-types/history_page_props";
 
+// the tab bar and the workflow selector are set to the same height; the bar
+// builds it out of padding and pill (see .surface-tabs), react-select needs
+// telling directly
+const FILTER_HEIGHT = 38;
+
+// An option's title carries the icon's own markup, which react-select renders as
+// markdown. The fallback <select> below can only hold text, so it showed the tags
+// themselves until hydration replaced it.
+const titleAsText = (title: string) =>
+  title
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+
 export function HistoryPage({
   title,
+  owner_options,
   workflow_options,
   surface_tabs,
   cards,
@@ -28,22 +43,61 @@ export function HistoryPage({
   empty_message,
 }: CustomComponentProps & HistoryPageProps) {
   return (
-    <div className="container-xxl my-4">
-      <h1 className="mb-4">{title}</h1>
+    // `sidebar_page_wrapper` already supplies the container-xxl
+    <div className="my-4">
+      <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        {/* mt-0 as well as mb-0: flex centres the margin box, and the app gives h1 a
+            20px top margin */}
+        <h1 className="my-0 d-flex align-items-center gap-2">
+          {/* centred on the word rather than sat on its baseline: at the
+              heading's size a baseline-aligned glyph reads as sunken */}
+          <i
+            className="fa-regular fa-history text-muted fs-4"
+            aria-hidden="true"
+          />
+          <span>{title}</span>
+        </h1>
 
-      <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3 mb-4">
-        <SurfaceSelector tabs={surface_tabs} />
-        <div className="flex-grow-1 mt-2" style={{ width: "300px" }}>
-          <WorkflowFilter options={workflow_options} />
+        <div className="history-header-controls d-flex flex-wrap align-items-center gap-2">
+          <div className="history-type-filter">
+            <WorkflowFilter options={workflow_options} />
+          </div>
+          <OwnerFilter options={owner_options} />
         </div>
       </div>
 
+      <div className="mb-4">
+        <SurfaceSelector tabs={surface_tabs} />
+      </div>
+
+      <HistoryCardGrid
+        cards={cards}
+        loadMoreHref={load_more_href}
+        emptyMessage={
+          empty_message ?? "Nothing here yet — your runs will show up here."
+        }
+      />
+    </div>
+  );
+}
+
+export function HistoryCardGrid({
+  cards,
+  loadMoreHref,
+  emptyMessage,
+}: {
+  cards: HistoryPageProps["cards"];
+  loadMoreHref: string | null;
+  emptyMessage: string;
+}) {
+  return (
+    <>
       {cards.length === 0 ? (
-        <p className="text-muted">
-          {empty_message ?? "Nothing here yet — your runs will show up here."}
-        </p>
+        <p className="text-muted">{emptyMessage}</p>
       ) : (
-        <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
+        // one card per row on a phone: at two the 16:10 preview is too short for
+        // a chat to fit without clipping
+        <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3 d-flex align-items-stretch">
           {cards.map((card, i) => (
             <div key={`${card.href}-${i}`} className="col">
               <HistoryWorkflowCard card={card} />
@@ -52,13 +106,46 @@ export function HistoryPage({
         </div>
       )}
 
-      {load_more_href && (
+      {loadMoreHref && (
         <div className="d-flex justify-content-center mt-5">
-          <a href={load_more_href} className="btn btn-theme">
+          <a href={loadMoreHref} className="btn btn-theme">
             Load more
           </a>
         </div>
       )}
+    </>
+  );
+}
+
+function OwnerFilter({ options }: { options: SurfaceTabData[] }) {
+  if (options.length === 0) return null;
+  return (
+    <div className="btn-group min-w-0" role="group">
+      {options.map((option) => (
+        <Link
+          key={option.id}
+          to={option.href}
+          className={
+            "btn btn-sm d-flex align-items-center gap-2 text-nowrap " +
+            (option.active ? "btn-secondary" : "btn-outline-secondary")
+          }
+        >
+          {option.icon && (
+            <span
+              className="d-inline-flex align-items-center flex-shrink-0"
+              aria-hidden="true"
+              dangerouslySetInnerHTML={{ __html: option.icon }}
+            />
+          )}
+          {/* only a workspace name can be arbitrarily long, and the server caps it
+              at 30 characters; "Just me" is two words and never truncates, which
+              is also what stops it shrinking - a label that can ellipsize lets its
+              button shrink to nothing */}
+          <span className={option.id === "all" ? "text-truncate" : ""}>
+            {option.title}
+          </span>
+        </Link>
+      ))}
     </div>
   );
 }
@@ -75,13 +162,13 @@ function WorkflowFilter({ options }: { options: WorkflowFilterOption[] }) {
         fallback={
           <select
             className="form-select"
-            style={{ height: "38px", border: "none" }}
+            style={{ height: `${FILTER_HEIGHT}px`, border: "none" }}
             disabled
             defaultValue={active.id}
           >
             {options.map((option) => (
               <option key={option.id} value={option.id}>
-                {option.title}
+                {titleAsText(option.title)}
               </option>
             ))}
           </select>
@@ -95,6 +182,12 @@ function WorkflowFilter({ options }: { options: WorkflowFilterOption[] }) {
             getOptionLabel={(option) => option.title}
             isMulti={false}
             isClearable={false}
+            styles={{
+              control: (base) => ({ ...base, minHeight: FILTER_HEIGHT }),
+              // above the tab strip's scroll chevrons (z-index 1), which come
+              // later in the document and drew through the open menu
+              menu: (base) => ({ ...base, zIndex: 5 }),
+            }}
             className="mb-0 text-nowrap"
             placeholder='<i class="fa-regular fa-gift"></i> Type'
             components={{
@@ -155,6 +248,9 @@ const MarkdownPlaceholder = (
 
 function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
   const activeRef = useRef<HTMLAnchorElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const activeId = tabs.find((tab) => tab.active)?.id;
   // keep the active tab in view on initial load (deep links) and after
   // client-side navigation between surfaces (component stays mounted, so this
@@ -163,10 +259,55 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
     activeRef.current?.scrollIntoView({ inline: "nearest", block: "nearest" });
   }, [activeId]);
 
+  // the chevron only earns its place while there is something to its right -
+  // a button that scrolls nothing is worse than no button
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () => {
+      setCanScrollLeft(el.scrollLeft > 1);
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, [tabs.length]);
+
   if (tabs.length === 0) return null;
   return (
-    <div className="overflow-auto workflow-tab-scroll flex-grow-1 min-w-0">
-      <div className="d-inline-flex p-1 rounded-pill gap-1 align-items-center bg-light">
+    // the track is the full width of the row and scrolls its tabs inside, so both
+    // its ends stay round
+    <div
+      className={
+        "surface-tabs rounded-pill bg-light flex-grow-1 min-w-0" +
+        (canScrollLeft ? " surface-tabs--less" : "") +
+        (canScrollRight ? " surface-tabs--more" : "")
+      }
+    >
+      {canScrollLeft && (
+        <button
+          type="button"
+          className="surface-tabs-scroll-btn surface-tabs-prev"
+          aria-label="Show previous tabs"
+          onClick={() =>
+            scrollerRef.current?.scrollBy({ left: -200, behavior: "smooth" })
+          }
+        >
+          <i className="fa-regular fa-chevron-left" aria-hidden="true" />
+        </button>
+      )}
+      {/* centred while the tabs fit; `safe` hands alignment back to the start once
+          they overflow, so the first tab stays reachable */}
+      <div
+        ref={scrollerRef}
+        className="surface-tabs-scroll d-flex gap-1 align-items-center overflow-auto"
+        style={{ justifyContent: "safe center" }}
+      >
         {tabs.map((tab) => (
           <Link
             key={tab.id}
@@ -184,6 +325,18 @@ function SurfaceSelector({ tabs }: { tabs: SurfaceTabData[] }) {
           </Link>
         ))}
       </div>
+      {canScrollRight && (
+        <button
+          type="button"
+          className="surface-tabs-scroll-btn surface-tabs-next"
+          aria-label="Show more tabs"
+          onClick={() =>
+            scrollerRef.current?.scrollBy({ left: 200, behavior: "smooth" })
+          }
+        >
+          <i className="fa-regular fa-chevron-right" aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }

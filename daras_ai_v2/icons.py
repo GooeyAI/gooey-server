@@ -84,3 +84,22 @@ card_icons = {
 integrations_img = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/bfced380-bb60-11f0-80c3-02420a0001e9/d1487c30-12b0-4cc2-bd07-6f22a6f3806b.png"
 
 help_guide = '<i class="fa-duotone fa-solid fa-life-ring"></i>'
+
+split = '<i class="fa-regular fa-table-columns"></i>'
+share = '<i class="fa-regular fa-share-nodes"></i>'
+trash = '<i class="fa-regular fa-trash"></i>'
+flag = '<i class="fa-regular fa-flag"></i>'
+regenerate = '<i class="fa-solid fa-recycle"></i>'
+terminal = '<i class="fa-sharp fa-light fa-rectangle-terminal"></i>'
+variables = '<i class="fa-solid fa-brackets-curly"></i>'
+books = '<i class="fa-light fa-books"></i>'
+
+
+# Bare FontAwesome class names, no <i> wrapper, for the React props that build the element
+# themselves - `MenuLinkData.icon`, `WorkspacePaneControl.icon`. Names mirror those above.
+class cls:
+    user = "fa-regular fa-user"
+    company = "fa-regular fa-buildings"
+    code = "fa-regular fa-code"
+    credit_card = "fa-regular fa-credit-card"
+    cancel = "fa-regular fa-xmark"

@@ -40,6 +40,16 @@ jobs:
             exit 1
           fi
 
+      # Runs in this job rather than its own: Node and `npm ci` are already set up above,
+      # so the whole GUI suite costs seconds instead of a second checkout and install.
+      - name: Run GUI tests
+        working-directory: gooey-gui
+        run: npm test
+
+      - name: Type-check GUI
+        working-directory: gooey-gui
+        run: npm run typecheck
+
   test:
     runs-on: ubuntu-22.04
     strategy:
