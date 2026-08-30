@@ -814,14 +814,9 @@ def sidebar_page_wrapper(
     is_v2 = _is_layout_v2_page(page)
     # splatted so v1 keeps exactly the props it had
     fill = dict(style=dict(minHeight=0)) if is_v2 else {}
-    # `100svh` - the viewport with the browser's toolbar *expanded*, which is the one iOS
-    # lays out and scrolls against. `100vh` is the toolbar-retracted height and `100dvh`
-    # tracks it while the toolbar animates, so either one sizes the shell a toolbar taller
-    # than the page can show: the document gains a scroll it must never have, the header
-    # (a flow element at the top of the shell) rides off the top of it, and the run bar at
-    # the shell's foot sits under the toolbar. `svh` is never taller than what is on screen.
-    # The only place the viewport is measured - the rest of the shell is `h-100`.
-    viewport = dict(style=dict(height="100svh")) if is_v2 else {}
+    # `100dvh`, not `vh-100`: on mobile Safari `100vh` is the viewport with the URL bar
+    # retracted. The only place the viewport is measured - the rest of the shell is `h-100`.
+    viewport = dict(style=dict(height="100dvh")) if is_v2 else {}
 
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
     # row on desktop (rail beside content).

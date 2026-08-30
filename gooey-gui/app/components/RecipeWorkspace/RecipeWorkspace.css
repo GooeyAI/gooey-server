@@ -78,24 +78,7 @@
      width below stops applying. 40cqw is the narrowest any pane gets. */
   min-width: var(--pane-minor-w);
   min-height: 0;
-  /* One axis only. `overflow: auto` gave the pane a horizontal scroll as well, and every
-     `gui.columns()` in the form below is a Bootstrap `.row` - which carries `margin-inline:
-     -12px` for a container gutter to absorb. Below lg there is no gutter to absorb it
-     (`.recipe-workspace.container-xxl` and the editor's own content box both drop their side
-     padding), so the row sat 12px past the pane and the whole pane - pane strip, form and run
-     bar together - could be dragged sideways and left parked there, clipping the first
-     character of every label. The 12px is the column's own padding, so there is nothing in it
-     to lose by clipping. Same rule the document tabs already keep, for the same reason. */
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-/* ...and anything that genuinely cannot wrap scrolls inside its own box rather than being cut
-   off by the line above. Tables are the case that needs it here - app.css already gives every
-   `pre` its own scroller and wraps it. Same escape hatch the document tabs keep. */
-.recipe-workspace-pane-content table {
-  max-width: 100%;
-  overflow-x: auto;
+  overflow: auto;
 }
 
 /* Same role, so the width a pane's content is pinned to and the width the pane settles at

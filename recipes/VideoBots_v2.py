@@ -215,12 +215,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             # run spinner, and a percentage height would claim the whole column regardless of
             # what is above it. `minHeight: 0` so it can shrink when one of them appears.
             className="flex-grow-1",
-            # `position: relative` so `fillParent` fills *this* box. The widget's root is
-            # absolutely positioned, and the nearest positioned ancestor is otherwise
-            # `.recipe-workspace-pane` - so it spanned the whole pane and painted over the
-            # failure notice above it, which is what put the conversation both above and
-            # below that notice.
-            style=dict(minHeight=0, position="relative"),
+            style=dict(minHeight=0),
         )
 
     @cached_property
@@ -407,8 +402,15 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             )
             with gui.div(
                 # pe-3 keeps the scrollbar off the content when the pane overflows
-                className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3",
-                style=dict(minHeight=0),
+                className="flex-grow-1 pt-2 pe-1 pe-lg-3",
+                # One axis, and not Bootstrap's `overflow-auto`: that is `overflow: auto
+                # !important` on *both* axes, so this pane scrolled sideways too - every
+                # `gui.columns()` inside a pane is a `.row` carrying `margin-inline: -12px`
+                # for a container gutter to absorb, and there is none to absorb it here. That
+                # left the form draggable by 12px and parked there, clipping the first
+                # character of every label. Written as a style rather than a utility because
+                # the utility's `!important` would win over it.
+                style=dict(minHeight=0, overflowY="auto", overflowX="hidden"),
             ):
                 render_pane()
 
