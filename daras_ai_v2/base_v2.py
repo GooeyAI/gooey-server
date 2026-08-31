@@ -80,6 +80,10 @@ from workspaces.models import Workspace
 
 RUN_GRID_PAGE_SIZE = 24
 
+# About's description, before it gives way to a "more" link. Enough to say what a workflow is
+# without pushing the cards below it off the screen unread.
+ABOUT_NOTES_LINE_CLAMP = 6
+
 
 def format_credits_as_dollars(credits: int) -> str:
     """A credit count as the price a user pays, via the one conversion rate billing uses."""
@@ -798,16 +802,48 @@ class BasePage(BasePageV1):
         """What this workflow is. Version history lives in the title menu and Related
         Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
-        # The portrait leads; the top bar carries the title and author line.
+        # The portrait leads, with the owner under it; the top bar carries the title.
         self._render_about_photo(pr)
-        # description and the cards share one panel - two levels of the same answer
-        with gui.div(className="v2-about-panel"):
-            # full text: this tab is made to be read
-            if pr.notes:
+        self._render_about_author(pr)
+        # A panel each, rather than one holding both: the description is prose to read and
+        # the cards are a spec to scan, and sharing a box made the cards read as a footnote
+        # to the text above them.
+        if pr.notes:
+            with gui.div(className="v2-about-panel"):
+                # the same heading the meta groups carry, so the two panels read as a pair
+                gui.html('<div class="v2-about-section-title">Description</div>')
                 with gui.div(className="container-margin-reset v2-about-notes"):
-                    gui.write(pr.notes)
+                    gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
+        # `.v2-about-panel:empty` hides this for a recipe with neither cards nor
+        # deployments, which is what the base `_render_about_meta` renders.
+        with gui.div(className="v2-about-panel"):
             self._render_about_meta()
             self._render_about_deployments()
+
+    def _render_about_author(self, pr: PublishedRun):
+        """Who published this, under the portrait and below lg only.
+
+        Above lg the top bar's author line already says it. Below lg that line is dropped for
+        width, which left the workflow unattributed on a phone - the one place About is the
+        whole page rather than half of it. Read off `pr.workspace` like the bar's line is, so
+        the two cannot name different owners.
+        """
+        from widgets.author import render_author_from_workspace
+
+        if not pr.workspace_id:
+            return
+        try:
+            current_workspace = self.current_workspace
+        except Workspace.DoesNotExist:
+            current_workspace = None
+        with gui.div(className="v2-about-author d-lg-none"):
+            render_author_from_workspace(
+                pr.workspace,
+                image_size="32px",
+                # the block never renders above lg, so there is no second size to scale to
+                responsive=False,
+                current_workspace=current_workspace,
+            )
 
     def _render_about_photo(self, pr: PublishedRun):
         """The workflow's portrait. `CIRCLE_IMAGE_WORKFLOWS` get a round crop, matching the
@@ -1332,17 +1368,39 @@ ABOUT_CSS = """
     border-radius: 50%;
 }
 
-/* Description and the meta groups share one tinted panel - they answer "what is this" at two
-   levels of detail. Only the cards inside carry their own surface. */
+/* Who published this, pulled up into the portrait's bottom margin so the two read as one
+   heading block. Below lg only - `d-lg-none` on the element, since above lg the top bar's
+   author line says the same thing and this would repeat it. */
+& .v2-about-author {
+    display: flex;
+    justify-content: center;
+    margin: -0.75rem 0 1.5rem;
+}
+
+/* One panel per kind of answer: the description is prose to read, the meta groups are a spec
+   to scan. Only the cards inside carry their own surface. */
 & .v2-about-panel {
     background: var(--gooey-surface-100);
     border-radius: 16px;
     padding: 1.5rem;
 }
 
+& .v2-about-panel + .v2-about-panel {
+    margin-top: 1rem;
+}
+
+/* The meta panel is opened before its contents are known - `_render_about_meta` is a
+   per-recipe hook and the base renders nothing - so a recipe with no cards and no
+   deployments would leave an empty tinted box under the description. */
+& .v2-about-panel:empty {
+    display: none;
+}
+
 & .v2-about-notes {
     color: var(--gooey-ink);
-    margin-bottom: 1.5rem;
+    /* The clamp's "…more" is drawn over the tail of the last line, so it carries an opaque
+       background to cover it - white by default, which read as a chip against this panel. */
+    --line-clamp-bg: var(--gooey-surface-100);
 }
 
 /* Model and Tools & Integrations, side by side while there is room. Model holds one card, so
@@ -1351,6 +1409,13 @@ ABOUT_CSS = """
     display: flex;
     flex-wrap: wrap;
     gap: 1.5rem;
+}
+
+/* `_render_about_meta` and `_render_about_deployments` each emit a row of their own, and a
+   flex `gap` only spaces a container's own children - so without this Deployments sat flush
+   against the cards above it while the groups inside one row were properly spaced. */
+& .v2-about-groups + .v2-about-groups {
+    margin-top: 1.5rem;
 }
 
 /* Sizes to its own cards. With `min-width: 0` the group could be squeezed narrower than one
@@ -1362,10 +1427,11 @@ ABOUT_CSS = """
 }
 
 & .v2-about-section-title {
-    /* names the group - plain and dark, since it labels content rather than decorating it */
+    /* Names the section rather than saying anything itself, so it is set back from what it
+       labels - the cards and the description are what should be read first. */
     font-size: 0.9375rem;
     font-weight: 500;
-    color: var(--gooey-ink);
+    color: var(--gooey-ink-muted);
     margin: 0 0 0.5rem 0;
 }
 
@@ -1444,6 +1510,11 @@ ABOUT_CSS = """
         gap: 1.25rem;
     }
 
+    /* matches the gap the groups inside a row use here */
+    & .v2-about-groups + .v2-about-groups {
+        margin-top: 1.25rem;
+    }
+
     /* the group is full width now, so its cards may wrap within it */
     & .v2-about-meta {
         flex-wrap: wrap;
@@ -1457,10 +1528,17 @@ ABOUT_CSS = """
         max-width: var(--v2-about-card-width);
     }
 
-    /* clears the tab pills, which below lg float over the bottom of the viewport rather than
-       sitting in the top bar */
-    & .v2-about-panel {
-        margin-bottom: 4.5rem;
+    & {
+        /* Clears the tab pills, which below lg float over the bottom of the viewport rather
+           than sitting in the top bar. On the container rather than the last panel: whether
+           the meta panel is the last *rendered* box depends on whether it was hidden as
+           empty, and a `:last-child` rule reads the DOM, not what is displayed. */
+        padding-bottom: 4.5rem;
+        /* The panels are the full width of the pane, which put their edges hard against the
+           viewport's. Matches the `px-2` the editor column carries at this width, so the
+           content edge holds still when the two tabs are switched between. */
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
 }
 """
