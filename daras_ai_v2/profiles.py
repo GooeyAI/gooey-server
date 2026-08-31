@@ -201,19 +201,26 @@ def _render_user_profile_stats(user: AppUser):
     )
 
 
-def _render_team_profile_stats(workspace: Workspace):
-    public_workflow_count = (
+def public_workflow_count(workspace: Workspace) -> int:
+    """How many of a workspace's published workflows a stranger can see.
+
+    Shared with the recipe page's About tab, which reports the same number under the
+    workspace's name - two definitions of "how many workflows" would drift.
+    """
+    return (
         PublishedRun.objects.filter(workspace=workspace)
         .exclude(public_access=WorkflowAccessLevel.VIEW_ONLY)
         .count()
     )
+
+
+def _render_team_profile_stats(workspace: Workspace):
+    workflow_count = public_workflow_count(workspace)
     members_count = WorkspaceMembership.objects.filter(workspace=workspace).count()
 
     with gui.div(className="d-flex align-items-center mt-3 text-secondary"):
         with gui.div(className="me-3"):
-            gui.html(
-                f"{format_number_with_suffix(public_workflow_count)} Public Workflows"
-            )
+            gui.html(f"{format_number_with_suffix(workflow_count)} Public Workflows")
 
         with gui.div(className="d-flex align-items-center gap-2"):
             _render_member_photos(workspace)
