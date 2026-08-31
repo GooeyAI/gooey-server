@@ -1514,6 +1514,15 @@ ABOUT_CSS = """
     margin-top: var(--gooey-space-4);
 }
 
+/* `gui.html` wraps whatever it renders in a `display: contents` span. That span is a sibling
+   like any other, so the rule above matched it - but a box that draws nothing cannot carry a
+   margin, and the Description heading sat flush against the tags above it. Hand the gap to
+   the first real box inside the wrapper instead. */
+& .v2-about-author + .gui-html-container > :first-child,
+& .v2-about-tags + .gui-html-container > :first-child {
+    margin-top: var(--gooey-space-4);
+}
+
 /* Mark, then the name over what else this workspace has published. Left-aligned under a
    centred portrait on purpose: two lines centred read as a caption to the picture, and this
    is the workflow's attribution. */
