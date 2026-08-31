@@ -201,11 +201,59 @@ def test_page_shell_config_is_built_once_from_typed_layouts(monkeypatch):
     assert preview_config.active_run_id == "run-1"
 
 
+def test_view_only_reads_edit_permission_rather_than_authorship():
+    """A workspace holds its apps in common, so a member with EDIT access is an editor of an
+    app somebody else published, and a staff admin is an editor of every app. Reading
+    `is_current_user_owner` asked who typed it in, which handed a member the presentation
+    tabs on their own workspace's app.
+
+    Both `can_edit_current_pr` and `current_sr_pr` are `cached_property`, so assigning to the
+    instance is what a computed answer would have left behind.
+    """
+    page = object.__new__(VideoBotsPageV2)
+    page.current_sr_pr = (SimpleNamespace(id=7), SimpleNamespace(saved_run_id=7))
+
+    page.can_edit_current_pr = False
+    assert page.is_view_only() is True
+
+    page.can_edit_current_pr = True
+    assert page.is_view_only() is False
+
+
+def test_a_run_of_an_app_is_never_view_only():
+    """The url has to point at the published run itself. A run of an app is the viewer's to
+    work on and re-save as their own, whoever published the app it came from."""
+    page = object.__new__(VideoBotsPageV2)
+    page.current_sr_pr = (SimpleNamespace(id=7), SimpleNamespace(saved_run_id=99))
+
+    page.can_edit_current_pr = False
+    assert page.is_view_only() is False
+
+
+def test_can_edit_current_pr_answers_false_without_a_user_or_workspace(monkeypatch):
+    """The predicate is read while rendering every page, including logged-out ones, so it
+    has to answer rather than raise."""
+    from workspaces.models import Workspace
+
+    page = object.__new__(VideoBotsPageV2)
+    page.request = SimpleNamespace(user=None)
+    assert page.can_edit_current_pr is False
+
+    page = object.__new__(VideoBotsPageV2)
+    page.request = SimpleNamespace(user=SimpleNamespace())
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_workspace",
+        property(lambda self: (_ for _ in ()).throw(Workspace.DoesNotExist())),
+    )
+    assert page.can_edit_current_pr is False
+
+
 def test_entry_layout_lands_on_the_tab_set_it_was_given(monkeypatch):
-    """`is_unowned_example` picks both the tabs and the view they open on, so the two cannot
-    disagree. A visitor's tabs are About and How it works, and How it works is a config form
-    they have no way to save - so About. Everyone else works, and folds to the preview on a
-    phone."""
+    """`is_view_only` picks both the tabs and the view they open on, so the two cannot
+    disagree. A view-only viewer's tabs are About and How it works, and How it works is a
+    config form they have no way to save - so About. Everyone who can update the app works,
+    and folds to the preview on a phone."""
     about = SplitLayout(primary=SurfaceId.about, secondary=SurfaceId.preview)
     work = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
     tabs = [TabSpec(key="about", label="About", layout=about)]
@@ -214,15 +262,15 @@ def test_entry_layout_lands_on_the_tab_set_it_was_given(monkeypatch):
     page.tab = RecipeTabs.run
     page.request = SimpleNamespace(query_params={})
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
     assert page.entry_layout(tabs) == about
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: False)
     assert page.entry_layout(tabs) == work
 
-    # The url has no say: an admin reading somebody else's published run is a visitor to it,
-    # gets their tab set, and so lands where that tab set starts.
-    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
+    # The url has no say: whoever cannot update the app gets the view-only tab set, and so
+    # lands where that tab set starts.
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
     page.request.query_params = {"run_id": "run-1"}
     assert page.entry_layout(tabs) == about
 
@@ -299,32 +347,32 @@ def test_about_deployment_cards_carry_the_chips_targets():
     assert page._pop_submit_intent() == intent
 
 
-def test_narrow_surface_keeps_the_editor_for_a_visitor(monkeypatch):
-    """A visitor's one work tab is "How it works", which exists to show the configuration -
-    so a phone keeps the editor. An owner on Split keeps the bot."""
+def test_narrow_surface_keeps_the_editor_for_a_view_only_viewer(monkeypatch):
+    """Their one work tab is "How it works", which exists to show the configuration - so a
+    phone keeps the editor. An editor on Split keeps the bot."""
     page = object.__new__(VideoBotsPageV2)
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
     assert page.narrow_surface() == SurfaceId.editor
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: False)
     assert page.narrow_surface() == SurfaceId.preview
 
 
-def test_usage_is_kept_out_of_a_visitors_bar(monkeypatch):
-    """A visitor gets About and How it works, which present the workflow. A list of its runs
-    is an owner's tool, so it does not belong beside them - even for an admin, who may read
-    the run data of an app that is not theirs."""
+def test_usage_is_kept_out_of_a_view_only_bar(monkeypatch):
+    """A view-only viewer gets About and How it works, which present the workflow. A list of
+    its runs is an editor's tool, so it does not belong beside them. Both rights are needed:
+    updating the app, and belonging to the workspace whose runs the tab lists."""
     page = object.__new__(VideoBotsPageV2)
     monkeypatch.setattr(VideoBotsPageV2, "can_view_usage", lambda self: True)
     monkeypatch.setattr(
         VideoBotsPageV2, "current_app_url", lambda self, tab: "/agent/usage/"
     )
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
     assert page._usage_href() is None
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_unowned_example", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: False)
     assert page._usage_href() == "/agent/usage/"
 
     monkeypatch.setattr(VideoBotsPageV2, "can_view_usage", lambda self: False)

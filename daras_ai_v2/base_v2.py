@@ -1,6 +1,7 @@
 import html
 import inspect
 import typing
+from functools import cached_property
 
 import pydantic
 
@@ -243,8 +244,8 @@ class BasePage(BasePageV1):
         Per-recipe rather than a layout rule: a chat keeps the bot, a media recipe would keep
         the form. Both the workspace and the top bar fold on this, so it lives server-side.
         """
-        if self.is_unowned_example():
-            # A visitor's one work tab is "How it works", which exists to show config.
+        if self.is_view_only():
+            # Their one work tab is "How it works", which exists to show config.
             return SurfaceId.editor
         return SurfaceId.preview
 
@@ -450,15 +451,16 @@ class BasePage(BasePageV1):
         self.submit_and_redirect()
 
     def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        """The view the workspace opens on. About for a visitor, the work split otherwise.
+        """The view the workspace opens on. About for a view-only viewer, the work split for
+        anyone who can update the app.
 
         Read off the same answer `get_tab_spec` reads, so the landing view and the tabs
-        offered cannot disagree: a visitor is given About and How it works, and How it works
-        is a config form they have no way to save. About is what their half of the tab set
-        is for, so it is where they start - the root of a recipe and a published run they do
-        not own alike.
+        offered cannot disagree: a view-only viewer is given About and How it works, and How
+        it works is a config form they have no way to save. About is what their half of the
+        tab set is for, so it is where they start - the root of a recipe and a published run
+        they cannot update alike.
         """
-        if self.is_unowned_example():
+        if self.is_view_only():
             return tabs[0].layout
         return self.work_layout()
 
@@ -466,9 +468,14 @@ class BasePage(BasePageV1):
         """The two-pane working view: the editor with its preview beside it."""
         return SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
 
+    @cached_property
     def can_edit_current_pr(self) -> bool:
-        """Whether this workflow is the viewer's to change: its creator, an editor in its
-        workspace, or an admin. A root recipe belongs to nobody, so it answers False.
+        """Whether this workflow is the viewer's to change: its creator, a member of its
+        workspace holding EDIT access, a workspace admin, or a staff admin. A root recipe
+        belongs to nobody, so it answers False for everyone but a staff admin.
+
+        Cached because the answer costs a membership and a workspace-admin query, and the
+        page asks it once per surface it decides.
         """
         if not self.request.user:
             return False
@@ -480,12 +487,18 @@ class BasePage(BasePageV1):
             workspace=workspace, user=self.request.user, pr=self.current_pr
         )
 
-    def is_unowned_example(self) -> bool:
-        """The url points at a published workflow the viewer does not own, rather than at a
-        run of it - an example, or the recipe's root. In other words, a first-time visitor.
+    def is_view_only(self) -> bool:
+        """The url points at a published workflow the viewer cannot update, rather than at a
+        run of it. They get the tabs that present the workflow instead of the ones that
+        change it.
+
+        Permission, not authorship: a workspace holds its apps in common, so a member with
+        EDIT access reads as an editor here even on an app somebody else published. A run of
+        an app is always the viewer's to work on, which is why the url has to point at the
+        published run itself for this to answer True.
         """
         sr, pr = self.current_sr_pr
-        return pr.saved_run_id == sr.id and not self.is_current_user_owner()
+        return pr.saved_run_id == sr.id and not self.can_edit_current_pr
 
     SUBMIT_INTENT_KEY = "--recipe-submit-intent"
 
@@ -616,7 +629,7 @@ class BasePage(BasePageV1):
                 title=identity.title if config.workspace_active else identity.name,
                 title_href=identity.href,
                 crumb_label=None if config.workspace_active else self.tab.label,
-                view_only=self.is_unowned_example(),
+                view_only=self.is_view_only(),
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
@@ -654,12 +667,13 @@ class BasePage(BasePageV1):
     def _usage_href(self) -> str | None:
         """The Usage tab's url, or None to leave it out of the bar.
 
-        Out for a visitor even when they may read the run data - an admin looking at somebody
-        else's app is the case. `get_viewer_tab_spec` gives them About and How it works,
-        which present the workflow; a list of its runs is an owner's tool and does not belong
-        beside them. The route itself stays open, so a link to it still resolves.
+        Two rights, and both are needed: updating the app puts the editing tabs in the bar,
+        and belonging to the workspace is what makes its run list readable. A view-only
+        viewer gets About and How it works, which present the workflow; a list of its runs
+        is an editor's tool and does not belong beside them. The route itself stays open, so
+        a link to it still resolves.
         """
-        if self.is_unowned_example() or not self.can_view_usage():
+        if self.is_view_only() or not self.can_view_usage():
             return None
         return self.current_app_url(RecipeTabs.usage)
 
@@ -682,7 +696,7 @@ class BasePage(BasePageV1):
         """Permission-derived label for the publish action."""
         if not self.is_logged_in():
             return "Save"
-        if self.can_edit_current_pr():
+        if self.can_edit_current_pr:
             return "Update"
         elif self._has_request_changed():
             return "Save and Run"
@@ -723,7 +737,7 @@ class BasePage(BasePageV1):
         return by_id[gui.session_state[key]].render
 
     def get_tab_spec(self) -> list[TabSpec]:
-        if self.is_unowned_example():
+        if self.is_view_only():
             return self.get_viewer_tab_spec()
         return [
             TabSpec(
