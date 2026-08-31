@@ -549,34 +549,7 @@ def get_conversations_and_messages(bi) -> tuple[ConversationQuerySet, MessageQue
 
 
 def calculate_overall_stats(*, bi, conversations, messages, run_title, run_url):
-    # due to things like personal convos for slack, each user can have multiple conversations
-    users = conversations.distinct_by_user_id().order_by()
-    user_messages = messages.filter(role=CHATML_ROLE_USER).order_by()
-    bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT).order_by()
-    num_active_users_last_7_days = (
-        user_messages.filter(
-            conversation__in=users,
-            created_at__gte=timezone.now() - datetime.timedelta(days=7),
-        )
-        .distinct_by_user_id()
-        .count()
-    )
-    num_active_users_last_30_days = (
-        user_messages.filter(
-            conversation__in=users,
-            created_at__gte=timezone.now() - datetime.timedelta(days=30),
-        )
-        .distinct_by_user_id()
-        .count()
-    )
-    positive_feedbacks = Feedback.objects.filter(
-        message__conversation__bot_integration=bi,
-        rating=Feedback.Rating.POSITIVE,
-    ).count()
-    negative_feedbacks = Feedback.objects.filter(
-        message__conversation__bot_integration=bi,
-        rating=Feedback.Rating.NEGATIVE,
-    ).count()
+    stats = compute_overall_stats(bi=bi, conversations=conversations, messages=messages)
     run_link = f'Powered By: <a href="{run_url}" target="_blank">{run_title}</a>'
     if bi.get_display_name() != bi.name:
         connection_detail = f"- Connected to: {bi.get_display_name()}"
@@ -589,18 +562,78 @@ def calculate_overall_stats(*, bi, conversations, messages, run_title, run_url):
             - Last Updated: {bi.updated_at.strftime("%b %d, %Y")}
             - {run_link}
             {connection_detail}
-            * {users.count()} Users
-            * {num_active_users_last_7_days} Active Users (Last 7 Days)
-            * {num_active_users_last_30_days} Active Users (Last 30 Days)
-            * {conversations.count()} Conversations
-            * {user_messages.count()} User Messages
-            * {bot_messages.count()} Bot Messages
-            * {messages.count()} Total Messages
-            * {positive_feedbacks} Positive Feedbacks
-            * {negative_feedbacks} Negative Feedbacks
+            * {stats["users"]} Users
+            * {stats["active_users_last_7_days"]} Active Users (Last 7 Days)
+            * {stats["active_users_last_30_days"]} Active Users (Last 30 Days)
+            * {stats["conversations"]} Conversations
+            * {stats["user_messages"]} User Messages
+            * {stats["bot_messages"]} Bot Messages
+            * {stats["total_messages"]} Total Messages
+            * {stats["positive_feedbacks"]} Positive Feedbacks
+            * {stats["negative_feedbacks"]} Negative Feedbacks
             """,
         unsafe_allow_html=True,
     )
+
+
+def compute_overall_stats(
+    *, bi, conversations, messages, start_date=None, end_date=None
+) -> dict:
+    """Engagement counts for a bot integration, without rendering anything.
+
+    Shared by the stats page and the MCP server (`scripts/mcp_server.py`) so
+    both report identical numbers.
+
+    `conversations` and `messages` may already be narrowed to a date range, in
+    which case pass the same `start_date`/`end_date` so the feedback counts are
+    narrowed to match. The active-user figures are always computed against the
+    bot's full history, so "active users (last 7 days)" means the same thing
+    whether or not a range was given.
+    """
+    # due to things like personal convos for slack, each user can have multiple conversations
+    users = conversations.distinct_by_user_id().order_by()
+    user_messages = messages.filter(role=CHATML_ROLE_USER).order_by()
+    bot_messages = messages.filter(role=CHATML_ROLE_ASSISTANT).order_by()
+
+    all_conversations, all_messages = get_conversations_and_messages(bi)
+    all_users = all_conversations.distinct_by_user_id().order_by()
+    all_user_messages = all_messages.filter(role=CHATML_ROLE_USER).order_by()
+    num_active_users_last_7_days = (
+        all_user_messages.filter(
+            conversation__in=all_users,
+            created_at__gte=timezone.now() - datetime.timedelta(days=7),
+        )
+        .distinct_by_user_id()
+        .count()
+    )
+    num_active_users_last_30_days = (
+        all_user_messages.filter(
+            conversation__in=all_users,
+            created_at__gte=timezone.now() - datetime.timedelta(days=30),
+        )
+        .distinct_by_user_id()
+        .count()
+    )
+
+    feedbacks = Feedback.objects.filter(message__conversation__bot_integration=bi)
+    if start_date:
+        feedbacks = feedbacks.filter(message__created_at__date__gte=start_date)
+    if end_date:
+        feedbacks = feedbacks.filter(message__created_at__date__lte=end_date)
+    positive_feedbacks = feedbacks.filter(rating=Feedback.Rating.POSITIVE).count()
+    negative_feedbacks = feedbacks.filter(rating=Feedback.Rating.NEGATIVE).count()
+
+    return {
+        "users": users.count(),
+        "active_users_last_7_days": num_active_users_last_7_days,
+        "active_users_last_30_days": num_active_users_last_30_days,
+        "conversations": conversations.count(),
+        "user_messages": user_messages.count(),
+        "bot_messages": bot_messages.count(),
+        "total_messages": messages.count(),
+        "positive_feedbacks": positive_feedbacks,
+        "negative_feedbacks": negative_feedbacks,
+    }
 
 
 def get_tabular_data(

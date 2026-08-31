@@ -212,3 +212,6 @@ node_modules/
 # End of https://www.toptal.com/developers/gitignore/api/python,macOS
 bots/management/commands/export_messages.py
 bots/management/commands/import_messages.py
+
+# CSV exports written by scripts/mcp_server.py
+/exports/

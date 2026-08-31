@@ -252,6 +252,68 @@ Several features are opt-in and only appear when the relevant API keys are confi
 
 See [configuration.md](configuration.md) for the full list of keys and their defaults.
 
+### 🔎 MCP server (analyse copilot data in Claude)
+
+An [MCP](https://modelcontextprotocol.io) server that exposes copilot analytics, so
+Claude Desktop / Claude Code can query bot data directly. It reuses the same querysets
+as the copilot **Stats** page, so its numbers match the UI.
+
+Tools: `list_bots`, `bot_stats`, `sample_messages`, `export_table` (writes a CSV to
+`exports/` for pandas), `sql` (read-only SELECT) and `describe_tables`.
+
+It is two processes:
+
+- `scripts/analytics_cli.py` runs in the gooey-server virtualenv and does the ORM work,
+  printing JSON.
+- `scripts/mcp_server.py` speaks MCP and shells out to it.
+
+They are split because the `mcp` package requires uvicorn >= 0.31 while this project
+pins uvicorn `^0.18.3`, so `mcp` cannot be installed into the gooey-server environment
+without upgrading the production ASGI server. Hence `mcp` gets its own virtualenv and
+is not a project dependency:
+
+```bash
+python3 -m venv .mcp-venv
+.mcp-venv/bin/pip install "mcp>=2"
+```
+
+Register it with Claude Code, from the repo root:
+
+```bash
+claude mcp add gooey \
+  -e GOOEY_PYTHON="$(poetry env info -e)" \
+  -e GOOEY_REPO="$PWD" \
+  -- "$PWD/.mcp-venv/bin/python" "$PWD/scripts/mcp_server.py"
+```
+
+Or with Claude Desktop, in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "gooey": {
+      "command": "/path/to/gooey-server/.mcp-venv/bin/python",
+      "args": ["/path/to/gooey-server/scripts/mcp_server.py"],
+      "env": {
+        "GOOEY_PYTHON": "/path/to/gooey-virtualenv/bin/python",
+        "GOOEY_REPO": "/path/to/gooey-server"
+      }
+    }
+  }
+}
+```
+
+You can also drive the CLI half on its own, without any of the MCP plumbing:
+
+```bash
+python scripts/analytics_cli.py list-bots '{"limit": 5}'
+python scripts/analytics_cli.py bot-stats '{"bot_id": 1}'
+```
+
+The server is read-only, but it has no workspace scoping — it can read whatever its
+`DATABASE_URL` can. Point it at a local database or a read replica, and remember that
+message content is end-user data.
+
 ## 📐 Code Formatting
 
 Use [ruff](https://docs.astral.sh/ruff/)
