@@ -1446,7 +1446,7 @@ ABOUT_CSS = """
 & .v2-about-meta {
     display: flex;
     flex-wrap: nowrap;
-    gap: 0.75rem;
+    gap: 1.5rem;
 }
 
 /* Icon above label, not beside it: the label is the longer of the two and wraps, so a row
@@ -1463,7 +1463,7 @@ ABOUT_CSS = """
        so without it each card grew to fit its own text and no two matched. */
     --v2-about-card-width: 11rem;
     flex: 0 0 var(--v2-about-card-width);
-    min-width: 0;
+    min-width: 11rem;
     padding: 0.875rem;
     border: 1px solid var(--gooey-line-default);
     border-radius: 12px;
