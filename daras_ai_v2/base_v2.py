@@ -836,7 +836,12 @@ class BasePage(BasePageV1):
             current_workspace = self.current_workspace
         except Workspace.DoesNotExist:
             current_workspace = None
-        with gui.div(className="v2-about-author d-lg-none"):
+        # A portrait brings its own gap above; with no photo there is none, and the block
+        # opened flush against the top of the pane.
+        className = "v2-about-author d-lg-none mb-4"
+        if not pr.photo_url:
+            className += " mt-2"
+        with gui.div(className=className):
             render_author_from_workspace(
                 pr.workspace,
                 image_size="32px",
@@ -1371,10 +1376,11 @@ ABOUT_CSS = """
 /* Who published this, pulled up into the portrait's bottom margin so the two read as one
    heading block. Below lg only - `d-lg-none` on the element, since above lg the top bar's
    author line says the same thing and this would repeat it. */
+/* Spacing is on the element, in Bootstrap utilities - it depends on whether a portrait was
+   rendered above, which only the page knows. */
 & .v2-about-author {
     display: flex;
     justify-content: center;
-    margin: -0.75rem 0 1.5rem;
 }
 
 /* One panel per kind of answer: the description is prose to read, the meta groups are a spec
