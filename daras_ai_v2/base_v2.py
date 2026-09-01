@@ -814,8 +814,12 @@ class BasePage(BasePageV1):
                 self._render_about_author(pr)
                 self._render_about_tags(tags)
                 if pr.notes:
-                    # the same heading the meta groups carry, so the panels read as a pair
-                    gui.html('<div class="v2-about-section-title">Description</div>')
+                    # the same heading the meta groups carry, so the panels read as a pair.
+                    # A real `gui.div` rather than `gui.html`: that wraps its body in a
+                    # `.gui-html-container`, which is `display: contents` and so generates no
+                    # box - the panel's spacing rule would land on the wrapper and vanish.
+                    with gui.div(className="v2-about-section-title"):
+                        gui.html("Description")
                     with gui.div(className="container-margin-reset v2-about-notes"):
                         gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
         # `.v2-about-panel:empty` hides this for a recipe with neither cards nor
@@ -1648,7 +1652,10 @@ ABOUT_CSS = """
     font-size: 0.9375rem;
     font-weight: 500;
     color: var(--gooey-ink-muted);
-    margin: 0 0 var(--gooey-space-2) 0;
+    /* `margin-bottom`, not the `margin` shorthand: the shorthand also sets `margin-top: 0`,
+       which silently cancelled the gap the preceding tags row hands to whatever follows it -
+       same specificity, and this rule comes later. */
+    margin-bottom: var(--gooey-space-2);
 }
 
 /* `nowrap`: a group's cards belong on one line, and the group is what gives way when the row

@@ -356,7 +356,7 @@ export function RecipeTopBar({
           ? [
               {
                 key: "--sheet-remix",
-                label: "Remix",
+                label: "Ask Gooey to Edit",
                 iconClass: "fa-regular fa-shuffle",
                 onPick: () => setBuilder(true),
               },
