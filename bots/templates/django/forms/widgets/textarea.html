@@ -17,18 +17,25 @@
     <textarea name="{{ widget.name }}" {% include "django/forms/widgets/attrs.html" %}
     >{% if widget.value %}{{ widget.value | pretty_json }}{% endif %}</textarea>
     <script>
-        CodeMirror.fromTextArea(document.getElementById("{{ widget.attrs.id }}"), {
-            lineNumbers: true,
-            matchBrackets: true,
-            mode: "application/json",
-            gutters: ["CodeMirror-lint-markers"],
-            theme: "monokai",
-            lint: true,
-            extraKeys: {
-                "Ctrl-F": "findPersistent",
-                "Cmd-F": "findPersistent"
-            }
-        });
+        (() => {
+            const textarea = document.getElementById("{{ widget.attrs.id }}");
+            // CodeMirror's synchronous JSON linting can lock up the admin page for
+            // large SavedRun states. Keep those values in the native textarea.
+            if (textarea.value.length > 100_000) return;
+
+            CodeMirror.fromTextArea(textarea, {
+                lineNumbers: true,
+                matchBrackets: true,
+                mode: "application/json",
+                gutters: ["CodeMirror-lint-markers"],
+                theme: "monokai",
+                lint: true,
+                extraKeys: {
+                    "Ctrl-F": "findPersistent",
+                    "Cmd-F": "findPersistent"
+                }
+            });
+        })();
     </script>
 {% else %}
     <textarea rows="1" name="{{ widget.name }}" {% include "django/forms/widgets/attrs.html" %}
