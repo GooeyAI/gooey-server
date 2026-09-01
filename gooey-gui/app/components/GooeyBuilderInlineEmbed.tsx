@@ -113,7 +113,5 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
 
-  // No `w-100`: Bootstrap's width utilities are `!important` and would beat the settled-width
-  // rule in app.css. Width is owned there.
-  return <div className="h-100" id="gooey-builder-embed" />;
+  return <div id="gooey-builder-embed" />;
 }

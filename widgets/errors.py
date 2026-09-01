@@ -17,6 +17,7 @@ def insufficient_credits_error(error_params: dict):
     sr = error_params["sr"]
     current_workspace = error_params.get("current_workspace")
     price = error_params.get("price", None)
+    on_rerun = error_params.get("on_rerun")
     current_user = request.user
     personal_workspace = (
         current_user and current_user.get_or_create_personal_workspace()[0]
@@ -66,6 +67,8 @@ def insufficient_credits_error(error_params: dict):
     if gui.session_state.pop(RERUN_KEY, None):
         if rerun_workspace:
             set_current_workspace(request.session, rerun_workspace.id)
+        if on_rerun:
+            return on_rerun()
         gui.session_state["-submit-workflow"] = True
         raise gui.RerunException()
 

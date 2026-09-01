@@ -59,7 +59,7 @@ def gooey_builder_run_route(request: Request, title: str, run_id: str):
     if gui.session_state.pop("builderOnNewConversation", None):
         raise gui.RedirectException(get_route_path(ask_gooey_new_page))
 
-    # explicit viewport height so the embed's h-100 fills the screen
+    # Bound the flex column so the Builder embed can fill its remaining height.
     with (
         sidebar_page_wrapper(request, full_width_content=True),
         gui.div(
