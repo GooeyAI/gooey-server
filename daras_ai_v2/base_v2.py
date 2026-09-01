@@ -275,34 +275,33 @@ class BasePage(BasePageV1):
         )
 
     def _render_gooey_builder(self):
-        # The panel's collapse control, positioned against `.gooey-sidebar` at every
-        # breakpoint so there is no app-header offset to hardcode.
-        gui.model_component(
-            WorkspacePaneControlProps(
-                label="Close Ask gooey",
-                icon=FontAwesomeIcon(class_name=icons.cls.cancel),
-                target=PanelControlTarget(
-                    panel_key=GOOEY_BUILDER_EVENT_KEY,
-                    open=False,
-                ),
-                className="v2-builder-close",
-            )
-        )
-        # The panel's title, and its "new conversation" control - v2 hides the widget's own
-        # header. Skipped on an empty thread, where the widget draws its own splash.
-        if not builder_thread_is_empty(self):
+        with gui.div(className="v2-builder-header"):
+            # v2 hides the widget's own header. Skip the title on an empty thread, where the
+            # widget draws its own splash.
+            if not builder_thread_is_empty(self):
+                gui.model_component(
+                    WorkspacePaneControlProps(
+                        label=GOOEY_BUILDER_TITLE,
+                        # the label names the panel; the tooltip says what clicking it does
+                        tooltip="New Chat",
+                        icon=PhotoIcon(url=get_gooey_builder_photo_url()),
+                        target=EventControlTarget(
+                            event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new"
+                        ),
+                        show_label=True,
+                        # padding is owned by `.v2-pane-control-labelled`, not a utility class
+                        className="v2-builder-new",
+                    )
+                )
             gui.model_component(
                 WorkspacePaneControlProps(
-                    label=GOOEY_BUILDER_TITLE,
-                    # the label names the panel; the tooltip says what clicking it does
-                    tooltip="New Chat",
-                    icon=PhotoIcon(url=get_gooey_builder_photo_url()),
-                    target=EventControlTarget(
-                        event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new"
+                    label="Close Ask gooey",
+                    icon=FontAwesomeIcon(class_name=icons.cls.cancel),
+                    target=PanelControlTarget(
+                        panel_key=GOOEY_BUILDER_EVENT_KEY,
+                        open=False,
                     ),
-                    show_label=True,
-                    # padding is owned by `.v2-pane-control-labelled`, not a utility class
-                    className="v2-builder-new",
+                    className="v2-builder-close",
                 )
             )
         render_gooey_builder(

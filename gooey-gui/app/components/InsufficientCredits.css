@@ -7,6 +7,11 @@
   padding: 16px 18px;
 }
 
+.gooey-builder-insufficient-credits > .insufficient-credits {
+  max-width: none;
+  width: 100%;
+}
+
 .insufficient-credits__title {
   align-items: center;
   color: #2a2a2a;

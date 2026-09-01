@@ -406,8 +406,10 @@ button .gui-html-container,
   border-right: 1px solid #e0e0e0;
 }
 
-/* Default: fill whatever holds it - the standalone builder page has no panel around it. */
+/* Fill the space left below Builder headers and notices. */
 #gooey-builder-embed {
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
 }
 
