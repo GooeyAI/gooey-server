@@ -340,8 +340,19 @@ button .gui-html-container,
   --gooey-space-2: 8px; /* space/2 */
   --gooey-space-3: 12px; /* space/3 */
   --gooey-space-4: 16px; /* space/4 */
+  /* Not in the Figma set, but on its step - the scale is 4px per unit, so these continue it
+     rather than inventing values. The recipe page's panels and card rows were already
+     spacing on 20 and 24 with no step to name either with. */
+  --gooey-space-5: 20px;
+  --gooey-space-6: 24px;
 
   --gooey-radius-xs: 8px; /* radius/xs - buttons */
+  /* Also outside the Figma set, and the same story: the v2 surfaces round at 10, 12 and 16
+     and the scale jumped straight from 8 to 32. Ordered small to large with xs, so a reader
+     can pick one by size rather than by hunting for the hex. */
+  --gooey-radius-sm: 10px; /* controls that sit in a row - pane pills, the code editor */
+  --gooey-radius-md: 12px; /* cards */
+  --gooey-radius-lg: 16px; /* panels, the About portrait */
   --gooey-radius-pill: 32px; /* radius/pill - the drawer's top corners */
   --gooey-radius-full: 99px; /* radius/full - avatars, grab handle */
 }

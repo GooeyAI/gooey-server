@@ -209,7 +209,10 @@ export function LineClamp({
             <button
               style={{
                 border: "none",
-                backgroundColor: "white",
+                // Opaque on purpose: this sits over the tail of the clamped line and has to
+                // cover it. White only suits a white surface, so a caller on a tinted one
+                // sets --line-clamp-bg to whatever it is sitting on.
+                backgroundColor: "var(--line-clamp-bg, white)",
                 color: "rgba(0, 0, 0, 0.6)",
               }}
               type={"button"}

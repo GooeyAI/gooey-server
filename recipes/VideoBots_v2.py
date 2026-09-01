@@ -266,7 +266,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     def get_tab_spec(self) -> list[TabSpec]:
         """The agent tab set. Deploy is absent - its body is reached through the
         `/integrations/` url via `render_selected_tab()`."""
-        if self.is_unowned_example():
+        if self.is_view_only():
             return self.get_viewer_tab_spec()
         return [
             TabSpec(

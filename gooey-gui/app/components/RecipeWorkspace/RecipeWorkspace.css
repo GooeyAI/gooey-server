@@ -189,7 +189,6 @@
 .v2-reading-col {
   width: 100%;
   max-width: var(--v2-reading-max);
-  padding: var(--gooey-space-1) 0;
   margin-inline: auto;
 }
 

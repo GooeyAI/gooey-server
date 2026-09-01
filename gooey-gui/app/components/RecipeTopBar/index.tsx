@@ -24,7 +24,8 @@ import {
   workspaceTargetForLayout,
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
-import { encodeSubmitIntent, type RecipeSubmitIntent } from "./submitIntent";
+import { isIntegrationLabelled } from "./integrationChips";
+import { encodeSubmitIntent } from "./submitIntent";
 
 type TopBarTarget = LinkTarget | SubmitTarget;
 type MenuEntry = {
@@ -355,7 +356,7 @@ export function RecipeTopBar({
           ? [
               {
                 key: "--sheet-remix",
-                label: "Remix",
+                label: "Ask Gooey to Edit",
                 iconClass: "fa-regular fa-shuffle",
                 onPick: () => setBuilder(true),
               },
@@ -640,11 +641,16 @@ export function RecipeTopBar({
           </div>
         )}
 
-        {/* At most one chip is labelled, none past two: the centred pill group leaves the
-            right cluster half the bar's slack. Unlabelled chips keep their name in the
-            tooltip and in the ... menu. */}
+        {/* Labels only in the view-only bar, and at most one there: the centred pill group
+            leaves the right cluster half the bar's slack, and an editor's bar spends that on
+            the tabs and Update. Unlabelled chips keep their name in the tooltip and in the
+            ... menu. */}
         {integrations.map((integration, i) => {
-          const labelled = i === 0 && integrations.length <= 2;
+          const labelled = isIntegrationLabelled({
+            index: i,
+            count: integrations.length,
+            viewOnly: view_only,
+          });
           const className = clsx(
             "gooey-topbar-integration d-none d-lg-inline-flex",
             labelled && "gooey-topbar-integration--labelled",
