@@ -2185,8 +2185,6 @@ class BasePage:
         run_status: str | None = STARTING_STATE,
         **defaults,
     ) -> SavedRun:
-        from routers.firebase_auth import init_firebase_anonymous_user
-
         gui.session_state[StateKeys.run_status] = run_status
         gui.session_state.pop(StateKeys.error_msg, None)
         gui.session_state.pop(StateKeys.run_time, None)
@@ -2194,8 +2192,7 @@ class BasePage:
         self.clear_outputs()
 
         assert self.request, "request is not set for current session"
-        if not self.request.user:
-            init_firebase_anonymous_user(self.request)
+        self.ensure_authentication()
 
         if enable_rate_limits:
             ensure_rate_limits(self.workflow, self.request.user, self.current_workspace)
