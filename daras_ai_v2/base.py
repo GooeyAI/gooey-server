@@ -2129,9 +2129,14 @@ class BasePage:
         unsaved_state: dict[str, typing.Any] | None = None,
         **defaults,
     ):
+        if not self.is_logged_in():
+            defaults.setdefault("run_status", None)
         sr = self.create_and_validate_new_run(enable_rate_limits=True, **defaults)
         if not sr:
             return
+        self.ensure_authentication(
+            next_url=sr.get_app_url(query_params={SUBMIT_AFTER_LOGIN_Q: "1"})
+        )
         self.call_runner_task(sr, unsaved_state=unsaved_state)
         return sr
 
@@ -2185,6 +2190,8 @@ class BasePage:
         run_status: str | None = STARTING_STATE,
         **defaults,
     ) -> SavedRun:
+        from routers.firebase_auth import init_firebase_anonymous_user
+
         gui.session_state[StateKeys.run_status] = run_status
         gui.session_state.pop(StateKeys.error_msg, None)
         gui.session_state.pop(StateKeys.run_time, None)
@@ -2192,7 +2199,8 @@ class BasePage:
         self.clear_outputs()
 
         assert self.request, "request is not set for current session"
-        self.ensure_authentication()
+        if not self.request.user:
+            init_firebase_anonymous_user(self.request)
 
         if enable_rate_limits:
             ensure_rate_limits(self.workflow, self.request.user, self.current_workspace)
