@@ -94,9 +94,7 @@ def render_standalone_gooey_builder(
 
     handle_gooey_builder_redirect(builder_sr)
     builder_run_url = builder_sr.get_app_url()
-    messages = get_chat_widget_messages(
-        builder_sr.to_dict(), web_url=builder_run_url
-    )
+    messages = get_chat_widget_messages(builder_sr.to_dict(), web_url=builder_run_url)
     if builder_sr.error_type == exceptions.InsufficientCredits.__name__:
         render_gooey_builder_insufficient_credits(
             request=request,
