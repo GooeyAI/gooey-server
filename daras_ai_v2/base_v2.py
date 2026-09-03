@@ -1245,9 +1245,9 @@ PANE_STRIP_CSS = """
    column every time the window changes width.
 
    `!important` throughout: these compete with the app's own button styling, which is more
-   specific than a scoped `& button` rule and otherwise wins (tertiary buttons come with
-   their own padding and a pink hover). */
-& {
+   specific than a scoped button rule and otherwise wins (tertiary buttons come with their
+   own padding and a pink hover). */
+& .recipe-workspace-pane-tabs {
     display: flex;
     flex-wrap: nowrap;
     gap: var(--gooey-space-2);
@@ -1263,7 +1263,7 @@ PANE_STRIP_CSS = """
     border-bottom: 1px solid var(--gooey-line-soft);
 }
 
-& button {
+& .recipe-workspace-pane-tabs > button {
     flex: 0 0 auto;
     /* inline-flex keeps the active dot on the same line as the label; with inline-block it
        becomes a block-level box and the label drops to a second line */
@@ -1281,20 +1281,20 @@ PANE_STRIP_CSS = """
     font-size: 14px !important;
 }
 
-& button:hover {
+& .recipe-workspace-pane-tabs > button:hover {
     background: var(--gooey-bg-page) !important;
     border-color: var(--gooey-line-strong) !important;
     color: var(--gooey-ink) !important;
 }
 
-& button.pane-active {
+& .recipe-workspace-pane-tabs > button.pane-active {
     border-color: var(--gooey-line-strong) !important;
     color: var(--gooey-ink) !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     background: var(--gooey-surface-100) !important;
 }
 
-& button.pane-active::before {
+& .recipe-workspace-pane-tabs > button.pane-active::before {
     content: "";
     flex: 0 0 auto;
     width: 6px;
@@ -1309,7 +1309,7 @@ PANE_STRIP_CSS = """
    through between the two. The bottom half stays: that is what holds the strip's own rule off
    the pills, and leaves room for the active pill's shadow. `!important` to beat the utility. */
 @media (max-width: 991.98px) {
-    & {
+    & .recipe-workspace-pane-tabs {
         margin-top: 0 !important;
     }
 }
