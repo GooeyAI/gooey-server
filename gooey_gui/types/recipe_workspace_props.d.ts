@@ -36,13 +36,16 @@ export interface RecipeWorkspaceProps {
 export interface RecipeSurfaceProps {
   surface: SurfaceId;
 }
-export interface SessionStateUpdate {
-  key: string;
-  value: string;
+export interface WorkspaceEditorPane {
+  id: string;
+  label: string;
+}
+export interface RecipeWorkspacePanesProps {
+  panes: WorkspaceEditorPane[];
 }
 export interface RecipeWorkspaceTriggerProps {
   layout: SingleLayout | SplitLayout;
-  state_update: SessionStateUpdate | null;
+  editor_pane: string | null;
   className: string | null;
 }
 export interface FontAwesomeIcon {
