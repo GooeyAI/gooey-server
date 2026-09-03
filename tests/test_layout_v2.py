@@ -8,7 +8,6 @@ import pytest
 
 import gooey_gui as gui
 from daras_ai_v2.base import BasePage as BasePageV1
-from daras_ai_v2.base_v2 import PANE_STRIP_CSS
 from daras_ai_v2.tab_spec import TabSpec
 from gooey_gui.types.recipe_top_bar_props import (
     LinkTarget,
@@ -156,11 +155,6 @@ def test_workspace_panes_render_all_content_in_one_pass(monkeypatch):
             ]
         )
     ]
-
-
-def test_workspace_pane_styles_do_not_target_body_buttons():
-    assert "& button" not in PANE_STRIP_CSS
-    assert "& .recipe-workspace-pane-tabs > button" in PANE_STRIP_CSS
 
 
 def test_layout_models_reject_extra_and_duplicate_surfaces():

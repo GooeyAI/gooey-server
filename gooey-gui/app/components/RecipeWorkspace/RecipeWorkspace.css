@@ -47,6 +47,58 @@
   transform: translateX(0);
 }
 
+.recipe-workspace-pane-tabs {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  gap: var(--gooey-space-2);
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: var(--gooey-space-3);
+  border-bottom: 1px solid var(--gooey-line-soft);
+  scrollbar-width: thin;
+}
+
+.recipe-workspace-pane-tabs > button {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  align-items: center;
+  margin: 0 !important;
+  padding: var(--gooey-space-2) var(--gooey-space-3) !important;
+  border: 1px solid var(--gooey-line-soft) !important;
+  border-radius: var(--gooey-radius-sm) !important;
+  background: var(--gooey-bg-page) !important;
+  color: var(--gooey-ink-muted) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 120% !important;
+  white-space: nowrap !important;
+}
+
+.recipe-workspace-pane-tabs > button:hover {
+  border-color: var(--gooey-line-strong) !important;
+  background: var(--gooey-bg-page) !important;
+  color: var(--gooey-ink) !important;
+}
+
+.recipe-workspace-pane-tabs > button.pane-active {
+  border-color: var(--gooey-line-strong) !important;
+  background: var(--gooey-surface-100) !important;
+  color: var(--gooey-ink) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.recipe-workspace-pane-tabs > button.pane-active::before {
+  width: 6px;
+  height: 6px;
+  margin-right: var(--gooey-space-2);
+  border-radius: 50%;
+  background: var(--gooey-ink);
+  content: "";
+  flex: 0 0 auto;
+}
+
 /* A pane's share of the row comes from the role React gives it - major, minor or solo -
    rather than from reading which panes are open off the workspace's own classes, which
    cannot distinguish "alone" from "not beside the editor". */
@@ -338,6 +390,10 @@
 }
 
 @media (max-width: 991.98px) {
+  .recipe-workspace-pane-tabs {
+    margin-top: 0 !important;
+  }
+
   /* Both work views start at the header's rule, so the page's top gutter showed as a strip of
      background between the two. `!important` to beat `pt-2`. About keeps its gutter - it is a
      card, and sits off the rule. */

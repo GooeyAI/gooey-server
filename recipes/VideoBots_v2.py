@@ -10,7 +10,6 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.base_v2 import (
     ABOUT_META_ICON_SIZE,
     FILL_HEIGHT_EDITOR_CSS,
-    PANE_STRIP_CSS,
     VARIABLES_DIALOG_CSS,
     BasePage,
     RecipeTabs,
@@ -63,7 +62,7 @@ MODEL_ROW_CSS = """
     margin-bottom: 0;
 }
 
-/* Match the pane strip's pills (PANE_STRIP_CSS: 0.875rem). Neither react-select nor
+/* Match the pane strip's pills (14px). Neither react-select nor
    `AIModelSpec.display_html()` sets a font size, so the control was inheriting the page's 1rem
    and reading a size larger than the tabs directly above it. Set on the wrapper so the value,
    the placeholder and the open menu all shift together. */
@@ -377,10 +376,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             WorkspaceEditorPane(id=ConfigPane.settings, label="Settings"),
             WorkspaceEditorPane(id=ConfigPane.debug, label="Debug"),
         ]
-        with (
-            gui.styled(PANE_STRIP_CSS),
-            gui.model_component(RecipeWorkspacePanesProps(panes=panes)),
-        ):
+        with gui.model_component(RecipeWorkspacePanesProps(panes=panes)):
             with gui.div():
                 self._render_llm_instructions_pane()
             with gui.div():
