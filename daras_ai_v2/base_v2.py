@@ -1052,7 +1052,7 @@ class BasePage(BasePageV1):
             if not is_deleted:
                 self.render_is_cancelled()
                 with gui.div(
-                    className="flex-grow-1 d-flex flex-column",
+                    className="flex-grow-1 d-flex flex-column v2-run-output",
                     style=dict(minHeight=0),
                 ):
                     self.render_output()
