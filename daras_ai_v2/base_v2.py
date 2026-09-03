@@ -313,6 +313,7 @@ class BasePage(BasePageV1):
             # nothing on this tab submits, and a stale key from the workspace would fire
             # against a run the reader is not looking at
             gui.session_state.pop(self.SUBMIT_INTENT_KEY, None)
+            gui.session_state.pop("-submit-workflow", None)
             return
 
         intent = self._pop_submit_intent()
@@ -350,6 +351,9 @@ class BasePage(BasePageV1):
 
     def _pop_submit_intent(self) -> RecipeSubmitIntent | None:
         raw_intent = gui.session_state.pop(self.SUBMIT_INTENT_KEY, None)
+        legacy_submit = gui.session_state.pop("-submit-workflow", None)
+        if not raw_intent and legacy_submit:
+            raw_intent = RunIntent()
         if not raw_intent:
             return None
 

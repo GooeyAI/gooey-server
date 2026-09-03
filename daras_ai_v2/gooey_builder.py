@@ -25,13 +25,15 @@ from daras_ai_v2.web_widget_embed import (
 from routers.custom_api_router import CustomAPIRouter
 
 from workspaces.models import Workspace
-from workspaces.widgets import get_current_workspace
+from workspaces.widgets import get_current_workspace, set_current_workspace
+from widgets.errors import get_insufficient_credits_rerun_workspace
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
 DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg"
 GOOEY_BUILDER_EVENT_KEY = "builder-sidebar"
+GOOEY_BUILDER_RERUN_KEY = "--insufficient-credits-rerun-builder"
 
 
 def render_gooey_builder(
@@ -47,7 +49,7 @@ def render_gooey_builder(
     handle_gooey_builder_redirect(builder_sr)
     workflow_state = {
         field_name: gui.session_state[field_name]
-        for field_name in page.fields_to_save()
+        for field_name in page.RequestModel.model_fields
         if field_name in gui.session_state
     }
     if builder_thread_is_empty(page):
@@ -136,26 +138,18 @@ def render_gooey_builder_insufficient_credits(
         builder_run_url=builder_sr.get_app_url(),
         workflow_state=workflow_state or {},
     )
-
-    def on_rerun():
-        rerun_gooey_builder(request, retry_body)
+    if gui.session_state.pop(GOOEY_BUILDER_RERUN_KEY, None):
+        raise gui.RedirectException(submit_gooey_builder_message(request, retry_body))
 
     error_params = dict(builder_sr.error_params or {})
     error_params.update(
         request=request,
         sr=builder_sr,
         current_workspace=current_workspace,
-        on_rerun=on_rerun,
+        rerun_key=GOOEY_BUILDER_RERUN_KEY,
     )
     with gui.div(className="gooey-builder-insufficient-credits"):
         exceptions.InsufficientCredits.render(error_params)
-
-
-def rerun_gooey_builder(
-    request: fastapi.Request,
-    body: GooeyBuilderSendMessage,
-) -> typing.NoReturn:
-    raise gui.RedirectException(submit_gooey_builder_message(request, body))
 
 
 def render_gooey_builder_embed(
@@ -310,6 +304,17 @@ def submit_gooey_builder_message(
         raise fastapi.HTTPException(status_code=404)
 
     workspace = get_current_workspace(request.user, request.session)
+    if builder_sr.error_type == exceptions.InsufficientCredits.__name__:
+        # A Builder retry does not use the shared credit error handler.
+        # Select and save the fallback workspace before the new run starts.
+        rerun_workspace = get_insufficient_credits_rerun_workspace(
+            current_user=request.user,
+            sr=builder_sr,
+            current_workspace=workspace,
+        )
+        if rerun_workspace:
+            workspace = rerun_workspace
+            set_current_workspace(request.session, workspace.id)
     if body.workflow_url:
         # copy the workflow_url into a new run linked to
         # builder_sr so the chat widget can navigate the user to a workflow page
