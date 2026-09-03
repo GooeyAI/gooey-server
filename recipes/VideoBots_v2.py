@@ -10,6 +10,7 @@ from daras_ai_v2 import icons, settings
 from daras_ai_v2.base_v2 import (
     ABOUT_META_ICON_SIZE,
     FILL_HEIGHT_EDITOR_CSS,
+    PANE_STRIP_CSS,
     VARIABLES_DIALOG_CSS,
     BasePage,
     RecipeTabs,
@@ -30,13 +31,7 @@ from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
-from daras_ai_v2.tab_spec import (
-    PaneSpec,
-    SingleLayout,
-    SplitLayout,
-    SurfaceId,
-    TabSpec,
-)
+from daras_ai_v2.tab_spec import SingleLayout, SplitLayout, SurfaceId, TabSpec
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
@@ -49,8 +44,9 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarIntegration,
 )
 from gooey_gui.types.recipe_workspace_props import (
+    RecipeWorkspacePanesProps,
     RecipeWorkspaceTriggerProps,
-    SessionStateUpdate,
+    WorkspaceEditorPane,
 )
 
 from recipes.VideoBots import VideoBotsPage
@@ -96,8 +92,7 @@ MODEL_ROW_CSS = """
 # `(str, Enum)` rather than `enum.StrEnum`: this runs on 3.10, where StrEnum does not exist.
 # Matching `BulkRunnerRunState` in gooey_gui/types/bulk_progress_props.py.
 class ConfigPane(str, Enum):
-    """Stable ids for the working column's panes. Session state and the About cards' deep
-    links carry these, so they must not change; the labels in `_config_panes()` may."""
+    """Stable ids shared by the pane component and the About cards' deep links."""
 
     llm_instructions = "llm-instructions"
     knowledge = "knowledge"
@@ -302,8 +297,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             ),
         ]
 
-    CONFIG_PANE_KEY = "--edit-subtab"
-
     def _render_about_meta(self):
         """How this agent is put together. Each card links into the config pane that owns
         the setting."""
@@ -361,10 +354,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         with gui.model_component(
             RecipeWorkspaceTriggerProps(
                 layout=SingleLayout(surface=SurfaceId.editor),
-                state_update=SessionStateUpdate(
-                    key=self.CONFIG_PANE_KEY,
-                    value=pane.value,
-                ),
+                editor_pane=pane.value,
                 className="v2-about-meta-card",
             )
         ):
@@ -375,37 +365,33 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
             )
 
-    def _config_panes(self) -> list[PaneSpec]:
-        """The working column's panes, in strip order. Each composes existing widgets."""
-        return [
-            PaneSpec(
-                ConfigPane.llm_instructions,
-                "LLM Instructions",
-                self._render_llm_instructions_pane,
-            ),
-            PaneSpec(ConfigPane.knowledge, "Knowledge", self._render_knowledge_pane),
-            # functions only - the variables half of v1's block moved to a dialog beside the
-            # prompt. Rendering it here too would mean two editors on the same widget keys.
-            PaneSpec(ConfigPane.tools, "Tools", self._render_functions),
-            PaneSpec(ConfigPane.settings, "Settings", self._render_settings_pane),
-            PaneSpec(ConfigPane.debug, "Debug", self._render_debug_pane),
-        ]
-
     def _render_input_col(self):
         """The working column, shared by Edit and Split. Overridden here rather than per
         tab, so both get the pane strip without duplicating the layout."""
-        with gui.div(className="d-flex flex-column h-100", style=dict(minHeight=0)):
-            # strip and submit row are fixed; only the pane between them scrolls, and only
-            # when its content actually overflows
-            render_pane = self._render_pane_strip(
-                self._config_panes(), key=self.CONFIG_PANE_KEY
-            )
-            with gui.div(
-                # pe-3 keeps the scrollbar off the content when the pane overflows
-                className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3",
-                style=dict(minHeight=0),
-            ):
-                render_pane()
+        panes = [
+            WorkspaceEditorPane(
+                id=ConfigPane.llm_instructions, label="LLM Instructions"
+            ),
+            WorkspaceEditorPane(id=ConfigPane.knowledge, label="Knowledge"),
+            WorkspaceEditorPane(id=ConfigPane.tools, label="Tools"),
+            WorkspaceEditorPane(id=ConfigPane.settings, label="Settings"),
+            WorkspaceEditorPane(id=ConfigPane.debug, label="Debug"),
+        ]
+        with (
+            gui.styled(PANE_STRIP_CSS),
+            gui.model_component(RecipeWorkspacePanesProps(panes=panes)),
+        ):
+            with gui.div():
+                self._render_llm_instructions_pane()
+            with gui.div():
+                self._render_knowledge_pane()
+            # The Variables editor already renders beside the prompt with the same keys.
+            with gui.div():
+                self._render_functions()
+            with gui.div():
+                self._render_settings_pane()
+            with gui.div():
+                self._render_debug_pane()
 
         # nothing in this column submits any more; the top bar owns Run
         return False
