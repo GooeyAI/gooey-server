@@ -582,3 +582,31 @@ def test_the_bar_names_the_published_run_a_saved_run_belongs_to(monkeypatch):
     )
     page.current_sr_pr = (SimpleNamespace(id=99), root_pr)
     assert page._top_bar_parent().label == "Copilot"
+
+
+def test_the_builder_panel_is_hosted_only_beside_the_workspace(monkeypatch):
+    """Deploy, API and Usage have no workspace for the panel to sit next to, and Deploy's
+    web preview breaks outright when it takes half the width. They still offer the way in:
+    availability stays tab-blind, or the mobile sheet would lose the row that navigates to
+    the workspace and opens it there."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "_can_launch_builder", lambda self: True)
+
+    for tab in (RecipeTabs.run, RecipeTabs.preview):
+        page.tab = tab
+        assert page._is_workspace_tab() is True, tab.name
+        assert page._hosts_builder() is True, tab.name
+
+    for tab in (RecipeTabs.integrations, RecipeTabs.run_as_api, RecipeTabs.usage):
+        page.tab = tab
+        assert page._is_workspace_tab() is False, tab.name
+        assert page._hosts_builder() is False, tab.name
+
+
+def test_the_workspace_alone_does_not_host_an_unavailable_builder(monkeypatch):
+    """Hosting is availability *and* the tab - a logged-out visitor gets no panel anywhere."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "_can_launch_builder", lambda self: False)
+
+    page.tab = RecipeTabs.run
+    assert page._hosts_builder() is False

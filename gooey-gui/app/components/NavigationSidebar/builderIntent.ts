@@ -16,6 +16,12 @@ export function builderNavigationState(
   return { builderIntent: item.builder_intent };
 }
 
+/** The same command, for a link the rail builds itself rather than one the server declared:
+ *  a tab that cannot hold the panel navigates to the workspace carrying this. */
+export function builderOpenNavigationState(): BuilderNavigationState {
+  return { builderIntent: "open" };
+}
+
 export function readBuilderIntent(state: unknown): BuilderIntent | null {
   if (!state || typeof state !== "object") return null;
   const { builderIntent } = state as Partial<BuilderNavigationState>;

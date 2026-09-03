@@ -168,7 +168,7 @@ class BasePage(BasePageV1):
         self._handle_top_bar_actions()
 
     def _page_shell_config(self, tabs: list[TabSpec]) -> PageShellConfig:
-        workspace_active = self.tab in {RecipeTabs.run, RecipeTabs.preview}
+        workspace_active = self._is_workspace_tab()
         route_layout = None
         if self.tab == RecipeTabs.preview:
             route_layout = SingleLayout(surface=SurfaceId.preview)
@@ -261,16 +261,34 @@ class BasePage(BasePageV1):
             f"{self.current_pr.published_run_id}"
         )
 
-    def _can_show_builder(self) -> bool:
+    def _is_workspace_tab(self) -> bool:
+        """Whether this tab draws the workspace, rather than being a document or a route."""
+        return self.tab in {RecipeTabs.run, RecipeTabs.preview}
+
+    def _can_launch_builder(self) -> bool:
+        """Whether Ask Gooey is available for this workflow at all.
+
+        Availability, not presence: every tab offers the way in, because a tab that cannot
+        hold the panel navigates to the workspace and opens it there.
+        """
         try:
             workspace = self.current_workspace
         except Workspace.DoesNotExist:
             return False
         return can_launch_gooey_builder(self.request, workspace)
 
+    def _hosts_builder(self) -> bool:
+        """Whether this page draws the panel itself.
+
+        Only beside the workspace. Deploy, API and Usage are documents and routes with no
+        workspace next to the panel to talk about, and Deploy's web preview breaks outright
+        when the panel takes half its width.
+        """
+        return self._can_launch_builder() and self._is_workspace_tab()
+
     def _builder_layout(self):
         """(builder pane, body pane), or `(None, dummy)` when the Builder is unavailable."""
-        if not self._can_show_builder():
+        if not self._hosts_builder():
             return None, gui.dummy()
 
         return sidebar_layout(
@@ -655,11 +673,11 @@ class BasePage(BasePageV1):
                 ),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
-                    GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else None
+                    GOOEY_BUILDER_EVENT_KEY if self._can_launch_builder() else None
                 ),
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
-                    if self._can_show_builder() and not builder_thread_is_empty(self)
+                    if self._can_launch_builder() and not builder_thread_is_empty(self)
                     else None
                 ),
                 # a route rather than a pane, and empty for anyone who cannot read the

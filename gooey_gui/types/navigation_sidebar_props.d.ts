@@ -40,6 +40,7 @@ export interface GooeyBuilderData {
   name: string;
   event_key: string;
   storage_key: string | null;
+  open_href: string | null;
 }
 export interface NavAccountData {
   user: NavUserData | null;

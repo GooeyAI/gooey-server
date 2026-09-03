@@ -462,6 +462,15 @@ def _load_gooey_builder_data(
     bi = get_gooey_builder_integration()
     if bi is None:
         return None
+    # A v2 tab that is not the workspace offers the way in but does not hold the panel, so
+    # it says where to open it instead. The storage key stays as it is: the rail and the
+    # top bar share this panel, and handing them different keys would have them disagree
+    # about whose state they are reading.
+    if is_v2 and not page._hosts_builder():
+        open_href = page.current_app_url(RecipeTabs.run)
+    else:
+        open_href = None
+
     return GooeyBuilderData(
         # shared with the Builder panel's own title button, so the rail and the panel cannot
         # end up showing different avatars
@@ -469,6 +478,7 @@ def _load_gooey_builder_data(
         name=bi.name,
         event_key=GOOEY_BUILDER_EVENT_KEY,
         storage_key=(f"{page._workspace_storage_key()}:builder" if is_v2 else None),
+        open_href=open_href,
     )
 
 
