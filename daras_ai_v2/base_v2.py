@@ -51,6 +51,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     PublishIntent,
     RecipeSubmitIntent,
     RecipeTopBarProps,
+    RunControlIntent,
     RunIntent,
     ShareIntent,
     StopIntent,
@@ -622,9 +623,8 @@ class BasePage(BasePageV1):
                 icon_html=icons.share,
             )
 
-        is_running = self._is_run_in_progress()
-
         usage_active = self.tab == RecipeTabs.usage
+        publish_label = self._top_bar_publish_label()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -638,8 +638,9 @@ class BasePage(BasePageV1):
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
-                publish_label=self._top_bar_publish_label(),
-                publish_intent=PublishIntent(),
+                publish_label=publish_label,
+                # no label means no control, so there is no intent for it to carry
+                publish_intent=None if publish_label is None else PublishIntent(),
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
                 deploy_href=self.current_app_url(RecipeTabs.integrations),
                 share=share,
@@ -647,7 +648,7 @@ class BasePage(BasePageV1):
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 title_menu_items=self._title_menu_items(),
                 integrations=self._top_bar_integrations(),
-                run_intent=StopIntent() if is_running else RunIntent(),
+                run_intent=self._top_bar_run_intent(),
                 cost_label=None if usage_active else (cost_label or None),
                 cost_href=(
                     None if usage_active else (self.get_credits_click_url() or None)
@@ -696,8 +697,24 @@ class BasePage(BasePageV1):
             )
         return None
 
-    def _top_bar_publish_label(self) -> str:
-        """Permission-derived label for the publish action."""
+    def _top_bar_run_intent(self) -> RunControlIntent | None:
+        """Run or Stop, or None where the bar carries no run control at all.
+
+        Usage reports on runs already made rather than being somewhere to make one. Left out
+        here rather than hidden in the bar, so there is nothing to relocate into the editor's
+        bottom bar on a narrow screen either.
+        """
+        if self.tab == RecipeTabs.usage:
+            return None
+        return StopIntent() if self._is_run_in_progress() else RunIntent()
+
+    def _top_bar_publish_label(self) -> str | None:
+        """Permission-derived label for the publish action, or None for no control at all.
+
+        Nothing to publish from Usage: it is a report on the app, not a draft of one.
+        """
+        if self.tab == RecipeTabs.usage:
+            return None
         if not self.is_logged_in():
             return "Save"
         if self.can_edit_current_pr:

@@ -15,6 +15,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     RecipeTopBarProps,
     RecipeSubmitIntent,
     RunIntent,
+    StopIntent,
     SubmitTarget,
     TopBarIntegration,
 )
@@ -502,3 +503,49 @@ def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
         ("translate", RecipeTabs.examples),
         ("not-a-recipe", RecipeTabs.examples),
     ]
+
+
+def test_usage_carries_no_run_control(monkeypatch):
+    """Usage reports on runs already made, so the bar offers no Run - and because it is left
+    out rather than hidden, there is nothing to relocate into the editor's bottom run bar on
+    a narrow screen either."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "_is_run_in_progress", lambda self: False)
+
+    page.tab = RecipeTabs.usage
+    assert page._top_bar_run_intent() is None
+
+    page.tab = RecipeTabs.run
+    assert page._top_bar_run_intent() == RunIntent()
+
+    # a run in progress offers Stop, and still nothing on Usage
+    monkeypatch.setattr(VideoBotsPageV2, "_is_run_in_progress", lambda self: True)
+    assert page._top_bar_run_intent() == StopIntent()
+    page.tab = RecipeTabs.usage
+    assert page._top_bar_run_intent() is None
+
+
+def test_usage_offers_nothing_to_publish(monkeypatch):
+    """It is a report on the app, not a draft of one. None is the bar's "no control at all",
+    the same answer that keeps Update out of the mobile slot and the Publish menu."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_edit_current_pr", property(lambda self: True)
+    )
+
+    page.tab = RecipeTabs.usage
+    assert page._top_bar_publish_label() is None
+
+    page.tab = RecipeTabs.run
+    assert page._top_bar_publish_label() == "Update"
+
+
+def test_the_bar_drops_the_publish_intent_with_its_label():
+    """The two are one control, and the component needs both to draw it - so a label of None
+    must not leave an intent behind for a button that is not there."""
+    from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps
+
+    field = RecipeTopBarProps.model_fields["run_intent"]
+    assert not field.is_required(), "the bar has to be able to carry no run control"
+    assert RecipeTopBarProps.model_fields["publish_intent"].default is None

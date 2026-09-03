@@ -79,7 +79,7 @@ export interface RecipeTopBarProps {
   builder_new_event: string | null;
   usage_href: string | null;
   usage_active: boolean;
-  run_intent: RunIntent | StopIntent;
+  run_intent: (RunIntent | StopIntent) | null;
   cost_label: string | null;
   cost_href: string | null;
   cost_title: string | null;

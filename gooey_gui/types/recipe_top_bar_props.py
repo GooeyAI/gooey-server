@@ -130,7 +130,9 @@ class RecipeTopBarProps(StrictComponentModel):
     usage_href: str | None = None
     usage_active: bool = False
 
-    run_intent: RunControlIntent
+    # None where the bar carries no run control at all: Usage reports on runs already made,
+    # so it offers neither Run nor the cost of one.
+    run_intent: RunControlIntent | None = None
     cost_label: str | None = None
     cost_href: str | None = None
     cost_title: str | None = None

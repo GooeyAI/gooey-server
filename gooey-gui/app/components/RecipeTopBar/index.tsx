@@ -143,7 +143,7 @@ export function RecipeTopBar({
     }
   };
   const handleRun = () => {
-    if (config.workspace_active && run_intent.kind === "run") {
+    if (config.workspace_active && run_intent?.kind === "run") {
       window.setTimeout(() => selectLayout(config.run_layout), 0);
     }
   };
@@ -179,7 +179,9 @@ export function RecipeTopBar({
   // swaps to it from the sheet, and Preview is already there - the slot gives way to Update.
   const canShowPreview = builderOpen || activeViewSpec?.key === "about";
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
-  const isRunning = run_intent.kind === "stop";
+  // Absent on a tab that carries no run control, where nothing is running as far as the
+  // bar is concerned.
+  const isRunning = run_intent?.kind === "stop";
 
   const setBuilder = (open: boolean) => {
     if (builder_panel_key) {
@@ -772,27 +774,31 @@ export function RecipeTopBar({
           </span>
         )}
 
-        <button
-          type="submit"
-          name={submit_intent_key}
-          value={encodeSubmitIntent(run_intent)}
-          className={clsx(
-            "gooey-topbar-run",
-            isRunning && "gooey-topbar-run-stop"
-          )}
-          onClick={handleRun}
-          title={isRunning ? "Stop this run" : "Run"}
-          aria-label={isRunning ? "Stop this run" : "Run"}
-        >
-          {isRunning ? (
-            <i className="fa-regular fa-xmark-large" />
-          ) : (
-            <i className="fa-solid fa-play" />
-          )}
-          <span className="gooey-topbar-btn-label">
-            {isRunning ? "Stop" : "Run"}
-          </span>
-        </button>
+        {/* Omitted, not disabled, where the server sends no run intent: Usage is a report
+            on runs already made, so a Run control has nothing to do there. */}
+        {!!run_intent && (
+          <button
+            type="submit"
+            name={submit_intent_key}
+            value={encodeSubmitIntent(run_intent)}
+            className={clsx(
+              "gooey-topbar-run",
+              isRunning && "gooey-topbar-run-stop"
+            )}
+            onClick={handleRun}
+            title={isRunning ? "Stop this run" : "Run"}
+            aria-label={isRunning ? "Stop this run" : "Run"}
+          >
+            {isRunning ? (
+              <i className="fa-regular fa-xmark-large" />
+            ) : (
+              <i className="fa-solid fa-play" />
+            )}
+            <span className="gooey-topbar-btn-label">
+              {isRunning ? "Stop" : "Run"}
+            </span>
+          </button>
+        )}
       </div>
 
       {sheetOpen && (
