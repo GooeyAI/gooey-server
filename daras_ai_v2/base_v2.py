@@ -31,7 +31,6 @@ from daras_ai_v2.gooey_builder import (
     render_gooey_builder,
 )
 from daras_ai_v2.tab_spec import (
-    PaneSpec,
     SingleLayout,
     SplitLayout,
     SurfaceId,
@@ -706,39 +705,6 @@ class BasePage(BasePageV1):
             return "Save and Run"
         else:
             return "Save as New"
-
-    def _render_pane_strip(
-        self, panes: list[PaneSpec], *, key: str
-    ) -> typing.Callable[[], None]:
-        """Render an in-page strip of panes and return the one to draw.
-
-        Panes are panels within one view, so they have no url - an ordered list of specs and
-        a session-state key, which carries `PaneSpec.id` rather than the label.
-
-        Only the active pane renders. Widgets on the others keep their values because the
-        whole `session_state` round-trips regardless of what was drawn, so a pane must read
-        `gui.session_state` rather than another pane's return value.
-        """
-        by_id = {pane.id: pane for pane in panes}
-
-        # Deep links write this key directly (see `RecipeWorkspaceTrigger.state_key`), so
-        # only an absent or stale value needs settling.
-        if gui.session_state.get(key) not in by_id:
-            gui.session_state[key] = panes[0].id
-
-        with gui.styled(PANE_STRIP_CSS), gui.div(className="mb-1"):
-            for pane in panes:
-                is_active = pane.id == gui.session_state[key]
-                if gui.button(
-                    pane.label,
-                    key=f"{key}:{pane.id}",
-                    type="tertiary",
-                    className="pane-active" if is_active else "",
-                ):
-                    gui.session_state[key] = pane.id
-                    gui.rerun()
-
-        return by_id[gui.session_state[key]].render
 
     def get_tab_spec(self) -> list[TabSpec]:
         if self.is_view_only():

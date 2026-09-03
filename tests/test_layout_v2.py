@@ -1,5 +1,6 @@
 import html
 import re
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pydantic
@@ -20,6 +21,7 @@ from gooey_gui.types.recipe_top_bar_props import (
 from gooey_gui.types.sidebar_props import SidebarProps
 from gooey_gui.types.recipe_workspace_props import (
     PageShellConfig,
+    RecipeWorkspacePanesProps,
     RecipeSurfaceProps,
     SingleLayout,
     SplitLayout,
@@ -92,6 +94,7 @@ def test_generated_v2_component_names_match_registry():
     assert {
         RecipeSurfaceProps._component,
         RecipeTopBarProps._component,
+        RecipeWorkspacePanesProps._component,
         RecipeWorkspaceProps._component,
         RecipeWorkspaceTriggerProps._component,
         SidebarProps._component,
@@ -99,11 +102,59 @@ def test_generated_v2_component_names_match_registry():
     } == {
         "RecipeSurface",
         "RecipeTopBar",
+        "RecipeWorkspacePanes",
         "RecipeWorkspace",
         "RecipeWorkspaceTrigger",
         "Sidebar",
         "WorkspacePaneControl",
     }
+
+
+def test_workspace_panes_render_all_content_in_one_pass(monkeypatch):
+    rendered = []
+    components = []
+    page = object.__new__(VideoBotsPageV2)
+
+    monkeypatch.setattr(gui, "styled", lambda css: nullcontext())
+    monkeypatch.setattr(gui, "div", lambda: nullcontext())
+    monkeypatch.setattr(
+        gui,
+        "model_component",
+        lambda props: components.append(props) or nullcontext(),
+    )
+    for method_name in (
+        "_render_llm_instructions_pane",
+        "_render_knowledge_pane",
+        "_render_functions",
+        "_render_settings_pane",
+        "_render_debug_pane",
+    ):
+        monkeypatch.setattr(
+            VideoBotsPageV2,
+            method_name,
+            lambda self, name=method_name: rendered.append(name),
+        )
+
+    page._render_input_col()
+
+    assert rendered == [
+        "_render_llm_instructions_pane",
+        "_render_knowledge_pane",
+        "_render_functions",
+        "_render_settings_pane",
+        "_render_debug_pane",
+    ]
+    assert components == [
+        RecipeWorkspacePanesProps(
+            panes=[
+                {"id": "llm-instructions", "label": "LLM Instructions"},
+                {"id": "knowledge", "label": "Knowledge"},
+                {"id": "tools", "label": "Tools"},
+                {"id": "settings", "label": "Settings"},
+                {"id": "debug", "label": "Debug"},
+            ]
+        )
+    ]
 
 
 def test_layout_models_reject_extra_and_duplicate_surfaces():
