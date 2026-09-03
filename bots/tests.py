@@ -1,10 +1,13 @@
 import random
 import uuid
+from types import SimpleNamespace
 
 import pytz
+import pytest
 from daras_ai_v2 import settings
 from app_users.models import AppUser
 from daras_ai_v2.functional import map_parallel
+from daras_ai_v2.bots import _save_partial_reply
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT, CHATML_ROLE_USER
 from recipes.VideoBotsStats import get_tabular_data
 from workspaces.models import Workspace
@@ -15,6 +18,80 @@ from .models import (
     Message,
     Platform,
 )
+
+
+def test_save_partial_reply_preserves_raw_and_display_content(monkeypatch):
+    state = {
+        "input_prompt": "display input",
+        "raw_input_text": "raw input",
+        "raw_output_text": ["raw partial reply"],
+        "output_text": ["display partial reply"],
+    }
+    saved_run = SimpleNamespace(refresh_from_db=lambda: None, to_dict=lambda: state)
+    bot = SimpleNamespace(convo=object(), user_msg_id="user-message-id")
+    saved_message = {}
+    monkeypatch.setattr("daras_ai_v2.bots.save_msg_pair_to_db", saved_message.update)
+
+    _save_partial_reply(
+        bot=bot,
+        sr=saved_run,
+        bot_msg_id="bot-message-id",
+        received_time=None,
+    )
+
+    assert saved_message["bot_msg_content"] == "raw partial reply"
+    assert saved_message["bot_msg_display_content"] == "display partial reply"
+
+
+@pytest.mark.parametrize(
+    ("state", "expected_content", "expected_display_content"),
+    [
+        ({"raw_output_text": ["raw partial reply"]}, "raw partial reply", ""),
+        ({"output_text": ["display partial reply"]}, "", "display partial reply"),
+    ],
+)
+def test_save_partial_reply_uses_empty_string_for_missing_output(
+    monkeypatch, state, expected_content, expected_display_content
+):
+    saved_run = SimpleNamespace(refresh_from_db=lambda: None, to_dict=lambda: state)
+    bot = SimpleNamespace(convo=object(), user_msg_id="user-message-id")
+    saved_message = {}
+    monkeypatch.setattr("daras_ai_v2.bots.save_msg_pair_to_db", saved_message.update)
+
+    _save_partial_reply(
+        bot=bot,
+        sr=saved_run,
+        bot_msg_id="bot-message-id",
+        received_time=None,
+    )
+
+    assert saved_message["bot_msg_content"] == expected_content
+    assert saved_message["bot_msg_display_content"] == expected_display_content
+
+
+def test_save_partial_reply_skips_empty_reply(monkeypatch):
+    state = {
+        "input_prompt": "display input",
+        "raw_input_text": "raw input",
+        "raw_output_text": [],
+        "output_text": [],
+    }
+    saved_run = SimpleNamespace(refresh_from_db=lambda: None, to_dict=lambda: state)
+    bot = SimpleNamespace(convo=object(), user_msg_id="user-message-id")
+    saved_messages = []
+    monkeypatch.setattr(
+        "daras_ai_v2.bots.save_msg_pair_to_db",
+        lambda **kwargs: saved_messages.append(kwargs),
+    )
+
+    _save_partial_reply(
+        bot=bot,
+        sr=saved_run,
+        bot_msg_id=None,
+        received_time=None,
+    )
+
+    assert saved_messages == []
 
 
 def test_add_balance(transactional_db):

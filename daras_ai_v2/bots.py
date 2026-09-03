@@ -700,8 +700,7 @@ def _save_partial_reply(
 ):
     sr.refresh_from_db()
     state = sr.to_dict()
-    reply_text = (state.get("raw_output_text") or state.get("output_text") or [""])[0]
-    if not reply_text:
+    if not (state.get("raw_output_text") or state.get("output_text")):
         return
     save_msg_pair_to_db(
         convo=bot.convo,
@@ -713,8 +712,8 @@ def _save_partial_reply(
         bot_msg_id=bot_msg_id,
         user_msg_display_content=state.get("input_prompt") or "",
         user_msg_content=state.get("raw_input_text") or "",
-        bot_msg_content=reply_text,
-        bot_msg_display_content=reply_text,
+        bot_msg_content=(state.get("raw_output_text") or [""])[0],
+        bot_msg_display_content=(state.get("output_text") or [""])[0],
         skip_analysis=True,
     )
 
