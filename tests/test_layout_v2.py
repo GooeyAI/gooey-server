@@ -525,9 +525,9 @@ def test_usage_carries_no_run_control(monkeypatch):
     assert page._top_bar_run_intent() is None
 
 
-def test_usage_offers_nothing_to_publish(monkeypatch):
-    """It is a report on the app, not a draft of one. None is the bar's "no control at all",
-    the same answer that keeps Update out of the mobile slot and the Publish menu."""
+def test_usage_keeps_the_publish_control(monkeypatch):
+    """Only Run comes out of the Usage bar. Publishing is not a thing you do to a run, so
+    the tab has no say in the label - it stays permission-derived on every tab."""
     page = object.__new__(VideoBotsPageV2)
     monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
     monkeypatch.setattr(
@@ -535,17 +535,15 @@ def test_usage_offers_nothing_to_publish(monkeypatch):
     )
 
     page.tab = RecipeTabs.usage
-    assert page._top_bar_publish_label() is None
+    assert page._top_bar_publish_label() == "Update"
 
     page.tab = RecipeTabs.run
     assert page._top_bar_publish_label() == "Update"
 
 
-def test_the_bar_drops_the_publish_intent_with_its_label():
-    """The two are one control, and the component needs both to draw it - so a label of None
-    must not leave an intent behind for a button that is not there."""
+def test_the_bar_can_carry_no_run_control():
+    """`run_intent` has to be omittable for Usage to drop Run - it was a required prop."""
     from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps
 
     field = RecipeTopBarProps.model_fields["run_intent"]
     assert not field.is_required(), "the bar has to be able to carry no run control"
-    assert RecipeTopBarProps.model_fields["publish_intent"].default is None

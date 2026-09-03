@@ -624,7 +624,6 @@ class BasePage(BasePageV1):
             )
 
         usage_active = self.tab == RecipeTabs.usage
-        publish_label = self._top_bar_publish_label()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -638,9 +637,8 @@ class BasePage(BasePageV1):
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
-                publish_label=publish_label,
-                # no label means no control, so there is no intent for it to carry
-                publish_intent=None if publish_label is None else PublishIntent(),
+                publish_label=self._top_bar_publish_label(),
+                publish_intent=PublishIntent(),
                 api_href=self.current_app_url(RecipeTabs.run_as_api),
                 deploy_href=self.current_app_url(RecipeTabs.integrations),
                 share=share,
@@ -708,13 +706,8 @@ class BasePage(BasePageV1):
             return None
         return StopIntent() if self._is_run_in_progress() else RunIntent()
 
-    def _top_bar_publish_label(self) -> str | None:
-        """Permission-derived label for the publish action, or None for no control at all.
-
-        Nothing to publish from Usage: it is a report on the app, not a draft of one.
-        """
-        if self.tab == RecipeTabs.usage:
-            return None
+    def _top_bar_publish_label(self) -> str:
+        """Permission-derived label for the publish action."""
         if not self.is_logged_in():
             return "Save"
         if self.can_edit_current_pr:
