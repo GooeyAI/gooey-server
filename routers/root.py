@@ -392,6 +392,23 @@ Authorization: Bearer GOOEY_API_KEY
 def examples_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
+    from daras_ai_v2.all_pages import normalize_slug
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+    from widgets.workflow_search import workflow_filter_slug, workflow_filter_slugs
+
+    # only the recipes that render in v2, which is where this tab has no home: it is not in
+    # the v2 top bar, and a v1 page keeps its own tab. So the fork, not just the flag.
+    page_cls = page_slug_map_v2.get(normalize_slug(page_slug))
+    if page_cls and can_use_layout_v2(request):
+        # v2 has one Examples gallery: explore, filtered to this workflow. The filter blanks
+        # a value it has no option for, so a workflow explore does not list keeps its own
+        # tab rather than being sent to an unfiltered gallery. 302, since which page you get
+        # depends on the user.
+        slug = workflow_filter_slug(page_cls.workflow)
+        if slug in workflow_filter_slugs():
+            href = furl(get_route_path(explore_page)).add({"workflow": slug})
+            return RedirectResponse(str(href), status_code=302)
     return render_recipe_page(request, page_slug, RecipeTabs.examples, example_id)
 
 

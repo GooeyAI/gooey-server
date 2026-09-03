@@ -1045,9 +1045,6 @@ class BasePage(BasePageV1):
     def render_selected_tab(self):
         """Render document-style tabs reached by URL."""
         match self.tab:
-            case RecipeTabs.examples:
-                self._examples_tab()
-
             case RecipeTabs.history:
                 self._history_tab()
 

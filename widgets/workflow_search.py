@@ -21,6 +21,7 @@ from pydantic import BaseModel, field_validator
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, Tag, WorkflowAccessLevel
+from bots.models.workflow import Workflow
 from daras_ai_v2 import icons
 from daras_ai_v2.custom_enum import GooeyEnum
 from daras_ai_v2.fastapi_tricks import get_app_route_url
@@ -420,11 +421,27 @@ def get_workspace_from_filter_value(
     return None
 
 
+def workflow_filter_slug(workflow: Workflow) -> str:
+    """The value the Type filter keys this workflow's option by.
+
+    `gui.selectbox` replaces a value it has no option for with the blank one, so a link that
+    means to arrive with the gallery filtered has to carry exactly this.
+    """
+    return workflow.short_slug.lower()
+
+
+def workflow_filter_slugs() -> set[str]:
+    """Every value the Type filter has an option for."""
+    from daras_ai_v2.all_pages import all_home_pages
+
+    return {workflow_filter_slug(p.workflow) for p in all_home_pages}
+
+
 def render_workflow_filter(key: str = "workflow_filter", value: str = ""):
     from daras_ai_v2.all_pages import all_home_pages
 
     workflow_options = {
-        p.workflow.short_slug.lower(): f"{p.workflow.emoji} {p.workflow.short_title}"
+        workflow_filter_slug(p.workflow): f"{p.workflow.emoji} {p.workflow.short_title}"
         for p in all_home_pages
     }
     return _render_selectbox(

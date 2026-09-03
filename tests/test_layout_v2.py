@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pydantic
 import pytest
+from furl import furl
 
 import gooey_gui as gui
 from daras_ai_v2.base import BasePage as BasePageV1
@@ -410,3 +411,94 @@ def test_title_menu_is_empty_when_logged_out(monkeypatch):
     page = object.__new__(VideoBotsPageV2)
     monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: False)
     assert page._title_menu_items() == []
+
+
+def test_examples_route_redirects_to_the_explore_gallery_in_v2(monkeypatch):
+    """A v2 page has no Examples tab - it is not in the top bar, and v1's card grid is not
+    what the shell renders - so the route hands off to explore, filtered to the workflow.
+    302, not 301: which page you get depends on the user."""
+    import daras_ai_v2.layout_v2
+    from routers.root import examples_route
+
+    monkeypatch.setattr(
+        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: True
+    )
+    render = examples_route.__wrapped__
+
+    # the slug the tab is reached by, and an older one for the same recipe: one gallery
+    resp = render(request=SimpleNamespace(), page_slug="agent")
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "/explore/?workflow=bots"
+
+    resp = render(request=SimpleNamespace(), page_slug="video-bots")
+    assert resp.headers["location"] == "/explore/?workflow=bots"
+
+
+def test_examples_redirect_only_names_a_workflow_the_type_filter_can_hold(monkeypatch):
+    """`gui.selectbox` swaps a value it has no option for for the blank one, which blanks the
+    filter and bounces to the whole gallery - so the redirect either carries an option that
+    exists or does not happen. Sweeps the v2 forks, so a recipe forked before it is listed
+    on explore fails here rather than sending its Examples tab somewhere useless."""
+    import daras_ai_v2.layout_v2
+    import routers.root
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+    from routers.root import examples_route
+    from widgets import workflow_search
+
+    monkeypatch.setattr(
+        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: True
+    )
+    filter_options = workflow_search.workflow_filter_slugs()
+    assert filter_options, "no Type options at all - the check below would be vacuous"
+
+    for slug, page_cls in page_slug_map_v2.items():
+        resp = examples_route.__wrapped__(request=SimpleNamespace(), page_slug=slug)
+        assert furl(resp.headers["location"]).args["workflow"] in filter_options, slug
+
+    # and with no option to carry, the tab stays put rather than opening the whole gallery
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append(page_slug),
+    )
+    monkeypatch.setattr(workflow_search, "workflow_filter_slugs", set)
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    assert calls == ["agent"]
+
+
+def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
+    """A v1 page's tab bar offers Examples and renders it in place, so only a recipe forked
+    to v2 hands off. The flag alone is not enough - it is on for every recipe an admin
+    opens, while the fork is what decides which layout the page is drawn in."""
+    import daras_ai_v2.layout_v2
+    import routers.root
+    from routers.root import RecipeTabs, examples_route
+
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append((page_slug, tab)),
+    )
+
+    monkeypatch.setattr(
+        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: False
+    )
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+
+    monkeypatch.setattr(
+        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: True
+    )
+    # v2 is on, but these render in v1: a recipe with no fork yet, a legacy api-only one,
+    # and an unknown slug that still needs to reach the 404 the tab already raises
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="qr-code")
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="translate")
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="not-a-recipe")
+
+    assert calls == [
+        ("agent", RecipeTabs.examples),
+        ("qr-code", RecipeTabs.examples),
+        ("translate", RecipeTabs.examples),
+        ("not-a-recipe", RecipeTabs.examples),
+    ]
