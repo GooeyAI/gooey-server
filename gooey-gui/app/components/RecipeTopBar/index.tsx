@@ -16,6 +16,7 @@ import {
   useWorkspaceLayout,
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
+import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import {
   activeViewForLayouts,
   isRootLayout,
@@ -25,6 +26,8 @@ import {
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
 import { isIntegrationLabelled } from "./integrationChips";
+import type { SheetSlot } from "./sheetSlots";
+import { sheetAudience, sheetSlots } from "./sheetSlots";
 import { encodeSubmitIntent } from "./submitIntent";
 
 type TopBarTarget = LinkTarget | SubmitTarget;
@@ -53,6 +56,21 @@ const PREVIEW_VIEW: WorkspaceView = {
   desktop_only: false,
 };
 
+// `BasePage.MENU_*` - the keys Python stamps on the title-menu items, so the sheet can put
+// them in its own order rather than taking the list as it comes.
+const MENU_VERSION_HISTORY_KEY = "--menu-version-history";
+const MENU_DUPLICATE_KEY = "--menu-duplicate";
+const MENU_DELETE_KEY = "--menu-delete";
+
+// Where a "Run of <name>" row lands: the published run's own About. There is no
+// per-surface url to link to, so the layout rides along as navigation state, which the next
+// page reads while it hydrates.
+const ABOUT_LAYOUT: WorkspaceLayout = {
+  kind: "split",
+  primary: "about",
+  secondary: "preview",
+};
+
 // the Publish menu's own entries, distinguishable from anything the server declares
 const PUBLISH_ITEM_KEY = "--topbar-item-publish";
 const SHARE_ITEM_KEY = "--topbar-item-share";
@@ -66,6 +84,7 @@ export function RecipeTopBar({
   photo_url,
   circle_photo,
   author,
+  parent,
   title_menu_items,
   integrations,
   submit_intent_key,
@@ -289,15 +308,19 @@ export function RecipeTopBar({
       mobileOnly: true,
     })),
   ];
-  const viewEntry = (key: string): SheetEntry[] => {
-    const view = config.views.find((candidate) => candidate.key === key);
-    if (!view) {
+  const viewEntry = (key: string, label?: string): SheetEntry[] => {
+    const view = views.find((candidate) => candidate.key === key);
+    // The sheet only exists below lg, so a view that asks to be desktop-only has no
+    // business in it - Split is one, and it is why this guard is here rather than assumed.
+    if (!view || view.desktop_only) {
       return [];
     }
     return [
       {
         key: `--sheet-view-${view.key}`,
-        label: view.label,
+        // The sheet names a couple of the surfaces differently from the desktop pills, which
+        // have the room to be terser - so the label is overridable here.
+        label: label ?? view.label,
         iconHtml: view.icon_html ?? undefined,
         onPick: () => showView(view),
       },
@@ -319,90 +342,122 @@ export function RecipeTopBar({
         ]
       : [];
 
-  // The way into Ask Gooey from the surfaces it is not already covering. Not from About,
-  // whose header offers the preview instead, and not while the panel is up, where the sheet
-  // offers New Chat. Nor from API or Deploy, which do not show the panel at all.
-  const builderEntry: SheetEntry[] =
-    !builderOpen &&
-    !!builder_panel_key &&
-    (usage_active ||
-      activeViewSpec?.key === "edit" ||
-      activeViewSpec?.key === "preview")
+  // The way into Ask Gooey. Not while the panel is already up, where the sheet offers New
+  // Chat instead. What it offers to do depends on whose published run it is: your own is
+  // edited, someone else's is remixed into a copy, and a saved run is just worked on.
+  const builderEntry = (label: string): SheetEntry[] =>
+    !builderOpen && !!builder_panel_key
       ? [
           {
             key: "--sheet-builder",
-            label: "Ask Gooey",
+            label,
             iconClass: "fa-regular fa-sparkles",
             onPick: showBuilder,
           },
         ]
       : [];
 
-  const otherWorkView = activeViewSpec?.key === "edit" ? "preview" : "edit";
+  // A control on the Ask Gooey panel, so it is only offered while that panel is up.
+  const newChatEntry: SheetEntry[] =
+    builder_new_event && builderOpen
+      ? [
+          {
+            key: "--sheet-new-chat",
+            label: "New Chat",
+            iconClass: "fa-regular fa-pen-to-square",
+            onPick: () =>
+              window.dispatchEvent(new CustomEvent(builder_new_event)),
+          },
+        ]
+      : [];
 
-  const sheetEntries: SheetEntry[] = view_only
+  // The channels this published run is deployed to, as rows of their own. No group heading:
+  // the menu is one flat list, and with a channel or two at the top of it a heading is more
+  // furniture than help.
+  const integrationEntries: SheetEntry[] = integrations.map((it) => ({
+    key: it.key,
+    label: it.label,
+    iconHtml: it.icon_html,
+    href: it.target.kind === "link" ? it.target.href : undefined,
+    submitIntent: it.target.kind === "submit" ? it.target.intent : undefined,
+    onPick: () => setBuilder(false),
+  }));
+
+  const sheetEntry = (entries: MenuEntry[], key: string): SheetEntry[] =>
+    entries
+      .filter((item) => item.key === key)
+      .map((item) => ({
+        key: item.key,
+        label: item.label,
+        iconHtml: item.iconHtml ?? undefined,
+        href: item.target?.kind === "link" ? item.target.href : undefined,
+        submitIntent:
+          item.target?.kind === "submit" ? item.target.intent : undefined,
+        onPick: item.onPick ?? (() => setBuilder(false)),
+      }));
+
+  // Named so the three menus below read as the orders they are, rather than as index
+  // arithmetic over `publishEntries` and `title_menu_items`.
+  const saveEntry = sheetEntry(publishEntries, PUBLISH_ITEM_KEY);
+  const shareEntry = sheetEntry(publishEntries, SHARE_ITEM_KEY);
+  const apiEntry = sheetEntry(publishEntries, API_ITEM_KEY);
+  const deployEntry = sheetEntry(publishEntries, DEPLOY_ITEM_KEY);
+  const versionsEntry = sheetEntry(titleEntries, MENU_VERSION_HISTORY_KEY);
+  const duplicateEntry = sheetEntry(titleEntries, MENU_DUPLICATE_KEY);
+  const deleteEntry = sheetEntry(titleEntries, MENU_DELETE_KEY);
+
+  // Where a saved run's menu leads: back to the published run it belongs to, opening on
+  // About. The layout rides along in the navigation state, read while the next page
+  // hydrates.
+  const parentEntry: SheetEntry[] = parent
     ? [
-        // `views`, so a tab set that names no Preview of its own still offers the bot here.
-        // A visitor's does not, and the header's eye only appears from About - which left
-        // How it works with no route to the thing it is describing.
-        ...views
-          .filter((view) => !view.desktop_only)
-          .map((view) => ({
-            key: `--sheet-view-${view.key}`,
-            label: view.label,
-            iconHtml: view.icon_html ?? undefined,
-            onPick: () => showView(view),
-          })),
-        ...usageEntry,
-        ...(builder_panel_key
-          ? [
-              {
-                key: "--sheet-remix",
-                label: "Ask Gooey to Edit",
-                iconClass: "fa-regular fa-shuffle",
-                onPick: () => setBuilder(true),
-              },
-            ]
-          : []),
+        {
+          key: "--sheet-parent",
+          label: `Run of ${parent.label}`,
+          iconClass: "fa-regular fa-circle-info",
+          href: parent.href,
+          navigationLayout: ABOUT_LAYOUT,
+          onPick: () => setBuilder(false),
+        },
       ]
-    : [
-        ...viewEntry("about"),
-        // A control on the Ask Gooey panel, so it is only offered while that panel is up.
-        ...(builder_new_event && builderOpen
-          ? [
-              {
-                key: "--sheet-new-chat",
-                label: "New Chat",
-                iconClass: "fa-regular fa-pen-to-square",
-                onPick: () =>
-                  window.dispatchEvent(new CustomEvent(builder_new_event)),
-              },
-            ]
-          : []),
-        ...viewEntry(otherWorkView),
-        ...builderEntry,
-        ...usageEntry,
-        ...titleEntries.map((item) => ({
-          key: item.key,
-          label: item.label,
-          iconHtml: item.iconHtml ?? undefined,
-          href: item.target?.kind === "link" ? item.target.href : undefined,
-          submitIntent:
-            item.target?.kind === "submit" ? item.target.intent : undefined,
-        })),
-        ...overflowEntries
-          .filter((item) => item.key !== PUBLISH_ITEM_KEY)
-          .map((item) => ({
-            key: item.key,
-            label: item.label,
-            iconHtml: item.iconHtml ?? undefined,
-            href: item.target?.kind === "link" ? item.target.href : undefined,
-            submitIntent:
-              item.target?.kind === "submit" ? item.target.intent : undefined,
-            heading: item.heading,
-            onPick: item.onPick ?? (() => setBuilder(false)),
-          })),
-      ];
+    : [];
+
+  const audience = sheetAudience({ onSavedRun: !!parent, viewOnly: view_only });
+
+  /* Every row the sheet can hold. `sheetSlots` picks which of them appear and in what order;
+     the labels are here because they are the one thing that varies with who is looking - a
+     visitor configures nothing, so their row explains rather than edits, and Ask Gooey
+     edits your own published run, remixes someone else's and just works on a saved run. */
+  const slotEntries: Record<SheetSlot, SheetEntry[]> = {
+    parent: parentEntry,
+    integrations: integrationEntries,
+    about: viewEntry("about"),
+    preview: viewEntry("preview"),
+    edit:
+      audience === "visitor"
+        ? viewEntry("how-it-works", "How it Works")
+        : viewEntry("edit"),
+    newChat: newChatEntry,
+    builder: builderEntry(
+      {
+        savedRun: "Ask Gooey",
+        visitor: "Ask Gooey to Remix",
+        editor: "Ask Gooey to Edit",
+      }[audience]
+    ),
+    usage: usageEntry,
+    save: saveEntry,
+    deploy: deployEntry,
+    share: shareEntry,
+    api: apiEntry,
+    versions: versionsEntry,
+    duplicate: duplicateEntry,
+    delete: deleteEntry,
+  };
+
+  const sheetEntries: SheetEntry[] = sheetSlots(audience).flatMap(
+    (slot) => slotEntries[slot]
+  );
 
   // Shared by the two forms the heading takes. The crumb sits inside it so a long name
   // ellipsises against it rather than pushing it off the row.
@@ -774,8 +829,8 @@ export function RecipeTopBar({
           </span>
         )}
 
-        {/* Omitted, not disabled, where the server sends no run intent: Usage is a report
-            on runs already made, so a Run control has nothing to do there. */}
+        {/* Omitted, not disabled, where the server sends no run intent: Usage lists the
+            saved runs already made, so a Run control has nothing to do there. */}
         {!!run_intent && (
           <button
             type="submit"

@@ -59,6 +59,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarAuthor,
     TopBarIntegration,
     TopBarMenuItem,
+    TopBarParent,
 )
 from gooey_gui.types.recipe_workspace_props import (
     EventControlTarget,
@@ -636,6 +637,7 @@ class BasePage(BasePageV1):
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
+                parent=self._top_bar_parent(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
                 publish_label=self._top_bar_publish_label(),
                 publish_intent=PublishIntent(),
@@ -698,13 +700,32 @@ class BasePage(BasePageV1):
     def _top_bar_run_intent(self) -> RunControlIntent | None:
         """Run or Stop, or None where the bar carries no run control at all.
 
-        Usage reports on runs already made rather than being somewhere to make one. Left out
-        here rather than hidden in the bar, so there is nothing to relocate into the editor's
-        bottom bar on a narrow screen either.
+        Usage lists the saved runs already made rather than being somewhere to make one.
+        Left out here rather than hidden in the bar, so there is nothing to relocate into
+        the editor's bottom bar on a narrow screen either.
         """
         if self.tab == RecipeTabs.usage:
             return None
         return StopIntent() if self._is_run_in_progress() else RunIntent()
+
+    def _top_bar_parent(self) -> TopBarParent | None:
+        """The published run this saved run belongs to, or None on the published run itself.
+
+        A saved run is somewhere you work, while Deploy, Share and Versions act on the
+        published run behind it - so the mobile sheet leads with the way back there instead
+        of offering them. A saved run of a root recipe answers with the recipe, which is
+        what it forked from.
+        """
+        sr, pr = self.current_sr_pr
+        if pr.saved_run_id == sr.id:
+            return None
+        # `get_recipe_title` reaches for the root published run, so it is only asked when
+        # there is no title of our own to use
+        if pr.is_root():
+            label = self.get_recipe_title()
+        else:
+            label = pr.title or self.get_recipe_title()
+        return TopBarParent(label=label, href=pr.get_app_url())
 
     def _top_bar_publish_label(self) -> str:
         """Permission-derived label for the publish action."""

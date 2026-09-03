@@ -547,3 +547,38 @@ def test_the_bar_can_carry_no_run_control():
 
     field = RecipeTopBarProps.model_fields["run_intent"]
     assert not field.is_required(), "the bar has to be able to carry no run control"
+
+
+def test_the_bar_names_the_published_run_a_saved_run_belongs_to(monkeypatch):
+    """`parent` is the mobile sheet's way back to the published run, and by being present
+    only on a saved run it is also how the sheet knows which of its three menus to draw.
+    """
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "get_recipe_title", classmethod(lambda cls: "Copilot")
+    )
+
+    # the url points at the published run itself - no way back, there is nowhere back to
+    page.current_sr_pr = (SimpleNamespace(id=7), SimpleNamespace(saved_run_id=7))
+    assert page._top_bar_parent() is None
+
+    # a saved run carries the title of the published run it belongs to
+    pr = SimpleNamespace(
+        saved_run_id=7,
+        is_root=lambda: False,
+        title="Farmer.AI",
+        get_app_url=lambda: "/agent/farmer-ai-xyz/",
+    )
+    page.current_sr_pr = (SimpleNamespace(id=99), pr)
+    parent = page._top_bar_parent()
+    assert (parent.label, parent.href) == ("Farmer.AI", "/agent/farmer-ai-xyz/")
+
+    # a saved run of a root recipe falls back to the recipe, which is what it forked from
+    root_pr = SimpleNamespace(
+        saved_run_id=7,
+        is_root=lambda: True,
+        title="",
+        get_app_url=lambda: "/agent/",
+    )
+    page.current_sr_pr = (SimpleNamespace(id=99), root_pr)
+    assert page._top_bar_parent().label == "Copilot"

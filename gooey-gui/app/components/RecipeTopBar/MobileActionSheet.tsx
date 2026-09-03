@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "@remix-run/react";
+import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
+import { workspaceLayoutNavigationState } from "../RecipeWorkspace/paneState";
 import { encodeSubmitIntent, type RecipeSubmitIntent } from "./submitIntent";
 
 /** One row of the sheet. Either a link (`href`) or an action (`onPick`), never both. */
@@ -10,6 +12,9 @@ export type SheetEntry = {
   iconHtml?: string;
   iconClass?: string;
   href?: string;
+  /** For a link that has to arrive on a particular surface: carried as navigation state,
+   *  which the destination reads while hydrating. */
+  navigationLayout?: WorkspaceLayout;
   submitIntent?: RecipeSubmitIntent;
   onPick?: () => void;
   /** A group label rather than a row you can press - it names the entries under it. */
@@ -82,13 +87,20 @@ export function MobileActionSheet({
                   <i className={entry.iconClass} />
                 )}
               </span>
-              {entry.label}
+              {/* An element of its own so it can be truncated - a bare text node is not
+                  something CSS can put an ellipsis on. */}
+              <span className="gooey-sheet-label">{entry.label}</span>
             </>
           );
           return entry.href ? (
             <Link
               key={entry.key}
               to={entry.href}
+              state={
+                entry.navigationLayout
+                  ? workspaceLayoutNavigationState(entry.navigationLayout)
+                  : undefined
+              }
               className="gooey-sheet-item"
               role="menuitem"
               // A link entry may still have side effects to run before it navigates.

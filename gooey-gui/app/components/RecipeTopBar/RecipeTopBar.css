@@ -812,6 +812,17 @@ a.gooey-topbar-cost:hover {
   font-size: 1rem;
 }
 
+/* One line each, however long the name. A published run can be titled a whole sentence, and
+   a row that wraps to two lines pushes every row under it further down a screen that is
+   already short. `min-width: 0` because a flex item will not shrink below its own content
+   width without it, which is what leaves the text to overflow instead of ellipsising. */
+.gooey-sheet-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* ------------------------------------------------- no motion below lg
 
    The layout animations are desktop affordances - one surface making room for another beside
