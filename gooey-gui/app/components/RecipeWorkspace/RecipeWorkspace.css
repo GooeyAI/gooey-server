@@ -159,6 +159,11 @@
   min-height: 0;
   max-height: 45%;
   overflow-y: auto;
+  /* Same reading column as the output below it: capped and centred, so the notice lines up
+     with the content instead of stretching across the whole pane. */
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
 }
 
 .recipe-workspace-controls {

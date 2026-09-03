@@ -297,11 +297,6 @@ def submit_gooey_builder_message(
 
     builder_run_url = body.builder_run_url or get_default_builder_pr().get_app_url()
     builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
-    if (
-        builder_sr.surface == SavedRun.Surface.builder_prompt
-        and builder_sr.uid != request.user.uid
-    ):
-        raise fastapi.HTTPException(status_code=404)
 
     workspace = get_current_workspace(request.user, request.session)
     if builder_sr.error_type == exceptions.InsufficientCredits.__name__:
