@@ -12,6 +12,7 @@ import {
   paneRolesForLayout,
   paneVisibility,
   revealRunLayout,
+  shouldRevealRunOutput,
   singleLayout,
   splitLayout,
   workspaceControlsForLayout,
@@ -153,6 +154,43 @@ describe("initialWorkspaceState", () => {
       layout: collapsePane(started.layout, "preview"),
     };
     expect(revealRunLayout(closed, config)).toEqual(closed);
+  });
+
+  it("leaves About and Preview where they are when a run starts", () => {
+    // Those views were chosen to show something in particular, and a run is no reason to
+    // take it away - Preview *is* the output, and About keeps the preview beside it.
+    const config = { ...baseConfig, active_run_id: "run-1" };
+
+    for (const layout of [preview, about, split]) {
+      expect(
+        revealRunLayout({ version: 1, layout, handled_run_id: null }, config)
+      ).toEqual({ version: 1, layout, handled_run_id: "run-1" });
+    }
+  });
+
+  it("marks the run handled even when the view does not change", () => {
+    // Otherwise the same run arriving again would find the user on Edit and swap the view
+    // out from under them, a beat after they chose it.
+    const config = { ...baseConfig, active_run_id: "run-1" };
+    const stayed = revealRunLayout(
+      { version: 1, layout: preview, handled_run_id: null },
+      config
+    );
+    expect(stayed.handled_run_id).toBe("run-1");
+
+    const thenEdited = { ...stayed, layout: edit };
+    expect(revealRunLayout(thenEdited, config)).toEqual(thenEdited);
+  });
+});
+
+describe("shouldRevealRunOutput", () => {
+  it("is true only for the editor on its own", () => {
+    // The one view a run would start out of sight from.
+    expect(shouldRevealRunOutput(edit)).toBe(true);
+    expect(shouldRevealRunOutput(preview)).toBe(false);
+    expect(shouldRevealRunOutput(about)).toBe(false);
+    expect(shouldRevealRunOutput(split)).toBe(false);
+    expect(shouldRevealRunOutput(singleLayout("about"))).toBe(false);
   });
 });
 
