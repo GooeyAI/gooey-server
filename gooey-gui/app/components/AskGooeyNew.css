@@ -256,6 +256,14 @@
   display: none;
 }
 
+.ask-gooey-suggestions-scroll > :first-child {
+  margin-left: auto;
+}
+
+.ask-gooey-suggestions-scroll > :last-child {
+  margin-right: auto;
+}
+
 .ask-gooey-suggestion-chip {
   background: #fff;
   border: 1px solid #eaeaea;
@@ -274,19 +282,33 @@
 
 .ask-gooey-suggestions-fade {
   position: absolute;
-  right: 0;
   top: 0;
   bottom: 4px;
   width: 80px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ask-gooey-suggestions-fade--left {
+  left: 0;
+  justify-content: flex-start;
+  background: linear-gradient(
+    to left,
+    rgba(251, 250, 248, 0) 0%,
+    rgba(251, 250, 248, 1) 60%
+  );
+}
+
+.ask-gooey-suggestions-fade--right {
+  right: 0;
+  justify-content: flex-end;
   background: linear-gradient(
     to right,
     rgba(251, 250, 248, 0) 0%,
     rgba(251, 250, 248, 1) 60%
   );
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  pointer-events: none;
 }
 
 .ask-gooey-suggestions-arrow {
@@ -299,6 +321,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.ask-gooey-suggestions-fade--left .ask-gooey-suggestions-arrow {
+  padding: 8px 16px 8px 4px;
 }
 
 .ask-gooey-suggestions-arrow i {
