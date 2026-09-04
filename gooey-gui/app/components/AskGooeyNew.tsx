@@ -21,6 +21,14 @@ type Attachment = {
   uploading: boolean;
 };
 
+const SUGGESTION_CHARACTER_LIMIT = 38;
+
+const suggestions = [
+  "Swahili WhatsApp bot for community health workers",
+  "Which AI models best understand Hausa?",
+  "Eval models using google sheet of audio samples",
+];
+
 export function AskGooeyNew({
   title = "What will you build today?",
   highlight = "",
@@ -34,7 +42,8 @@ export function AskGooeyNew({
   const [isFocused, setIsFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showScrollArrow, setShowScrollArrow] = useState(true);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const { micState, toggleRecording, stopRecording } = useLiveTranscription({
     value,
@@ -81,11 +90,11 @@ export function AskGooeyNew({
   };
 
   const checkScroll = () => {
-    if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } =
-        scrollContainerRef.current;
-      setShowScrollArrow(scrollLeft + clientWidth < scrollWidth - 1);
-    }
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    setCanScrollLeft(scrollLeft > 1);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
   };
 
   useEffect(() => {
@@ -159,19 +168,13 @@ export function AskGooeyNew({
     : "ask-gooey-send-btn";
   const micBtnClass = micButtonClass(micState);
 
-  const suggestions = [
-    "Swahili WhatsApp bot for community health workers",
-    "Which AI models best understand Hausa?",
-    "Eval models using google sheet of audi...",
-  ];
-
   return (
     <div className="ask-gooey-page">
       <div className="ask-gooey-column">
         <div className="ask-gooey-header">
           <img
             className="ask-gooey-logo"
-            src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/47e069e2-5b65-11f1-80ef-02420a00016f/gooey-builder-logo-fit.gif"
+            src="https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/9e94e550-a6ac-11f1-998d-02420a00015a/gooey-builder-logo-transparent.gif"
             alt="Gooey Logo"
           />
           <h1 className="ask-gooey-title">{titleParts}</h1>
@@ -184,35 +187,51 @@ export function AskGooeyNew({
             </div>
           )}
           <div className="ask-gooey-suggestions">
+            {canScrollLeft && (
+              <div className="ask-gooey-suggestions-fade ask-gooey-suggestions-fade--left">
+                <button
+                  type="button"
+                  onClick={() =>
+                    scrollContainerRef.current?.scrollBy({
+                      left: -250,
+                      behavior: "smooth",
+                    })
+                  }
+                  aria-label="Scroll suggestions left"
+                  className="ask-gooey-suggestions-arrow"
+                >
+                  <i className="fa-solid fa-chevron-left" />
+                </button>
+              </div>
+            )}
             <div
               id="suggestions-container"
               ref={scrollContainerRef}
               onScroll={checkScroll}
               className="ask-gooey-suggestions-scroll"
             >
-              {suggestions.map((chip, i) => (
+              {suggestions.map((prompt) => (
                 <button
-                  key={i}
+                  key={prompt}
                   type="button"
-                  onClick={() => setValue(chip)}
+                  onClick={() => setValue(prompt)}
                   className="ask-gooey-suggestion-chip"
                 >
-                  {chip}
+                  {truncateSuggestion(prompt)}
                 </button>
               ))}
             </div>
-            {showScrollArrow && (
-              <div className="ask-gooey-suggestions-fade">
+            {canScrollRight && (
+              <div className="ask-gooey-suggestions-fade ask-gooey-suggestions-fade--right">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (scrollContainerRef.current) {
-                      scrollContainerRef.current.scrollBy({
-                        left: 250,
-                        behavior: "smooth",
-                      });
-                    }
-                  }}
+                  onClick={() =>
+                    scrollContainerRef.current?.scrollBy({
+                      left: 250,
+                      behavior: "smooth",
+                    })
+                  }
+                  aria-label="Scroll suggestions right"
                   className="ask-gooey-suggestions-arrow"
                 >
                   <i className="fa-solid fa-chevron-right" />
@@ -329,6 +348,11 @@ export function AskGooeyNew({
       </div>
     </div>
   );
+}
+
+function truncateSuggestion(prompt: string) {
+  if (prompt.length <= SUGGESTION_CHARACTER_LIMIT) return prompt;
+  return `${prompt.slice(0, SUGGESTION_CHARACTER_LIMIT).trimEnd()}...`;
 }
 
 async function uploadFile(file: File): Promise<string> {
