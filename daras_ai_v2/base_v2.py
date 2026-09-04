@@ -31,7 +31,6 @@ from daras_ai_v2.gooey_builder import (
     render_gooey_builder,
 )
 from daras_ai_v2.tab_spec import (
-    PaneSpec,
     SingleLayout,
     SplitLayout,
     SurfaceId,
@@ -707,39 +706,6 @@ class BasePage(BasePageV1):
         else:
             return "Save as New"
 
-    def _render_pane_strip(
-        self, panes: list[PaneSpec], *, key: str
-    ) -> typing.Callable[[], None]:
-        """Render an in-page strip of panes and return the one to draw.
-
-        Panes are panels within one view, so they have no url - an ordered list of specs and
-        a session-state key, which carries `PaneSpec.id` rather than the label.
-
-        Only the active pane renders. Widgets on the others keep their values because the
-        whole `session_state` round-trips regardless of what was drawn, so a pane must read
-        `gui.session_state` rather than another pane's return value.
-        """
-        by_id = {pane.id: pane for pane in panes}
-
-        # Deep links write this key directly (see `RecipeWorkspaceTrigger.state_key`), so
-        # only an absent or stale value needs settling.
-        if gui.session_state.get(key) not in by_id:
-            gui.session_state[key] = panes[0].id
-
-        with gui.styled(PANE_STRIP_CSS), gui.div(className="mb-1"):
-            for pane in panes:
-                is_active = pane.id == gui.session_state[key]
-                if gui.button(
-                    pane.label,
-                    key=f"{key}:{pane.id}",
-                    type="tertiary",
-                    className="pane-active" if is_active else "",
-                ):
-                    gui.session_state[key] = pane.id
-                    gui.rerun()
-
-        return by_id[gui.session_state[key]].render
-
     def get_tab_spec(self) -> list[TabSpec]:
         if self.is_view_only():
             return self.get_viewer_tab_spec()
@@ -1269,82 +1235,6 @@ FILL_HEIGHT_EDITOR_CSS = """
 @media (max-width: 991.98px) {
     & .cm-editor {
         min-height: 55vh;
-    }
-}
-"""
-
-PANE_STRIP_CSS = """
-/* The strip spans the column and scrolls sideways when the pills do not fit, rather than
-   wrapping onto a second row - a two-row strip pushes the pane down and reflows the whole
-   column every time the window changes width.
-
-   `!important` throughout: these compete with the app's own button styling, which is more
-   specific than a scoped `& button` rule and otherwise wins (tertiary buttons come with
-   their own padding and a pink hover). */
-& {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: var(--gooey-space-2);
-    width: 100%;
-    flex-shrink: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-    /* A rule under the strip, separating it from the pane it switches. The padding is what
-       keeps the line off the pills - and it doubles as room for the active pill's shadow,
-       which `overflow-y: hidden` was clipping. */
-    padding-bottom: var(--gooey-space-3);
-    border-bottom: 1px solid var(--gooey-line-soft);
-}
-
-& button {
-    flex: 0 0 auto;
-    /* inline-flex keeps the active dot on the same line as the label; with inline-block it
-       becomes a block-level box and the label drops to a second line */
-    display: inline-flex !important;
-    align-items: center;
-    white-space: nowrap !important;
-    margin: 0 !important;
-    padding: var(--gooey-space-2) var(--gooey-space-3) !important;
-    border: 1px solid var(--gooey-line-soft) !important;
-    border-radius: var(--gooey-radius-sm) !important;
-    background: var(--gooey-bg-page) !important;
-    color: var(--gooey-ink-muted) !important;
-    font-weight: 500 !important;
-    line-height: 120% !important;
-    font-size: 14px !important;
-}
-
-& button:hover {
-    background: var(--gooey-bg-page) !important;
-    border-color: var(--gooey-line-strong) !important;
-    color: var(--gooey-ink) !important;
-}
-
-& button.pane-active {
-    border-color: var(--gooey-line-strong) !important;
-    color: var(--gooey-ink) !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    background: var(--gooey-surface-100) !important;
-}
-
-& button.pane-active::before {
-    content: "";
-    flex: 0 0 auto;
-    width: 6px;
-    height: 6px;
-    margin-right: var(--gooey-space-2);
-    border-radius: 50%;
-    background: var(--gooey-ink);
-}
-
-/* Below lg the strip is the first thing under the app header, and the editor's surface starts
-   at the header's rule - so `my-1`'s top margin was the last 4px of page background showing
-   through between the two. The bottom half stays: that is what holds the strip's own rule off
-   the pills, and leaves room for the active pill's shadow. `!important` to beat the utility. */
-@media (max-width: 991.98px) {
-    & {
-        margin-top: 0 !important;
     }
 }
 """
