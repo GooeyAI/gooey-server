@@ -409,8 +409,11 @@ def test_chat_widget_records_created_at_alongside_the_run(db_fixtures):
     assert assistant_msg["created_at"] == sr.created_at.isoformat()
 
 
-def test_get_chat_widget_messages_exports_created_at_on_user_messages():
-    """Only outgoing messages render a timestamp in the widget."""
+def test_get_chat_widget_messages_exports_created_at_on_both_halves():
+    """
+    A turn is one run, so both halves report that run's timestamp - the user
+    half reading it off the assistant entry that recorded it.
+    """
     messages = get_chat_widget_messages(
         {
             "messages": [
@@ -422,14 +425,16 @@ def test_get_chat_widget_messages_exports_created_at_on_user_messages():
                 },
             ],
             "input_prompt": "latest question",
+            "output_text": ["latest reply"],
             "created_at": "2026-08-13T11:00:00+00:00",
         }
     )
 
     assert messages[0]["created_at"] == "2026-08-13T10:30:00+00:00"
-    assert "created_at" not in messages[1]
+    assert messages[1]["created_at"] == "2026-08-13T10:30:00+00:00"
     # the live turn timestamps from the run currently being viewed
     assert messages[2]["created_at"] == "2026-08-13T11:00:00+00:00"
+    assert messages[3]["created_at"] == "2026-08-13T11:00:00+00:00"
 
 
 def test_chat_widget_stamps_run_time_on_the_assistant_entry(db_fixtures):
