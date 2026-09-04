@@ -890,7 +890,10 @@ def run_openai_chat(
     if anthropic_json_workaround:
         ret = _extract_anthropic_json_responses(completion)
     else:
-        ret = [choice.message.dict() for choice in completion.choices]
+        # some providers may return choices with a null message
+        ret = [choice.message.dict() for choice in completion.choices if choice.message]
+    if not ret:
+        return [format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text="")]
     record_openai_llm_usage(used_model, completion, messages, ret)
     return ret
 
