@@ -103,6 +103,10 @@ def chat_widget_input_to_request_body(
             role=CHATML_ROLE_ASSISTANT,
             content_text=prev_output,
         ) | {"run_url": run_url}
+        if sr.run_time:
+            # named as the streaming api's final_response event names it, since
+            # both report how long the same run took to answer
+            assistant_entry["run_time_sec"] = sr.run_time.total_seconds()
         extra_content = assistant_extra_content(state, prev_output)
         if extra_content:
             assistant_entry["extra_content"] = extra_content
@@ -293,6 +297,8 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                     type=event_type,
                     status=status,
                     detail=state.get(StateKeys.run_status) or "",
+                    # absent until the run finishes, so nothing shows mid-answer
+                    run_time_sec=state.get(StateKeys.run_time),
                     raw_output_text=raw_output_text,
                     output_text=[text],
                     text=text,
@@ -351,6 +357,8 @@ def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
             )
             if run_url:
                 msg["web_url"] = run_url
+            if run_time_sec := entry.get("run_time_sec"):
+                msg["run_time_sec"] = run_time_sec
             if audio:
                 msg["output_audio"] = audio
             if video:
