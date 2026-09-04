@@ -130,7 +130,12 @@ def test_chat_widget_moves_run_metadata_into_history(db_fixtures):
     }
 
 
-def test_chat_widget_stamps_run_url_on_both_entries(db_fixtures):
+def test_chat_widget_records_the_turns_run_once(db_fixtures):
+    """
+    One run produces both halves of a turn, so its url is recorded on the
+    assistant half only - the user half must not carry a second copy, in
+    extra_content or anywhere else.
+    """
     sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
     request_body, _ = chat_widget_input_to_request_body(
         sr,
@@ -144,8 +149,8 @@ def test_chat_widget_stamps_run_url_on_both_entries(db_fixtures):
 
     user_msg, assistant_msg = request_body["messages"]
     assert user_msg["role"] == "user"
-    # outgoing turns keep it in extra_content, which to_llm_body drops wholesale
-    assert user_msg["extra_content"]["run_url"] == sr.get_app_url()
+    assert "run_url" not in user_msg
+    assert "run_url" not in user_msg.get("extra_content", {})
     assert assistant_msg["run_url"] == sr.get_app_url()
 
 
@@ -153,19 +158,46 @@ def test_get_chat_widget_messages_exports_user_web_url():
     messages = get_chat_widget_messages(
         {
             "messages": [
+                {"role": "user", "content": "hello"},
                 {
-                    "role": "user",
-                    "content": "hello",
-                    "extra_content": {"run_url": "https://example.com/run-123"},
+                    "role": "assistant",
+                    "content": "reply",
+                    "run_url": "https://example.com/run-123",
                 },
                 {"role": "user", "content": "from before the change"},
+                {"role": "assistant", "content": "reply from before the change"},
             ]
         }
     )
 
     assert messages[0]["web_url"] == "https://example.com/run-123"
     # pre-change turns carry no run_url, so the widget hides the edit affordance
-    assert "web_url" not in messages[1]
+    assert "web_url" not in messages[2]
+
+
+def test_get_chat_widget_messages_does_not_borrow_a_later_turns_run():
+    """
+    An unanswered turn takes no run metadata: editing it would otherwise re-run
+    whichever later turn it borrowed the url from.
+    """
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "never answered"},
+                {"role": "user", "content": "hello"},
+                {
+                    "role": "assistant",
+                    "content": "reply",
+                    "run_url": "https://example.com/run-123",
+                    "created_at": "2026-08-13T10:30:00+00:00",
+                },
+            ]
+        }
+    )
+
+    assert "web_url" not in messages[0]
+    assert "created_at" not in messages[0]
+    assert messages[1]["web_url"] == "https://example.com/run-123"
 
 
 def test_get_chat_widget_messages_sets_web_url_on_live_user_message():
@@ -195,11 +227,7 @@ def test_chat_widget_edit_truncates_history_at_edited_turn(db_fixtures):
         "messages": [
             {"role": "user", "content": "turn one"},
             {"role": "assistant", "content": "reply one"},
-            {
-                "role": "user",
-                "content": "old question",
-                "run_url": edit_sr.get_app_url(),
-            },
+            {"role": "user", "content": "old question"},
             {
                 "role": "assistant",
                 "content": "old answer",
@@ -358,11 +386,11 @@ def test_chat_widget_edit_leaves_superseded_turns_attached(db_fixtures):
     assert thread.first_run == r1
 
 
-def test_chat_widget_stamps_created_at_on_the_user_entry(db_fixtures):
+def test_chat_widget_records_created_at_alongside_the_run(db_fixtures):
     """
-    Only outgoing messages render a timestamp in the widget, so the assistant
-    half of the turn doesn't carry one. Stored as isoformat because this goes
-    into the run's json state.
+    The timestamp belongs to the turn's run, so it sits with the run url on the
+    assistant half, outside extra_content. Stored as isoformat because this
+    goes into the run's json state.
     """
     sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
     request_body, _ = chat_widget_input_to_request_body(
@@ -376,20 +404,22 @@ def test_chat_widget_stamps_created_at_on_the_user_entry(db_fixtures):
     )
 
     user_msg, assistant_msg = request_body["messages"]
-    assert user_msg["extra_content"]["created_at"] == sr.created_at.isoformat()
-    assert "created_at" not in assistant_msg.get("extra_content", {})
+    assert "created_at" not in user_msg
+    assert "created_at" not in user_msg.get("extra_content", {})
+    assert assistant_msg["created_at"] == sr.created_at.isoformat()
 
 
 def test_get_chat_widget_messages_exports_created_at_on_user_messages():
+    """Only outgoing messages render a timestamp in the widget."""
     messages = get_chat_widget_messages(
         {
             "messages": [
+                {"role": "user", "content": "hello"},
                 {
-                    "role": "user",
-                    "content": "hello",
-                    "extra_content": {"created_at": "2026-08-13T10:30:00+00:00"},
+                    "role": "assistant",
+                    "content": "reply",
+                    "created_at": "2026-08-13T10:30:00+00:00",
                 },
-                {"role": "assistant", "content": "reply"},
             ],
             "input_prompt": "latest question",
             "created_at": "2026-08-13T11:00:00+00:00",

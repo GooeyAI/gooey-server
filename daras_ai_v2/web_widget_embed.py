@@ -79,10 +79,6 @@ def chat_widget_input_to_request_body(
     )
     prev_output = (state.get("raw_output_text") or [""])[0]
     if prev_chat_input and prev_output:
-        # both halves of a turn come from the same run, so they share its url.
-        # the widget uses it to render a run link, and to edit that turn.
-        run_url = sr.get_app_url()
-
         user_entry = format_chat_entry(
             role=CHATML_ROLE_USER,
             content_text=prev_input,
@@ -90,19 +86,24 @@ def chat_widget_input_to_request_body(
             # input_audio=prev_input_audio,
             input_documents=prev_input_documents,
         )
-        user_entry["extra_content"] = user_extra_content(
-            state,
-            get_entry_text(user_entry),
-            prev_input_audio,
-            prev_input_documents,
-            run_url=run_url,
-            created_at=sr.created_at.isoformat(),
+        extra_content = user_extra_content(
+            state, get_entry_text(user_entry), prev_input_audio, prev_input_documents
         )
+        if extra_content:
+            user_entry["extra_content"] = extra_content
 
+        # a turn is produced by one run, and the assistant half is the half that
+        # run answered with - so the run is recorded here, once, and the user
+        # half is rendered from it rather than storing its own copy. these sit
+        # outside extra_content: they describe the run, not the message.
         assistant_entry = format_chat_entry(
             role=CHATML_ROLE_ASSISTANT,
             content_text=prev_output,
-        ) | {"run_url": run_url}
+        ) | {
+            "run_url": sr.get_app_url(),
+            # isoformat because this is persisted into the run's json state
+            "created_at": sr.created_at.isoformat(),
+        }
         if sr.run_time:
             # named as the streaming api's final_response event names it, since
             # both report how long the same run took to answer
@@ -157,9 +158,7 @@ def _editable_run_refs(current_sr: SavedRun, state: dict) -> set[tuple[str, str]
     """
     refs = {(current_sr.run_id, current_sr.uid)}
     for entry in state.get("messages") or []:
-        run_url = entry.get("run_url") or (entry.get("extra_content") or {}).get(
-            "run_url"
-        )
+        run_url = entry.get("run_url")
         if not run_url:
             continue
         _, run_id, uid = extract_query_params(yarl.URL(run_url).query)
@@ -173,19 +172,8 @@ def user_extra_content(
     raw_input_text: str,
     input_audio: str | None,
     input_documents: list[str] | None,
-    *,
-    run_url: str,
-    created_at: str,
 ) -> dict[str, Any]:
-    """
-    Widget-only metadata for an outgoing message. to_llm_body drops
-    extra_content wholesale, so nothing in here can reach the model.
-
-    created_at is an isoformat string because this is persisted into the run's
-    json state. Only outgoing messages render a timestamp, so the assistant
-    half of the turn doesn't carry one.
-    """
-    ret = {"run_url": run_url, "created_at": created_at}
+    ret = {}
     input_prompt = state.get("input_prompt")
     if input_prompt is not None and input_prompt != raw_input_text:
         ret["display_content"] = input_prompt
@@ -316,13 +304,14 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
 def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
     from daras_ai_v2.bots import parse_bot_html
 
-    for entry in entries:
+    # each entry paired with the one after it. a turn's run is recorded on the
+    # assistant half that answered it, and only that immediately following half
+    # counts: a turn whose answer was never saved must not borrow a later turn's
+    # run, or editing it would re-run the wrong one
+    for entry, next_entry in zip(entries, entries[1:] + [{}]):
         role = entry.get("role")
 
         extra_content = entry.get("extra_content") or {}
-        # assistant turns carry run_url at the top level, outgoing ones keep it
-        # in extra_content alongside the rest of their widget-only metadata
-        run_url = entry.get("run_url") or extra_content.get("run_url")
         text = extra_content.get("display_content", get_entry_text(entry)) or ""
         audio = extra_content.get("audio")
         video = extra_content.get("video")
@@ -334,11 +323,12 @@ def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
                 input_prompt=text,
                 input_images=get_entry_images(entry) or [],
             )
-            if run_url:
-                # the widget only offers to edit a message it can point at a run
-                msg["web_url"] = run_url
-            if created_at := extra_content.get("created_at"):
-                msg["created_at"] = created_at
+            if next_entry.get("role") == CHATML_ROLE_ASSISTANT:
+                if run_url := next_entry.get("run_url"):
+                    # the widget only offers to edit a message it can point at a run
+                    msg["web_url"] = run_url
+                if created_at := next_entry.get("created_at"):
+                    msg["created_at"] = created_at
             if audio:
                 msg["input_audio"] = audio
             if documents:
@@ -355,7 +345,7 @@ def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
                 output_text=[text],
                 buttons=[],
             )
-            if run_url:
+            if run_url := entry.get("run_url"):
                 msg["web_url"] = run_url
             if run_time_sec := entry.get("run_time_sec"):
                 msg["run_time_sec"] = run_time_sec
