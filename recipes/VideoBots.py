@@ -3,6 +3,7 @@ import math
 import typing
 
 import typing_extensions
+from django.db import transaction
 from pydantic import BaseModel, Field
 
 import gooey_gui as gui
@@ -1358,7 +1359,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
             sr.save(update_fields=["message_thread"])
 
         if message_thread:
-            run_conversation_title_generator(sr, self.request.user)
+            user = self.request.user
+            transaction.on_commit(lambda: run_conversation_title_generator(sr, user))
 
         return sr
 

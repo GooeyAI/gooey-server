@@ -36,6 +36,7 @@ from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
     ConversationEntry,
+    format_chat_entry,
 )
 from daras_ai_v2.ratelimits import RateLimitExceeded, ensure_bot_rate_limits
 from daras_ai_v2.search_ref import SearchReference
@@ -47,7 +48,7 @@ from number_cycling.models import (
 )
 from number_cycling.utils import parse_extension_number
 from recipes.VideoBots import ReplyButton
-from routers.api import submit_api_call
+from routers.api import create_new_run, submit_api_call
 from workspaces.models import Workspace
 
 PAGE_NOT_CONNECTED_ERROR = (
@@ -412,7 +413,7 @@ def msg_handler(bot: BotInterface):
 
 @db_middleware
 def msg_handler_raw(bot: BotInterface):
-    recieved_time: datetime = timezone.now()
+    received_time: datetime = timezone.now()
     if not bot.page_cls:
         bot.send_msg(text=PAGE_NOT_CONNECTED_ERROR)
         return
@@ -469,27 +470,23 @@ def msg_handler_raw(bot: BotInterface):
         bot.send_msg(text=RESET_MSG)
     else:
         _process_and_send_msg(
-            workspace=bot.workspace,
-            current_user=bot.current_user,
             bot=bot,
             input_images=input_images,
             input_documents=input_documents,
             input_text=input_text,
             input_audio=input_audio,
-            recieved_time=recieved_time,
+            received_time=received_time,
         )
 
 
 def _process_and_send_msg(
     *,
-    workspace: Workspace,
-    current_user: AppUser,
     bot: BotInterface,
     input_images: list[str] | None,
     input_audio: str | None,
     input_documents: list[str] | None,
     input_text: str,
-    recieved_time: datetime,
+    received_time: datetime,
 ):
     # get latest messages for context
     saved_msgs = bot.convo.last_n_msgs()
@@ -520,25 +517,17 @@ def _process_and_send_msg(
         bot_conversation=bot.convo,
         defaults=dict(title=input_text),
     )[0]
-    result, sr = submit_api_call(
-        page_cls=bot.page_cls,
-        query_params=bot.query_params,
-        workspace=workspace,
-        current_user=current_user,
+    run = _submit_bot_run(
+        bot=bot,
         request_body=body,
-        surface=SavedRun.Surface.deployment,
         message_thread=message_thread,
     )
-    bot.on_run_created(sr)
 
-    try:
-        sr.platform = bot.platform
-        sr.user_message_id = bot.user_msg_id
-        sr.save(update_fields=["platform", "user_message_id"])
-    except IntegrityError as e:
-        # Likely duplicate (platform, user_message_id). Log and proceed.
-        traceback.print_exc()
-        capture_exception(e)
+    # Duplicate WhatsApp deliveries are ignored before starting another run.
+    if run is None:
+        return
+    result, sr = run
+    bot.on_run_created(sr)
 
     send_feedback_buttons = bot.show_feedback_buttons
     should_strip_thinking = bot.platform != Platform.WEB
@@ -552,6 +541,17 @@ def _process_and_send_msg(
         channel = bot.page_cls.realtime_channel_name(sr.run_id, sr.uid)
         with gui.realtime_subscribe(channel) as realtime_gen:
             for state in realtime_gen:
+                if bot.platform == Platform.WHATSAPP:
+                    sr.refresh_from_db(fields=["is_cancelled"])
+                    if sr.is_cancelled:
+                        # stop streaming if a newer WhatsApp event replaced this run
+                        _save_partial_reply(
+                            bot=bot,
+                            sr=sr,
+                            bot_msg_id=sent_msg_id or update_msg_id,
+                            received_time=received_time,
+                        )
+                        return
                 bot.recipe_run_state = bot.page_cls.get_run_state(state)
                 bot.run_status = state.get(StateKeys.run_status) or ""
                 # check for errors
@@ -608,6 +608,16 @@ def _process_and_send_msg(
 
     # wait for the celery task to finish
     sr.wait_for_celery_result(result)
+    if bot.platform == Platform.WHATSAPP:
+        sr.refresh_from_db(fields=["is_cancelled"])
+        if sr.is_cancelled:
+            _save_partial_reply(
+                bot=bot,
+                sr=sr,
+                bot_msg_id=sent_msg_id or update_msg_id,
+                received_time=received_time,
+            )
+            return
     # get the final state from db
     state = sr.to_dict()
     bot.recipe_run_state = bot.page_cls.get_run_state(state)
@@ -642,13 +652,15 @@ def _process_and_send_msg(
             update_msg_id=update_msg_id,
         )
 
-    # save msgs to db
+    # save msgs to db. the attachments come off the run row, not the locals: on
+    # WhatsApp the row holds the inputs merged from the events this run replaced,
+    # and those events saved nothing of their own (see _save_partial_reply)
     save_msg_pair_to_db(
         convo=bot.convo,
-        input_images=input_images,
-        input_documents=input_documents,
+        input_images=state.get("input_images"),
+        input_documents=state.get("input_documents"),
         saved_run=sr,
-        received_time=recieved_time,
+        received_time=received_time,
         user_msg_id=bot.user_msg_id,
         bot_msg_id=sent_msg_id or update_msg_id,
         # user input
@@ -677,6 +689,145 @@ def strip_thinking(text: str | None) -> str:
 THINKING_TAG_RE = re.compile(
     r"<think\b[^>]*>.*?(?:</think\s*>|\Z)", flags=re.IGNORECASE | re.DOTALL
 )
+
+
+def _save_partial_reply(
+    *,
+    bot: BotInterface,
+    sr: SavedRun,
+    bot_msg_id: str | None,
+    received_time: datetime,
+):
+    sr.refresh_from_db()
+    state = sr.to_dict()
+    if not (state.get("raw_output_text") or state.get("output_text")):
+        return
+    save_msg_pair_to_db(
+        convo=bot.convo,
+        input_images=state.get("input_images"),
+        input_documents=state.get("input_documents"),
+        saved_run=sr,
+        received_time=received_time,
+        user_msg_id=bot.user_msg_id,
+        bot_msg_id=bot_msg_id,
+        user_msg_display_content=state.get("input_prompt") or "",
+        user_msg_content=state.get("raw_input_text") or "",
+        bot_msg_content=(state.get("raw_output_text") or [""])[0],
+        bot_msg_display_content=(state.get("output_text") or [""])[0],
+        skip_analysis=True,
+    )
+
+
+def _submit_bot_run(
+    *, bot: BotInterface, request_body: dict, message_thread: MessageThread
+):
+    kwargs = dict(
+        page_cls=bot.page_cls,
+        query_params=bot.query_params,
+        workspace=bot.workspace,
+        current_user=bot.current_user,
+        request_body=request_body,
+        surface=SavedRun.Surface.deployment,
+        message_thread=message_thread,
+    )
+    if bot.platform != Platform.WHATSAPP:
+        result, sr = submit_api_call(**kwargs)
+        _save_run_message_id(bot, sr)
+        return result, sr
+
+    with transaction.atomic():
+        message_thread = MessageThread.objects.select_for_update().get(
+            pk=message_thread.pk
+        )
+        # Ignore duplicate webhook deliveries that already started a run.
+        if (
+            bot.user_msg_id
+            and SavedRun.objects.filter(
+                platform=bot.platform,
+                user_message_id=bot.user_msg_id,
+            ).exists()
+        ):
+            return None
+        kwargs["message_thread"] = message_thread
+        kwargs["request_body"] = _cancel_active_run_and_merge_inputs(
+            bot, message_thread, request_body
+        )
+        # create the run while still holding the lock, so message_thread.last_run
+        # already points at it when the next event takes the lock
+        page, sr = create_new_run(**kwargs)
+        if sr.message_thread_id != message_thread.pk:
+            capture_exception(
+                RuntimeError(
+                    f"whatsapp run {sr.pk} did not join locked message thread "
+                    f"{message_thread.pk}; event batching is inert for this convo"
+                )
+            )
+        _save_run_message_id(bot, sr)
+    result = page.call_runner_task(sr)
+    return result, sr
+
+
+def _save_run_message_id(bot: BotInterface, sr: SavedRun):
+    try:
+        with transaction.atomic():
+            sr.platform = bot.platform
+            sr.user_message_id = bot.user_msg_id
+            sr.save(update_fields=["platform", "user_message_id"])
+    except IntegrityError as e:
+        # Likely duplicate (platform, user_message_id). Log and proceed.
+        traceback.print_exc()
+        capture_exception(e)
+
+
+def _cancel_active_run_and_merge_inputs(
+    bot: BotInterface,
+    message_thread: MessageThread,
+    request_body: dict,
+) -> dict:
+    last_run = message_thread.last_run
+    # Only merge when there is an active, uncancelled run to replace.
+    if (
+        not last_run
+        or last_run.is_cancelled
+        or bot.page_cls.get_run_state(last_run.to_dict())
+        not in (RecipeRunState.starting, RecipeRunState.running)
+    ):
+        return request_body
+
+    last_run.is_cancelled = True
+    last_run.save(update_fields=["is_cancelled", "updated_at"])
+    last_run.refresh_from_db()
+    return _merge_run_inputs(last_run.state, request_body)
+
+
+def _merge_run_inputs(previous: dict, current: dict) -> dict:
+    merged = previous | current
+
+    previous_reply = (
+        previous.get("raw_output_text") or previous.get("output_text") or [""]
+    )[0]
+
+    if previous_reply:
+        merged["messages"] = (current.get("messages") or []) + [
+            format_chat_entry(
+                role=CHATML_ROLE_USER,
+                content_text=previous.get("raw_input_text")
+                or previous.get("input_prompt")
+                or "",
+                input_images=previous.get("input_images"),
+                input_documents=previous.get("input_documents"),
+            ),
+            format_chat_entry(role=CHATML_ROLE_ASSISTANT, content_text=previous_reply),
+        ]
+        return merged
+
+    merged["input_prompt"] = "\n".join(
+        filter(None, [previous.get("input_prompt"), current.get("input_prompt")])
+    )
+    for field in ("input_images", "input_documents"):
+        merged[field] = (previous.get(field) or []) + (current.get(field) or []) or None
+    merged["input_audio"] = current.get("input_audio") or previous.get("input_audio")
+    return merged
 
 
 def compute_prompt_delta(
@@ -766,6 +917,7 @@ def save_msg_pair_to_db(
     bot_msg_display_content: str = "",
     saved_run: SavedRun | None = None,
     received_time: datetime | None = None,
+    skip_analysis: bool = False,
 ):
     if received_time:
         response_time = timezone.now() - received_time
@@ -795,6 +947,7 @@ def save_msg_pair_to_db(
         saved_run=saved_run,
         response_time=response_time,
     )
+    assistant_msg._analysis_started = skip_analysis
     # save the messages & attachments
     # note that its important to save the user_msg and assistant_msg together because we use get_next_by_created_at in our code
     with transaction.atomic():
