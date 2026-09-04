@@ -27,6 +27,7 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from starlette.datastructures import URL
 
 import gooey_gui as gui
+from gooey_gui.types.run_timeline_props import RunTimelineProps
 from ai_models.llm_openapi import patch_ai_model_schema_enums
 from app_users.models import AppUser, AppUserTransaction
 from auth.token_authentication import DISABLED_ACCOUNT_ERROR_MESSAGE
@@ -1786,20 +1787,17 @@ class BasePage:
         with gui.expander("**🐞 Debug**", key=key):
             if not gui.session_state.get(key):
                 return
-            render_called_functions(
-                saved_run=self.current_sr, trigger=FunctionTrigger.pre
-            )
-            self.render_steps()
-            render_called_functions(
-                saved_run=self.current_sr, trigger=FunctionTrigger.post
-            )
-            gui.caption(
-                f"""
-                Run Time: {self.current_sr.run_time.total_seconds():.2f}s\n\n
-                [Parent Run]({self.current_sr.parent and self.current_sr.parent.get_app_url()})
-                """,
-                unsafe_allow_html=True,
-            )
+            self.render_debug_pane()
+
+    def render_debug_pane(self):
+        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.pre)
+        self.render_steps()
+        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
+        render_run_timeline(self.current_sr)
+        gui.caption(
+            f"[Parent Run]({self.current_sr.parent and self.current_sr.parent.get_app_url()})",
+            unsafe_allow_html=True,
+        )
 
     def _render_help(self):
         placeholder = gui.div()
@@ -2756,6 +2754,19 @@ class BasePage:
                 return True
         # members can access
         return bool(user and workspace in user.cached_workspaces)
+
+
+def render_run_timeline(sr: SavedRun):
+    # run_time is measured by the worker from when it starts executing,
+    # and updated_at is the final save, so the gap before that is the queue wait
+    started_at = sr.updated_at - sr.run_time
+    gui.model_component(
+        RunTimelineProps(
+            created_at=sr.created_at,
+            started_at=started_at,
+            finished_at=sr.updated_at,
+        )
+    )
 
 
 def started_at_text(dt: datetime.datetime):

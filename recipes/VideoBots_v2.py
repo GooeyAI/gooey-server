@@ -41,8 +41,6 @@ from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
-from functions.base_llm_tool import render_called_functions
-from functions.models import FunctionTrigger
 from gooey_gui.types.recipe_top_bar_props import (
     MenuIntent,
     SubmitTarget,
@@ -388,7 +386,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             # prompt. Rendering it here too would mean two editors on the same widget keys.
             PaneSpec(ConfigPane.tools, "Tools", self._render_functions),
             PaneSpec(ConfigPane.settings, "Settings", self._render_settings_pane),
-            PaneSpec(ConfigPane.debug, "Debug", self._render_debug_pane),
+            PaneSpec(ConfigPane.debug, "Debug", self.render_debug_pane),
         ]
 
     def _render_input_col(self):
@@ -557,18 +555,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
 
         gui.write("---")
         self.render_settings()
-
-    def _render_debug_pane(self):
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.pre)
-        self.render_steps()
-        render_called_functions(saved_run=self.current_sr, trigger=FunctionTrigger.post)
-        gui.caption(
-            f"""
-            Run Time: {self.current_sr.run_time.total_seconds():.2f}s\n\n
-            [Parent Run]({self.current_sr.parent and self.current_sr.parent.get_app_url()})
-            """,
-            unsafe_allow_html=True,
-        )
 
     def _render_deploy_panel(self):
         """Render deployment settings for the integrations route."""
