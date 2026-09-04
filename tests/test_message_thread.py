@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 
 from app_users.models import AppUser
@@ -398,6 +400,85 @@ def test_get_chat_widget_messages_exports_created_at_on_user_messages():
     assert "created_at" not in messages[1]
     # the live turn timestamps from the run currently being viewed
     assert messages[2]["created_at"] == "2026-08-13T11:00:00+00:00"
+
+
+def test_chat_widget_stamps_run_time_on_the_assistant_entry(db_fixtures):
+    """
+    How long the answer took is a property of the run that produced it, so it
+    rides along with the run url on the assistant half. Named as the streaming
+    api's final_response event names it, since both report the same run.
+    """
+    sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
+    sr.run_time = datetime.timedelta(seconds=3.5)
+    sr.save(update_fields=["run_time"])
+
+    request_body, _ = chat_widget_input_to_request_body(
+        sr,
+        {
+            "input_prompt": "hello",
+            "raw_input_text": "hello",
+            "raw_output_text": ["reply"],
+        },
+        {"input_prompt": "follow up"},
+    )
+
+    user_msg, assistant_msg = request_body["messages"]
+    assert assistant_msg["run_time_sec"] == 3.5
+    assert "run_time_sec" not in user_msg
+
+
+def test_chat_widget_omits_run_time_when_the_run_was_never_timed(db_fixtures):
+    sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
+
+    request_body, _ = chat_widget_input_to_request_body(
+        sr,
+        {
+            "input_prompt": "hello",
+            "raw_input_text": "hello",
+            "raw_output_text": ["reply"],
+        },
+        {"input_prompt": "follow up"},
+    )
+
+    assert "run_time_sec" not in request_body["messages"][1]
+
+
+def test_get_chat_widget_messages_exports_run_time_on_assistant_messages():
+    """Only the response carries a run time - the outgoing half has none."""
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "reply", "run_time_sec": 3.5},
+            ],
+            "input_prompt": "latest question",
+            "output_text": ["latest reply"],
+            "__run_time": 1.25,
+        }
+    )
+
+    assert "run_time_sec" not in messages[0]
+    assert messages[1]["run_time_sec"] == 3.5
+    # the live turn reports the run currently being viewed
+    assert messages[3]["run_time_sec"] == 1.25
+
+
+def test_get_chat_widget_messages_omits_run_time_while_still_running():
+    """A run has no time until it finishes, so nothing shows mid-answer."""
+    messages = get_chat_widget_messages(
+        {"input_prompt": "hello", "__run_status": "Running..."}
+    )
+
+    assert messages[1]["type"] == "message_part"
+    assert messages[1]["run_time_sec"] is None
+
+
+def test_run_time_is_stripped_before_reaching_the_llm():
+    from daras_ai_v2.language_model_body import to_llm_body
+
+    body = to_llm_body([{"role": "assistant", "content": "reply", "run_time_sec": 3.5}])
+
+    assert "run_time_sec" not in body[0]
 
 
 def test_created_at_is_stripped_before_reaching_the_llm():
