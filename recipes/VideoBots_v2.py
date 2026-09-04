@@ -15,15 +15,7 @@ from daras_ai_v2.base_v2 import (
     RecipeTabs,
 )
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
-from daras_ai_v2.doc_search_settings_widgets import (
-    bulk_documents_uploader,
-    cache_knowledge_widget,
-    citation_style_selector,
-    doc_extract_selector,
-    doc_search_advanced_settings,
-    keyword_instructions_widget,
-    query_instructions_widget,
-)
+from daras_ai_v2.doc_search_settings_widgets import bulk_documents_uploader
 from daras_ai_v2.fastapi_tricks import get_api_route_url
 from daras_ai_v2.field_render import field_desc, field_title
 from daras_ai_v2.integrations_tab import render_integrations_tab
@@ -469,27 +461,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 accept=["audio/*", "application/*", "video/*", "text/*"],
                 help=field_desc(self.RequestModel, "documents"),
             )
-
-        if not gui.session_state.get("documents"):
-            return
-
-        gui.write("#### 📄 Knowledge Base")
-        gui.text_area(
-            "###### 👩‍🏫 " + field_title(self.RequestModel, "task_instructions"),
-            help=field_desc(self.RequestModel, "task_instructions"),
-            key="task_instructions",
-            height=300,
-        )
-        citation_style_selector()
-        gui.checkbox("🔗 Shorten citation links", key="use_url_shortener")
-        cache_knowledge_widget(self)
-        doc_extract_selector(self.request.user)
-
-        gui.write("---")
-        query_instructions_widget()
-        keyword_instructions_widget()
-        gui.write("---")
-        doc_search_advanced_settings()
 
     def _render_settings_pane(self):
         gui.markdown("#### 💪 Capabilities")
