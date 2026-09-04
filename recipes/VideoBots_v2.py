@@ -373,7 +373,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 self._render_llm_instructions_pane()
             with gui.div():
                 self._render_knowledge_pane()
-            # The Variables editor already renders beside the prompt with the same keys.
+            # Tools renders functions only; Variables renders once in the prompt dialog.
             with gui.div():
                 self._render_functions()
             with gui.div():
