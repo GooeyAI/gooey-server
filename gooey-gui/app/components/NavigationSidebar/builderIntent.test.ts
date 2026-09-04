@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   builderOpenNavigationState,
+  builderTargetHref,
   navigationStateWithoutBuilderIntent,
   readBuilderIntent,
 } from "./builderIntent";
@@ -46,5 +47,21 @@ describe("navigationStateWithoutBuilderIntent", () => {
       navigationStateWithoutBuilderIntent({ builderIntent: "open" })
     ).toBeNull();
     expect(navigationStateWithoutBuilderIntent(null)).toBeNull();
+  });
+});
+
+describe("builderTargetHref", () => {
+  it("relativizes the server's absolute url", () => {
+    // Left absolute, `navigate` resolved it against the origin and the rail's Ask Gooey
+    // landed on `/http://localhost:3000/agent/?run_id=...` - a 404 - from Deploy and API.
+    expect(
+      builderTargetHref("http://localhost:3000/agent/?run_id=32i1&uid=1rEt")
+    ).toBe("/agent/?run_id=32i1&uid=1rEt");
+  });
+
+  it("is null where the page holds the panel already", () => {
+    expect(builderTargetHref(null)).toBeNull();
+    expect(builderTargetHref(undefined)).toBeNull();
+    expect(builderTargetHref("")).toBeNull();
   });
 });

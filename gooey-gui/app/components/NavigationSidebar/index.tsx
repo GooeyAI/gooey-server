@@ -13,6 +13,7 @@ import { useAppShellPanel, useNavDrawer } from "~/appShellContext";
 import { AccountSection } from "./AccountSection";
 import {
   builderOpenNavigationState,
+  builderTargetHref,
   clearBuilderIntent,
   readBuilderIntent,
 } from "./builderIntent";
@@ -42,7 +43,7 @@ export function NavigationSidebar({
   // Where to open the panel when this page cannot hold it - Deploy, API and Usage have no
   // workspace beside it. Set means the panel is not here, whatever the last state of it
   // was: the rail goes on offering the way in, and does not collapse for it.
-  const builderElsewhere = gooey_builder?.open_href ?? null;
+  const builderElsewhere = builderTargetHref(gooey_builder?.open_href);
   const builderInitiallyOpen = Boolean(
     builderEventKey && state[builderEventKey] && !builderElsewhere
   );

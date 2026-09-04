@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
 import {
   activeViewForLayouts,
+  appRelativeHref,
   collapsePane,
   foldForNarrowViewport,
   initialWorkspaceState,
@@ -293,6 +294,20 @@ describe("workspace navigation", () => {
 
   it("does not navigate when the workspace is active", () => {
     expect(workspaceTargetForLayout(true, "/agent/")).toBeNull();
+  });
+
+  it("relativizes any server-sent href, keeping the query", () => {
+    // Handed an absolute url, `navigate` resolves it against the origin and 404s on
+    // `/http://localhost:3000/agent/...` - so every navigation off a server-sent href has
+    // to come through here, the rail's Ask Gooey included.
+    expect(
+      appRelativeHref("http://localhost:3000/agent/?run_id=32i1&uid=1rEt")
+    ).toBe("/agent/?run_id=32i1&uid=1rEt");
+    expect(appRelativeHref("https://gooey.ai/agent/#tools")).toBe(
+      "/agent/#tools"
+    );
+    // already a path: left exactly as it is
+    expect(appRelativeHref("/agent/?run_id=32i1")).toBe("/agent/?run_id=32i1");
   });
 
   it("hides panes until storage hydration completes", () => {

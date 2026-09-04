@@ -1,5 +1,7 @@
 import type { NavWorkflowItem } from "@gooey-types/navigation_sidebar_props";
 
+import { appRelativeHref } from "../RecipeWorkspace/paneState";
+
 // Opening a Builder chat from the rail is a one-time command, not a place the
 // user can link to, so it travels as Remix navigation state instead of a url
 // fragment. `NavigationSidebar` is the single consumer: it acts on the intent
@@ -14,6 +16,19 @@ export function builderNavigationState(
 ): BuilderNavigationState | undefined {
   if (!item.builder_intent) return undefined;
   return { builderIntent: item.builder_intent };
+}
+
+/** Where the rail's Ask Gooey has to go before it can open, or null when the panel is on
+ *  this page already.
+ *
+ *  The server sends an absolute app url and `navigate` wants a path - handed the absolute
+ *  one it resolves it against the origin and 404s on `/http://host/agent/`. Bound to the
+ *  prop in one named place so the relativizing cannot be left off at the call site.
+ */
+export function builderTargetHref(
+  openHref: string | null | undefined
+): string | null {
+  return openHref ? appRelativeHref(openHref) : null;
 }
 
 /** The same command, for a link the rail builds itself rather than one the server declared:
