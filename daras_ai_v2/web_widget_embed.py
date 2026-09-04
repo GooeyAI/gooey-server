@@ -285,6 +285,9 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                     type=event_type,
                     status=status,
                     detail=state.get(StateKeys.run_status) or "",
+                    # both halves of the turn are stamped with the run's own
+                    # created_at, so they carry the same timestamp
+                    created_at=state.get(StateKeys.created_at),
                     # absent until the run finishes, so nothing shows mid-answer
                     run_time_sec=state.get(StateKeys.run_time),
                     raw_output_text=raw_output_text,
@@ -347,6 +350,8 @@ def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
             )
             if run_url := entry.get("run_url"):
                 msg["web_url"] = run_url
+            if created_at := entry.get("created_at"):
+                msg["created_at"] = created_at
             if run_time_sec := entry.get("run_time_sec"):
                 msg["run_time_sec"] = run_time_sec
             if audio:
