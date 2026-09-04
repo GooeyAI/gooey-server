@@ -689,3 +689,21 @@ def test_the_workspace_alone_does_not_host_an_unavailable_builder(monkeypatch):
 
     page.tab = RecipeTabs.run
     assert page._hosts_builder() is False
+
+
+def test_about_names_how_much_the_workflow_has_been_run():
+    """The metric the explore cards carry, formatted the same way, so a workflow reads the
+    same on its own page as in the gallery it was found in. What the owner has published
+    besides this belongs to their profile, not to the workflow being read about."""
+    page = object.__new__(VideoBotsPageV2)
+    subtitle = page._about_author_subtitle
+
+    assert subtitle(SimpleNamespace(run_count=1)) == "1 run"
+    assert subtitle(SimpleNamespace(run_count=42)) == "42 runs"
+    # the same suffixes the cards use, so a busy workflow does not read as a phone number
+    assert subtitle(SimpleNamespace(run_count=1500)) == "1.5K runs"
+    assert subtitle(SimpleNamespace(run_count=1200000)) == "1.2M runs"
+
+    # nothing to report yet: the line is left off rather than reading "0 runs"
+    assert subtitle(SimpleNamespace(run_count=0)) == ""
+    assert subtitle(SimpleNamespace(run_count=None)) == ""
