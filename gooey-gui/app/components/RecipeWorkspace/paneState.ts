@@ -387,7 +387,10 @@ function isSurfaceId(value: unknown): value is SurfaceId {
   return value === "about" || value === "editor" || value === "preview";
 }
 
-function appRelativeHref(href: string): string {
+/** Python sends absolute app urls; Remix's `navigate` wants a path. Handed an absolute one
+ *  it resolves it against the origin, which doubles it - `/http://host/agent/` - and 404s.
+ *  Every navigation off a server-sent href has to come through here. */
+export function appRelativeHref(href: string): string {
   if (!href.startsWith("http://") && !href.startsWith("https://")) {
     return href;
   }
