@@ -878,8 +878,8 @@ class BasePage(BasePageV1):
             self._render_about_deployments()
 
     def _render_about_author(self, pr: PublishedRun):
-        """Who published this, at the head of the panel: their mark, their name, how much
-        else they have published, and Share opposite.
+        """Who published this, at the head of the panel: their mark, their name, how much it
+        has been run, and Share opposite.
 
         At every width. The top bar names the workspace too above lg, so the two repeat each
         other there - but About is the tab that presents the workflow, and a reader landing
@@ -890,18 +890,11 @@ class BasePage(BasePageV1):
         mark, and this stacks a count under the name. Bending the shared widget into two
         shapes would reach the page header and the workflow cards that also use it.
         """
-        from daras_ai.text_format import format_number_with_suffix
-        from daras_ai_v2.profiles import public_workflow_count
-        from django.utils.translation import ngettext
-
         if not pr.workspace_id:
             return
         workspace = pr.workspace
 
-        count = public_workflow_count(workspace)
-        noun = ngettext(singular="workflow", plural="workflows", number=count)
-        subtitle = f"{format_number_with_suffix(count)} Published {noun}"
-
+        subtitle = self._about_author_subtitle(pr)
         link = self._about_author_href(workspace)
         with gui.div(className="v2-about-author"):
             with (
@@ -917,11 +910,30 @@ class BasePage(BasePageV1):
                         '<span class="v2-about-author-name">'
                         f"{html.escape(workspace.display_name(self.request.user))}</span>"
                     )
-                    gui.html(
-                        f'<span class="v2-about-author-meta">{html.escape(subtitle)}</span>'
-                    )
+                    if subtitle:
+                        gui.html(
+                            '<span class="v2-about-author-meta">'
+                            f"{html.escape(subtitle)}</span>"
+                        )
             if share := self._about_share_button():
                 gui.html(share)
+
+    def _about_author_subtitle(self, pr: PublishedRun) -> str:
+        """The line under the owner's name: how much this workflow has been run.
+
+        The metric the explore cards carry, formatted the same way, so a workflow reads the
+        same on its own page as in the gallery it was found in. What the owner has published
+        besides this belongs to their profile rather than to the workflow you came here to
+        read about. Empty until there is a run to count - "0 runs" says less than nothing.
+        """
+        from daras_ai.text_format import format_number_with_suffix
+        from django.utils.translation import ngettext
+
+        run_count = pr.run_count or 0
+        if not run_count:
+            return ""
+        noun = ngettext(singular="run", plural="runs", number=run_count)
+        return f"{format_number_with_suffix(run_count)} {noun}"
 
     def _about_share_button(self) -> str | None:
         """Share, opposite the author. Carries the same `ShareIntent` the bar's button does,
