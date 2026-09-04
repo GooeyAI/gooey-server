@@ -7,6 +7,9 @@ import pytest
 from furl import furl
 
 import gooey_gui as gui
+from fastapi import HTTPException
+
+from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage as BasePageV1
 from daras_ai_v2.tab_spec import TabSpec
 from gooey_gui.types.recipe_top_bar_props import (
@@ -414,16 +417,15 @@ def test_title_menu_is_empty_when_logged_out(monkeypatch):
     assert page._title_menu_items() == []
 
 
-def test_examples_route_redirects_to_the_explore_gallery_in_v2(monkeypatch):
+def test_examples_route_redirects_to_the_explore_gallery_in_v2():
     """A v2 page has no Examples tab - it is not in the top bar, and v1's card grid is not
     what the shell renders - so the route hands off to explore, filtered to the workflow.
-    302, not 301: which page you get depends on the user."""
-    import daras_ai_v2.layout_v2
+
+    302, not 301: the fork list grows as recipes migrate, and a permanent redirect would
+    outlive a recipe's membership of it in every browser that cached it. No monkeypatch -
+    the gate answers off `all_pages_v2`, so this exercises the real one."""
     from routers.root import examples_route
 
-    monkeypatch.setattr(
-        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: True
-    )
     render = examples_route.__wrapped__
 
     # the slug the tab is reached by, and an older one for the same recipe: one gallery
@@ -440,15 +442,11 @@ def test_examples_redirect_only_names_a_workflow_the_type_filter_can_hold(monkey
     filter and bounces to the whole gallery - so the redirect either carries an option that
     exists or does not happen. Sweeps the v2 forks, so a recipe forked before it is listed
     on explore fails here rather than sending its Examples tab somewhere useless."""
-    import daras_ai_v2.layout_v2
     import routers.root
     from daras_ai_v2.all_pages_v2 import page_slug_map_v2
     from routers.root import examples_route
     from widgets import workflow_search
 
-    monkeypatch.setattr(
-        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: True
-    )
     filter_options = workflow_search.workflow_filter_slugs()
     assert filter_options, "no Type options at all - the check below would be vacuous"
 
@@ -470,9 +468,8 @@ def test_examples_redirect_only_names_a_workflow_the_type_filter_can_hold(monkey
 
 def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
     """A v1 page's tab bar offers Examples and renders it in place, so only a recipe forked
-    to v2 hands off. The flag alone is not enough - it is on for every recipe an admin
-    opens, while the fork is what decides which layout the page is drawn in."""
-    import daras_ai_v2.layout_v2
+    to v2 hands off. The fork is the whole decision - there is no user in it, so a logged
+    out visitor and an admin get the same answer for the same slug."""
     import routers.root
     from routers.root import RecipeTabs, examples_route
 
@@ -483,25 +480,94 @@ def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
         lambda request, page_slug, tab, example_id: calls.append((page_slug, tab)),
     )
 
-    monkeypatch.setattr(
-        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: False
-    )
-    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
-
-    monkeypatch.setattr(
-        daras_ai_v2.layout_v2, "can_use_layout_v2", lambda request: True
-    )
-    # v2 is on, but these render in v1: a recipe with no fork yet, a legacy api-only one,
-    # and an unknown slug that still needs to reach the 404 the tab already raises
+    # a recipe with no fork yet, a legacy api-only one, and an unknown slug that still needs
+    # to reach the 404 the tab already raises
     examples_route.__wrapped__(request=SimpleNamespace(), page_slug="qr-code")
     examples_route.__wrapped__(request=SimpleNamespace(), page_slug="translate")
     examples_route.__wrapped__(request=SimpleNamespace(), page_slug="not-a-recipe")
 
     assert calls == [
-        ("agent", RecipeTabs.examples),
         ("qr-code", RecipeTabs.examples),
         ("translate", RecipeTabs.examples),
         ("not-a-recipe", RecipeTabs.examples),
+    ]
+
+    # and with the flag off, even the fork keeps its v1 tab - the kill switch reaches here
+    monkeypatch.setattr(settings, "ENABLE_LAYOUT_V2", False)
+    calls.clear()
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    assert calls == [("agent", RecipeTabs.examples)]
+
+
+def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():
+    """The gate takes a slug, not a request: v2 is per-recipe, and every visitor - logged
+    out included - gets the same layout for the same url.
+
+    Sweeps `all_pages_v2` rather than naming slugs, so a recipe added to the fork list is
+    covered here the day it lands. The v1 half names real recipes on purpose: those urls
+    must keep answering in v1 whatever else changes."""
+    from daras_ai_v2.all_pages import page_slug_map
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+
+    assert page_slug_map_v2, "no v2 forks at all - the sweep below would be vacuous"
+    for slug in page_slug_map_v2:
+        assert can_use_layout_v2(slug), slug
+
+    for slug in ["qr-code", "translate", "not-a-recipe"]:
+        assert not can_use_layout_v2(slug), slug
+
+    # every recipe without a fork, so migrating one cannot quietly change another
+    for slug in page_slug_map:
+        if slug not in page_slug_map_v2:
+            assert not can_use_layout_v2(slug), slug
+
+
+def test_usage_is_404_on_a_recipe_with_no_v2_fork(monkeypatch):
+    """v1's `render_selected_tab` has no case for this tab, so letting the route through
+    would render chrome around an empty body. The 404 is what keeps that unreachable."""
+    import routers.root
+    from routers.root import RecipeTabs, usage_route
+
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append((page_slug, tab)),
+    )
+
+    for slug in ["qr-code", "translate", "not-a-recipe"]:
+        with pytest.raises(HTTPException) as excinfo:
+            usage_route.__wrapped__(request=SimpleNamespace(), page_slug=slug)
+        assert excinfo.value.status_code == 404, slug
+    assert calls == [], "a page with no Usage tab still rendered one"
+
+    # the fork does have the tab
+    usage_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    assert calls == [("agent", RecipeTabs.usage)]
+
+
+def test_history_stays_per_recipe_outside_the_v2_forks(monkeypatch):
+    """A v2 fork renames this tab Usage. Everything else keeps its own History rather than
+    being sent to the global one: v2 is scoped per recipe, so this tab is too."""
+    import routers.root
+    from routers.root import RecipeTabs, history_route
+
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append((page_slug, tab)),
+    )
+
+    history_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    history_route.__wrapped__(request=SimpleNamespace(), page_slug="qr-code")
+    history_route.__wrapped__(request=SimpleNamespace(), page_slug="translate")
+
+    assert calls == [
+        ("agent", RecipeTabs.usage),
+        ("qr-code", RecipeTabs.history),
+        ("translate", RecipeTabs.history),
     ]
 
 

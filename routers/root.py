@@ -398,13 +398,13 @@ def examples_route(
     from widgets.workflow_search import workflow_filter_slug, workflow_filter_slugs
 
     # only the recipes that render in v2, which is where this tab has no home: it is not in
-    # the v2 top bar, and a v1 page keeps its own tab. So the fork, not just the flag.
-    page_cls = page_slug_map_v2.get(normalize_slug(page_slug))
-    if page_cls and can_use_layout_v2(request):
+    # the v2 top bar, and a v1 page keeps its own tab. The gate answers on the fork, so a
+    # true answer means the v2 map holds this slug.
+    if can_use_layout_v2(page_slug):
+        page_cls = page_slug_map_v2[normalize_slug(page_slug)]
         # v2 has one Examples gallery: explore, filtered to this workflow. The filter blanks
         # a value it has no option for, so a workflow explore does not list keeps its own
-        # tab rather than being sent to an unfiltered gallery. 302, since which page you get
-        # depends on the user.
+        # tab rather than being sent to an unfiltered gallery.
         slug = workflow_filter_slug(page_cls.workflow)
         if slug in workflow_filter_slugs():
             href = furl(get_route_path(explore_page)).add({"workflow": slug})
@@ -433,22 +433,12 @@ def api_route(
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
-    from daras_ai_v2.all_pages import normalize_slug, page_slug_map
-    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
     from daras_ai_v2.layout_v2 import can_use_layout_v2
-    from widgets.history import history_href_for_workflow
 
-    normalized_slug = normalize_slug(page_slug)
-    page_cls = page_slug_map.get(normalized_slug)
-    if page_cls and can_use_layout_v2(request):
-        # a v2 fork keeps this tab, renamed Usage
-        if normalized_slug in page_slug_map_v2:
-            return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
-        # otherwise v2 has one History for every recipe - 302, since which page you get
-        # depends on the user
-        return RedirectResponse(
-            history_href_for_workflow(page_cls.workflow), status_code=302
-        )
+    # a v2 fork keeps this tab, renamed Usage. Every other recipe keeps its own History
+    # rather than being sent to the global one - v2 is per-recipe, so this tab is too.
+    if can_use_layout_v2(page_slug):
+        return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
     return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
 
 
@@ -463,7 +453,8 @@ def usage_route(
 ):
     from daras_ai_v2.layout_v2 import can_use_layout_v2
 
-    if not can_use_layout_v2(request):
+    # a v1 page has no case for this tab, so it would render chrome around an empty body
+    if not can_use_layout_v2(page_slug):
         raise HTTPException(status_code=404)
     return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
 
@@ -754,10 +745,10 @@ def render_recipe_page(
         raise RecipePageNotFound
 
     # Layout v2 fork switch: swap in the v2 fork of this recipe where one exists.
-    if can_use_layout_v2(request):
+    if can_use_layout_v2(page_slug):
         from daras_ai_v2.all_pages_v2 import page_slug_map_v2
 
-        page_cls = page_slug_map_v2.get(normalized_slug, page_cls)
+        page_cls = page_slug_map_v2[normalized_slug]
 
     # ensure the latest slug is used
     latest_slug = page_cls.canonical_slug()
