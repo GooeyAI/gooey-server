@@ -2129,9 +2129,14 @@ class BasePage:
         unsaved_state: dict[str, typing.Any] | None = None,
         **defaults,
     ):
+        if not self.is_logged_in():
+            defaults.setdefault("run_status", None)
         sr = self.create_and_validate_new_run(enable_rate_limits=True, **defaults)
         if not sr:
             return
+        self.ensure_authentication(
+            next_url=sr.get_app_url(query_params={SUBMIT_AFTER_LOGIN_Q: "1"})
+        )
         self.call_runner_task(sr, unsaved_state=unsaved_state)
         return sr
 

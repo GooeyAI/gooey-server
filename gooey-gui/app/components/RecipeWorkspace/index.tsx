@@ -1,13 +1,14 @@
 import "./RecipeWorkspace.css";
 
 import clsx from "clsx";
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import type { EditorRunBarProps } from "@gooey-types/recipe_top_bar_props";
 import type {
   PageShellConfig,
   RecipeSurfaceProps,
+  RecipeWorkspacePanesProps,
   RecipeWorkspaceProps,
   RecipeWorkspaceTriggerProps,
 } from "@gooey-types/recipe_workspace_props";
@@ -26,9 +27,13 @@ import {
 } from "./paneState";
 import { namedSurfaceSlots } from "./surfaceSlots";
 
-const RecipeWorkspaceConfigContext = createContext<PageShellConfig | null>(
-  null
-);
+type RecipeWorkspaceContextValue = {
+  config: PageShellConfig;
+  activeEditorPane: string | null;
+  setActiveEditorPane: (paneId: string) => void;
+};
+const RecipeWorkspaceContext =
+  createContext<RecipeWorkspaceContextValue | null>(null);
 
 export function RecipeWorkspace({
   children,
@@ -43,7 +48,7 @@ export function RecipeWorkspace({
   const controls = workspaceControlsForLayout(layout);
 
   return (
-    <RecipeWorkspaceConfigContext.Provider value={config}>
+    <RecipeWorkspaceProvider key={config.storage_key} config={config}>
       <div
         style={{ visibility: paneVisibility(hydrated) }}
         className="recipe-workspace container-xxl py-lg-2"
@@ -110,7 +115,82 @@ export function RecipeWorkspace({
           }
         />
       </div>
-    </RecipeWorkspaceConfigContext.Provider>
+    </RecipeWorkspaceProvider>
+  );
+}
+
+function RecipeWorkspaceProvider({
+  children,
+  config,
+}: {
+  children: ReactNode;
+  config: PageShellConfig;
+}) {
+  const [activeEditorPane, setActiveEditorPane] = useState<string | null>(null);
+  return (
+    <RecipeWorkspaceContext.Provider
+      value={{ config, activeEditorPane, setActiveEditorPane }}
+    >
+      {children}
+    </RecipeWorkspaceContext.Provider>
+  );
+}
+
+export function RecipeWorkspacePanes({
+  children,
+  onChange,
+  state,
+  panes,
+}: CustomComponentProps & RecipeWorkspacePanesProps) {
+  const { activeEditorPane, setActiveEditorPane } = useRecipeWorkspaceContext();
+  const selectedPane = panes.some((pane) => pane.id === activeEditorPane)
+    ? activeEditorPane
+    : panes[0]?.id;
+  if (panes.length !== children.length) {
+    throw new Error("RecipeWorkspacePanes requires one child per pane");
+  }
+  return (
+    <div className="d-flex flex-column h-100" style={{ minHeight: 0 }}>
+      <div className="recipe-workspace-pane-tabs mb-1" role="tablist">
+        {panes.map((pane) => {
+          const selected = pane.id === selectedPane;
+          return (
+            <button
+              key={pane.id}
+              id={`editor-pane-tab-${pane.id}`}
+              type="button"
+              role="tab"
+              className={selected ? "pane-active" : undefined}
+              aria-selected={selected}
+              aria-controls={`editor-pane-${pane.id}`}
+              onClick={() => setActiveEditorPane(pane.id)}
+            >
+              {pane.label}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3"
+        style={{ minHeight: 0 }}
+      >
+        {panes.map((pane, index) => (
+          <div
+            key={pane.id}
+            id={`editor-pane-${pane.id}`}
+            role="tabpanel"
+            aria-labelledby={`editor-pane-tab-${pane.id}`}
+            hidden={pane.id !== selectedPane}
+          >
+            <RenderedChildren
+              children={[children[index]]}
+              onChange={onChange}
+              state={state}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -119,16 +199,15 @@ export function RecipeWorkspaceTrigger({
   onChange,
   state,
   layout,
-  state_update,
+  editor_pane,
   className,
 }: CustomComponentProps & RecipeWorkspaceTriggerProps) {
-  const config = useRecipeWorkspaceConfig();
+  const { config, setActiveEditorPane } = useRecipeWorkspaceContext();
   const { selectLayout } = useWorkspaceLayout(config);
   const handleClick = () => {
     selectLayout(layout);
-    if (state_update && state[state_update.key] !== state_update.value) {
-      state[state_update.key] = state_update.value;
-      onChange();
+    if (editor_pane) {
+      setActiveEditorPane(editor_pane);
     }
   };
   return (
@@ -165,7 +244,7 @@ export function EditorRunBar({
   cost_href,
   cost_title,
 }: CustomComponentProps & EditorRunBarProps) {
-  const config = useRecipeWorkspaceConfig();
+  const { config } = useRecipeWorkspaceContext();
   const { selectLayout } = useWorkspaceLayout(config);
   const isRunning = run_intent.kind === "stop";
   const runLabel = isRunning ? "Stop this run" : "Run";
@@ -306,10 +385,12 @@ function WorkspacePane({
   );
 }
 
-function useRecipeWorkspaceConfig(): PageShellConfig {
-  const config = useContext(RecipeWorkspaceConfigContext);
-  if (!config) {
-    throw new Error("RecipeWorkspaceTrigger must be inside RecipeWorkspace");
+function useRecipeWorkspaceContext() {
+  const value = useContext(RecipeWorkspaceContext);
+  if (!value) {
+    throw new Error(
+      "RecipeWorkspaceContext must be used inside RecipeWorkspace"
+    );
   }
-  return config;
+  return value;
 }

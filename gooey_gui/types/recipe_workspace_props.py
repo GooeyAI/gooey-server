@@ -84,16 +84,22 @@ class RecipeSurfaceProps(StrictComponentModel):
     surface: SurfaceId
 
 
-class SessionStateUpdate(StrictComponentModel):
-    key: str
-    value: str
+class WorkspaceEditorPane(StrictComponentModel):
+    id: str
+    label: str
+
+
+class RecipeWorkspacePanesProps(StrictComponentModel):
+    _component: ClassVar[Literal["RecipeWorkspacePanes"]] = "RecipeWorkspacePanes"
+
+    panes: list[WorkspaceEditorPane]
 
 
 class RecipeWorkspaceTriggerProps(StrictComponentModel):
     _component: ClassVar[Literal["RecipeWorkspaceTrigger"]] = "RecipeWorkspaceTrigger"
 
     layout: WorkspaceLayout
-    state_update: SessionStateUpdate | None = None
+    editor_pane: str | None = None
     className: str | None = None
 
 
