@@ -23,6 +23,7 @@ import {
   collapsePane,
   paneRolesForLayout,
   paneVisibility,
+  shouldRevealRunOutput,
   workspaceControlsForLayout,
 } from "./paneState";
 import { namedSurfaceSlots } from "./surfaceSlots";
@@ -245,13 +246,14 @@ export function EditorRunBar({
   cost_title,
 }: CustomComponentProps & EditorRunBarProps) {
   const { config } = useRecipeWorkspaceContext();
-  const { selectLayout } = useWorkspaceLayout(config);
+  const { layout, selectLayout } = useWorkspaceLayout(config);
   const isRunning = run_intent.kind === "stop";
   const runLabel = isRunning ? "Stop this run" : "Run";
-  // Show the output the moment a run starts, as the bar above does. A tick late, so the form
-  // this button submits has posted before the layout moves under it.
+  // Show the output the moment a run starts, as the bar above does, and on the same terms:
+  // only from the editor on its own. A tick late, so the form this button submits has posted
+  // before the layout moves under it.
   const handleRun = () => {
-    if (run_intent.kind === "run") {
+    if (run_intent.kind === "run" && shouldRevealRunOutput(layout)) {
       window.setTimeout(() => selectLayout(config.run_layout), 0);
     }
   };

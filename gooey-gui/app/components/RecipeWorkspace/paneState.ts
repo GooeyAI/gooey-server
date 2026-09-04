@@ -94,6 +94,18 @@ export function clearWorkspaceLayoutNavigationState() {
   window.history.replaceState({ ...historyState, usr: nextUserState }, "");
 }
 
+/** Whether starting a run should swap this layout for the one that shows the output.
+ *
+ * Only from the editor on its own. That is the view a run would start out of sight from, so
+ * it gives way to the split. Every other view was chosen to show something in particular -
+ * About to read about the workflow, Preview to watch it - and a run is no reason to take it
+ * away. Preview is already the output, and About keeps the preview beside it on a wide
+ * screen, so nothing is hidden by staying put either.
+ */
+export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {
+  return layout.kind === "single" && layout.surface === "editor";
+}
+
 export function revealRunLayout(
   state: PersistedWorkspaceState,
   config: PageShellConfig
@@ -103,7 +115,11 @@ export function revealRunLayout(
   }
   return {
     version: 1,
-    layout: config.run_layout,
+    // The run counts as handled either way, so a view the user picked for this run is not
+    // swapped out later by the same run arriving again.
+    layout: shouldRevealRunOutput(state.layout)
+      ? config.run_layout
+      : state.layout,
     handled_run_id: config.active_run_id,
   };
 }

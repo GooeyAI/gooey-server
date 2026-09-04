@@ -22,6 +22,7 @@ import {
   isRootLayout,
   layoutsEqual,
   paneVisibility,
+  shouldRevealRunOutput,
   workspaceTargetForLayout,
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
@@ -162,7 +163,11 @@ export function RecipeTopBar({
     }
   };
   const handleRun = () => {
-    if (config.workspace_active && run_intent?.kind === "run") {
+    if (
+      config.workspace_active &&
+      run_intent?.kind === "run" &&
+      shouldRevealRunOutput(layout)
+    ) {
       window.setTimeout(() => selectLayout(config.run_layout), 0);
     }
   };
