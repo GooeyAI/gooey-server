@@ -14,7 +14,7 @@ export function GooeyBuilderInlineEmbed(
   props: CustomComponentProps & {
     config: Record<string, any>;
     event_key: string;
-    messages?: Record<string, any> | null;
+    messages?: Record<string, any>[] | null;
     builder_run_url: string;
     workflow_state: Record<string, any>;
     builder_only?: boolean;
@@ -68,6 +68,15 @@ export function GooeyBuilderInlineEmbed(
           if (!redirectUrl) return;
           let url = new URL(redirectUrl);
           ctx.current.navigate(url.pathname + url.search);
+        },
+        onEditQuery: (_messageId: string, input_data: any, webUrl?: string) => {
+          // webUrl identifies the run that produced the edited turn, so the
+          // server re-runs that turn rather than always the latest one
+          if (!webUrl) return;
+          controllerRef.current?.onSendMessage({
+            ...input_data,
+            edit_run_url: webUrl,
+          });
         },
         onNewConversation: async () => {
           ctx.current.update_session_state({ builderOnNewConversation: true });

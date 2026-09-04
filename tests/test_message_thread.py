@@ -1,3 +1,7 @@
+import datetime
+
+import pytest
+
 from app_users.models import AppUser
 from bots.models import (
     BotIntegration,
@@ -8,6 +12,7 @@ from bots.models import (
     get_default_published_run_workspace,
 )
 from bots.models.message_thread import MessageThread
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.web_widget_embed import (
     chat_widget_input_to_request_body,
     get_chat_widget_messages,
@@ -123,6 +128,408 @@ def test_chat_widget_moves_run_metadata_into_history(db_fixtures):
         "video": ["https://example.com/video.mp4"],
         "audio": ["https://example.com/audio.mp3"],
     }
+
+
+def test_chat_widget_records_the_turns_run_once(db_fixtures):
+    """
+    One run produces both halves of a turn, so its url is recorded on the
+    assistant half only - the user half must not carry a second copy, in
+    extra_content or anywhere else.
+    """
+    sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
+    request_body, _ = chat_widget_input_to_request_body(
+        sr,
+        {
+            "input_prompt": "hello",
+            "raw_input_text": "hello",
+            "raw_output_text": ["raw reply"],
+        },
+        {"input_prompt": "follow up"},
+    )
+
+    user_msg, assistant_msg = request_body["messages"]
+    assert user_msg["role"] == "user"
+    assert "run_url" not in user_msg
+    assert "run_url" not in user_msg.get("extra_content", {})
+    assert assistant_msg["run_url"] == sr.get_app_url()
+
+
+def test_get_chat_widget_messages_exports_user_web_url():
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {
+                    "role": "assistant",
+                    "content": "reply",
+                    "run_url": "https://example.com/run-123",
+                },
+                {"role": "user", "content": "from before the change"},
+                {"role": "assistant", "content": "reply from before the change"},
+            ]
+        }
+    )
+
+    assert messages[0]["web_url"] == "https://example.com/run-123"
+    # pre-change turns carry no run_url, so the widget hides the edit affordance
+    assert "web_url" not in messages[2]
+
+
+def test_get_chat_widget_messages_does_not_borrow_a_later_turns_run():
+    """
+    An unanswered turn takes no run metadata: editing it would otherwise re-run
+    whichever later turn it borrowed the url from.
+    """
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "never answered"},
+                {"role": "user", "content": "hello"},
+                {
+                    "role": "assistant",
+                    "content": "reply",
+                    "run_url": "https://example.com/run-123",
+                    "created_at": "2026-08-13T10:30:00+00:00",
+                },
+            ]
+        }
+    )
+
+    assert "web_url" not in messages[0]
+    assert "created_at" not in messages[0]
+    assert messages[1]["web_url"] == "https://example.com/run-123"
+
+
+def test_get_chat_widget_messages_sets_web_url_on_live_user_message():
+    messages = get_chat_widget_messages(
+        {"input_prompt": "hi", "output_text": ["hello"]},
+        web_url="https://example.com/run-current",
+    )
+
+    assert messages[0]["role"] == "user"
+    assert messages[0]["web_url"] == "https://example.com/run-current"
+
+
+def test_chat_widget_edit_truncates_history_at_edited_turn(db_fixtures):
+    current_sr, _ = _make_sr_with_thread(uid="user-a", title="current")
+    edit_sr = _make_sr(
+        uid="user-a",
+        run_id="run-edit-target",
+        state={
+            "input_prompt": "old question",
+            "messages": [
+                {"role": "user", "content": "turn one"},
+                {"role": "assistant", "content": "reply one"},
+            ],
+        },
+    )
+    state = {
+        "messages": [
+            {"role": "user", "content": "turn one"},
+            {"role": "assistant", "content": "reply one"},
+            {"role": "user", "content": "old question"},
+            {
+                "role": "assistant",
+                "content": "old answer",
+                "run_url": edit_sr.get_app_url(),
+            },
+        ]
+    }
+
+    request_body, message_thread = chat_widget_input_to_request_body(
+        current_sr, state, {"input_prompt": "new question"}, edit_sr=edit_sr
+    )
+
+    # this fixture's edit_sr has no thread, so there is none to hand over
+    assert message_thread is None
+    assert request_body["input_prompt"] == "new question"
+    # the edited turn and everything after it are dropped
+    assert request_body["messages"] == [
+        {"role": "user", "content": "turn one"},
+        {"role": "assistant", "content": "reply one"},
+    ]
+
+
+def test_chat_widget_edit_allows_current_run(db_fixtures):
+    current_sr = _make_sr(
+        uid="user-a",
+        run_id="run-current",
+        state={
+            "input_prompt": "newest question",
+            "messages": [{"role": "user", "content": "turn one"}],
+        },
+    )
+
+    request_body, _ = chat_widget_input_to_request_body(
+        current_sr, current_sr.state, {"input_prompt": "edited"}, edit_sr=current_sr
+    )
+
+    assert request_body["input_prompt"] == "edited"
+    assert request_body["messages"] == [{"role": "user", "content": "turn one"}]
+
+
+def test_chat_widget_edit_rejects_run_outside_conversation(db_fixtures):
+    current_sr, _ = _make_sr_with_thread(uid="user-a", title="current")
+    elsewhere_sr = _make_sr(
+        uid="user-a", run_id="run-elsewhere", state={"bot_script": "private prompt"}
+    )
+
+    with pytest.raises(UserError):
+        chat_widget_input_to_request_body(
+            current_sr,
+            {"messages": []},
+            {"input_prompt": "steal it"},
+            edit_sr=elsewhere_sr,
+        )
+
+
+def test_chat_widget_edit_rejects_other_users_run(db_fixtures):
+    current_sr, _ = _make_sr_with_thread(uid="user-a", title="current")
+    stranger_sr = _make_sr(
+        uid="user-b", run_id="run-stranger", state={"bot_script": "private prompt"}
+    )
+    # even if the history is forged to reference it, the uid check rejects it
+    state = {
+        "messages": [
+            {
+                "role": "user",
+                "content": "x",
+                "run_url": stranger_sr.get_app_url(),
+            }
+        ]
+    }
+
+    with pytest.raises(UserError):
+        chat_widget_input_to_request_body(
+            current_sr, state, {"input_prompt": "steal it"}, edit_sr=stranger_sr
+        )
+
+
+def test_chat_widget_edit_does_not_mutate_source_run_state(db_fixtures):
+    current_sr = _make_sr(
+        uid="user-a",
+        run_id="run-current-2",
+        state={
+            "messages": [{"role": "user", "content": "turn one"}],
+            "variables": {"foo": "bar"},
+        },
+    )
+
+    request_body, _ = chat_widget_input_to_request_body(
+        current_sr, current_sr.state, {"input_prompt": "edited"}, edit_sr=current_sr
+    )
+    request_body["messages"].append({"role": "user", "content": "injected"})
+    request_body["variables"]["foo"] = "mutated"
+
+    assert current_sr.state["messages"] == [{"role": "user", "content": "turn one"}]
+    assert current_sr.state["variables"] == {"foo": "bar"}
+
+
+def test_chat_widget_edit_hands_the_thread_over_instead_of_forking(db_fixtures):
+    """
+    An edit keeps the conversation's own thread, so the sidebar shows one row
+    that moves - not a new row per edit, titled after the edited message.
+    """
+    r1, thread = _make_sr_with_thread(uid="user-a", title="first message")
+    r2 = _make_thread_run(thread, run_id="run-2", uid="user-a", prompt="second message")
+
+    _, message_thread = chat_widget_input_to_request_body(
+        r1,
+        {
+            "messages": [
+                {"role": "user", "content": "first message"},
+                {
+                    "role": "assistant",
+                    "content": "a1",
+                    "run_url": r2.get_app_url(),
+                },
+            ]
+        },
+        {"input_prompt": "second message edited"},
+        edit_sr=r2,
+    )
+
+    assert message_thread == thread
+    assert thread.title == "first message"  # not retitled to the edited message
+
+
+def test_chat_widget_edit_leaves_superseded_turns_attached(db_fixtures):
+    """
+    message_thread is a superseded run's only link back to its conversation, so
+    editing must not detach it. Nothing user-facing walks a thread's runs - the
+    sidebar and fetch_conversations both key off last_run - so leaving them be
+    costs nothing and keeps the abandoned branch traceable.
+    """
+    r1, thread = _make_sr_with_thread(uid="user-a", title="first message")
+    r2 = _make_thread_run(thread, run_id="run-2", uid="user-a", prompt="second message")
+    r3 = _make_thread_run(thread, run_id="run-3", uid="user-a", prompt="third message")
+
+    chat_widget_input_to_request_body(
+        r1,
+        {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "a1",
+                    "run_url": r2.get_app_url(),
+                }
+            ]
+        },
+        {"input_prompt": "second message edited"},
+        edit_sr=r2,
+    )
+
+    for sr in (r1, r2, r3):
+        sr.refresh_from_db()
+        assert sr.message_thread == thread
+    thread.refresh_from_db()
+    assert thread.first_run == r1
+
+
+def test_chat_widget_records_created_at_alongside_the_run(db_fixtures):
+    """
+    The timestamp belongs to the turn's run, so it sits with the run url on the
+    assistant half, outside extra_content. Stored as isoformat because this
+    goes into the run's json state.
+    """
+    sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
+    request_body, _ = chat_widget_input_to_request_body(
+        sr,
+        {
+            "input_prompt": "hello",
+            "raw_input_text": "hello",
+            "raw_output_text": ["reply"],
+        },
+        {"input_prompt": "follow up"},
+    )
+
+    user_msg, assistant_msg = request_body["messages"]
+    assert "created_at" not in user_msg
+    assert "created_at" not in user_msg.get("extra_content", {})
+    assert assistant_msg["created_at"] == sr.created_at.isoformat()
+
+
+def test_get_chat_widget_messages_exports_created_at_on_both_halves():
+    """
+    A turn is one run, so both halves report that run's timestamp - the user
+    half reading it off the assistant entry that recorded it.
+    """
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {
+                    "role": "assistant",
+                    "content": "reply",
+                    "created_at": "2026-08-13T10:30:00+00:00",
+                },
+            ],
+            "input_prompt": "latest question",
+            "output_text": ["latest reply"],
+            "created_at": "2026-08-13T11:00:00+00:00",
+        }
+    )
+
+    assert messages[0]["created_at"] == "2026-08-13T10:30:00+00:00"
+    assert messages[1]["created_at"] == "2026-08-13T10:30:00+00:00"
+    # the live turn timestamps from the run currently being viewed
+    assert messages[2]["created_at"] == "2026-08-13T11:00:00+00:00"
+    assert messages[3]["created_at"] == "2026-08-13T11:00:00+00:00"
+
+
+def test_chat_widget_stamps_run_time_on_the_assistant_entry(db_fixtures):
+    """
+    How long the answer took is a property of the run that produced it, so it
+    rides along with the run url on the assistant half. Named as the streaming
+    api's final_response event names it, since both report the same run.
+    """
+    sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
+    sr.run_time = datetime.timedelta(seconds=3.5)
+    sr.save(update_fields=["run_time"])
+
+    request_body, _ = chat_widget_input_to_request_body(
+        sr,
+        {
+            "input_prompt": "hello",
+            "raw_input_text": "hello",
+            "raw_output_text": ["reply"],
+        },
+        {"input_prompt": "follow up"},
+    )
+
+    user_msg, assistant_msg = request_body["messages"]
+    assert assistant_msg["run_time_sec"] == 3.5
+    assert "run_time_sec" not in user_msg
+
+
+def test_chat_widget_omits_run_time_when_the_run_was_never_timed(db_fixtures):
+    sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
+
+    request_body, _ = chat_widget_input_to_request_body(
+        sr,
+        {
+            "input_prompt": "hello",
+            "raw_input_text": "hello",
+            "raw_output_text": ["reply"],
+        },
+        {"input_prompt": "follow up"},
+    )
+
+    assert "run_time_sec" not in request_body["messages"][1]
+
+
+def test_get_chat_widget_messages_exports_run_time_on_assistant_messages():
+    """Only the response carries a run time - the outgoing half has none."""
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "reply", "run_time_sec": 3.5},
+            ],
+            "input_prompt": "latest question",
+            "output_text": ["latest reply"],
+            "__run_time": 1.25,
+        }
+    )
+
+    assert "run_time_sec" not in messages[0]
+    assert messages[1]["run_time_sec"] == 3.5
+    # the live turn reports the run currently being viewed
+    assert messages[3]["run_time_sec"] == 1.25
+
+
+def test_get_chat_widget_messages_omits_run_time_while_still_running():
+    """A run has no time until it finishes, so nothing shows mid-answer."""
+    messages = get_chat_widget_messages(
+        {"input_prompt": "hello", "__run_status": "Running..."}
+    )
+
+    assert messages[1]["type"] == "message_part"
+    assert messages[1]["run_time_sec"] is None
+
+
+def test_run_time_is_stripped_before_reaching_the_llm():
+    from daras_ai_v2.language_model_body import to_llm_body
+
+    body = to_llm_body([{"role": "assistant", "content": "reply", "run_time_sec": 3.5}])
+
+    assert "run_time_sec" not in body[0]
+
+
+def test_created_at_is_stripped_before_reaching_the_llm():
+    from daras_ai_v2.language_model_body import to_llm_body
+
+    body = to_llm_body(
+        [
+            {
+                "role": "user",
+                "content": "hello",
+                "created_at": "2026-08-13T10:30:00+00:00",
+            }
+        ]
+    )
+
+    assert "created_at" not in body[0]
 
 
 def test_get_chat_widget_messages_exports_historical_run_metadata():
@@ -344,6 +751,31 @@ def test_bot_conversation_reuses_same_message_thread(db_fixtures):
 
     assert thread1.id == thread2.id
     assert thread1.title == "hello"
+
+
+def _make_sr(*, uid: str, run_id: str, state: dict) -> SavedRun:
+    return SavedRun.objects.create(
+        workflow=Workflow.VIDEO_BOTS,
+        run_id=run_id,
+        uid=uid,
+        state=state,
+    )
+
+
+def _make_thread_run(
+    thread: MessageThread, *, run_id: str, uid: str, prompt: str
+) -> SavedRun:
+    """A later turn in `thread`, becoming its last_run."""
+    sr = SavedRun.objects.create(
+        workflow=Workflow.VIDEO_BOTS,
+        run_id=run_id,
+        uid=uid,
+        message_thread=thread,
+        state={"input_prompt": prompt, "raw_input_text": prompt},
+    )
+    thread.last_run = sr
+    thread.save(update_fields=["last_run"])
+    return sr
 
 
 def _make_sr_with_thread(*, uid: str, title: str) -> tuple[SavedRun, MessageThread]:
