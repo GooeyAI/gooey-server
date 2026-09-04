@@ -141,8 +141,7 @@ export function RecipeWorkspacePanes({
   onChange,
   state,
   panes,
-  className,
-}: CustomComponentProps & RecipeWorkspacePanesProps & { className?: string }) {
+}: CustomComponentProps & RecipeWorkspacePanesProps) {
   const { activeEditorPane, setActiveEditorPane } = useRecipeWorkspaceContext();
   const selectedPane = panes.some((pane) => pane.id === activeEditorPane)
     ? activeEditorPane
@@ -152,7 +151,7 @@ export function RecipeWorkspacePanes({
   }
   return (
     <div className="d-flex flex-column h-100" style={{ minHeight: 0 }}>
-      <div className={clsx(className, "mb-1")} role="tablist">
+      <div className="recipe-workspace-pane-tabs mb-1" role="tablist">
         {panes.map((pane) => {
           const selected = pane.id === selectedPane;
           return (
