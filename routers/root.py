@@ -416,7 +416,39 @@ def api_route(
 def history_route(
     request: Request, page_slug: str, run_slug: str = None, example_id: str = None
 ):
+    from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+    from widgets.history import history_href_for_workflow
+
+    normalized_slug = normalize_slug(page_slug)
+    page_cls = page_slug_map.get(normalized_slug)
+    if page_cls and can_use_layout_v2(request):
+        # a v2 fork keeps this tab, renamed Usage
+        if normalized_slug in page_slug_map_v2:
+            return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
+        # otherwise v2 has one History for every recipe - 302, since which page you get
+        # depends on the user
+        return RedirectResponse(
+            history_href_for_workflow(page_cls.workflow), status_code=302
+        )
     return render_recipe_page(request, page_slug, RecipeTabs.history, example_id)
+
+
+@gui.route(
+    app,
+    "/{page_slug}/usage/",
+    "/{page_slug}/{run_slug}/usage/",
+    "/{page_slug}/{run_slug}-{example_id}/usage/",
+)
+def usage_route(
+    request: Request, page_slug: str, run_slug: str = None, example_id: str = None
+):
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+
+    if not can_use_layout_v2(request):
+        raise HTTPException(status_code=404)
+    return render_recipe_page(request, page_slug, RecipeTabs.usage, example_id)
 
 
 @gui.route(
@@ -695,12 +727,20 @@ def render_recipe_page(
     request: Request, page_slug: str, tab: "RecipeTabs", example_id: str | None
 ):
     from daras_ai_v2.all_pages import normalize_slug, page_slug_map
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
 
     # lookup the page class
+    normalized_slug = normalize_slug(page_slug)
     try:
-        page_cls = page_slug_map[normalize_slug(page_slug)]
+        page_cls = page_slug_map[normalized_slug]
     except KeyError:
         raise RecipePageNotFound
+
+    # Layout v2 fork switch: swap in the v2 fork of this recipe where one exists.
+    if can_use_layout_v2(request):
+        from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+
+        page_cls = page_slug_map_v2.get(normalized_slug, page_cls)
 
     # ensure the latest slug is used
     latest_slug = page_cls.canonical_slug()
@@ -757,7 +797,11 @@ def sidebar_page_wrapper(
 
     context = {"request": request, "block_incognito": True}
 
-    display_gooey_builder = page and page.tab in [RecipeTabs.run, RecipeTabs.preview]
+    # v2's tabs and panes all live on one page, so the Builder stays available across them;
+    # v1 offers it on Run/Preview only.
+    display_gooey_builder = bool(page) and (
+        _is_layout_v2_page(page) or page.tab in [RecipeTabs.run, RecipeTabs.preview]
+    )
 
     default_collapsed = persist_toggle_state(
         navigation_sidebar.NAV_COLLAPSED_STATE_KEY,
@@ -765,22 +809,51 @@ def sidebar_page_wrapper(
         default=False,
     )
 
+    # v2 is an app shell: scrolling happens inside the tab body, which needs a definite
+    # height on every ancestor down to it. `min-vh-100` only sets a floor.
+    is_v2 = _is_layout_v2_page(page)
+    # splatted so v1 keeps exactly the props it had
+    fill = dict(style=dict(minHeight=0)) if is_v2 else {}
+    # `100dvh`, not `vh-100`: on mobile Safari `100vh` is the viewport with the URL bar
+    # retracted. The only place the viewport is measured - the rest of the shell is `h-100`.
+    viewport = dict(style=dict(height="100dvh")) if is_v2 else {}
+
     # Column on mobile (rail collapses to an off-canvas drawer + top bar),
     # row on desktop (rail beside content).
-    with gui.div(className="d-flex flex-column flex-lg-row min-vh-100 w-100"):
+    with gui.div(
+        className=(
+            "gooey-app-shell d-flex flex-column flex-lg-row w-100 "
+            + ("overflow-hidden" if is_v2 else "min-vh-100")
+        ),
+        **viewport,
+    ):
         navigation_sidebar.render(
             request, default_collapsed=default_collapsed, page=page
         )
 
-        with gui.div(className="d-flex flex-column flex-grow-1 min-w-0"):
-            sidebar, page_content = sidebar_layout(
-                key=GOOEY_BUILDER_EVENT_KEY,
-                session=request.session,
-                disabled=not display_gooey_builder,
-            )
+        # above `sidebar_layout`, whose `gap-2` between panel and page paints whatever is
+        # behind it
+        with gui.div(className="d-flex flex-column flex-grow-1 min-w-0", **fill):
+            if is_v2:
+                # v2 opens its own `sidebar_layout` from inside the page, so the top bar
+                # can span the full width. A second one here would share
+                # GOOEY_BUILDER_EVENT_KEY and render an empty panel beside the real one.
+                sidebar, page_content = None, gui.dummy()
+            else:
+                sidebar, page_content = sidebar_layout(
+                    key=GOOEY_BUILDER_EVENT_KEY,
+                    session=request.session,
+                    disabled=not display_gooey_builder,
+                )
             with (
                 page_content,
-                gui.div(className="d-flex flex-column min-vh-100 w-100"),
+                gui.div(
+                    className=(
+                        "d-flex flex-column w-100 "
+                        + ("h-100 overflow-hidden" if is_v2 else "min-vh-100")
+                    ),
+                    **fill,
+                ),
             ):
                 gui.html(templates.get_template("gtag.html").render(**context))
                 gui.html(copy_to_clipboard_scripts)
@@ -790,7 +863,8 @@ def sidebar_page_wrapper(
                         request.user, request.session
                     )
 
-                    if display_gooey_builder:
+                    # v2 renders the Builder itself, beside the tab body
+                    if display_gooey_builder and sidebar is not None:
                         with sidebar:
                             render_gooey_builder(
                                 event_key=GOOEY_BUILDER_EVENT_KEY,
@@ -800,15 +874,46 @@ def sidebar_page_wrapper(
                 else:
                     current_workspace = None
 
-                container_class = "container-xxl" if not full_width_content else ""
-                with gui.div(className=container_class):
-                    with gui.div(id="main-content", className=className):
+                # v2 drops `container-xxl` so the tab body (and the chat preview inside it)
+                # runs edge to edge instead of sitting in a centred, max-width column.
+                container_class = ""
+                if is_v2:
+                    container_class = "d-flex flex-column flex-grow-1 w-100"
+                elif not full_width_content:
+                    container_class = "container-xxl"
+
+                with gui.div(
+                    className=container_class,
+                    **fill,
+                ):
+                    with gui.div(
+                        id="main-content",
+                        className=(
+                            className + " d-flex flex-column flex-grow-1"
+                            if is_v2
+                            else className
+                        ),
+                        **fill,
+                    ):
                         yield current_workspace
 
-                    # gui.html(templates.get_template("footer.html").render(**context)) # remove footer for now
+                    # login_scripts is functional, not chrome - it stays on every page
                     gui.html(
                         templates.get_template("login_scripts.html").render(**context)
                     )
+
+
+def _is_layout_v2_page(page: typing.Optional["BasePage"]) -> bool:
+    """Layout v2 renders an app shell, which has no marketing footer.
+
+    v1 pages and every non-recipe page (account, explore, history, ...) keep theirs.
+    """
+    if page is None:
+        return False
+    # imported lazily: daras_ai_v2.base_v2 imports this module at module level
+    from daras_ai_v2.base_v2 import BasePage as BasePageV2
+
+    return isinstance(page, BasePageV2)
 
 
 class TabData(typing.NamedTuple):
@@ -845,6 +950,11 @@ class RecipeTabs(TabData, Enum):
         title=f"{icons.history} History",
         label="History",
         route=history_route,
+    )
+    usage = TabData(
+        title='<i class="fa-regular fa-chart-line"></i> Usage',
+        label="Usage",
+        route=usage_route,
     )
     integrations = TabData(
         title=f'<img width="20" height="20" style="margin-right: 4px;margin-top: -3px" src="{icons.integrations_img}" alt="Facebook, Whatsapp, Slack, Instagram Icons"> Deploy',

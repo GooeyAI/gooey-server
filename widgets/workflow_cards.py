@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from app_users.models import AppUser
 from bots.models import PublishedRun, SavedRun, Workflow
+from bots.models.bot_integration import Platform
 from bots.models.workflow import WorkflowMetadata
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2.preview_img import media_preview_img
@@ -15,6 +16,8 @@ from gooey_gui.types.home_page_props import (
     ChatPreview,
     IconPreview,
     MediaPreview,
+    RunStatusData,
+    SenderData,
     WorkflowCardData,
 )
 from workspaces.models import Workspace
@@ -24,6 +27,8 @@ if TYPE_CHECKING:
 
 CHAT_PREVIEW_MAXLEN = 130
 MEDIA_CAPTION_MAXLEN = 60
+
+RUN_STATUS_MAXLEN = 28
 
 
 def author_from_user(
@@ -80,13 +85,55 @@ def sr_to_card(
     workflow = Workflow(sr.workflow)
     metadata = sr.get_workflow_metadata()
     return WorkflowCardData(
-        title=(parent_pr and parent_pr.title) or workflow.label,
+        title=f"{sr.get_surface_display()}: "
+        + ((parent_pr and parent_pr.title) or workflow.label),
         href=sr.get_app_url(),
         workflow_icon=(metadata and (metadata.fa_icon or metadata.emoji)) or "",
         description=(parent_pr and parent_pr.notes) or None,
         preview=_sr_preview(workflow=workflow, sr=sr, pr=parent_pr, metadata=metadata),
         author=author,
+        sender=sender_from_run(sr),
+        run_status=run_status_from_run(sr),
     )
+
+
+def run_status_from_run(sr: SavedRun) -> RunStatusData | None:
+    """What this run is doing - a finished run says nothing."""
+    from daras_ai_v2.base import BasePage, RecipeRunState
+
+    if sr.is_cancelled:
+        return RunStatusData(state="cancelled", label="Cancelled")
+    match BasePage.get_run_state(sr.to_dict()):
+        case RecipeRunState.failed:
+            return RunStatusData(state="failed", label="Failed")
+        case RecipeRunState.starting:
+            return RunStatusData(state="starting", label="Starting")
+        case RecipeRunState.running:
+            return RunStatusData(
+                state="running",
+                label=truncate_text_words(sr.run_status, maxlen=RUN_STATUS_MAXLEN),
+            )
+    return None
+
+
+def sender_from_run(sr: SavedRun) -> SenderData | None:
+    """Needs `message_thread__bot_conversation` selected to stay off the N+1 path."""
+    if sr.platform is None:
+        return None
+    platform = Platform(sr.platform)
+    # a run can carry a platform without a conversation behind it
+    convo = sr.message_thread and sr.message_thread.bot_conversation
+    return SenderData(
+        icon=platform.get_icon(),
+        label=mask_user_id(convo.get_display_name() or "") if convo else "",
+    )
+
+
+def mask_user_id(value: str) -> str:
+    value = value.strip()
+    if len(value) < len("123xxx1233"):
+        return value
+    return f"{value[:3]}xxx{value[-4:]}"
 
 
 def pr_to_card(

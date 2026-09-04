@@ -243,12 +243,17 @@ class Workspace(SafeDeleteModel):
         Check if workspace is allowed to purchase credit topups.
 
         Returns True if:
+        - Workspace is a personal workspace, OR
         - Workspace has an Enterprise subscription, OR
         - Workspace has purchased topups before (ADDON or AUTO_RECHARGE transactions)
 
-        Returns False otherwise (including workspaces with no subscription)
+        Returns False otherwise (including team workspaces with no subscription)
         """
         from app_users.models import AppUserTransaction, TransactionReason
+
+        # Personal workspaces always allowed
+        if self.is_personal:
+            return True
 
         # Enterprise workspaces always allowed
         if self.subscription_id:

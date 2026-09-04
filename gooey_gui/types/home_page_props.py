@@ -39,12 +39,28 @@ class AuthorData(pydantic.BaseModel):
     photo_url: str | None = None
 
 
+class RunStatusData(pydantic.BaseModel):
+    state: Literal["starting", "running", "failed", "cancelled"]
+    label: str
+
+
+class SenderData(pydantic.BaseModel):
+    """Who a deployment run was for, as opposed to who owns the integration."""
+
+    icon: str
+    label: str
+
+
 class WorkflowCardData(pydantic.BaseModel):
     title: str
     href: str
     workflow_icon: str | None = None
     description: str | None = None
     author: AuthorData | None = None
+    # shown in the author's place: a deployment run's author is the integration's
+    # owner, not whoever sent the message
+    sender: SenderData | None = None
+    run_status: RunStatusData | None = None
     preview: CardPreview | None = None
     updated_at: str | None = None
     run_count: int | None = None

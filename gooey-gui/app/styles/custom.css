@@ -932,6 +932,12 @@ button {
   min-width: 50vw !important;
 }
 
+.tippy-box[data-theme~="gooey-fit-content"] {
+  width: max-content;
+  min-width: 0 !important;
+  max-width: 80vw !important;
+}
+
 @media (min-width: 768px) {
   .tippy-box {
     max-width: 35vw !important;
@@ -958,4 +964,23 @@ button {
 }
 .object-fit-none {
   object-fit: none;
+}
+
+/* Mobile: Safari on iOS zooms the whole page in whenever a focused field's
+   font-size is under 16px, and most of the app renders its inputs inside
+   0.9rem wrappers (e.g. widgets/workflow_search.py), so they inherit 14.4px.
+   Level the fields themselves up to 16px here rather than pinning the viewport
+   with maximum-scale, which would stop the focus zoom but also take pinch-zoom
+   away on browsers that honour it.
+
+   !important because the fields we need to reach are styled by whatever owns
+   them -- react-select's generated emotion classes, per-component rules like
+   .ask-gooey-textarea -- and every one of those outranks a bare element
+   selector. Scoped to form controls below the mobile breakpoint. */
+@media (max-width: 991.98px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }

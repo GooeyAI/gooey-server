@@ -24,6 +24,7 @@ class HistoryPageProps(pydantic.BaseModel):
     _component: str = "HistoryPage"
 
     title: str = "History"
+    owner_options: list[SurfaceTabData] = []  # "Just me" vs the whole workspace
     workflow_options: list[WorkflowFilterOption] = []
     surface_tabs: list[SurfaceTabData] = []
     cards: list[WorkflowCardData] = []

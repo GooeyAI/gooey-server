@@ -8,6 +8,8 @@
     "dev": "remix dev",
     "start": "remix-serve build",
     "typecheck": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepack": "npm run build"
   },
   "bin": {
@@ -88,7 +90,8 @@
     "eslint": "^8.38.0",
     "json-schema-to-typescript": "^15.0.4",
     "prettier": "^3.0.3",
-    "typescript": "^5.0.4"
+    "typescript": "^5.0.4",
+    "vitest": "^2.1.9"
   },
   "engines": {
     "node": ">=14"

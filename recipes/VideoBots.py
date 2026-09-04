@@ -1448,12 +1448,12 @@ def messages_as_prompt(query_msgs: list[dict]) -> str:
 
 
 def infer_asr_model_and_language(
-    user_language: str, default=AsrModels.gpt_4_o_audio
+    user_language: str, default=AsrModels.gpt_transcribe
 ) -> tuple[str, str]:
     asr_lang = None
     user_lang = user_language.lower()
     if "am" in user_lang:
-        asr_model = AsrModels.usm
+        asr_model = AsrModels.chirp_3
         asr_lang = "am-et"
     elif "hi" in user_lang:
         asr_model = AsrModels.nemo_hindi

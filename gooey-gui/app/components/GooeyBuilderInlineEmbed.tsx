@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { fetchServerAPI } from "~/fetchServerAPI";
 import type { CustomComponentProps } from "~/components";
 import { useGlobalContext } from "~/globalContext";
+import { useAppShellPanelActions } from "~/appShellContext";
 
 declare global {
   interface Window {
@@ -26,6 +27,7 @@ export function GooeyBuilderInlineEmbed(
   const controllerRef = useRef<any>(null);
 
   const ctx = useGlobalContext();
+  const { setPanelOpen } = useAppShellPanelActions();
 
   useEffect(() => {
     const loadEmbed = () => {
@@ -41,6 +43,7 @@ export function GooeyBuilderInlineEmbed(
       // builder-only pages are standalone, so there's no sidebar to close
       if (!propsRef.current.builder_only) {
         config.onClose = function () {
+          setPanelOpen(propsRef.current.event_key, false);
           window.dispatchEvent(
             new CustomEvent(`${propsRef.current.event_key}:close`)
           );
@@ -102,8 +105,16 @@ export function GooeyBuilderInlineEmbed(
     script?.addEventListener("load", loadEmbed);
     loadEmbed();
 
+    // v2 hides the widget's header, so the panel's title button fires this instead. Routed
+    // through the controller, the same path the widget's own control uses.
+    const newConversationEvent = `${propsRef.current.event_key}:new`;
+    const onNewConversation = () =>
+      controllerRef.current?.onNewConversation?.();
+    window.addEventListener(newConversationEvent, onNewConversation);
+
     return () => {
       script?.removeEventListener("load", loadEmbed);
+      window.removeEventListener(newConversationEvent, onNewConversation);
     };
   }, []);
 
@@ -111,5 +122,7 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
 
-  return <div className="w-100 h-100" id="gooey-builder-embed" />;
+  // No `w-100`: Bootstrap's width utilities are `!important` and would beat the settled-width
+  // rule in app.css. Width is owned there.
+  return <div className="h-100" id="gooey-builder-embed" />;
 }

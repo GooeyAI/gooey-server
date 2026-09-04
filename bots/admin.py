@@ -520,7 +520,6 @@ class SavedRunAdmin(GooeyModelAdmin):
         "created_at",
         "updated_at",
         "run_time",
-        "surface",
         "parent_builder_saved_run",
         "view_bot_message",
         "view_memory_entries",

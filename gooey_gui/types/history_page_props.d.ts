@@ -15,6 +15,7 @@ export interface WorkflowFilterOption {
 }
 export interface HistoryPageProps {
   title: string;
+  owner_options: SurfaceTabData[];
   workflow_options: WorkflowFilterOption[];
   surface_tabs: SurfaceTabData[];
   cards: WorkflowCardData[];
@@ -27,6 +28,8 @@ export interface WorkflowCardData {
   workflow_icon: string | null;
   description: string | null;
   author: AuthorData | null;
+  sender: SenderData | null;
+  run_status: RunStatusData | null;
   preview: (ChatPreview | MediaPreview | IconPreview) | null;
   updated_at: string | null;
   run_count: number | null;
@@ -36,6 +39,17 @@ export interface WorkflowCardData {
 export interface AuthorData {
   name: string;
   photo_url: string | null;
+}
+/**
+ * Who a deployment run was for, as opposed to who owns the integration.
+ */
+export interface SenderData {
+  icon: string;
+  label: string;
+}
+export interface RunStatusData {
+  state: "starting" | "running" | "failed" | "cancelled";
+  label: string;
 }
 export interface ChatPreview {
   type: "chat";

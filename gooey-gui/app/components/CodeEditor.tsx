@@ -1,3 +1,5 @@
+import "./CodeEditor.css";
+
 import CodeMirror, {
   type Extension,
   type ReactCodeMirrorRef,

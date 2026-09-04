@@ -98,24 +98,19 @@ function NavItem({
     collapsed && "position-relative",
     children && "nav-section-toggle",
     !!item.href && "bg-hover-light",
-    item.dense ? "dense px-2 py-1 small" : "px-2 py-2"
+    item.dense ? "dense px-2 py-1 small" : "px-2 py-1"
   );
   const content = (
     <Fragment>
       <span
         className={clsx(
-          "d-flex align-items-center flex-grow-1",
+          "d-flex align-items-center flex-grow-1 gap-1",
           collapsed && "justify-content-center",
-          collapsed && !item.href && "d-none", // hide when no href and collapsed
-          item.dense ? "gap-1" : "gap-2"
+          collapsed && !item.href && "d-none" // hide when no href and collapsed
         )}
       >
         <span
-          className={clsx(
-            "nav-item-icon",
-            !isActive && "text-muted",
-            item.dense && !collapsed && "small"
-          )}
+          className="nav-item-icon"
           dangerouslySetInnerHTML={{ __html: item.icon }}
         />
         {!collapsed && <span>{item.label}</span>}
@@ -156,9 +151,9 @@ function NavItemChildren({
   const showSkeleton = isFetching && items.length === 0;
 
   if (items.length === 0 && !showSkeleton) {
-    // A fetched section has no href of its own, so an empty result means there's
-    // nothing to link to — drop the whole section instead of a dead label.
-    if (item.items_url) return null;
+    // A fetched section with no href of its own has nothing to link to once the
+    // result comes back empty — drop it instead of leaving a dead label.
+    if (item.items_url && !item.href) return null;
     // No children → behaves like a plain nav item (label links to href).
     return (
       <NavItem
@@ -200,7 +195,7 @@ function NavItemChildren({
         )}
       </NavItem>
       {showItems && (
-        <div className={clsx(!item.dense && "saved-tree")}>
+        <div className={clsx(!item.dense && "saved-tree mb-2")}>
           {showSkeleton ? (
             <WorkflowListSkeleton rows={3} indent={!item.dense} />
           ) : (

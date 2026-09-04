@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import importlib
+import inspect
 import json
 import pkgutil
 import re
@@ -58,7 +59,9 @@ def get_pydantic_models(module: ModuleType) -> list[type[pydantic.BaseModel]]:
     return [
         cls
         for cls in vars(module).values()
-        if issubclass(cls, pydantic.BaseModel) and cls.__module__ == module.__name__
+        if inspect.isclass(cls)
+        and issubclass(cls, pydantic.BaseModel)
+        and cls.__module__ == module.__name__
     ]
 
 

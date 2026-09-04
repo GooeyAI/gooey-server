@@ -5,22 +5,25 @@ export function GooeyBuilderButton({
   gooey_builder,
   compact,
   mobile = false,
+  onOpen,
 }: {
   gooey_builder: GooeyBuilderData;
   compact: boolean;
   mobile?: boolean;
+  onOpen: () => void;
 }) {
   return (
     <button
       type="button"
       className={clsx(
-        "gooey-builder-btn btn bg-hover-light d-flex align-items-center position-relative p-2",
+        "gooey-builder-btn gooey-orbit-border btn bg-hover-light d-flex align-items-center position-relative p-2",
         compact ? "justify-content-center" : "gap-2",
         mobile ? "border-0" : "border border-1"
       )}
       title={gooey_builder.name}
       onClick={(e) => {
         e.stopPropagation();
+        onOpen();
         window.dispatchEvent(
           new CustomEvent(`${gooey_builder.event_key}:open`)
         );

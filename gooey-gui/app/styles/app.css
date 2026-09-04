@@ -112,7 +112,7 @@ div.code-toolbar {
   color: inherit;
 }
 
-.gui-input-text input, 
+.gui-input-text input,
 .gui-input-password input {
   padding: 0.8rem;
 }
@@ -183,8 +183,7 @@ div.code-toolbar {
 }
 
 .container-margin-reset p {
-    margin: 0;
-
+  margin: 0;
 }
 
 .gui-md-container {
@@ -315,8 +314,78 @@ button .gui-html-container,
   background-color: var(--bs-gray-200) !important;
 }
 
+/* Design-system tokens, prefixed because the design's own names are too generic to own
+   globally. Each comment names the Figma token it comes from. A deliberate subset: only what
+   the mobile header, its drawer and the pane pills use. The v2 desktop bar still runs an
+   older ad-hoc palette, so the two disagree on colour until it is converted. */
 :root {
-  --sidebar_open_width: 340px;
+  --gooey-ink: #0a1021; /* ink - titles, pill and drawer labels */
+  --gooey-line-default: #d9d9d9; /* line - root header rule, outline button border */
+  --gooey-line-soft: #e6e6e6; /* line-soft - sub-view rule, pill border, grab handle */
+  --gooey-surface-50: #fbfaf8; /* surface-50 - navigation rail, app shell */
+  --gooey-surface-100: #f7f5f2; /* surface-100 - selected pill fill */
+  --gooey-surface-200: #f1f2f4; /* surface-200 - the tab group's track */
+  --gooey-bg-page: #fffefd; /* bg - outline button fill */
+  --gooey-scrim: rgb(10 16 33 / 30%); /* the drawer's backdrop */
+
+  /* Not in the Figma set - added because the v2 surfaces need them and had been carrying
+     one-off hexes instead. Replace with the design's own once it defines them. */
+  --gooey-line-strong: #c9c9c9; /* a border under hover or on a selected control */
+  --gooey-ink-muted: #6b6b6b; /* secondary label, menu heading, cost readout */
+  --gooey-danger: #c0392b; /* destructive action */
+  --gooey-warn: #f0a020; /* the unpublished-changes dot */
+  --gooey-ok-wash: #eaf6ee; /* the run bar's cost tint */
+
+  --gooey-space-1: 4px; /* space/1 */
+  --gooey-space-2: 8px; /* space/2 */
+  --gooey-space-3: 12px; /* space/3 */
+  --gooey-space-4: 16px; /* space/4 */
+  /* Not in the Figma set, but on its step - the scale is 4px per unit, so these continue it
+     rather than inventing values. The recipe page's panels and card rows were already
+     spacing on 20 and 24 with no step to name either with. */
+  --gooey-space-5: 20px;
+  --gooey-space-6: 24px;
+
+  --gooey-radius-xs: 8px; /* radius/xs - buttons */
+  /* Also outside the Figma set, and the same story: the v2 surfaces round at 10, 12 and 16
+     and the scale jumped straight from 8 to 32. Ordered small to large with xs, so a reader
+     can pick one by size rather than by hunting for the hex. */
+  --gooey-radius-sm: 10px; /* controls that sit in a row - pane pills, the code editor */
+  --gooey-radius-md: 12px; /* cards */
+  --gooey-radius-lg: 16px; /* panels, the About portrait */
+  --gooey-radius-pill: 32px; /* radius/pill - the drawer's top corners */
+  --gooey-radius-full: 99px; /* radius/full - avatars, grab handle */
+}
+
+/* Run state, as the history card's status pill reports it (HomePage.css). The warn and
+   error values are BulkProgressCard's, so a cancelled or failed run reads the same in both
+   places; that card deliberately keeps its own copy of them for now, so the two are kept in
+   step by hand until it is converted. Only the pill's values are tokens - a token nothing
+   references is a claim the codebase has not earned. */
+:root {
+  --gooey-status-ink: #070b1a;      /* settled states - queued, completed, neutral text */
+  --gooey-status-muted: #59617d;    /* captions, and the "starting" accent */
+  --gooey-status-line: #e4e4e7;     /* the neutral card/pill border */
+
+  /* in-flight, in the brand cyan (the spinner accent in custom.css). The cyan itself
+     is the marker; text uses the darkened -ink, which the cyan is far too light to do
+     legibly at 0.75rem on its own tint. */
+  --gooey-status-running: #03dac5;
+  --gooey-status-running-ink: #0a6d63;
+  --gooey-status-running-bg: #e6faf7;
+  --gooey-status-running-line: #a6ebe2;
+
+  --gooey-status-warn: #9d7b1f;     /* cancelled / stopped */
+  --gooey-status-warn-bg: #fff7d8;
+  --gooey-status-warn-line: #f0dc92;
+
+  --gooey-status-error: #b42318;    /* failed */
+  --gooey-status-error-bg: #fff4f2;
+  --gooey-status-error-line: #f5b8b0;
+}
+
+:root {
+  --sidebar_open_width: 460px;
   --sidebar_closed_width: 0;
   --sidebar_mobile_width: 100vw;
   --sidebar_desktop_breakpoint: 1140px;
@@ -324,6 +393,7 @@ button .gui-html-container,
 }
 
 .gooey-sidebar {
+  display: flex;
   background-color: #f9f9f9;
   position: sticky;
   top: 0;
@@ -331,37 +401,55 @@ button .gui-html-container,
   bottom: 0;
   z-index: 999;
   height: 100dvh;
+  opacity: 1;
+  transform: translateX(0);
+  overflow: hidden;
+  transition:
+    min-width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.gooey-sidebar::after {
-  /* Right Sidebar Gradient Shadow */
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 16px;
-  height: 100%;
-  background: linear-gradient(to left, rgba(15, 23, 42, 0.07) 0%, transparent 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.gooey-sidebar-bordered {
+.gooey-sidebar-bordered,
+.gooey-sidebar-resizable {
   border-right: 1px solid #e0e0e0;
 }
 
+/* Default: fill whatever holds it - the standalone builder page has no panel around it. */
+#gooey-builder-embed {
+  width: 100%;
+}
+
+/* Inside a panel, pin the widget to the width the panel settles at, so the transition
+   reveals it rather than reflowing it on every frame. `--sidebar-settled-width` comes from
+   Sidebar.tsx; a container unit would not work, since the animating element is the
+   container. */
+.gooey-sidebar #gooey-builder-embed {
+  width: var(--sidebar-settled-width, var(--sidebar_open_width));
+}
+
+@media (max-width: 1140px) {
+  /* full-screen takeover at this breakpoint, so the settled width is the viewport */
+  .gooey-sidebar #gooey-builder-embed {
+    width: var(--sidebar_mobile_width);
+  }
+}
+
 .gooey-sidebar-open {
-  display: flex;
   min-width: var(--sidebar_open_width);
   width: var(--sidebar_open_width);
   max-width: var(--sidebar_open_width);
 }
 .gooey-sidebar-closed {
-  display: none;
   min-width: var(--sidebar_closed_width);
   width: var(--sidebar_closed_width);
   max-width: var(--sidebar_closed_width);
-  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-1rem);
+  border-right-width: 0;
 }
 
 .gooey-sidebar-closed:hover {
@@ -371,28 +459,34 @@ button .gui-html-container,
 /* change the value here when updating the sidebar_desktop_breakpoint variable in the app.css file */
 @media (max-width: 1140px) {
   .gooey-sidebar-open {
-      position: fixed;
-      left: 0;
-      bottom: 0;
-      min-width: var(--sidebar_mobile_width);
-      width: var(--sidebar_mobile_width);
-      max-width: var(--sidebar_mobile_width);
-      /* Full-screen mobile takeover must sit above the nav top bar
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    min-width: var(--sidebar_mobile_width);
+    width: var(--sidebar_mobile_width);
+    max-width: var(--sidebar_mobile_width);
+    /* Full-screen mobile takeover must sit above the nav top bar
          (.nav-mobile-topbar, z-index 1030) but below the nav scrim/drawer
          (1044 / 9999) so reopening the nav still layers correctly. */
-      z-index: 1035;
-      border-left: 1px solid #e0e0e0;
-      border-right: none;
-      height: calc(100dvh); /* 4px for the progress bar */
+    z-index: 1035;
+    border-left: 1px solid #e0e0e0;
+    border-right: none;
+    height: calc(100dvh); /* 4px for the progress bar */
   }
   .gooey-sidebar-closed {
-      position: sticky;
-      right: 0;
-      left: auto;
-      min-width: 0px;
-      width: 0px;
-      max-width: 0px;
-      overflow: hidden;
+    position: sticky;
+    right: 0;
+    left: auto;
+    min-width: 0px;
+    width: 0px;
+    max-width: 0px;
+    overflow: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gooey-sidebar {
+    transition: none;
   }
 }
 
@@ -401,16 +495,37 @@ button .gui-html-container,
   top: 0;
   right: 0;
   bottom: 0;
-  width: 4px;
+  width: 10px;
   cursor: col-resize;
   z-index: 2;
   background: transparent;
-  transition: background-color 150ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.gooey-sidebar-resizer:hover,
-body.gooey-sidebar-resizing .gooey-sidebar-resizer {
-  background: rgba(15, 23, 42, 0.12);
+/* A vertical run of dots, so the edge reads as a grab handle before you are on it. */
+.gooey-sidebar-resizer::before {
+  content: "";
+  width: 3px;
+  height: 22px;
+  background-image: radial-gradient(
+    circle at center,
+    #c2c2c2 1.5px,
+    transparent 1.6px
+  );
+  background-size: 3px 7px;
+  background-repeat: repeat-y;
+  transition: background-image 150ms ease;
+}
+
+.gooey-sidebar-resizer:hover::before,
+body.gooey-sidebar-resizing .gooey-sidebar-resizer::before {
+  background-image: radial-gradient(
+    circle at center,
+    #8a8a8a 1.5px,
+    transparent 1.6px
+  );
 }
 
 body.gooey-sidebar-resizing,

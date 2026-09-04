@@ -274,10 +274,12 @@ function RenderedTreeNode({
       );
     }
     case "img": {
-      return <GooeyImg {...props} />;
+      const { src, ...imageProps } = props;
+      return <GooeyImg src={src} {...imageProps} />;
     }
     case "video": {
-      return <GooeyVideo {...props} />;
+      const { src, ...videoProps } = props;
+      return <GooeyVideo src={src} {...videoProps} />;
     }
     case "audio": {
       const { caption, ...args } = props;

@@ -25,6 +25,7 @@ import { handleRedirectResponse } from "~/handleRedirect";
 import { applyFormDataTransforms, RenderedChildren } from "~/renderer";
 import "~/styles/app.css";
 import "~/styles/custom.css";
+import { AppShellProvider } from "./appShellContext";
 import { GlobalContextProvider } from "./globalContext";
 import settings from "./settings";
 
@@ -277,13 +278,15 @@ function App() {
         onSubmit={onSubmit}
         noValidate
       >
-        <GlobalContextProvider value={globalContext}>
-          <RenderedChildren
-            children={children}
-            onChange={onChange}
-            state={state}
-          />
-        </GlobalContextProvider>
+        <AppShellProvider>
+          <GlobalContextProvider value={globalContext}>
+            <RenderedChildren
+              children={children}
+              onChange={onChange}
+              state={state}
+            />
+          </GlobalContextProvider>
+        </AppShellProvider>
       </form>
       <script
         async

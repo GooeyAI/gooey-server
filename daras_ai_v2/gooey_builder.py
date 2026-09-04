@@ -34,13 +34,6 @@ DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.app
 GOOEY_BUILDER_EVENT_KEY = "builder-sidebar"
 
 
-class GooeyBuilderWorkflow(typing.TypedDict):
-    current_url: str
-    current_user: str
-    current_workspace: str
-    state: dict
-
-
 def render_gooey_builder(
     *,
     event_key: str,
@@ -53,16 +46,19 @@ def render_gooey_builder(
     builder_sr = page.current_sr.parent_builder_saved_run
     handle_gooey_builder_redirect(builder_sr)
 
-    if builder_sr and not gui.session_state.get("builderOnNewConversation"):
+    if builder_thread_is_empty(page):
+        builder_run_url = None
+        messages = []
+    else:
         builder_run_url = builder_sr.get_app_url()
         messages = get_chat_widget_messages(
             builder_sr.to_dict(), web_url=builder_run_url
         )
-    else:
-        builder_run_url = None
-        messages = []
 
     render_gooey_builder_embed(
+        # forwarded so the embed can tell a v2 page from a v1 one - without it every caller
+        # of this function looks like v1 and gets the widget's own header back
+        page=page,
         event_key=event_key,
         builder_run_url=builder_run_url,
         messages=messages,
@@ -79,6 +75,7 @@ def render_standalone_gooey_builder(
     event_key: str,
     request: fastapi.Request,
     builder_sr: SavedRun,
+    page: BasePage | None = None,
 ):
     """Render only the gooey builder chat for a builder prompt run, without any
     associated workflow page."""
@@ -98,6 +95,7 @@ def render_standalone_gooey_builder(
 
     builder_run_url = builder_sr.get_app_url()
     render_gooey_builder_embed(
+        page=page or None,
         event_key=event_key,
         builder_run_url=builder_run_url,
         messages=get_chat_widget_messages(
@@ -115,6 +113,7 @@ def render_gooey_builder_embed(
     messages: list,
     workflow_state: dict,
     builder_only: bool = False,
+    page: BasePage | None = None,
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
@@ -133,6 +132,15 @@ def render_gooey_builder_embed(
     # conversations live in the navigation sidebar, not the builder widget
     config["enableConversations"] = False
     config["theme"] = "builder"
+
+    # imported here rather than at module level: routers.root imports this module
+    from routers.root import _is_layout_v2_page
+
+    # v2 only: its panel supplies its own chrome, and below the sidebar breakpoint its own
+    # floating close. v1 has neither and still needs the widget's header to close at all.
+    if _is_layout_v2_page(page):
+        config["showHeader"] = False
+
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
     branding["inputPlaceholderText"] = "Ask Gooey"
@@ -146,6 +154,51 @@ def render_gooey_builder_embed(
         builder_run_url=builder_run_url or bi.published_run.get_app_url(),
         workflow_state=workflow_state,
         builder_only=builder_only,
+    )
+
+
+GOOEY_BUILDER_TITLE = "Ask Gooey"
+
+
+def builder_thread_is_empty(page: BasePage) -> bool:
+    """True when the Builder panel has no conversation to show - a workflow that was never
+    built through it, or a thread the user has just reset.
+
+    The one definition of "empty", so the chrome around the widget and the messages handed to
+    it can never disagree about which state the panel is in.
+    """
+    if gui.session_state.get("builderOnNewConversation"):
+        return True
+    return not page.current_sr.parent_builder_saved_run
+
+
+def get_gooey_builder_integration() -> BotIntegration | None:
+    """The builder's deployment, or None when it is unconfigured or missing.
+
+    The one place that lookup happens, so every surface showing the builder - the nav rail's
+    button, the panel's title - agrees on whether it exists at all.
+    """
+    if not settings.GOOEY_BUILDER_INTEGRATION_ID:
+        return None
+    try:
+        return BotIntegration.objects.get(id=settings.GOOEY_BUILDER_INTEGRATION_ID)
+    except BotIntegration.DoesNotExist:
+        return None
+
+
+def get_gooey_builder_photo_url(bi: BotIntegration | None = None) -> str:
+    """The builder's avatar, from its deployment's branding.
+
+    Falls back to the packaged image, so a missing, unconfigured or blank-branded
+    integration costs a default rather than a broken <img>. Pass `bi` when the caller has
+    already fetched it, to save the query.
+    """
+    if bi is None:
+        bi = get_gooey_builder_integration()
+    if bi is None:
+        return DEFAULT_GOOEY_BUILDER_PHOTO_URL
+    return (
+        bi.get_web_widget_branding().get("photoUrl") or DEFAULT_GOOEY_BUILDER_PHOTO_URL
     )
 
 
