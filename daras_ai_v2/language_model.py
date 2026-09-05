@@ -61,6 +61,7 @@ EMBEDDING_MODEL_MAX_TOKENS = 8191
 SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 AZURE_OPENAI_MODEL_PREFIX = "openai-"
+FIREWORKS_OPENAI_BASE_URL = "https://api.fireworks.ai/inference/v1"
 
 
 class _ReasoningEffort(typing.NamedTuple):
@@ -412,6 +413,10 @@ def _run_chat_model(
                 temperature=temperature,
                 tools=tools,
                 response_format_type=response_format_type,
+                stream=stream,
+                start_chunk_size=start_chunk_size,
+                stop_chunk_size=stop_chunk_size,
+                step_chunk_size=step_chunk_size,
             )
         case ModelProvider.openai_audio:
             return run_openai_audio(
@@ -1453,7 +1458,7 @@ def _run_groq_chat(
     return [choice["message"] for choice in out["choices"]]
 
 
-@retry_if(aifail.http_should_retry)
+@retry_if(openai_should_retry)
 def _run_fireworks_chat(
     *,
     model: str,
@@ -1465,7 +1470,11 @@ def _run_fireworks_chat(
     avoid_repetition: bool = False,
     tools: list[BaseLLMTool] | None = None,
     response_format_type: ResponseFormatType | None = None,
-):
+    stream: bool = False,
+    start_chunk_size: int,
+    stop_chunk_size: int,
+    step_chunk_size: int,
+) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
     from usage_costs.cost_utils import record_cost_auto
     from usage_costs.models import ModelSku
 
@@ -1475,6 +1484,7 @@ def _run_fireworks_chat(
         max_tokens=max_tokens,
         n=num_outputs,
         temperature=temperature,
+        stream=stream,
     )
     if tools:
         data["tools"] = [tool.spec_openai for tool in tools]
@@ -1485,13 +1495,23 @@ def _run_fireworks_chat(
         data["stop"] = stop
     if response_format_type:
         data["response_format"] = {"type": response_format_type}
-    r = requests.post(
-        "https://api.fireworks.ai/inference/v1/chat/completions",
-        headers={"Authorization": f"Bearer {settings.FIREWORKS_API_KEY}"},
-        json=data,
-    )
-    raise_for_status(r)
-    out = r.json()
+    if stream:
+        data["stream_options"] = {"include_usage": True}
+    r = get_openai_client(
+        model,
+        api_key=settings.FIREWORKS_API_KEY,
+        base_url=FIREWORKS_OPENAI_BASE_URL,
+    ).chat.completions.create(**data)
+    if stream:
+        return _stream_openai_chunked(
+            r.__stream__(),
+            model,
+            data["messages"],
+            start_chunk_size=start_chunk_size,
+            stop_chunk_size=stop_chunk_size,
+            step_chunk_size=step_chunk_size,
+        )
+    out = r.model_dump(exclude_unset=True)
 
     record_cost_auto(
         model=model,
