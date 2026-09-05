@@ -61,7 +61,6 @@ EMBEDDING_MODEL_MAX_TOKENS = 8191
 SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 AZURE_OPENAI_MODEL_PREFIX = "openai-"
-FIREWORKS_OPENAI_BASE_URL = "https://api.fireworks.ai/inference/v1"
 
 
 class _ReasoningEffort(typing.NamedTuple):
@@ -403,8 +402,8 @@ def _run_chat_model(
                 response_format_type=response_format_type,
             )
         case ModelProvider.fireworks:
-            return _run_fireworks_chat(
-                model=model.model_id,
+            return run_openai_chat(
+                model=model,
                 avoid_repetition=avoid_repetition,
                 max_tokens=max_tokens,
                 messages=messages,
@@ -413,6 +412,7 @@ def _run_chat_model(
                 temperature=temperature,
                 tools=tools,
                 response_format_type=response_format_type,
+                reasoning_effort=reasoning_effort,
                 stream=stream,
                 start_chunk_size=start_chunk_size,
                 stop_chunk_size=stop_chunk_size,
@@ -1401,6 +1401,12 @@ def get_openai_client(
             max_retries=0,
             base_url="https://api.mistral.ai/v1",
         )
+    elif model.startswith("accounts/fireworks/"):
+        client = openai.OpenAI(
+            api_key=settings.FIREWORKS_API_KEY,
+            max_retries=0,
+            base_url="https://api.fireworks.ai/inference/v1",
+        )
     else:
         client = openai.OpenAI(
             api_key=settings.OPENAI_API_KEY,
@@ -1449,74 +1455,6 @@ def _run_groq_chat(
 
     record_cost_auto(
         model=model, sku=ModelSku.llm_prompt, quantity=out["usage"]["prompt_tokens"]
-    )
-    record_cost_auto(
-        model=model,
-        sku=ModelSku.llm_completion,
-        quantity=out["usage"]["completion_tokens"],
-    )
-    return [choice["message"] for choice in out["choices"]]
-
-
-@retry_if(openai_should_retry)
-def _run_fireworks_chat(
-    *,
-    model: str,
-    messages: list[ConversationEntry],
-    max_tokens: int,
-    num_outputs: int,
-    temperature: float | None = None,
-    stop: list[str] | None = None,
-    avoid_repetition: bool = False,
-    tools: list[BaseLLMTool] | None = None,
-    response_format_type: ResponseFormatType | None = None,
-    stream: bool = False,
-    start_chunk_size: int,
-    stop_chunk_size: int,
-    step_chunk_size: int,
-) -> list[ConversationEntry] | typing.Generator[list[ConversationEntry], None, None]:
-    from usage_costs.cost_utils import record_cost_auto
-    from usage_costs.models import ModelSku
-
-    data = dict(
-        model=model,
-        messages=to_llm_body(messages),
-        max_tokens=max_tokens,
-        n=num_outputs,
-        temperature=temperature,
-        stream=stream,
-    )
-    if tools:
-        data["tools"] = [tool.spec_openai for tool in tools]
-    if avoid_repetition:
-        data["frequency_penalty"] = 0.1
-        data["presence_penalty"] = 0.25
-    if stop:
-        data["stop"] = stop
-    if response_format_type:
-        data["response_format"] = {"type": response_format_type}
-    if stream:
-        data["stream_options"] = {"include_usage": True}
-    r = get_openai_client(
-        model,
-        api_key=settings.FIREWORKS_API_KEY,
-        base_url=FIREWORKS_OPENAI_BASE_URL,
-    ).chat.completions.create(**data)
-    if stream:
-        return _stream_openai_chunked(
-            r.__stream__(),
-            model,
-            data["messages"],
-            start_chunk_size=start_chunk_size,
-            stop_chunk_size=stop_chunk_size,
-            step_chunk_size=step_chunk_size,
-        )
-    out = r.model_dump(exclude_unset=True)
-
-    record_cost_auto(
-        model=model,
-        sku=ModelSku.llm_prompt,
-        quantity=out["usage"]["prompt_tokens"],
     )
     record_cost_auto(
         model=model,
