@@ -15,7 +15,7 @@ from bots.models import (
     SavedRun,
     PublishedRun,
 )
-from daras_ai_v2 import settings
+from daras_ai_v2 import exceptions, settings
 from daras_ai_v2.fastapi_tricks import fastapi_login_required
 from daras_ai_v2.web_widget_embed import (
     load_chat_widget_lib,
@@ -25,13 +25,15 @@ from daras_ai_v2.web_widget_embed import (
 from routers.custom_api_router import CustomAPIRouter
 
 from workspaces.models import Workspace
-from workspaces.widgets import get_current_workspace
+from workspaces.widgets import get_current_workspace, set_current_workspace
+from widgets.errors import get_insufficient_credits_rerun_workspace
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
 
 DEFAULT_GOOEY_BUILDER_PHOTO_URL = "https://storage.googleapis.com/dara-c1b52.appspot.com/daras_ai/media/63bdb560-b891-11f0-b9bc-02420a00014a/generate-ai-abstract-symbol-artificial-intelligence-colorful-stars-icon-vector%201.jpg"
 GOOEY_BUILDER_EVENT_KEY = "builder-sidebar"
+GOOEY_BUILDER_RERUN_KEY = "--insufficient-credits-rerun-builder"
 
 
 def render_gooey_builder(
@@ -45,7 +47,11 @@ def render_gooey_builder(
 
     builder_sr = page.current_sr.parent_builder_saved_run
     handle_gooey_builder_redirect(builder_sr)
-
+    workflow_state = {
+        field_name: gui.session_state[field_name]
+        for field_name in page.RequestModel.model_fields
+        if field_name in gui.session_state
+    }
     if builder_thread_is_empty(page):
         builder_run_url = None
         messages = []
@@ -54,6 +60,16 @@ def render_gooey_builder(
         messages = get_chat_widget_messages(
             builder_sr.to_dict(), web_url=builder_run_url
         )
+        if builder_sr.error_type == exceptions.InsufficientCredits.__name__:
+            render_gooey_builder_insufficient_credits(
+                request=request,
+                builder_sr=builder_sr,
+                current_workspace=page.current_workspace,
+                workflow_url=page.current_sr.get_app_url(),
+                workflow_state=workflow_state,
+            )
+            if messages and messages[-1].get("web_url") == builder_run_url:
+                messages.pop()
 
     render_gooey_builder_embed(
         # forwarded so the embed can tell a v2 page from a v1 one - without it every caller
@@ -62,11 +78,7 @@ def render_gooey_builder(
         event_key=event_key,
         builder_run_url=builder_run_url,
         messages=messages,
-        workflow_state={
-            field_name: gui.session_state[field_name]
-            for field_name in page.fields_to_save()
-            if field_name in gui.session_state
-        },
+        workflow_state=workflow_state,
     )
 
 
@@ -83,6 +95,16 @@ def render_standalone_gooey_builder(
         return
 
     handle_gooey_builder_redirect(builder_sr)
+    builder_run_url = builder_sr.get_app_url()
+    messages = get_chat_widget_messages(builder_sr.to_dict(), web_url=builder_run_url)
+    if builder_sr.error_type == exceptions.InsufficientCredits.__name__:
+        render_gooey_builder_insufficient_credits(
+            request=request,
+            builder_sr=builder_sr,
+            current_workspace=get_current_workspace(request.user, request.session),
+        )
+        if messages and messages[-1].get("web_url") == builder_run_url:
+            messages.pop()
 
     if builder_sr.run_status:
         # subscribe to the builder run so the page re-renders while it's
@@ -93,17 +115,41 @@ def render_standalone_gooey_builder(
         )
         gui.realtime_pull([channel])
 
-    builder_run_url = builder_sr.get_app_url()
     render_gooey_builder_embed(
         page=page or None,
         event_key=event_key,
         builder_run_url=builder_run_url,
-        messages=get_chat_widget_messages(
-            builder_sr.to_dict(), web_url=builder_run_url
-        ),
+        messages=messages,
         workflow_state={},
         builder_only=True,
     )
+
+
+def render_gooey_builder_insufficient_credits(
+    *,
+    request: fastapi.Request,
+    builder_sr: SavedRun,
+    current_workspace: Workspace | None,
+    workflow_url: str | None = None,
+    workflow_state: dict | None = None,
+) -> None:
+    retry_body = GooeyBuilderSendMessage(
+        workflow_url=workflow_url,
+        builder_run_url=builder_sr.get_app_url(),
+        workflow_state=workflow_state or {},
+    )
+    if gui.session_state.pop(GOOEY_BUILDER_RERUN_KEY, None):
+        raise gui.RedirectException(submit_gooey_builder_message(request, retry_body))
+
+    error_params = dict(builder_sr.error_params or {})
+    error_params.update(
+        request=request,
+        sr=builder_sr,
+        current_workspace=current_workspace,
+        rerun_key=GOOEY_BUILDER_RERUN_KEY,
+    )
+    with gui.div(className="gooey-builder-insufficient-credits"):
+        exceptions.InsufficientCredits.render(error_params)
 
 
 def render_gooey_builder_embed(
@@ -237,14 +283,33 @@ class GooeyBuilderSendMessage(pydantic.BaseModel):
 
 @router.post("/__/gooey-builder/send-message", dependencies=[fastapi_login_required])
 def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendMessage):
+    return submit_gooey_builder_message(request, body)
+
+
+def submit_gooey_builder_message(
+    request: fastapi.Request, body: GooeyBuilderSendMessage
+) -> str:
     from daras_ai_v2.workflow_url_input import url_to_runs
     from functions.gooey_builder_tools import insert_gooey_builder_variables
 
     # inline import to avoid a circular dependency with routers.ask_gooey_new
     from routers.ask_gooey_new import get_gooey_builder_run_url
 
-    workspace = get_current_workspace(request.user, request.session)
+    builder_run_url = body.builder_run_url or get_default_builder_pr().get_app_url()
+    builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
 
+    workspace = get_current_workspace(request.user, request.session)
+    if builder_sr.error_type == exceptions.InsufficientCredits.__name__:
+        # A Builder retry does not use the shared credit error handler.
+        # Select and save the fallback workspace before the new run starts.
+        rerun_workspace = get_insufficient_credits_rerun_workspace(
+            current_user=request.user,
+            sr=builder_sr,
+            current_workspace=workspace,
+        )
+        if rerun_workspace:
+            workspace = rerun_workspace
+            set_current_workspace(request.session, workspace.id)
     if body.workflow_url:
         # copy the workflow_url into a new run linked to
         # builder_sr so the chat widget can navigate the user to a workflow page
@@ -264,8 +329,6 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         workflow_sr = None
         workflow_url = ""
 
-    builder_run_url = body.builder_run_url or get_default_builder_pr().get_app_url()
-    builder_page_cls, builder_sr, builder_pr = url_to_runs(builder_run_url)
     request_body, message_thread = chat_widget_input_to_request_body(
         builder_sr, builder_sr.state, body.input_data or builder_sr.state
     )

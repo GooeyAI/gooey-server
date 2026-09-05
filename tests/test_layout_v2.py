@@ -32,6 +32,8 @@ from gooey_gui.types.recipe_workspace_props import (
 from recipes.VideoBots import VideoBotsPage
 from recipes.VideoBots_v2 import VideoBotsPageV2
 from routers.root import RecipeTabs
+from widgets.errors import insufficient_credits_error
+from workspaces.widgets import SESSION_SELECTED_WORKSPACE
 
 
 def test_video_bots_v2_uses_existing_celery_runner_class():
@@ -312,6 +314,32 @@ def test_submit_intent_is_consumed_once():
 
     assert page._pop_submit_intent() == RunIntent()
     assert page._pop_submit_intent() is None
+
+
+def test_v2_translates_insufficient_credits_rerun_to_run_intent():
+    workspace = SimpleNamespace(id=42, balance=10, is_personal=True)
+    user = SimpleNamespace(
+        uid="user-1",
+        is_anonymous=False,
+        cached_workspaces=[workspace],
+        get_or_create_personal_workspace=lambda: (workspace, False),
+    )
+    saved_run = SimpleNamespace(uid=user.uid, workspace=workspace)
+    request = SimpleNamespace(user=user, session={})
+    page = object.__new__(VideoBotsPageV2)
+    page.request = request
+    page.current_sr = saved_run
+    page.current_workspace = workspace
+    gui.session_state.clear()
+    gui.session_state["--insufficient-credits-rerun"] = "1"
+
+    with pytest.raises(gui.RerunException):
+        insufficient_credits_error(page._get_default_error_params())
+
+    assert request.session[SESSION_SELECTED_WORKSPACE] == workspace.id
+    assert gui.session_state == {"-submit-workflow": True}
+    assert page._pop_submit_intent() == RunIntent()
+    assert not gui.session_state
 
 
 def test_about_deployment_cards_carry_the_chips_targets():

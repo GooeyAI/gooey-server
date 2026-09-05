@@ -7,6 +7,32 @@
   padding: 16px 18px;
 }
 
+/* The card fills its wrapper's column in the v2 run pane and the Builder panel, and never
+   shrinks or scrolls: it is a short, fixed-shape notice with its own buttons, not a dump of
+   arbitrary error text. (The v2 error wrapper is otherwise a capped scroller.) */
+.gooey-builder-insufficient-credits,
+.v2-run-error:has(.insufficient-credits) {
+  flex-shrink: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.gooey-builder-insufficient-credits > .insufficient-credits,
+.v2-run-error > .insufficient-credits {
+  max-width: none;
+  width: 100%;
+}
+
+/* The content carrying on underneath the card fades in from its top edge, rather than the
+   card painting a translucent band over it. Fading the content itself (a mask) instead of
+   overlaying it keeps the effect invisible against whatever is below - a white message, a
+   dark code block - where a white veil would read as a grey bar over the dark one. */
+:has(> .gooey-builder-insufficient-credits) #gooey-builder-embed,
+.v2-run-error:has(.insufficient-credits) ~ .v2-run-output {
+  mask-image: linear-gradient(to bottom, transparent, #000 2.5rem);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2.5rem);
+}
+
 .insufficient-credits__title {
   align-items: center;
   color: #2a2a2a;

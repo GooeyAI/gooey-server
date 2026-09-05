@@ -613,27 +613,30 @@ a.gooey-topbar-cost:hover {
   }
 }
 
-/* ---------------------------------------------------- gooey builder close
-
-   The Builder's collapse control, on the panel's own top-right corner. It belongs to the
-   panel, not to the workflow, so it sits on the panel's edge rather than in the top bar.
-   v2 only: v1 keeps the widget's own header and never renders this. */
-.v2-builder-close {
-  /* absolute against `.gooey-sidebar`, which is positioned at every width, so there is no
-     app-header offset to hardcode */
+/* v2 supplies the Builder header because the embedded widget's header is hidden. */
+.v2-builder-header {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 0;
+  right: 0;
+  left: 0;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0.5rem;
 }
 
-/* The panel's title and its "new conversation" control, since v2 hides the widget's own
-   header. Anchored like the close button. */
-.v2-builder-new {
-  position: absolute;
-  top: 0.6rem;
-  left: 0.5rem;
-  z-index: 5;
+.v2-builder-header:has(+ .gooey-builder-insufficient-credits) {
+  position: relative;
+  background: var(--gooey-bg-page);
+}
+
+.v2-builder-header .v2-pane-control {
+  background: rgb(255 255 255 / 92%);
+}
+
+.v2-builder-close {
+  margin-left: auto;
 }
 
 /* The shell paints the ground the Builder panel and the tab body sit on. Without it the
@@ -718,6 +721,11 @@ a.gooey-topbar-cost:hover {
   .v2-builder-close {
     /* `!important`: the control renders with Bootstrap display utilities. */
     display: none !important;
+  }
+
+  /* Do not leave an empty header above a new conversation. */
+  .v2-builder-header:not(:has(.v2-builder-new)) {
+    display: none;
   }
 }
 
