@@ -80,6 +80,14 @@ https://gooey.ai/explore/
 """,
     )
     bot.send_msg(
+        text="""Here's a step by step guide to growing chillies 🌱
+https://gooey.ai/explore/
+<button gui-target="input_prompt" gui-description="Can you create a step-by-step guide?">📝 Step-by-step guide</button>
+<button gui-target="input_prompt" gui-description="Can you suggest next steps?">➡️ Next steps</button>
+<button gui-target="input_prompt">🌐 Can you translate this to another language?</button>
+""",
+    )
+    bot.send_msg(
         text="""
 If the user asks something related to their current location, ask them for their location first by displaying the following html button:
 https://gooey.ai/explore/ 
