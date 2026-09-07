@@ -639,40 +639,19 @@ a.gooey-topbar-cost:hover {
   margin-left: auto;
 }
 
-/* The shell paints the ground the Builder panel and the tab body sit on. Without it the
-   `gap-2` between the two shows whatever is behind the shell instead. */
+/* Paint the gap between the Builder and tab body. */
 .v2-app-shell {
   background-color: var(--gooey-bg-page);
 }
 
-/* v2 mounts the panel inside the app shell, below the top bar, so `100dvh` would overrun
-   its container by the bar's height. Scoped so v1's full-height sidebar is untouched. */
+/* v2 mounts the panel inside the app shell, below the top bar. */
 .v2-app-shell .gooey-sidebar {
   height: 100%;
-  /* Panels and rails share one surface; `#f9f9f9` is v1's and stays there. */
   background-color: var(--gooey-surface-50);
 }
 
-/* Ask Gooey is a surface *below* the header in v2, not a takeover of it.
-
-   `.gooey-sidebar-open` goes `position: fixed; width: 100vw; z-index: 1035` at this width, and
-   its own comment says why: it had to sit above `.nav-mobile-topbar`, the sidebar's slim mobile
-   bar, because the panel was meant to cover the whole app. That bar no longer exists - this bar
-   is the app's only header now - so the takeover covers the one piece of chrome the design
-   keeps on screen, and with it the way back out of the panel.
-
-   So the panel goes back in flow and fills the shell it is already mounted in, which starts
-   below the header. The pane behind it is dropped rather than left to share the row: `Sidebar`
-   lays its two children out as a flex row, so a full-width panel would otherwise squeeze the
-   workspace to nothing beside it instead of replacing it. Selecting a view from the sheet
-   closes the panel, which brings that pane straight back.
-
-   Scoped to `.v2-app-shell`, so v1 keeps its own behaviour. */
+/* Keep the v2 Builder inside the shell instead of covering the app header. */
 @media (max-width: 1140px) {
-  /* v1 turns the panel into a fixed, full-viewport takeover below this width, because there
-     it flanks the whole page. v2 mounts it inside the shell, below the header, so it stays in
-     flow at every width - otherwise it covers the one piece of chrome that gets you back out.
-     Still a rail down to lg; only below that does it replace what sits beside it. */
   .v2-app-shell .gooey-sidebar-open {
     position: relative;
     z-index: auto;
@@ -683,17 +662,12 @@ a.gooey-topbar-cost:hover {
     max-width: var(--sidebar_open_width);
   }
 
-  /* The panel is a box inside the body's padding here, not the viewport, so the widget fills
-     the panel rather than `--sidebar_mobile_width`. */
   .v2-app-shell .gooey-sidebar #gooey-builder-embed {
     width: 100%;
   }
 }
 
-/* Below lg the shell shows one surface at a time, so Ask Gooey takes the row. Same threshold
-   as the top bar's navigation stack and the pane fold - the panel used to switch at the
-   sidebar's own 1140 instead, which left it covering the screen while the bar above it was
-   still in its desktop arrangement. */
+/* Below lg, the Builder replaces the workspace body. */
 @media (max-width: 991.98px) {
   .v2-app-shell .gooey-sidebar-open {
     min-width: 0;
@@ -701,25 +675,18 @@ a.gooey-topbar-cost:hover {
     max-width: 100%;
   }
 
-  /* ...and the workspace behind it steps aside. `:has()` rather than a descendant match,
-     since on API or Deploy the sibling is the tab's own body, not a pane. `!important`
-     because that sibling carries Bootstrap's `d-flex`. */
+  /* The sibling carries Bootstrap's `d-flex`. */
   .v2-app-shell:has(.recipe-workspace) .gooey-sidebar-open ~ div {
     display: none !important;
   }
 
-  /* Not shown on those tabs at all: Ask Gooey is the root of the workspace stack, so over
-     API or Deploy there would be nothing behind it to close back to. This covers arriving
-     with it already open - Back, a reload, a deep link. */
+  /* API and Deploy have no workspace view to return to. */
   .v2-app-shell:not(:has(.recipe-workspace)) .gooey-sidebar-open {
     display: none !important;
   }
 
-  /* The close control goes - at the root of the stack there is no view to close back to.
-     The title pill stays: it names the surface and starts a new conversation, and the panel
-     is the whole screen here, so there is nothing beside it for the label to crowd. */
+  /* At the root of the mobile stack there is no view to close back to. */
   .v2-builder-close {
-    /* `!important`: the control renders with Bootstrap display utilities. */
     display: none !important;
   }
 

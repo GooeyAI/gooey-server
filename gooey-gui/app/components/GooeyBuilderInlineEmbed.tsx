@@ -101,11 +101,16 @@ export function GooeyBuilderInlineEmbed(
     const newConversationEvent = `${propsRef.current.event_key}:new`;
     const onNewConversation = () =>
       controllerRef.current?.onNewConversation?.();
+    const rerunEvent = `${propsRef.current.event_key}:rerun`;
+    const onRerun = () =>
+      controllerRef.current?.rerun?.(propsRef.current.builder_run_url);
     window.addEventListener(newConversationEvent, onNewConversation);
+    window.addEventListener(rerunEvent, onRerun);
 
     return () => {
       script?.removeEventListener("load", loadEmbed);
       window.removeEventListener(newConversationEvent, onNewConversation);
+      window.removeEventListener(rerunEvent, onRerun);
     };
   }, []);
 
