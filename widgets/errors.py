@@ -17,7 +17,6 @@ def insufficient_credits_error(error_params: dict):
     sr = error_params["sr"]
     current_workspace = error_params.get("current_workspace")
     price = error_params.get("price", None)
-    rerun_key = error_params.get("rerun_key", RERUN_KEY)
     current_user = request.user
     rerun_workspace = get_insufficient_credits_rerun_workspace(
         current_user=current_user,
@@ -63,7 +62,7 @@ def insufficient_credits_error(error_params: dict):
     else:
         account_url = get_app_route_url(account_route)
 
-    if gui.session_state.pop(rerun_key, None):
+    if gui.session_state.pop(RERUN_KEY, None):
         if rerun_workspace:
             set_current_workspace(request.session, rerun_workspace.id)
         gui.session_state["-submit-workflow"] = True
@@ -84,7 +83,8 @@ def insufficient_credits_error(error_params: dict):
         accountUrl=account_url,
         isAnonymous=is_anonymous,
         verifiedEmailUserFreeCredits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
-        rerunKey=rerun_key,
+        rerunKey=RERUN_KEY,
+        rerunEvent=error_params.get("rerun_event"),
         upgradeKey=UPGRADE_KEY,
         buyCreditsKey=BUY_CREDITS_KEY,
         price=price,
@@ -97,8 +97,7 @@ def insufficient_credits_error(error_params: dict):
 
 
 def get_insufficient_credits_rerun_workspace(*, current_user, sr, current_workspace):
-    # Keep the current workspace if the user cannot access the run workspace.
-    # Otherwise, retry in the personal workspace because the run workspace has insufficient credits.
+    # Keep the current workspace when the run's workspace is inaccessible.
     if (
         not current_user
         or not sr.workspace

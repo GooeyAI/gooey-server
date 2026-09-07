@@ -14,23 +14,27 @@ type InsufficientCreditsProps = CustomComponentProps & {
   showRerun: boolean;
   rerunWorkspaceName: string | null;
   rerunWorkspaceBalance: number | null;
+  rerunEvent?: string | null;
 };
 
 function SubmitKeyBtn({
   name,
   label,
   variant = "primary",
+  onClick,
 }: {
   name: string;
   label: string;
   variant?: "primary" | "secondary";
+  onClick?: () => void;
 }) {
   return (
     <button
-      type="submit"
+      type={onClick ? "button" : "submit"}
       name={name}
       value="1"
       className={`btn btn-theme p-2 m-0 btn-${variant}`}
+      onClick={onClick}
     >
       {label}
     </button>
@@ -82,6 +86,7 @@ export function InsufficientCredits({
   showRerun,
   rerunWorkspaceName,
   rerunWorkspaceBalance,
+  rerunEvent,
 }: InsufficientCreditsProps) {
   if (isAnonymous) {
     return (
@@ -113,6 +118,11 @@ export function InsufficientCredits({
             name={rerunKey}
             label={`Re-run in ${rerunWorkspaceName}`}
             variant={showUpgrade ? "secondary" : "primary"}
+            onClick={
+              rerunEvent
+                ? () => window.dispatchEvent(new CustomEvent(rerunEvent))
+                : undefined
+            }
           />
         ) : (
           <SubmitKeyBtn
