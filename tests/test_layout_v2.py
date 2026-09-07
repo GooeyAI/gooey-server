@@ -127,7 +127,7 @@ def test_workspace_panes_render_all_content_in_one_pass(monkeypatch):
         "_render_knowledge_pane",
         "_render_functions",
         "_render_settings_pane",
-        "_render_debug_pane",
+        "render_debug_pane",
     ):
         monkeypatch.setattr(
             VideoBotsPageV2,
@@ -142,7 +142,7 @@ def test_workspace_panes_render_all_content_in_one_pass(monkeypatch):
         "_render_knowledge_pane",
         "_render_functions",
         "_render_settings_pane",
-        "_render_debug_pane",
+        "render_debug_pane",
     ]
     assert components == [
         RecipeWorkspacePanesProps(
