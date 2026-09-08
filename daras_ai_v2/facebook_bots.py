@@ -30,6 +30,8 @@ def get_wa_auth_header(access_token: str | None = None):
 
 class WhatsappBot(BotInterface):
     platform = Platform.WHATSAPP
+    # user message id the next reply should quote (see _cancel_active_run_and_merge_inputs)
+    reply_to_msg_id: str | None = None
 
     def __init__(self, message: dict, metadata: dict):
         self.input_message = message
@@ -132,7 +134,7 @@ class WhatsappBot(BotInterface):
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
     ) -> str | None:
-        return self.send_msg_to(
+        msg_id = self.send_msg_to(
             bot_number=self.bot_id,
             user_number=self.user_id,
             text=text,
@@ -141,7 +143,12 @@ class WhatsappBot(BotInterface):
             documents=documents,
             buttons=buttons,
             access_token=self.access_token,
+            reply_to_message_id=self.reply_to_msg_id,
         )
+        if text or audio or video or documents:
+            # only the first reply chunk quotes
+            self.reply_to_msg_id = None
+        return msg_id
 
     def mark_read(self):
         wa_mark_read(
@@ -164,6 +171,7 @@ class WhatsappBot(BotInterface):
         bot_number: str,
         user_number: str,
         access_token: str | None = None,
+        reply_to_message_id: str | None = None,
     ) -> str | None:
         video = video or []
         images = []
@@ -200,7 +208,9 @@ class WhatsappBot(BotInterface):
                     for doc in splits[:-1]
                 ],
                 access_token=access_token,
+                reply_to_message_id=reply_to_message_id,
             )
+            reply_to_message_id = None
 
         if buttons:
             # interactive text msg
@@ -266,6 +276,7 @@ class WhatsappBot(BotInterface):
             user_number=user_number,
             messages=messages,
             access_token=access_token,
+            reply_to_message_id=reply_to_message_id,
         )
 
 
@@ -392,20 +403,33 @@ def _wa_body_text(text: str | None) -> str:
 
 
 def send_wa_msgs_raw(
-    *, bot_number, user_number, messages: list, access_token: str | None = None
+    *,
+    bot_number,
+    user_number,
+    messages: list,
+    access_token: str | None = None,
+    reply_to_message_id: str | None = None,
 ) -> str | None:
     msg_id = None
     for msg in messages:
         print(f"send_wa_msgs_raw: {msg=}")
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": user_number,
+            "preview_url": True,
+            **msg,
+        }
+        # quote only the first chunk, never a button-only carrier
+        is_button_only = (
+            msg.get("interactive", {}).get("body", {}).get("text") == "\u200b"
+        )
+        if reply_to_message_id and not is_button_only:
+            payload["context"] = {"message_id": reply_to_message_id}
+            reply_to_message_id = None
         r = requests.post(
             f"https://graph.facebook.com/v16.0/{bot_number}/messages",
             headers=get_wa_auth_header(access_token),
-            json={
-                "messaging_product": "whatsapp",
-                "to": user_number,
-                "preview_url": True,
-                **msg,
-            },
+            json=payload,
         )
         confirmation = r.json()
         print("send_wa_msgs_raw:", r.status_code, confirmation)
