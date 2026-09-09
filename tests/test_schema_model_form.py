@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from daras_ai_v2 import schema_model_form
+from recipes import VideoGenPage as video_gen
 
 
 def test_image_size_enum_renders_selectbox():
@@ -23,12 +23,10 @@ def test_image_size_enum_renders_selectbox():
     }
 
     with (
-        patch.object(
-            schema_model_form.gui, "selectbox", return_value="square_hd"
-        ) as selectbox,
-        patch.object(schema_model_form.gui, "file_uploader") as file_uploader,
+        patch.object(video_gen.gui, "selectbox", return_value="square_hd") as selectbox,
+        patch.object(video_gen.gui, "file_uploader") as file_uploader,
     ):
-        value = schema_model_form.render_field(
+        value = video_gen.render_field(
             field=field,
             name="image_size",
             label="Image Size",
@@ -61,9 +59,9 @@ def test_image_url_fields_render_file_uploader(
     name, field, value, accept_multiple_files
 ):
     with patch.object(
-        schema_model_form.gui, "file_uploader", return_value=value
+        video_gen.gui, "file_uploader", return_value=value
     ) as file_uploader:
-        rendered_value = schema_model_form.render_field(
+        rendered_value = video_gen.render_field(
             field=field,
             name=name,
             label="Input Image",
