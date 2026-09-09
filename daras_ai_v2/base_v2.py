@@ -783,11 +783,15 @@ class BasePage(BasePageV1):
             TabSpec(
                 key="split",
                 label="Split",
-                icon_html=icons.run,
+                icon_html=icons.split,
                 layout=SplitLayout(
                     primary=SurfaceId.editor,
                     secondary=SurfaceId.preview,
                 ),
+                # Two panes side by side has nowhere to go below lg, where every layout
+                # folds to one. The mobile sheet drops a desktop-only view, so this is what
+                # keeps Split out of it.
+                desktop_only=True,
             ),
         ]
 

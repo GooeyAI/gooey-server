@@ -561,6 +561,52 @@ def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
     assert calls == [("agent", RecipeTabs.examples)]
 
 
+def test_the_menu_keys_python_stamps_are_the_ones_the_sheet_looks_for():
+    """These three strings are declared twice - once here, once as literals in
+    `RecipeTopBar/index.tsx` - because the mobile sheet reorders the title menu by key.
+
+    The generated prop *types* are checked by CI, but nothing checks a value. Rename one in
+    Python and the row silently vanishes from the phone menu: no type error, no failure,
+    no log line. This is that missing check.
+    """
+    import re
+    from pathlib import Path
+
+    from daras_ai_v2.base_v2 import BasePage as BasePageV2
+
+    source = Path("gooey-gui/app/components/RecipeTopBar/index.tsx").read_text()
+    found = dict(re.findall(r'const (MENU_\w+?)_KEY = "([^"]+)";', source))
+    assert found, "no menu key constants found - has the top bar been restructured?"
+
+    expected = {
+        "MENU_VERSION_HISTORY": BasePageV2.MENU_VERSION_HISTORY,
+        "MENU_DUPLICATE": BasePageV2.MENU_DUPLICATE,
+        "MENU_DELETE": BasePageV2.MENU_DELETE,
+    }
+    assert found == expected
+
+
+def test_a_recipe_gets_the_base_tab_set_unless_it_says_otherwise(monkeypatch):
+    """The base spec is the one every fork inherits, so Split has to be desktop-only *here*.
+    It folds to a single pane below lg and the mobile sheet drops a desktop-only view -
+    without the flag the next recipe to migrate gets a Split row in its phone menu.
+
+    Also pins that VideoBots takes the base set rather than restating it: the two had
+    already drifted on this very flag.
+    """
+    from recipes.VideoBots_v2 import VideoBotsPageV2
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: False)
+    tabs = VideoBotsPageV2.get_tab_spec(VideoBotsPageV2.__new__(VideoBotsPageV2))
+
+    by_key = {tab.key: tab for tab in tabs}
+    assert set(by_key) == {"about", "edit", "preview", "split"}
+    assert by_key["split"].desktop_only is True
+    assert not any(tab.desktop_only for key, tab in by_key.items() if key != "split"), (
+        "only Split has nowhere to go below lg"
+    )
+
+
 def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():
     """The gate takes a slug, not a request: v2 is per-recipe, and every visitor - logged
     out included - gets the same layout for the same url.

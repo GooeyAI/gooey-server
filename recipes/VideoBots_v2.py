@@ -22,7 +22,7 @@ from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
-from daras_ai_v2.tab_spec import SingleLayout, SplitLayout, SurfaceId, TabSpec
+from daras_ai_v2.tab_spec import SingleLayout, SurfaceId
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
@@ -246,45 +246,6 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 ref.set_open(True)
             if ref.is_open:
                 render_demo_dialog(ref, bi_id)
-
-    def get_tab_spec(self) -> list[TabSpec]:
-        """The agent tab set. Deploy is absent - its body is reached through the
-        `/integrations/` url via `render_selected_tab()`."""
-        if self.is_view_only():
-            return self.get_viewer_tab_spec()
-        return [
-            TabSpec(
-                key="about",
-                label="About",
-                icon_html=icons.info,
-                layout=SplitLayout(
-                    primary=SurfaceId.about,
-                    secondary=SurfaceId.preview,
-                ),
-            ),
-            TabSpec(
-                key="edit",
-                label="Edit",
-                icon_html=icons.edit,
-                layout=SingleLayout(surface=SurfaceId.editor),
-            ),
-            TabSpec(
-                key="preview",
-                label="Preview",
-                icon_html=icons.preview,
-                layout=SingleLayout(surface=SurfaceId.preview),
-            ),
-            TabSpec(
-                key="split",
-                label="Split",
-                icon_html=icons.split,
-                layout=SplitLayout(
-                    primary=SurfaceId.editor,
-                    secondary=SurfaceId.preview,
-                ),
-                desktop_only=True,
-            ),
-        ]
 
     def _render_about_meta(self):
         """How this agent is put together. Each card links into the config pane that owns
