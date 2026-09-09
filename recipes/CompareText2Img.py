@@ -283,8 +283,8 @@ class CompareText2ImgPage(BasePage):
                 case (
                     Text2ImgModels.gpt_image_1.name
                     | Text2ImgModels.gpt_image_1_5.name
-                    | Text2ImgModels.gpt_image_sunburst.name
-                    | Text2ImgModels.gpt_image_flare.name
+                    | Text2ImgModels.gpt_image_2_5_sunburst.name
+                    | Text2ImgModels.gpt_image_2_5_flare.name
                     | Text2ImgModels.gpt_image_2.name
                 ):
                     grouped_costs = self.get_grouped_linked_usage_cost_in_credits()
