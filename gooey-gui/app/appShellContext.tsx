@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from "react";
 
 import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
+import { WIDE_QUERY } from "./components/RecipeWorkspace/breakpoints";
 import {
   clearWorkspaceLayoutNavigationState,
   foldForNarrowViewport,
@@ -295,8 +296,6 @@ function useAppShellContext(): AppShellContextValue {
   }
   return context;
 }
-
-const WIDE_QUERY = "(min-width: 992px)";
 
 function persistWorkspaceState(
   storageKey: string,

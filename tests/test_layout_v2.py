@@ -487,6 +487,17 @@ def test_examples_route_redirects_to_the_explore_gallery_in_v2():
     resp = render(request=SimpleNamespace(), page_slug="video-bots")
     assert resp.headers["location"] == "/explore/?workflow=bots"
 
+    # a url that names a run is a link to that run, not to the gallery - the redirect keeps
+    # it rather than sending every shared example link to the same page
+    resp = render(
+        request=SimpleNamespace(),
+        page_slug="agent",
+        run_slug="my-bot",
+        example_id="abc123",
+    )
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "/agent/my-bot-abc123/"
+
 
 def test_examples_redirect_only_names_a_workflow_the_type_filter_can_hold(monkeypatch):
     """`gui.selectbox` swaps a value it has no option for for the blank one, which blanks the

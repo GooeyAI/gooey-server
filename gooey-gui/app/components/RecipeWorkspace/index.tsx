@@ -29,7 +29,7 @@ import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
   collapsePane,
   paneRolesForLayout,
-  shouldRevealRunOutput,
+  revealRunOutput,
   workspaceControlsForLayout,
 } from "./paneState";
 import { namedSurfaceSlots } from "./surfaceSlots";
@@ -255,12 +255,10 @@ export function EditorRunBar({
   const { layout, selectLayout } = useWorkspaceLayout(config);
   const isRunning = run_intent.kind === "stop";
   const runLabel = isRunning ? "Stop this run" : "Run";
-  // Show the output the moment a run starts, as the bar above does, and on the same terms:
-  // only from the editor on its own. A tick late, so the form this button submits has posted
-  // before the layout moves under it.
+  // Show the output the moment a run starts, as the bar above does and on the same terms.
   const handleRun = () => {
-    if (run_intent.kind === "run" && shouldRevealRunOutput(layout)) {
-      window.setTimeout(() => selectLayout(config.run_layout), 0);
+    if (run_intent.kind === "run") {
+      revealRunOutput(layout, config.run_layout, selectLayout);
     }
   };
   return (

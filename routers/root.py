@@ -402,9 +402,15 @@ def examples_route(
     # true answer means the v2 map holds this slug.
     if can_use_layout_v2(page_slug):
         page_cls = page_slug_map_v2[normalize_slug(page_slug)]
-        # v2 has one Examples gallery: explore, filtered to this workflow. The filter blanks
-        # a value it has no option for, so a workflow explore does not list keeps its own
-        # tab rather than being sent to an unfiltered gallery.
+        # A url naming a run is a link to that run, so it goes there rather than to a
+        # gallery of everything: dropping the run would turn every shared example link into
+        # the same page.
+        if example_id:
+            href = RecipeTabs.run.url_path(page_slug, run_slug, example_id)
+            return RedirectResponse(href, status_code=302)
+        # Otherwise v2 has one Examples gallery: explore, filtered to this workflow. The
+        # filter blanks a value it has no option for, so a workflow explore does not list
+        # keeps its own tab rather than being sent to an unfiltered gallery.
         slug = workflow_filter_slug(page_cls.workflow)
         if slug in workflow_filter_slugs():
             href = furl(get_route_path(explore_page)).add({"workflow": slug})

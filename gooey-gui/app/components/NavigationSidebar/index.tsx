@@ -10,6 +10,7 @@ import type {
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
 import { useAppShellPanel, useNavDrawer } from "~/appShellContext";
+import { NARROW_QUERY } from "../RecipeWorkspace/breakpoints";
 import { AccountSection } from "./AccountSection";
 import {
   builderOpenNavigationState,
@@ -23,7 +24,6 @@ import { PrimaryNavItems } from "./PrimaryNavItems";
 
 // Below this width the rail becomes an off-canvas drawer (matches the CSS
 // breakpoint in NavigationSidebar.css).
-const MOBILE_MEDIA_QUERY = "(max-width: 991.98px)";
 
 export function NavigationSidebar({
   logo_image_url,
@@ -109,7 +109,7 @@ export function NavigationSidebar({
   }, [builderEventKey]);
 
   useEffect(() => {
-    const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
+    const mq = window.matchMedia(NARROW_QUERY);
     const update = () => {
       setIsMobile(mq.matches);
       if (mq.matches) {

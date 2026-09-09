@@ -102,6 +102,24 @@ export function clearWorkspaceLayoutNavigationState() {
  * away. Preview is already the output, and About keeps the preview beside it on a wide
  * screen, so nothing is hidden by staying put either.
  */
+/** Move to the run layout when a run starts, from the views where that is wanted.
+ *
+ *  Deferred one macrotask. The timer does not *order* anything against the submit - it
+ *  yields, and the submit has already been dispatched by the time it runs, because both
+ *  happen off the same click. Written once because two run buttons need it and two copies
+ *  of a timing assumption are two things to get wrong.
+ */
+export function revealRunOutput(
+  layout: WorkspaceLayout,
+  runLayout: WorkspaceLayout,
+  selectLayout: (next: WorkspaceLayout) => void
+) {
+  if (!shouldRevealRunOutput(layout)) {
+    return;
+  }
+  window.setTimeout(() => selectLayout(runLayout), 0);
+}
+
 export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {
   return layout.kind === "single" && layout.surface === "editor";
 }

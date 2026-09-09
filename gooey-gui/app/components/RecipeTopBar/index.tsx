@@ -21,7 +21,7 @@ import {
   activeViewForLayouts,
   isRootLayout,
   layoutsEqual,
-  shouldRevealRunOutput,
+  revealRunOutput,
   workspaceHrefToNavigate,
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
@@ -141,10 +141,9 @@ export function RecipeTopBar({
   // Used wherever a layout has to be named. Not `config.views`, which is what the desktop
   // pill strip draws - the supplied Preview is reachable from the header and the sheet, both
   // of which are the narrow layout's, and a pill for it would be redundant beside them.
-  const views =
-    previewView === PREVIEW_VIEW
-      ? [...config.views, PREVIEW_VIEW]
-      : config.views;
+  const views = config.views.some((view) => view.key === "preview")
+    ? config.views
+    : [...config.views, PREVIEW_VIEW];
   const activeViewSpec = activeViewForLayouts(
     views,
     layout,
@@ -162,12 +161,8 @@ export function RecipeTopBar({
     }
   };
   const handleRun = () => {
-    if (
-      config.workspace_active &&
-      run_intent?.kind === "run" &&
-      shouldRevealRunOutput(layout)
-    ) {
-      window.setTimeout(() => selectLayout(config.run_layout), 0);
+    if (config.workspace_active && run_intent?.kind === "run") {
+      revealRunOutput(layout, config.run_layout, selectLayout);
     }
   };
 
@@ -643,13 +638,15 @@ export function RecipeTopBar({
 
         {/* Preview from About and from Ask Gooey, Update from the work views.
 
-            `preventDefault` because the two share a slot: choosing Preview leaves About, so
-            React patches this very node into the submit button below before the browser runs
-            the click's activation behaviour, and the form was posting the publish intent -
-            the save dialog opened on top of the preview. Cancelling the default action is
-            immune to that ordering; re-keying the pair would not be. */}
+            Two different controls, so they carry distinct keys: without them React reuses
+            one DOM node for both, and choosing Preview leaves About - so React patched this
+            node into the submit button below before the browser ran the click's activation
+            behaviour, and the form posted the publish intent. The save dialog opened on top
+            of the preview. The keys keep the nodes apart; `preventDefault` stays as the
+            direct guard on a control that must never submit. */}
         {canShowPreview ? (
           <button
+            key="topbar-action-preview"
             type="button"
             className="gooey-topbar-action d-lg-none"
             onClick={(e) => {
@@ -665,6 +662,7 @@ export function RecipeTopBar({
           !!publish_label &&
           !!publish_intent && (
             <button
+              key="topbar-action-publish"
               type="submit"
               name={submit_intent_key}
               value={encodeSubmitIntent(publish_intent)}
