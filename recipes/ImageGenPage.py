@@ -16,12 +16,13 @@ from daras_ai_v2.exceptions import PaymentRequired, UserError
 from daras_ai_v2.fal_ai import format_pricing_notes, generate_on_fal
 from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import HttpUrlStr
-from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG, safety_checker
-from daras_ai_v2.schema_model_form import (
+from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG
+from recipes.VideoGenPage import (
     build_combined_input_schema,
+    get_url_from_result,
     render_fields,
+    run_prompt_safety_checker,
 )
-from daras_ai_v2.variables_widget import render_prompt_vars
 from usage_costs.models import ModelSku
 
 
@@ -44,7 +45,8 @@ class ImageGenPage(BasePage):
         if not request.selected_model:
             raise UserError("Please select a model")
         inputs = request.inputs or {}
-        yield from self.run_safety_checker(inputs)
+        if not self.request.user.disable_safety_checker:
+            yield from run_prompt_safety_checker(inputs)
         model = self.get_model(request.selected_model)
         self.validate_model_inputs(model, inputs)
         if model.paid_only and not self.current_workspace.is_paying:
@@ -59,50 +61,11 @@ class ImageGenPage(BasePage):
             raise UserError(f"Invalid image output from {model.label}: {result}")
         if result.get("moderation_flagged"):
             raise UserError(SAFETY_CHECKER_MSG)
-        image_urls = extract_generated_image_urls(result)
+        images = result.get("images") or [result.get("image")]
+        image_urls = [url for image in images if (url := get_url_from_result(image))]
         if not image_urls:
             raise UserError(f"No image output from {model.label}: {result}")
         response.output_images = {model.name: image_urls}
-
-    def get_model(self, model_name: str) -> AIModelSpec:
-        try:
-            return AIModelSpec.objects.get(
-                category=AIModelSpec.Categories.image,
-                name__iexact=model_name,
-            )
-        except AIModelSpec.DoesNotExist:
-            available_models = AIModelSpec.objects.filter(
-                category=AIModelSpec.Categories.image
-            ).order_for_frontend()
-            raise UserError(
-                f"Model {model_name} not found. Should be one of: "
-                + ", ".join(available_models.values_list("name", flat=True))
-            )
-
-    def run_safety_checker(self, inputs: dict) -> typing.Iterator[str | None]:
-        if self.request.user.disable_safety_checker:
-            return
-        for key in ["prompt", "text_prompt", "negative_prompt"]:
-            text = inputs.get(key)
-            if not text:
-                continue
-            inputs[key] = render_prompt_vars(text, gui.session_state)
-            yield "Running safety checker..."
-            safety_checker(text=text)
-
-    def validate_model_inputs(self, model: AIModelSpec, inputs: dict) -> None:
-        input_schema = build_combined_input_schema([model])
-        if not input_schema:
-            raise UserError("The selected model does not have a usable request schema")
-        missing_fields = [
-            name
-            for name in input_schema.get("required", [])
-            if name not in inputs or inputs[name] is None or inputs[name] == ""
-        ]
-        if missing_fields:
-            raise UserError(
-                "Please provide: " + ", ".join(name.title() for name in missing_fields)
-            )
 
     def render(self):
         image_models = list(
@@ -150,9 +113,11 @@ class ImageGenPage(BasePage):
         self.render_run_preview_output(gui.session_state, preview=False)
 
     def render_run_preview_output(self, state: dict, preview: bool = True):
-        selected_model = state.get("selected_model")
-        image_urls = (state.get("output_images") or {}).get(selected_model, [])
-        model = self.available_models.get(selected_model) if selected_model else None
+        selected_model = state.get("selected_model") or ""
+        image_urls = CaseInsensitiveDict(state.get("output_images") or {}).get(
+            selected_model, []
+        )
+        model = self.available_models.get(selected_model)
         caption = model.label if model else selected_model
         for image_url in image_urls:
             gui.image(
@@ -162,7 +127,7 @@ class ImageGenPage(BasePage):
                 previewImg=media_preview_img(image_url) if preview else None,
             )
 
-        prompt = get_prompt(state.get("inputs") or {})
+        prompt = self.preview_input(state)
         if preview and prompt:
             prompt_preview = truncate_text_words(html.escape(prompt), 200)
             gui.write(
@@ -196,7 +161,12 @@ class ImageGenPage(BasePage):
 
     @classmethod
     def preview_input(cls, state: dict) -> str | None:
-        return get_prompt(state.get("inputs") or {}) or super().preview_input(state)
+        inputs = state.get("inputs") or {}
+        return (
+            inputs.get("prompt")
+            or inputs.get("text_prompt")
+            or super().preview_input(state)
+        )
 
     @classmethod
     def get_tool_call_schema(cls, state: dict) -> dict[str, typing.Any]:
@@ -204,7 +174,7 @@ class ImageGenPage(BasePage):
         selected_model = state.get("selected_model")
         image_models = AIModelSpec.objects.filter(
             category=AIModelSpec.Categories.image,
-            name=selected_model,
+            name__iexact=selected_model,
         )
         if inputs_schema := build_combined_input_schema(image_models):
             properties["inputs"] = inputs_schema
@@ -213,33 +183,31 @@ class ImageGenPage(BasePage):
             properties.pop("inputs", None)
         return properties
 
+    def get_model(self, model_name: str) -> AIModelSpec:
+        try:
+            return AIModelSpec.objects.get(
+                category=AIModelSpec.Categories.image,
+                name__iexact=model_name,
+            )
+        except AIModelSpec.DoesNotExist:
+            available_models = AIModelSpec.objects.filter(
+                category=AIModelSpec.Categories.image
+            ).order_for_frontend()
+            raise UserError(
+                f"Model {model_name} not found. Should be one of: "
+                + ", ".join(available_models.values_list("name", flat=True))
+            )
 
-def extract_generated_image_urls(result: dict) -> list[str]:
-    urls = []
-    for key in ["images", "image", "output", "outputs"]:
-        if key in result:
-            urls.extend(extract_asset_urls(result[key]))
-    return list(dict.fromkeys(urls))
-
-
-def extract_asset_urls(value: typing.Any) -> list[str]:
-    match value:
-        case str() if value.startswith(("http://", "https://")):
-            return [value]
-        case list():
-            return [url for item in value for url in extract_asset_urls(item)]
-        case dict() if isinstance(value.get("url"), str):
-            return [value["url"]]
-        case dict():
-            return [
-                url
-                for key, item in value.items()
-                if "image" in key.lower() or "output" in key.lower()
-                for url in extract_asset_urls(item)
-            ]
-        case _:
-            return []
-
-
-def get_prompt(inputs: dict) -> str:
-    return inputs.get("prompt") or inputs.get("text_prompt") or ""
+    def validate_model_inputs(self, model: AIModelSpec, inputs: dict) -> None:
+        input_schema = build_combined_input_schema([model])
+        if not input_schema:
+            raise UserError("The selected model does not have a usable request schema")
+        missing_fields = [
+            name
+            for name in input_schema.get("required", [])
+            if name not in inputs or inputs[name] is None or inputs[name] == ""
+        ]
+        if missing_fields:
+            raise UserError(
+                "Please provide: " + ", ".join(name.title() for name in missing_fields)
+            )
