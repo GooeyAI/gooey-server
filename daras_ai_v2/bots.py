@@ -111,6 +111,7 @@ class BotInterface:
         "text", "audio", "video", "image", "document", "interactive", "location"
     ]
     user_msg_id: str | None = None
+    reply_to_msg_id: str | None = None
     can_update_message: bool = False
 
     page_cls: typing.Type[BasePage] | None = None

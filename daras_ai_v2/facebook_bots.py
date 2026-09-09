@@ -30,8 +30,6 @@ def get_wa_auth_header(access_token: str | None = None):
 
 class WhatsappBot(BotInterface):
     platform = Platform.WHATSAPP
-    # user message id the next reply should quote (see _cancel_active_run_and_merge_inputs)
-    reply_to_msg_id: str | None = None
 
     def __init__(self, message: dict, metadata: dict):
         self.input_message = message
