@@ -26,6 +26,7 @@ from starlette.templating import Jinja2Templates
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = config("DEBUG", cast=bool, default=True)
+ENABLE_SILK = DEBUG and config("ENABLE_SILK", cast=bool, default=False)
 
 if DEBUG:
     SECRET_KEY = "xxxx"
@@ -82,7 +83,7 @@ INSTALLED_APPS = [
     "memory",
     "cms",
 ]
-if DEBUG:
+if ENABLE_SILK:
     INSTALLED_APPS.append("silk")
 
 MIDDLEWARE = [
@@ -97,7 +98,7 @@ MIDDLEWARE = [
     "csp.middleware.CSPMiddleware",
     # "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
-if DEBUG:
+if ENABLE_SILK:
     MIDDLEWARE.append("silk.middleware.SilkyMiddleware")
     SILKY_PYTHON_PROFILER = True
     SILKY_PYTHON_PROFILER_BINARY = True

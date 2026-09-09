@@ -24,5 +24,5 @@ urlpatterns = [
     path("", admin.site.urls),
 ]
 
-if settings.DEBUG:
+if settings.ENABLE_SILK:
     urlpatterns.insert(0, path("silk/", include("silk.urls", namespace="silk")))
