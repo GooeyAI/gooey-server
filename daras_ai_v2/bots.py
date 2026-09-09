@@ -265,11 +265,11 @@ class BotInterface:
         if disable_feedback:
             send_feedback_buttons = False
 
-        if self.platform == Platform.WHATSAPP and (
-            send_feedback_buttons or len(buttons) > 2
+        if self.platform == Platform.WHATSAPP and any(
+            btn.get("menu") for btn in buttons
         ):
-            # whatsapp shows more than 2 options as a menu, which is the only
-            # place these extra options fit
+            # whatsapp is sending an options menu, which is the only place
+            # these extra options fit
             buttons = (
                 _options_menu_buttons(
                     show_new_conversation_button=self.bi.show_new_conversation_button,
@@ -408,6 +408,8 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]
             reply["description"] = description
         if section:
             reply["section"] = section
+        if elem.tag == "option":
+            reply["menu"] = True
         buttons.append(reply)
 
     text = "".join(
@@ -1035,6 +1037,7 @@ def _options_menu_buttons(
                 "id": ButtonIds.new_conversation,
                 "title": "📝 New",
                 "description": "Start a new conversation on a different topic",
+                "menu": True,
             }
         )
     if send_feedback_buttons:
@@ -1043,11 +1046,13 @@ def _options_menu_buttons(
                 "id": ButtonIds.feedback_thumbs_up,
                 "title": "👍🏾 Thumbs Up",
                 "description": "This answer was helpful",
+                "menu": True,
             },
             {
                 "id": ButtonIds.feedback_thumbs_down,
                 "title": "👎🏽 Thumbs Down",
                 "description": "This answer was not helpful",
+                "menu": True,
             },
         ]
     if language:

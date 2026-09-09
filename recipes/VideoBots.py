@@ -126,6 +126,8 @@ class ReplyButton(typing_extensions.TypedDict):
     title: str
     description: typing_extensions.NotRequired[str]
     section: typing_extensions.NotRequired[str]
+    # render in an options menu (list msg) instead of as a reply button
+    menu: typing_extensions.NotRequired[bool]
 
 
 class VideoBotsPage(BasePage):

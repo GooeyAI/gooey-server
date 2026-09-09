@@ -26,8 +26,7 @@ WA_IMG_MAX_SIZE = 5 * 1024**2
 WA_MSG_MAX_SIZE = 1024
 
 # https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-reply-buttons-messages
-# whatsapp allows 3, but anything more than 2 reads better as an options menu
-WA_MAX_REPLY_BTNS = 2
+WA_MAX_REPLY_BTNS = 3
 WA_BTN_MAX_TITLE_LEN = 20
 WA_BTN_MAX_ID_LEN = 256
 
@@ -330,6 +329,7 @@ def _build_msg_buttons(
 ) -> list[dict]:
     ret = []
     button_group = []
+    menu_rows = []
     for button in buttons:
         if any("send_location" in action for action in csv_decode_row(button["id"])):
             ret.append(_build_interactive_location_msg(text))
@@ -344,25 +344,30 @@ def _build_msg_buttons(
                     },
                 }
             )
+        elif button.get("menu"):
+            menu_rows.append(button)
+            continue
         else:
             button_group.append(button)
             continue
         # dont repeat text in subsequent messages
         text = "\u200b"
 
-    if len(button_group) > WA_MAX_REPLY_BTNS:
-        # too many for reply buttons, send them as an options menu (list msg)
-        for idx in range(0, len(button_group), WA_LIST_MAX_ROWS):
-            ret.append(
-                _build_interactive_list_msg(
-                    button_group[idx : idx + WA_LIST_MAX_ROWS], text
-                )
-            )
-            text = "\u200b"
-    elif button_group:
+    for idx in range(0, len(button_group), WA_MAX_REPLY_BTNS):
         ret.append(
-            _build_interactive_button_msg(button_group, text, max_title_len, max_id_len)
+            _build_interactive_button_msg(
+                button_group[idx : idx + WA_MAX_REPLY_BTNS],
+                text,
+                max_title_len,
+                max_id_len,
+            )
         )
+        text = "\u200b"
+    for idx in range(0, len(menu_rows), WA_LIST_MAX_ROWS):
+        ret.append(
+            _build_interactive_list_msg(menu_rows[idx : idx + WA_LIST_MAX_ROWS], text)
+        )
+        text = "\u200b"
     return ret
 
 
