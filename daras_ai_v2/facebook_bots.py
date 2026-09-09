@@ -1,3 +1,5 @@
+from itertools import groupby
+
 import requests
 from furl import furl
 from loguru import logger
@@ -418,14 +420,27 @@ def _build_interactive_list_msg(
         )
         if description:
             row["description"] = truncate_text_words(description, WA_LIST_MAX_DESC_LEN)
-        rows.append(row)
+        rows.append((btn.get("section") or "", row))
+    # consecutive rows with the same section (a <label> around their <select>) are grouped
+    sections = [
+        {"title": section_title, "rows": [row for _, row in group]}
+        for section_title, group in groupby(rows, key=lambda x: x[0])
+    ]
+    if len(sections) == 1:
+        sections[0].pop("title")
+    else:
+        # whatsapp requires a title on every section when there's more than one
+        for section in sections:
+            section["title"] = truncate_text_words(
+                section["title"] or WA_LIST_BTN_LABEL, WA_LIST_MAX_TITLE_LEN
+            )
     return {
         "type": "interactive",
         "interactive": {
             "type": "list",
             "action": {
                 "button": WA_LIST_BTN_LABEL,
-                "sections": [{"rows": rows}],
+                "sections": sections,
             },
             "body": {"text": _wa_body_text(text)},
         },

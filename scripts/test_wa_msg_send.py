@@ -88,6 +88,19 @@ https://gooey.ai/explore/
 """,
     )
     bot.send_msg(
+        text="""Which car are you interested in? 🚗
+https://gooey.ai/explore/
+<label>Popular brands
+<select gui-target="input_prompt">
+  <option gui-description="Tell me about Volvo cars" value="Tell me about Volvo">🇸🇪 Volvo</option>
+  <option gui-description="Tell me about Saab cars" value="Tell me about Saab">✈️ Saab</option>
+  <option value="Tell me about Mercedes">⭐ Mercedes</option>
+  <option>🏁 Audi</option>
+</select>
+</label>
+""",
+    )
+    bot.send_msg(
         text="""
 If the user asks something related to their current location, ask them for their location first by displaying the following html button:
 https://gooey.ai/explore/ 

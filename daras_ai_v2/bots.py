@@ -375,23 +375,39 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]
 
     buttons = []
     disable_feedback = False
-    for idx, btn in enumerate(doc("button") or []):
-        if "disable_feedback" in (btn.attrib.get("gui-action") or ""):
+    # <button> and <select><option> both become buttons / options menu rows
+    for idx, elem in enumerate(doc("button, select > option") or []):
+        attrs = dict(elem.attrib)
+        title = (elem.text or "").strip()
+        prompt = title
+        section = ""
+        if elem.tag == "option":
+            select = elem.getparent()
+            # options inherit gui-* attrs from their <select>
+            attrs = {**select.attrib, **attrs}
+            # like an html form, the label is shown but the value is what gets sent
+            prompt = (attrs.get("value") or "").strip() or title
+            # a wrapping <label> becomes the section title of the options menu
+            label = select.getparent()
+            if label is not None and label.tag == "label":
+                section = (label.text or "").strip()
+        if "disable_feedback" in (attrs.get("gui-action") or ""):
             disable_feedback = True
-        btn_text = (btn.text or "").strip()
         reply = ReplyButton(
             # parsed by _handle_interactive_msg
             id=csv_encode_row(
                 idx + 1,
-                btn.attrib.get("gui-target") or "input_prompt",
-                btn.attrib.get("gui-action"),
-                # title must be the last item because it might get truncated
-                btn_text,
+                attrs.get("gui-target") or "input_prompt",
+                attrs.get("gui-action"),
+                # prompt must be the last item because it might get truncated
+                prompt,
             ),
-            title=btn_text,
+            title=title,
         )
-        if description := (btn.attrib.get("gui-description") or "").strip():
+        if description := (attrs.get("gui-description") or "").strip():
             reply["description"] = description
+        if section:
+            reply["section"] = section
         buttons.append(reply)
 
     text = "".join(
