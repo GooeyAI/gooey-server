@@ -226,7 +226,9 @@ export function workspaceControlsForLayout(
   return noControls;
 }
 
-export function workspaceTargetForLayout(
+/** Where to navigate to reach the workspace, or null when we are already on it.
+ *  Named for what it answers: there is no layout in the question. */
+export function workspaceHrefToNavigate(
   workspaceActive: boolean,
   workspaceHref: string
 ): string | null {
@@ -234,13 +236,6 @@ export function workspaceTargetForLayout(
     return null;
   }
   return appRelativeHref(workspaceHref);
-}
-
-export function paneVisibility(hydrated: boolean): "hidden" | "visible" {
-  if (!hydrated) {
-    return "hidden";
-  }
-  return "visible";
 }
 
 export function singleLayout(surface: SurfaceId): SingleLayout {

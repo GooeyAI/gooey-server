@@ -11,7 +11,6 @@ import {
   layoutsEqual,
   normalizeWorkspaceLayout,
   paneRolesForLayout,
-  paneVisibility,
   revealRunLayout,
   shouldRevealRunOutput,
   singleLayout,
@@ -19,7 +18,7 @@ import {
   workspaceControlsForLayout,
   workspaceLayoutFromNavigationState,
   workspaceLayoutNavigationState,
-  workspaceTargetForLayout,
+  workspaceHrefToNavigate,
 } from "./paneState";
 
 const about = splitLayout("about", "preview");
@@ -285,7 +284,7 @@ describe("view selection", () => {
 describe("workspace navigation", () => {
   it("strips an absolute app origin", () => {
     expect(
-      workspaceTargetForLayout(
+      workspaceHrefToNavigate(
         false,
         "https://gooey.ai/agent/?run_id=run-1&uid=user-1"
       )
@@ -293,7 +292,7 @@ describe("workspace navigation", () => {
   });
 
   it("does not navigate when the workspace is active", () => {
-    expect(workspaceTargetForLayout(true, "/agent/")).toBeNull();
+    expect(workspaceHrefToNavigate(true, "/agent/")).toBeNull();
   });
 
   it("relativizes any server-sent href, keeping the query", () => {
@@ -310,8 +309,4 @@ describe("workspace navigation", () => {
     expect(appRelativeHref("/agent/?run_id=32i1")).toBe("/agent/?run_id=32i1");
   });
 
-  it("hides panes until storage hydration completes", () => {
-    expect(paneVisibility(false)).toBe("hidden");
-    expect(paneVisibility(true)).toBe("visible");
-  });
 });

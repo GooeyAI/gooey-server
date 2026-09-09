@@ -5,6 +5,8 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -53,6 +55,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   );
   const [panels, setPanels] = useState<Record<string, PanelEntry>>({});
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+  const panelsRef = useRef(panels);
+  panelsRef.current = panels;
 
   const setWorkspace = useCallback((key: string, entry: WorkspaceEntry) => {
     setWorkspaces((current) => ({ ...current, [key]: entry }));
@@ -71,16 +75,19 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     setPanels((current) => ({ ...current, [key]: entry }));
   }, []);
 
+  // The storage key lives in the entry, so the write needs the current one - but a state
+  // updater has to stay pure (React runs it twice in StrictMode), so the key is read out
+  // through a ref and persisted here rather than inside the updater.
   const setPanelOpen = useCallback((key: string, open: boolean) => {
+    const storageKey = panelsRef.current[key]?.storageKey ?? null;
+    persistPanelOpen(storageKey, open);
     setPanels((current) => {
       const entry = current[key];
-      const storageKey = entry?.storageKey ?? null;
-      persistPanelOpen(storageKey, open);
       return {
         ...current,
         [key]: {
           open,
-          storageKey,
+          storageKey: entry?.storageKey ?? storageKey,
           hydrated: entry?.hydrated ?? true,
           commanded: true,
         },
@@ -88,19 +95,33 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Memoised because every workspace pane consumes this: an unmemoised literal made one
+  // drawer tap re-render the whole workspace tree. The setters are already stable, so only
+  // a real state change invalidates it.
+  const value = useMemo(
+    () => ({
+      workspaces,
+      setWorkspace,
+      hydrateWorkspace,
+      panels,
+      setPanel,
+      setPanelOpen,
+      navDrawerOpen,
+      setNavDrawerOpen,
+    }),
+    [
+      workspaces,
+      setWorkspace,
+      hydrateWorkspace,
+      panels,
+      setPanel,
+      setPanelOpen,
+      navDrawerOpen,
+    ]
+  );
+
   return (
-    <AppShellContext.Provider
-      value={{
-        workspaces,
-        setWorkspace,
-        hydrateWorkspace,
-        panels,
-        setPanel,
-        setPanelOpen,
-        navDrawerOpen,
-        setNavDrawerOpen,
-      }}
-    >
+    <AppShellContext.Provider value={value}>
       {children}
     </AppShellContext.Provider>
   );

@@ -21,9 +21,8 @@ import {
   activeViewForLayouts,
   isRootLayout,
   layoutsEqual,
-  paneVisibility,
   shouldRevealRunOutput,
-  workspaceTargetForLayout,
+  workspaceHrefToNavigate,
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
 import { isIntegrationLabelled } from "./integrationChips";
@@ -154,7 +153,7 @@ export function RecipeTopBar({
   );
   const chooseView = (view: WorkspaceView) => {
     selectLayout(view.layout);
-    const target = workspaceTargetForLayout(
+    const target = workspaceHrefToNavigate(
       config.workspace_active,
       config.workspace_href
     );
@@ -238,7 +237,7 @@ export function RecipeTopBar({
     // Usage is a page rather than a pane and does not draw the panel, so it has to be left
     // behind first. The panel is commanded open before the navigation and stays open across
     // it, so it is up when the workspace arrives.
-    const target = workspaceTargetForLayout(
+    const target = workspaceHrefToNavigate(
       config.workspace_active,
       config.workspace_href
     );
@@ -247,10 +246,17 @@ export function RecipeTopBar({
     }
   };
 
-  const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
-  const overflowRef = useDismissOnOutsideClick(() => setOverflowOpen(false));
-  const publishMenuRef = useDismissOnOutsideClick(() =>
-    setPublishMenuOpen(false)
+  const titleMenuRef = useDismissOnOutsideClick(
+    () => setTitleMenuOpen(false),
+    titleMenuOpen
+  );
+  const overflowRef = useDismissOnOutsideClick(
+    () => setOverflowOpen(false),
+    overflowOpen
+  );
+  const publishMenuRef = useDismissOnOutsideClick(
+    () => setPublishMenuOpen(false),
+    publishMenuOpen
   );
 
   const publishEntries: MenuEntry[] = [];
@@ -581,7 +587,7 @@ export function RecipeTopBar({
       {(config.views.length > 1 || !!usage_href) && (
         <div
           className="gooey-topbar-tabs"
-          style={{ visibility: paneVisibility(hydrated) }}
+          style={{ visibility: hydrated ? "visible" : "hidden" }}
         >
           {config.views.map((view) => (
             <button
@@ -885,11 +891,12 @@ function Menu({
 }) {
   if (!open || !items.length) return null;
   return (
-    <div className="gooey-topbar-menu">
+    <div className="gooey-topbar-menu" role="menu">
       {items.map((item) =>
         item.heading ? (
           <div
             key={item.key}
+            role="presentation"
             className={clsx(
               "gooey-topbar-menu-heading",
               item.mobileOnly && "d-lg-none"
@@ -901,6 +908,7 @@ function Menu({
           <Link
             key={item.key}
             to={item.target.href}
+            role="menuitem"
             onClick={onDismiss}
             className={clsx(
               "gooey-topbar-menu-item",
@@ -924,6 +932,7 @@ function Menu({
                 ? encodeSubmitIntent(item.target.intent)
                 : undefined
             }
+            role="menuitem"
             className={clsx(
               "gooey-topbar-menu-item",
               item.isDanger && "text-danger",
@@ -956,15 +965,40 @@ function Icon({ html, className }: { html?: string; className?: string }) {
   );
 }
 
-function useDismissOnOutsideClick(onDismiss: () => void) {
+/** Dismiss a menu on a click outside it or on Escape, and return focus to its trigger.
+ *
+ *  Only listens while the menu is open: `onDismiss` is an inline arrow at every call site,
+ *  so listing it as a dependency re-bound two document listeners on every render of the
+ *  bar - three menus' worth, most of them for menus that were shut. It is held in a ref
+ *  instead, which is also what lets the effect depend on `open` alone. */
+function useDismissOnOutsideClick(onDismiss: () => void, open: boolean) {
   const ref = useRef<HTMLDivElement>(null);
+  const dismiss = useRef(onDismiss);
+  dismiss.current = onDismiss;
+
   useEffect(() => {
-    const handle = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        dismiss.current();
+      }
     };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [onDismiss]);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Focus is inside the menu that is closing, so it has to be put somewhere the user
+      // can carry on from - the trigger is the only thing that outlives the menu.
+      const trigger = ref.current?.querySelector("button");
+      dismiss.current();
+      if (trigger instanceof HTMLElement) trigger.focus();
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
   return ref;
 }
 

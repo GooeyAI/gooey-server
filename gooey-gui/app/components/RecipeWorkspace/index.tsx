@@ -1,7 +1,14 @@
 import "./RecipeWorkspace.css";
 
 import clsx from "clsx";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 
 import type { EditorRunBarProps } from "@gooey-types/recipe_top_bar_props";
@@ -22,7 +29,6 @@ import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
   collapsePane,
   paneRolesForLayout,
-  paneVisibility,
   shouldRevealRunOutput,
   workspaceControlsForLayout,
 } from "./paneState";
@@ -51,7 +57,7 @@ export function RecipeWorkspace({
   return (
     <RecipeWorkspaceProvider key={config.storage_key} config={config}>
       <div
-        style={{ visibility: paneVisibility(hydrated) }}
+        style={{ visibility: hydrated ? "visible" : "hidden" }}
         className="recipe-workspace container-xxl py-lg-2"
       >
         <WorkspacePane
@@ -346,14 +352,20 @@ function WorkspacePane({
   rightControls?: ReactNode;
 }) {
   const open = role !== "closed";
-  const paneRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (open) {
-      paneRef.current?.removeAttribute("inert");
-      return;
-    }
-    paneRef.current?.setAttribute("inert", "");
-  }, [open]);
+  // Applied as the node attaches rather than from an effect: an effect runs after paint,
+  // which left a closed pane in the tab order for the first commit. React 17 has no `inert`
+  // prop, so the attribute is still set by hand - just at the right moment.
+  const paneRef = useCallback(
+    (node: HTMLElement | null) => {
+      if (!node) return;
+      if (open) {
+        node.removeAttribute("inert");
+      } else {
+        node.setAttribute("inert", "");
+      }
+    },
+    [open]
+  );
 
   return (
     <section
