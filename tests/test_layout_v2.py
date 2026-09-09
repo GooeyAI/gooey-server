@@ -487,16 +487,18 @@ def test_examples_route_redirects_to_the_explore_gallery_in_v2():
     resp = render(request=SimpleNamespace(), page_slug="video-bots")
     assert resp.headers["location"] == "/explore/?workflow=bots"
 
-    # a url that names a run is a link to that run, not to the gallery - the redirect keeps
-    # it rather than sending every shared example link to the same page
+    # Opened from a published run, the tab still meant "show me the gallery": v1 filtered
+    # `_examples_tab` on the workflow alone, so the run in the url never changed what was
+    # rendered. It goes to the same gallery - redirecting back to the run would strip
+    # `/examples/` and reload the page the user was already on.
     resp = render(
         request=SimpleNamespace(),
         page_slug="agent",
-        run_slug="my-bot",
-        example_id="abc123",
+        run_slug="base-copilot-w-search-rag-code-execution",
+        example_id="v1xm6uhp",
     )
     assert resp.status_code == 302
-    assert resp.headers["location"] == "/agent/my-bot-abc123/"
+    assert resp.headers["location"] == "/explore/?workflow=bots"
 
 
 def test_examples_redirect_only_names_a_workflow_the_type_filter_can_hold(monkeypatch):
