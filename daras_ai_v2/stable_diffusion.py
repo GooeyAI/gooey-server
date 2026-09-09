@@ -49,8 +49,8 @@ class Text2ImgModels(Enum):
 
     flux_1_dev = "FLUX.1 [dev]"
 
-    gpt_image_sunburst = "GPT Image Sunburst (OpenAI)"
-    gpt_image_flare = "GPT Image Flare (OpenAI)"
+    gpt_image_2_5_sunburst = "GPT Image 2.5 Sunburst (OpenAI)"
+    gpt_image_2_5_flare = "GPT Image 2.5 Flare (OpenAI)"
     gpt_image_2 = "GPT Image 2 (OpenAI)"
     gpt_image_1 = "GPT Image 1 (OpenAI)"
     gpt_image_1_5 = "GPT Image 1.5 (OpenAI)"
@@ -93,8 +93,8 @@ text2img_model_ids = {
     Text2ImgModels.nano_banana_pro: "fal-ai/nano-banana-pro",
     Text2ImgModels.nano_banana_2: "fal-ai/nano-banana-2",
     Text2ImgModels.nano_banana: "fal-ai/nano-banana",
-    Text2ImgModels.gpt_image_sunburst: "gpt-image-sunburst",
-    Text2ImgModels.gpt_image_flare: "gpt-image-flare",
+    Text2ImgModels.gpt_image_2_5_sunburst: "gpt-image-2.5-sunburst",
+    Text2ImgModels.gpt_image_2_5_flare: "gpt-image-2.5-flare",
     Text2ImgModels.gpt_image_2: "gpt-image-2",
     Text2ImgModels.gpt_image_1: "gpt-image-1",
     Text2ImgModels.gpt_image_1_5: "gpt-image-1.5",
@@ -115,8 +115,8 @@ class Img2ImgModels(Enum):
 
     flux_pro_kontext = "FLUX.1 Pro Kontext (fal.ai)"
 
-    gpt_image_sunburst = "GPT Image Sunburst (OpenAI)"
-    gpt_image_flare = "GPT Image Flare (OpenAI)"
+    gpt_image_2_5_sunburst = "GPT Image 2.5 Sunburst (OpenAI)"
+    gpt_image_2_5_flare = "GPT Image 2.5 Flare (OpenAI)"
     gpt_image_2 = "GPT Image 2 (OpenAI)"
     gpt_image_1 = "GPT Image 1 (OpenAI)"
     gpt_image_1_5 = "GPT Image 1.5 (OpenAI)"
@@ -156,8 +156,8 @@ class Img2ImgModels(Enum):
             cls.nano_banana,
             cls.nano_banana_2,
             cls.nano_banana_pro,
-            cls.gpt_image_sunburst,
-            cls.gpt_image_flare,
+            cls.gpt_image_2_5_sunburst,
+            cls.gpt_image_2_5_flare,
             cls.gpt_image_2,
             cls.gpt_image_1,
             cls.gpt_image_1_5,
@@ -171,8 +171,8 @@ img2img_model_ids = {
     Img2ImgModels.dream_shaper: "Lykon/DreamShaper",
     Img2ImgModels.dreamlike_2: "dreamlike-art/dreamlike-photoreal-2.0",
     Img2ImgModels.dall_e: "dall-e-2",
-    Img2ImgModels.gpt_image_sunburst: "gpt-image-sunburst",
-    Img2ImgModels.gpt_image_flare: "gpt-image-flare",
+    Img2ImgModels.gpt_image_2_5_sunburst: "gpt-image-2.5-sunburst",
+    Img2ImgModels.gpt_image_2_5_flare: "gpt-image-2.5-flare",
     Img2ImgModels.gpt_image_2: "gpt-image-2",
     Img2ImgModels.gpt_image_1: "gpt-image-1",
     Img2ImgModels.gpt_image_1_5: "gpt-image-1.5",
@@ -355,8 +355,8 @@ def text2img(
     if model not in {
         Text2ImgModels.dall_e_3,
         Text2ImgModels.flux_1_dev,
-        Text2ImgModels.gpt_image_sunburst,
-        Text2ImgModels.gpt_image_flare,
+        Text2ImgModels.gpt_image_2_5_sunburst,
+        Text2ImgModels.gpt_image_2_5_flare,
         Text2ImgModels.gpt_image_2,
         Text2ImgModels.gpt_image_1,
         Text2ImgModels.gpt_image_1_5,
@@ -388,8 +388,8 @@ def text2img(
             )
             return output_images
         case (
-            Text2ImgModels.gpt_image_sunburst
-            | Text2ImgModels.gpt_image_flare
+            Text2ImgModels.gpt_image_2_5_sunburst
+            | Text2ImgModels.gpt_image_2_5_flare
             | Text2ImgModels.gpt_image_2
             | Text2ImgModels.gpt_image_1
             | Text2ImgModels.gpt_image_1_5
@@ -602,8 +602,8 @@ def img2img(
 
     if not prompt and selected_model in (
         Img2ImgModels.flux_pro_kontext.name,
-        Img2ImgModels.gpt_image_sunburst.name,
-        Img2ImgModels.gpt_image_flare.name,
+        Img2ImgModels.gpt_image_2_5_sunburst.name,
+        Img2ImgModels.gpt_image_2_5_flare.name,
         Img2ImgModels.gpt_image_2.name,
         Img2ImgModels.gpt_image_1.name,
         Img2ImgModels.gpt_image_1_5.name,
@@ -640,8 +640,8 @@ def img2img(
 
             return output_images
         case (
-            Img2ImgModels.gpt_image_sunburst.name
-            | Img2ImgModels.gpt_image_flare.name
+            Img2ImgModels.gpt_image_2_5_sunburst.name
+            | Img2ImgModels.gpt_image_2_5_flare.name
             | Img2ImgModels.gpt_image_2.name
             | Img2ImgModels.gpt_image_1.name
             | Img2ImgModels.gpt_image_1_5.name
