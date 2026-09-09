@@ -89,9 +89,9 @@ def test_wa_list_groups_rows_by_section():
         {"id": "3", "title": "C"},
         {"id": "4", "title": "D", "section": "Bikes"},
     ]
-    sections = _build_interactive_list_msg(buttons, "hi")["interactive"]["action"][
-        "sections"
-    ]
+    action = _build_interactive_list_msg(buttons, "hi")["interactive"]["action"]
+    assert action["button"] == "Cars"
+    sections = action["sections"]
     assert [s["title"] for s in sections] == ["Cars", "Options", "Bikes"]
     assert [[r["title"] for r in s["rows"]] for s in sections] == [
         ["A", "B"],
@@ -100,11 +100,18 @@ def test_wa_list_groups_rows_by_section():
     ]
 
 
-def test_wa_list_single_untitled_section():
-    msg = _build_interactive_list_msg([{"id": "1", "title": "A"}], "hi")
-    assert msg["interactive"]["action"]["sections"] == [
-        {"rows": [{"id": "1", "title": "A"}]}
-    ]
+def test_wa_list_single_section_names_the_button():
+    action = _build_interactive_list_msg([{"id": "1", "title": "A"}], "hi")[
+        "interactive"
+    ]["action"]
+    assert action["button"] == "Options"
+    assert action["sections"] == [{"rows": [{"id": "1", "title": "A"}]}]
+
+    action = _build_interactive_list_msg(
+        [{"id": "1", "title": "A", "section": "Follow up questions"}], "hi"
+    )["interactive"]["action"]
+    assert action["button"] == "Follow up questions"
+    assert action["sections"] == [{"rows": [{"id": "1", "title": "A"}]}]
 
 
 def _btn(i, **kwargs):

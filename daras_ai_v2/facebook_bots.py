@@ -429,6 +429,8 @@ def _build_interactive_list_msg(
             sections[-1]["rows"].append(row)
         else:
             sections.append({"title": section_title, "rows": [row]})
+    # the first <label> names the button that opens the menu
+    button_label = next((s["title"] for s in sections if s["title"]), "")
     if len(sections) == 1:
         sections[0].pop("title")
     else:
@@ -442,7 +444,9 @@ def _build_interactive_list_msg(
         "interactive": {
             "type": "list",
             "action": {
-                "button": WA_LIST_BTN_LABEL,
+                "button": truncate_text_words(
+                    button_label or WA_LIST_BTN_LABEL, WA_BTN_MAX_TITLE_LEN
+                ),
                 "sections": sections,
             },
             "body": {"text": _wa_body_text(text)},
