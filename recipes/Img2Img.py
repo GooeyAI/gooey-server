@@ -187,6 +187,8 @@ class Img2ImgPage(BasePage):
             request.selected_model
             in [
                 Img2ImgModels.dall_e.name,
+                Img2ImgModels.gpt_image_sunburst.name,
+                Img2ImgModels.gpt_image_flare.name,
                 Img2ImgModels.gpt_image_2.name,
                 Img2ImgModels.gpt_image_1.name,
                 Img2ImgModels.gpt_image_1_5.name,
@@ -251,6 +253,8 @@ class Img2ImgPage(BasePage):
             case (
                 Img2ImgModels.gpt_image_1.name
                 | Img2ImgModels.gpt_image_1_5.name
+                | Img2ImgModels.gpt_image_sunburst.name
+                | Img2ImgModels.gpt_image_flare.name
                 | Img2ImgModels.gpt_image_2.name
             ):
                 match state.get("gpt_image_1_quality"):

@@ -29,6 +29,33 @@ def run():
         notes="Token-based pricing: $5/1M text input tokens, $10/1M image input tokens, $40/1M output tokens",
     )
 
+    # Provisional rates for Sunburst and Flare, matching our GPT Image 2 rates.
+    # GPT Image Sunburst (OpenAI) - Token-based pricing
+    image_generation_pricing_create(
+        model_id="gpt-image-sunburst",
+        model_name=Text2ImgModels.gpt_image_sunburst.name,
+        unit_cost_text_input=5.0,  # $5 per 1M tokens
+        unit_cost_image_input=10.0,  # $10 per 1M tokens
+        unit_cost_output=40.0,  # $40 per 1M tokens
+        unit_quantity=1e6,  # 1 million tokens
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing",
+        notes="Provisional, matching GPT Image 2: $5/1M text input tokens, $10/1M image input tokens, $40/1M output tokens",
+    )
+
+    # GPT Image Flare (OpenAI) - Token-based pricing
+    image_generation_pricing_create(
+        model_id="gpt-image-flare",
+        model_name=Text2ImgModels.gpt_image_flare.name,
+        unit_cost_text_input=5.0,  # $5 per 1M tokens
+        unit_cost_image_input=10.0,  # $10 per 1M tokens
+        unit_cost_output=40.0,  # $40 per 1M tokens
+        unit_quantity=1e6,  # 1 million tokens
+        provider=ModelProvider.openai,
+        pricing_url="https://openai.com/api/pricing",
+        notes="Provisional, matching GPT Image 2: $5/1M text input tokens, $10/1M image input tokens, $40/1M output tokens",
+    )
+
     # GPT Image 2 (OpenAI) - Token-based pricing
     image_generation_pricing_create(
         model_id="gpt-image-2",
