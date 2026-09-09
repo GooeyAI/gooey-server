@@ -1,5 +1,3 @@
-from itertools import groupby
-
 import requests
 from furl import furl
 from loguru import logger
@@ -413,7 +411,8 @@ def _build_interactive_list_msg(
     buttons: list[ReplyButton],
     text: str | None,
 ) -> dict:
-    rows = []
+    # rows are grouped into sections by the <label> around their <select>
+    sections = []
     for btn in buttons:
         title = btn["title"]
         row = {
@@ -425,12 +424,11 @@ def _build_interactive_list_msg(
         )
         if description:
             row["description"] = truncate_text_words(description, WA_LIST_MAX_DESC_LEN)
-        rows.append((btn.get("section") or "", row))
-    # consecutive rows with the same section (a <label> around their <select>) are grouped
-    sections = [
-        {"title": section_title, "rows": [row for _, row in group]}
-        for section_title, group in groupby(rows, key=lambda x: x[0])
-    ]
+        section_title = btn.get("section") or ""
+        if sections and sections[-1]["title"] == section_title:
+            sections[-1]["rows"].append(row)
+        else:
+            sections.append({"title": section_title, "rows": [row]})
     if len(sections) == 1:
         sections[0].pop("title")
     else:
