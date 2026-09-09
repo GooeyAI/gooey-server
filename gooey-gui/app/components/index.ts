@@ -27,3 +27,4 @@ export * from "./RecipeWorkspace";
 export * from "./Sidebar";
 export * from "./ToolPage";
 export * from "./WorkspacePaneControl";
+export * from "./RunTimeline";

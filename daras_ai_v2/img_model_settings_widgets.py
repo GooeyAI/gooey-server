@@ -14,6 +14,8 @@ PROPRIETARY_MODELS = {
     Text2ImgModels.nano_banana_pro.name,
     Text2ImgModels.nano_banana_2.name,
     Text2ImgModels.nano_banana.name,
+    Text2ImgModels.gpt_image_2_5_sunburst.name,
+    Text2ImgModels.gpt_image_2_5_flare.name,
     Text2ImgModels.gpt_image_2.name,
     Text2ImgModels.gpt_image_1.name,
     Text2ImgModels.gpt_image_1_5.name,
@@ -230,6 +232,8 @@ def quality_setting(selected_models: set[str]):
         )
 
     if selected_models & {
+        Text2ImgModels.gpt_image_2_5_sunburst.name,
+        Text2ImgModels.gpt_image_2_5_flare.name,
         Text2ImgModels.gpt_image_2.name,
         Text2ImgModels.gpt_image_1.name,
         Text2ImgModels.gpt_image_1_5.name,
@@ -367,6 +371,8 @@ def output_resolution_setting(selected_models: set[str]):
         pixel_options = ["1024p"]
         allowed_shapes = ["square", "wide"]
     elif selected_models <= {
+        Text2ImgModels.gpt_image_2_5_sunburst.name,
+        Text2ImgModels.gpt_image_2_5_flare.name,
         Text2ImgModels.gpt_image_2.name,
         Text2ImgModels.gpt_image_1.name,
         Text2ImgModels.gpt_image_1_5.name,
