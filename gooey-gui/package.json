@@ -60,6 +60,7 @@
     "marked": "^4.0.10",
     "mime-types": "^2.1.35",
     "mobile-detect": "^1.4.5",
+    "notistack": "^3.0.2",
     "nprogress": "^0.2.0",
     "plotly.js": "^2.27.1",
     "puppeteer": "^22.14.0",

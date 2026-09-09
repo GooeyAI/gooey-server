@@ -11,6 +11,7 @@ export * from "./WorkspaceMemoryTable";
 export * from "./bulkProgress/BulkProgressCard";
 export * from "./ComposioAuthRequired";
 export * from "./AskGooeyNew";
+export * from "./ErrorSnackbar";
 export * from "./ForgotPasswordForm";
 export * from "./GooeyBuilderInlineEmbed";
 export * from "./GooeyEmbedPreview";

@@ -16,6 +16,8 @@ import {
   useSearchParams,
   useSubmit,
 } from "@remix-run/react";
+import { closeSnackbar, SnackbarProvider } from "notistack";
+import type { SnackbarKey } from "notistack";
 import path from "path";
 import { useDebouncedCallback } from "use-debounce";
 import { gooeyGuiRouteHeader, realtimeRefreshKey } from "~/consts";
@@ -271,23 +273,29 @@ function App() {
 
   return (
     <div data-prismjs-copy="📋 Copy" data-prismjs-copy-success="✅ Copied!">
-      <form
-        ref={formRef}
-        id={"gooey-form"}
-        onChange={onChange}
-        onSubmit={onSubmit}
-        noValidate
+      <SnackbarProvider
+        action={snackbarDismissAction}
+        anchorOrigin={{ horizontal: "center", vertical: "bottom" }}
+        maxSnack={1}
       >
-        <AppShellProvider>
-          <GlobalContextProvider value={globalContext}>
-            <RenderedChildren
-              children={children}
-              onChange={onChange}
-              state={state}
-            />
-          </GlobalContextProvider>
-        </AppShellProvider>
-      </form>
+        <form
+          ref={formRef}
+          id={"gooey-form"}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          noValidate
+        >
+          <AppShellProvider>
+            <GlobalContextProvider value={globalContext}>
+              <RenderedChildren
+                children={children}
+                onChange={onChange}
+                state={state}
+              />
+            </GlobalContextProvider>
+          </AppShellProvider>
+        </form>
+      </SnackbarProvider>
       <script
         async
         defer
@@ -322,6 +330,19 @@ function App() {
         referrerPolicy="no-referrer"
       />
     </div>
+  );
+}
+
+function snackbarDismissAction(snackbarKey: SnackbarKey) {
+  return (
+    <button
+      aria-label="Dismiss notification"
+      className="btn btn-link p-1 text-white"
+      onClick={() => closeSnackbar(snackbarKey)}
+      type="button"
+    >
+      <i className="fa-solid fa-xmark" aria-hidden="true" />
+    </button>
   );
 }
 

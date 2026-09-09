@@ -40,6 +40,7 @@ from daras_ai_v2.tab_spec import (
 from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
 from functions.base_llm_tool import functions_input
+from gooey_gui.types.error_snackbar_props import ErrorSnackbarProps
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -1202,7 +1203,7 @@ class BasePage(BasePageV1):
         if submitted:
             self.submit_and_redirect()
 
-        # A flex column: the notices around the output - failure box, cancelled warning,
+        # A flex column: the notices around the output - custom failures, cancelled warning,
         # run spinner - size to themselves, and the output takes what is left. The pane
         # clips rather than scrolls, so a child claiming the full height would push the
         # bottom of the output out of reach. `minHeight: 0` at every level, or a flex child
@@ -1213,9 +1214,8 @@ class BasePage(BasePageV1):
         ):
             run_state = self.get_run_state(gui.session_state)
             if run_state == RecipeRunState.failed:
-                # Its own scroller: the pane clips rather than scrolls, so a long message -
-                # a traceback, a provider's error body - ran off the bottom with no way to
-                # reach the rest of it. Capped so it cannot crowd out the output either.
+                # Interactive custom failures remain in the pane and retain their scroller.
+                # A generic failure mounts only the snackbar, leaving this wrapper empty.
                 with gui.div(className="v2-run-error"):
                     self._render_failed_output()
 
@@ -1232,6 +1232,20 @@ class BasePage(BasePageV1):
                 self._render_running_output()
             elif not is_deleted:
                 self._render_after_output()
+
+    def _render_failed_output(self):
+        if self._render_custom_error():
+            return
+
+        message = (
+            gui.session_state.get(StateKeys.error_msg) or "The workflow failed to run."
+        )
+        gui.model_component(
+            ErrorSnackbarProps(
+                message=message,
+                snackbar_id=f"run-error:{self.current_sr.run_id}",
+            )
+        )
 
     def submit_and_redirect(
         self,
