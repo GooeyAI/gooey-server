@@ -127,6 +127,7 @@ def render_gooey_builder_embed(
     config["integration_id"] = "magic"
     config["mode"] = "inline"
     config["showRunLink"] = True
+    config["showRunTime"] = True
     config["showToolCalls"] = True
     config["enableSourcePreview"] = False
     # conversations live in the navigation sidebar, not the builder widget

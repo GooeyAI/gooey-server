@@ -189,6 +189,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             enablePhotoUpload=True,
             enableConversations=True,
             showToolCalls=True,
+            showRunTime=True,
             branding=bot_branding,
             fillParent=True,
             enableSourcePreview=False,

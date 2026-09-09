@@ -1153,6 +1153,7 @@ Translation Glossary for LLM Language (English) -> User Langauge
             enableConversations=True,
             showToolCalls=True,
             showRunLink=True,
+            showRunTime=True,
             showHeader=False,
             branding=bot_branding,
             fillParent=True,
