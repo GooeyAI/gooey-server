@@ -23,6 +23,7 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
 from daras_ai_v2.tab_spec import SingleLayout, SurfaceId
+from django.utils.text import get_text_list
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
@@ -251,12 +252,14 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         """How this agent is put together. Each card links into the config pane that owns
         the setting."""
         # One group under one heading, in the order the design names them: what the agent
-        # *is*, then what it can reach outside itself. Two groups put a wide gap and a second
-        # heading between three cards that read as one row, and a group holding a single card
-        # was the width of its own heading.
+        # *is*, then what it can reach outside itself. The heading names only the kinds the
+        # row actually holds, so a model on its own reads "Model" rather than promising two
+        # sections that are not there.
         cards: list[tuple[str, str, ConfigPane]] = []
+        kinds: list[str] = []
         if model := self._about_model_summary():
             cards.append((*model, ConfigPane.llm_instructions))
+            kinds.append("Model")
         if documents := len(gui.session_state.get("documents") or []):
             noun = "source" if documents == 1 else "sources"
             cards.append(
@@ -266,15 +269,17 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                     ConfigPane.knowledge,
                 )
             )
+            kinds.append("Knowledge base")
         if tools := len(gui.session_state.get("functions") or []):
             noun = "Tool" if tools == 1 else "Tools"
             cards.append((icons.code, f"{tools} {noun} called", ConfigPane.tools))
+            kinds.append("Tools")
 
         # a row of zeroes says less than no row: skip the heading too, not just the cards
         if not cards:
             return
 
-        self._render_about_meta_group("Model, Knowledge base & Tools", cards)
+        self._render_about_meta_group(get_text_list(kinds, "&"), cards)
 
     def _render_about_meta_group(
         self, title: str, cards: list[tuple[str, str, ConfigPane]]

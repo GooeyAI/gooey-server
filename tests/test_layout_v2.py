@@ -403,6 +403,49 @@ def test_about_deployment_cards_carry_the_chips_targets():
     assert page._pop_submit_intent() == intent
 
 
+def test_the_about_meta_heading_names_only_what_the_row_holds(monkeypatch):
+    """A model with no documents and no tools reads "Model", not a heading promising a
+    knowledge base and tools that are not there."""
+    import json
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_about_model_summary",
+        lambda self: (icons.sparkles, "GPT-5"),
+        raising=False,
+    )
+
+    def heading(**state):
+        gui.session_state.clear()
+        gui.session_state.update(state)
+        root = RenderTreeNode("root")
+        with NestingCtx(root):
+            page._render_about_meta()
+        found = _headings_in(root.to_dict())
+        # the renderer escapes the title, so `&` arrives as `&amp;`
+        return html.unescape(found[0][1]) if found else None
+
+    assert heading() == "Model"
+    assert heading(documents=["a"]) == "Model & Knowledge base"
+    assert heading(functions=["f"]) == "Model & Tools"
+    assert heading(documents=["a"], functions=["f"]) == (
+        "Model, Knowledge base & Tools"
+    )
+
+    # ...and with no model either, the row and its heading go entirely
+    monkeypatch.setattr(
+        VideoBotsPageV2, "_about_model_summary", lambda self: None, raising=False
+    )
+    gui.session_state.clear()
+    root = RenderTreeNode("root")
+    with NestingCtx(root):
+        page._render_about_meta()
+    assert json.dumps(root.to_dict()).count("v2-about-meta-card") == 0
+
+
 def test_every_about_card_is_drawn_from_one_body():
     """A deployment card and a config card are one object in the design, and were two copies
     of the same markup here - so a change to the card's shape reached one and not the other.
