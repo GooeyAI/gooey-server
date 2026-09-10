@@ -29,6 +29,7 @@ export function initialWorkspaceState(
   config: PageShellConfig,
   navigationState: unknown
 ): WorkspaceState {
+  const carried = carriedLayoutFor(config);
   if (config.route_layout) {
     return {
       layout: config.route_layout,
@@ -39,7 +40,7 @@ export function initialWorkspaceState(
   const navigationLayout = workspaceLayoutFromNavigationState(navigationState);
   return revealRunLayout(
     {
-      layout: navigationLayout ?? config.initial_layout,
+      layout: navigationLayout ?? carried ?? config.initial_layout,
       handled_run_id: null,
     },
     config
@@ -105,10 +106,35 @@ export function revealRunOutput(
   runLayout: WorkspaceLayout,
   selectLayout: (next: WorkspaceLayout) => void
 ) {
-  if (!shouldRevealRunOutput(layout)) {
-    return;
+  const next = shouldRevealRunOutput(layout) ? runLayout : layout;
+  // Running redirects to the run's own url, whose layout is the work view - so the view to
+  // end on rides across that one navigation, or Preview and About are swapped out by it.
+  carriedRunLayout = { layout: next, runId: null };
+  if (next !== layout) {
+    window.setTimeout(() => selectLayout(next), 0);
   }
-  window.setTimeout(() => selectLayout(runLayout), 0);
+}
+
+/* Set when Run is pressed, and held until the run it produced is over or replaced. A
+   module-level handoff because a server redirect carries no router state to put it in.
+
+   Bound to a run id rather than read once: the workspace re-renders many times while a run
+   is polled, and every one of those asks for the layout again. */
+let carriedRunLayout: { layout: WorkspaceLayout; runId: string | null } | null =
+  null;
+
+function carriedLayoutFor(config: PageShellConfig): WorkspaceLayout | null {
+  if (!carriedRunLayout) return null;
+  const runId = config.active_run_id ?? null;
+  if (carriedRunLayout.runId === null) {
+    // still on the page Run was pressed from; the run's own url has not arrived yet
+    if (!runId) return null;
+    carriedRunLayout = { layout: carriedRunLayout.layout, runId };
+    return carriedRunLayout.layout;
+  }
+  if (carriedRunLayout.runId === runId) return carriedRunLayout.layout;
+  carriedRunLayout = null;
+  return null;
 }
 
 export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {

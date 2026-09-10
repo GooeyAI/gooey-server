@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
 import {
@@ -11,6 +11,7 @@ import {
   layoutsEqual,
   paneRolesForLayout,
   revealRunLayout,
+  revealRunOutput,
   shouldRevealRunOutput,
   singleLayout,
   splitLayout,
@@ -284,4 +285,54 @@ describe("workspace navigation", () => {
     expect(appRelativeHref("/agent/?run_id=32i1")).toBe("/agent/?run_id=32i1");
   });
 
+});
+
+describe("carrying the view through a run", () => {
+  // A run redirects to its own url, whose layout is the work view. Pressing Run is a
+  // continuation, not an arrival, so the view being worked in has to survive it.
+  const runConfig = {
+    ...baseConfig,
+    initial_layout: split,
+    active_run_id: "run-9",
+  };
+
+  it("keeps Preview where it is", () => {
+    revealRunOutput(preview, split, () => {});
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(preview);
+  });
+
+  it("keeps About where it is", () => {
+    revealRunOutput(about, split, () => {});
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(about);
+  });
+
+  it("moves the solo editor to the work view, and lands there", () => {
+    vi.stubGlobal("window", { setTimeout: (fn: () => void) => fn() });
+    const picked: unknown[] = [];
+    revealRunOutput(edit, split, (l) => picked.push(l));
+    expect(picked).toEqual([split]);
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(split);
+    vi.unstubAllGlobals();
+  });
+
+  it("survives the workspace re-rendering while the run is polled", () => {
+    // The regression: the carry was read once, and the ten re-renders after it fell back
+    // to the run url's own layout, so Preview lasted a frame and then became the split.
+    revealRunOutput(preview, split, () => {});
+    for (let i = 0; i < 10; i++) {
+      expect(initialWorkspaceState(runConfig, null).layout).toEqual(preview);
+    }
+  });
+
+  it("is dropped once a navigation leaves that run behind", () => {
+    revealRunOutput(preview, split, () => {});
+    initialWorkspaceState(runConfig, null);
+    expect(initialWorkspaceState(baseConfig, null).layout).toEqual(about);
+  });
+
+  it("loses to an explicit destination in navigation state", () => {
+    revealRunOutput(preview, split, () => {});
+    const navigation = workspaceLayoutNavigationState(about);
+    expect(initialWorkspaceState(runConfig, navigation).layout).toEqual(about);
+  });
 });
