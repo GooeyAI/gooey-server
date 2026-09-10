@@ -21,7 +21,27 @@ import {
 import settings from "./settings";
 import type { ReactNode } from "react";
 
-export const links: LinksFunction = () => [...globalProgressStyles()];
+// Inter and Domine are the design system's two faces: Inter for UI text, Domine for display
+// headings. Loaded here rather than as `@font-face` beside basiercircle's `.otf` files
+// because Google serves the right subsets and formats per browser, and neither face ships
+// with the repo. Only the v2 surfaces and the navigation rail use them - see
+// `--gooey-font-ui` in app.css - so the rest of the app is unaffected by the extra request.
+const FONT_LINKS: ReturnType<LinksFunction> = [
+  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+  {
+    rel: "stylesheet",
+    href:
+      "https://fonts.googleapis.com/css2?family=Domine:wght@400..700" +
+      "&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900" +
+      "&display=swap",
+  },
+];
+
+export const links: LinksFunction = () => [
+  ...globalProgressStyles(),
+  ...FONT_LINKS,
+];
 
 declare global {
   interface Window {

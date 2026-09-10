@@ -328,10 +328,11 @@ button .gui-html-container,
   --gooey-bg-page: #fffefd; /* bg - outline button fill */
   --gooey-scrim: rgb(10 16 33 / 30%); /* the drawer's backdrop */
 
+  --gooey-line-strong: #b9b9b9; /* line/strong - hover border, selected control */
+  --gooey-ink-muted: #4b587a; /* ink-muted (= text/secondary) - secondary label, cost readout */
+
   /* Not in the Figma set - added because the v2 surfaces need them and had been carrying
      one-off hexes instead. Replace with the design's own once it defines them. */
-  --gooey-line-strong: #c9c9c9; /* a border under hover or on a selected control */
-  --gooey-ink-muted: #6b6b6b; /* secondary label, menu heading, cost readout */
   --gooey-danger: #c0392b; /* destructive action */
   --gooey-warn: #f0a020; /* the unpublished-changes dot */
   --gooey-ok-wash: #eaf6ee; /* the run bar's cost tint */
@@ -355,6 +356,41 @@ button .gui-html-container,
   --gooey-radius-lg: 16px; /* panels, the About portrait */
   --gooey-radius-pill: 32px; /* radius/pill - the drawer's top corners */
   --gooey-radius-full: 99px; /* radius/full - avatars, grab handle */
+
+  /* The design's two faces. `--gooey-font-ui` carries every UI, Meta, Body and Button style
+     in the set; `--gooey-font-heading` is the display face the Heading/* styles use. Both
+     fall back to basiercircle, which is what the rest of the app runs and what these
+     surfaces looked like before - so a blocked or slow webfont degrades to the old picture
+     rather than to Helvetica. Loaded in root.tsx. */
+  --gooey-font-ui: "Inter", basiercircle, sans-serif;
+  --gooey-font-heading: "Domine", basiercircle, Georgia, serif;
+}
+
+/* ── The design system's typefaces, where the design system reaches ──────────
+   The v2 workspace shell and the navigation rail, not the whole app: v1's pages, the
+   marketing header and the Django-rendered templates are still on basiercircle, and
+   converting them is a migration of its own rather than part of matching this view.
+
+   `.v2-app-shell` is the v2 page shell; `.nav-sidebar` is the rail, which is shared chrome
+   and so reaches v1 pages too - deliberately, so the one piece of navigation on screen does
+   not change face when you move between a v1 and a v2 recipe. */
+.v2-app-shell,
+.nav-sidebar {
+  font-family: var(--gooey-font-ui);
+}
+
+/* Only headings that are *drawn* as headings take the display face. v2 uses heading tags for
+   document structure and resets their look (see RecipeWorkspace.css), so a blanket
+   `h1, h2, ...` rule here would turn 14px section labels - which the design sets in Inter
+   Medium - into 14px serif. These are the two places a heading is meant to read as one:
+   the workflow's h1, and the prose headings inside the editor's help text.
+
+   Family only, no weight: `.recipe-workspace-editor :where(h2)` already sets one at the same
+   specificity as this selector, and which of two equal rules wins would come down to the
+   order the bundler happens to emit two stylesheets in. */
+.v2-app-shell .v2-about h1,
+.recipe-workspace-editor :where(h1, h2, h3) {
+  font-family: var(--gooey-font-heading);
 }
 
 /* Run state, as the history card's status pill reports it (HomePage.css). The warn and
