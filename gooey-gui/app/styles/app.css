@@ -445,26 +445,32 @@ button .gui-html-container,
   font-family: var(--gooey-font-ui);
 }
 
-/* Only headings that are *drawn* as headings take the display face. v2 uses heading tags for
-   document structure and resets their look (see RecipeWorkspace.css), so a blanket
-   `h1, h2, ...` rule here would turn 14px section labels - which the design sets in Inter
-   Medium - into 14px serif. These are the two places a heading is meant to read as one:
-   the workflow's h1, and the prose headings inside the editor's help text.
+/* Everything custom.css hands the heavy display face - not just headings, but `strong` and
+   the `.bold`/`.semibold` utilities the workflow cards title themselves with. Inheriting the
+   family from the page is not enough: each of those declares its own, so it has to be named
+   here or the card titles keep arriving in avenir.
 
-   Family only, no weight: `.recipe-workspace-editor :where(h2)` already sets one at the same
-   specificity as this selector, and which of two equal rules wins would come down to the
-   order the bundler happens to emit two stylesheets in. */
-/* custom.css sets the heavy display face on bare `h1`-`h6`, and v2 uses heading tags for
-   structure - so its section labels were arriving in it. Inter unless said otherwise. */
-.v2-app-shell :is(h1, h2, h3, h4, h5, h6),
-.gooey-ds-page :is(h1, h2, h3, h4, h5, h6),
-.ask-gooey-page :is(h1, h2, h3, h4, h5, h6) {
+   `:is()` takes the specificity of its heaviest argument, so these land at two classes and
+   outrank both `.bold` and `.gui-md-container strong`. */
+.v2-app-shell :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold),
+.gooey-ds-page :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold),
+.ask-gooey-page :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold) {
   font-family: var(--gooey-font-ui);
 }
 
-/* The two places a heading is actually drawn as one. Both outrank the rule above. */
+/* Only headings that are *drawn* as headings take the display face. v2 uses heading tags for
+   document structure and resets their look (see RecipeWorkspace.css), so a blanket
+   `h1, h2, ...` rule would set 14px section labels - which the design puts in Inter Medium -
+   in serif. Three places earn it: the workflow's h1, the prose headings in the editor's help
+   text, and Ask Gooey's "What will you build today?".
+
+   Below the UI rule on purpose: `.ask-gooey-page .ask-gooey-title` and
+   `.ask-gooey-page :is(...)` weigh the same, so this has to come second to win - which is
+   deterministic only because both live in this file. Family only, no weight: the editor's
+   own rule sets that. */
 .v2-app-shell .v2-about h1,
-.v2-app-shell .recipe-workspace-editor :is(h1, h2, h3) {
+.v2-app-shell .recipe-workspace-editor :is(h1, h2, h3),
+.ask-gooey-page .ask-gooey-title {
   font-family: var(--gooey-font-heading);
 }
 
