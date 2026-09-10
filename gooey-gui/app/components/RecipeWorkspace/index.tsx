@@ -187,6 +187,7 @@ export function RecipeWorkspacePanes({
           <div
             key={pane.id}
             id={`editor-pane-${pane.id}`}
+            className="recipe-workspace-pane-panel"
             role="tabpanel"
             aria-labelledby={`editor-pane-tab-${pane.id}`}
             hidden={pane.id !== selectedPane}

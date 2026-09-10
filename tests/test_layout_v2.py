@@ -305,28 +305,23 @@ def test_can_edit_current_pr_answers_false_without_a_user_or_workspace(monkeypat
     assert page.can_edit_current_pr is False
 
 
-def test_entry_layout_lands_on_the_tab_set_it_was_given(monkeypatch):
-    """`is_view_only` picks both the tabs and the view they open on, so the two cannot
-    disagree. A view-only viewer's tabs are About and How it works, and How it works is a
-    config form they have no way to save - so About. Everyone who can update the app works,
-    and folds to the preview on a phone."""
+def test_entry_layout_opens_on_about_whoever_is_asking(monkeypatch):
+    """Ownership used to decide this - an editor was dropped straight into the work split.
+    Both tab sets lead with About, so `tabs[0]` answers for everyone."""
     about = SplitLayout(primary=SurfaceId.about, secondary=SurfaceId.preview)
-    work = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
     tabs = [TabSpec(key="about", label="About", layout=about)]
 
     page = object.__new__(VideoBotsPageV2)
     page.tab = RecipeTabs.run
     page.request = SimpleNamespace(query_params={})
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
-    assert page.entry_layout(tabs) == about
+    for view_only in (True, False):
+        monkeypatch.setattr(
+            VideoBotsPageV2, "is_view_only", lambda self, v=view_only: v
+        )
+        assert page.entry_layout(tabs) == about
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: False)
-    assert page.entry_layout(tabs) == work
-
-    # The url has no say: whoever cannot update the app gets the view-only tab set, and so
-    # lands where that tab set starts.
-    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
+    # the url has no say either - a run opens on About and switches when it runs
     page.request.query_params = {"run_id": "run-1"}
     assert page.entry_layout(tabs) == about
 

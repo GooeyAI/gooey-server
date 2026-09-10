@@ -474,18 +474,9 @@ class BasePage(BasePageV1):
         self.submit_and_redirect()
 
     def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        """The view the workspace opens on. About for a view-only viewer, the work split for
-        anyone who can update the app.
-
-        Read off the same answer `get_tab_spec` reads, so the landing view and the tabs
-        offered cannot disagree: a view-only viewer is given About and How it works, and How
-        it works is a config form they have no way to save. About is what their half of the
-        tab set is for, so it is where they start - the root of a recipe and a published run
-        they cannot update alike.
-        """
-        if self.is_view_only():
-            return tabs[0].layout
-        return self.work_layout()
+        """The view the workspace opens on: About, whoever is asking. Ownership no longer
+        decides it - both tab sets lead with About, so `tabs[0]` is it either way."""
+        return tabs[0].layout
 
     def work_layout(self) -> WorkspaceLayout:
         """The two-pane working view: the editor with its preview beside it."""

@@ -151,6 +151,13 @@
   overflow: hidden;
 }
 
+/* A pane fills the body, and its wrapper with it - the one `RecipeWorkspacePanes` requires
+   per pane - so an editor inside can size against a height instead of growing to its text. */
+.recipe-workspace-pane-panel,
+.recipe-workspace-pane-panel > * {
+  height: 100%;
+}
+
 /* The failure notice above the output. A flex item's automatic minimum size would hold it at
    its full content height, which the clipping pane above then cuts off - so it is allowed to
    shrink (`min-height: 0`), bounded (`max-height`) and given the scrollbar itself. */
