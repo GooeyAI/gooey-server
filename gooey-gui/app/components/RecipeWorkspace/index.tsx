@@ -58,7 +58,7 @@ export function RecipeWorkspace({
     <RecipeWorkspaceProvider key={config.storage_key} config={config}>
       <div
         className={clsx(
-          "recipe-workspace container-xxl py-lg-2",
+          "recipe-workspace py-lg-2",
           !hydrated && "gooey-until-hydrated"
         )}
       >
@@ -180,7 +180,7 @@ export function RecipeWorkspacePanes({
         })}
       </div>
       <div
-        className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3"
+        className="recipe-workspace-pane-scroll flex-grow-1 overflow-auto pt-2"
         style={{ minHeight: 0 }}
       >
         {panes.map((pane, index) => (

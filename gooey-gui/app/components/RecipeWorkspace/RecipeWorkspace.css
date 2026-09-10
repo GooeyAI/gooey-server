@@ -14,6 +14,18 @@
   display: flex;
   flex: 1 1 auto;
   width: 100%;
+  /* Was Bootstrap's `.container-xxl`, which capped the whole workspace at 1320px and centred
+     it - so on any display wider than 1400px the panes stopped short of the rail and the
+     right edge and sat in a band of page colour. Its gutter is kept, at the 16px the design
+     asks for rather than Bootstrap's 12, because the editor's shadow paints into it (see
+     `.recipe-workspace-editor`) and `overflow: hidden` below clips at the padding box.
+
+     The cap itself is raised rather than dropped: at 1920px a laptop and most desktops get
+     the full width, and only a very wide display still centres - where an unbounded
+     workspace would put the chat 2000px from the form it belongs to. */
+  max-width: var(--v2-shell-max);
+  margin-inline: auto;
+  padding-inline: var(--gooey-space-4);
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -67,7 +79,8 @@
   margin: 0 !important;
   padding: var(--gooey-space-2) var(--gooey-space-3) !important;
   border: 1px solid var(--gooey-line-soft) !important;
-  border-radius: var(--gooey-radius-sm) !important;
+  /* the design's card radius, shared with the config card these sit on top of */
+  border-radius: var(--gooey-radius-md) !important;
   background: var(--gooey-bg-page) !important;
   color: var(--gooey-ink-muted) !important;
   font-size: 14px !important;
@@ -90,8 +103,8 @@
 }
 
 .recipe-workspace-pane-tabs > button.pane-active::before {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   margin-right: var(--gooey-space-2);
   border-radius: 50%;
   background: var(--gooey-ink);
@@ -113,6 +126,14 @@
   max-width: calc(40% - var(--recipe-pane-half-gap));
   border: 1px solid var(--gooey-line-default);
   border-radius: 0.75rem;
+  /* The same lift `.recipe-workspace-editor` carries, so the two framed surfaces sit at the
+     same depth - the preview had the border and the corners but not the shadow, which read
+     as the chat being printed on the page while the editor floated above it.
+
+     On the pane rather than its content box, for the reason the editor's comment gives:
+     `overflow: hidden` clips an element's children, never its own shadow, and the
+     workspace's `padding-inline` is what the shadow has to paint into. */
+  box-shadow: 0 0 12px 0 rgba(0, 0, 0, 0.08);
 }
 
 .recipe-workspace-pane--solo {
@@ -229,10 +250,21 @@
 }
 
 .v2-workspace-body {
-  /* Reading width for any surface that has the whole row: the solo working column and the
-     document tabs. Wider than prose, because these carry forms and code rather than
-     paragraphs. One definition, used from both css and `_render_solo_input_col`. */
-  --v2-reading-max: 1420px;
+  /* Two caps, because the two surfaces are read differently.
+
+     `--v2-shell-max` bounds the *workspace* - panes side by side, which want all the width
+     they can get and only need bounding so a chat and the form it belongs to do not end up
+     at opposite ends of a 34" display.
+
+     `--v2-reading-max` bounds a surface that has the whole row to itself - a document tab
+     (API, Deploy, History) or the solo working column - which is prose, forms, tables and
+     curl blocks, and stays readable by staying narrower. Wider than prose because these
+     carry code, but well inside the shell's cap.
+
+     Both were lower (1320 via Bootstrap, and 1420) and both showed as margins on a laptop.
+     One definition each, used from css and from `_render_solo_input_col`. */
+  --v2-shell-max: 1920px;
+  --v2-reading-max: 1600px;
   background-color: var(--gooey-bg-page) !important;
 }
 
@@ -295,13 +327,26 @@
 .recipe-workspace-editor {
   background: var(--gooey-bg-page);
   border-radius: 12px;
-  box-shadow: 0 0 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 12px 0 rgba(0, 0, 0, 0.08);
 }
 
 .recipe-workspace-editor > .recipe-workspace-pane-content {
-  /* An inset, now that the surface has an edge to sit off. The working column's `pe-lg-3` is
-     on top of this, not instead of it. */
+  /* An inset, now that the surface has an edge to sit off. The only one - the scroller inside
+     used to add `pe-lg-3` on top of it, which is what put the config panes 28px off the right
+     edge and 12px off the left. */
   padding: 0.75rem;
+}
+
+/* The scrolling body of the config panes, inside the inset above.
+
+   No side padding of its own: the inset is the inset, and a second one only on the end side
+   is what the design review saw as "extra padding right on the LLM instructions tab".
+   `scrollbar-gutter` instead, which reserves the scrollbar's width on *both* edges - so the
+   two margins stay equal and the content does not jump sideways when a pane that fits is
+   swapped for one that scrolls. Browsers without it overlay the scrollbar, which is the
+   behaviour this had before. */
+.recipe-workspace-pane-scroll {
+  scrollbar-gutter: stable both-edges;
 }
 
 /* ------------------------------------------------------------ editor run bar
@@ -379,16 +424,6 @@
   background: var(--gooey-danger);
 }
 
-/* Frames the preview where it shares the view with something else - Split, About - so the two
-   read as separate surfaces. Was an inline style on the div; moved here so the media query
-   below can drop it. */
-.v2-preview-frame {
-  min-height: 0;
-  overflow: hidden;
-  border: 1px solid var(--gooey-line-default);
-  border-radius: 12px;
-}
-
 @media (max-width: 991.98px) {
   .recipe-workspace-pane-tabs {
     margin-top: 0 !important;
@@ -415,25 +450,14 @@
     border-radius: 0 !important;
   }
 
-  /* A tab body that is not the workspace - API, Deploy, History - is a document, not a pane, so
-     it keeps a gutter. The markup carries `px-0` at this width for the workspace views, which
-     do run edge to edge; without this the API tab's text sat flush against both edges. */
+  /* One pane fills the screen here, so it runs to both edges and the desktop gutter would
+     only show as two strips of page colour beside it. The panes bring their own padding at
+     this width - see ABOUT_CSS's `padding-left`/`right` and the editor column's `px-2`. A
+     tab body that is *not* the workspace keeps a gutter of its own, up in
+     `.v2-workspace-body:not(:has(.recipe-workspace))`. */
   .recipe-workspace {
     position: relative;
-  }
-
-  /* `.container-xxl` brings half a gutter on each side. Beaten on specificity - two classes
-     to Bootstrap's one - rather than with `!important`. */
-  .recipe-workspace.container-xxl {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  /* One pane fills the screen at this width, so there is no second surface to be separated
-     from - and a border hugging the viewport reads as an outline, not a frame. */
-  .v2-preview-frame {
-    border: 0;
-    border-radius: 0;
+    padding-inline: 0;
   }
 
   /* A plain white field at this width: every edge of the frame is either off-screen or under
