@@ -842,11 +842,13 @@ class BasePage(BasePageV1):
         with gui.div(className="v2-about-panel"):
             self._render_about_tags(tags)
             if pr.notes:
-                # No heading over it. The description is the panel's subject, and a
-                # "Description" label above prose only says what the prose already is - the
-                # meta groups keep their headings because a row of cards does need naming.
-                with gui.div(className="container-margin-reset v2-about-notes"):
-                    gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
+                # Heading and prose in one box, so the panel's `gap` spaces the pair from
+                # what surrounds it and the heading's own margin does the rest.
+                with gui.div():
+                    with gui.tag("h2", className="v2-about-section-title"):
+                        gui.html("Description")
+                    with gui.div(className="container-margin-reset v2-about-notes"):
+                        gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
             # One row for both hooks, so Model and Deployments sit side by side rather
             # than each opening a row of its own and stacking.
             with gui.div(className="v2-about-groups"):
