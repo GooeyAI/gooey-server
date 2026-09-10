@@ -462,6 +462,40 @@ def test_title_menu_offers_v1s_options(monkeypatch):
     assert [i.label for i in page._title_menu_items()][1] == "Save as New"
 
 
+def test_the_root_recipes_version_history_is_an_admins_to_see(monkeypatch):
+    """A root recipe is edited in place, so it does have versions - the menu hid them
+    anyway. Gated now on who may edit the template: a staff admin, on a root pr."""
+    from bots.models import WorkflowAccessLevel
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(
+        is_root=lambda: True, saved_run="sr", tags=SimpleNamespace(all=list)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "current_pr", property(lambda self: pr))
+    monkeypatch.setattr(VideoBotsPageV2, "current_sr", property(lambda self: "sr"))
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_workspace", property(lambda self: None)
+    )
+    # says yes to everyone, so Delete's absence below is the root check and not this
+    monkeypatch.setattr(
+        WorkflowAccessLevel, "can_user_delete_published_run", lambda **kw: True
+    )
+    page.request = SimpleNamespace(user=object())
+
+    def _may_edit(answer: bool):
+        monkeypatch.setattr(
+            VideoBotsPageV2, "can_edit_current_pr", property(lambda self: answer)
+        )
+        return [item.label for item in page._title_menu_items()]
+
+    assert "Versions" not in _may_edit(False)
+    assert _may_edit(True)[0] == "Versions"
+
+    # Delete stays off the root recipe for everyone: it is the recipe, not a run of it.
+    assert "Delete" not in _may_edit(True)
+
+
 def test_title_menu_is_empty_when_logged_out(monkeypatch):
     page = object.__new__(VideoBotsPageV2)
     monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: False)
@@ -832,6 +866,136 @@ def test_usage_keeps_the_publish_control(monkeypatch):
 
     page.tab = RecipeTabs.run
     assert page._top_bar_publish_label() == "Update"
+
+
+def _capture_top_bar(page, monkeypatch) -> RecipeTopBarProps:
+    """Render the bar and hand back the one props object it sent to the client."""
+    split = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
+    config = PageShellConfig(
+        storage_key="layout",
+        initial_layout=split,
+        run_layout=split,
+        views=[WorkspaceView(key="split", label="Split", layout=split)],
+        workspace_href="/agent/",
+        workspace_active=False,
+    )
+    captured = []
+    monkeypatch.setattr(
+        gui, "model_component", lambda props: captured.append(props) or nullcontext()
+    )
+    page._render_top_bar(config=config)
+    (props,) = captured
+    return props
+
+
+def _bar_page(
+    monkeypatch,
+    *,
+    can_edit: bool,
+    is_root: bool = True,
+    url_names_the_pr: bool = True,
+    logged_in: bool = True,
+):
+    """A page with the bar's other inputs stubbed down to nothing, so only the publish
+    cluster is in play."""
+    page = object.__new__(VideoBotsPageV2)
+    page.tab = RecipeTabs.run
+    page.current_sr_pr = (
+        SimpleNamespace(id=7),
+        SimpleNamespace(
+            is_root=lambda: is_root, saved_run_id=7 if url_names_the_pr else 99
+        ),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_edit_current_pr", property(lambda self: can_edit)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: logged_in)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_workflow_identity",
+        lambda self: SimpleNamespace(
+            title="Agent", name="Agent", href=None, photo_url=None, circle_photo=False
+        ),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_app_url",
+        lambda self, tab=RecipeTabs.run, **kw: "/agent/",
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_cost", lambda self: ("", ""))
+    monkeypatch.setattr(VideoBotsPageV2, "can_manage_sharing", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_author", lambda self: None)
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_parent", lambda self: None)
+    monkeypatch.setattr(VideoBotsPageV2, "_has_request_changed", lambda self: False)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_user_save_run", lambda self, sr, pr: False
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "_title_menu_items", lambda self: [])
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_integrations", lambda self: [])
+    monkeypatch.setattr(VideoBotsPageV2, "get_credits_click_url", lambda self: "")
+    monkeypatch.setattr(VideoBotsPageV2, "_can_launch_builder", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "_usage_href", lambda self: None)
+    return page
+
+
+@pytest.mark.parametrize(
+    "is_root,url_names_the_pr,can_edit,offered",
+    [
+        # the recipe's own template, to someone who cannot change it
+        (True, True, False, False),
+        # somebody else's published workflow: same page, same answer
+        (False, True, False, False),
+        # a run of either is the viewer's own work, whoever they are
+        (True, False, False, True),
+        (False, False, False, True),
+        # an editor keeps the lot, wherever they are standing
+        (True, True, True, True),
+        (False, True, True, True),
+    ],
+)
+def test_the_publish_cluster_follows_view_only(
+    monkeypatch, is_root, url_names_the_pr, can_edit, offered
+):
+    """All four move together - the client renders Publish for any entry left, so one
+    stray href keeps the button. A run is never view-only, hence the run rows."""
+    props = _capture_top_bar(
+        _bar_page(
+            monkeypatch,
+            can_edit=can_edit,
+            is_root=is_root,
+            url_names_the_pr=url_names_the_pr,
+        ),
+        monkeypatch,
+    )
+
+    assert (props.publish_label is not None) is offered
+    assert (props.publish_intent is not None) is offered
+    assert (props.api_href is not None) is offered
+    assert (props.deploy_href is not None) is offered
+
+
+def test_a_logged_out_visitor_gets_no_publish_cluster_on_a_view_only_page(monkeypatch):
+    """Logged out is view-only everywhere it cannot edit, so it loses the cluster too -
+    the bar's Run control is the way in from here."""
+    props = _capture_top_bar(
+        _bar_page(monkeypatch, can_edit=False, logged_in=False), monkeypatch
+    )
+
+    assert props.publish_label is None
+    assert props.publish_intent is None
+    assert props.api_href is None
+    assert props.deploy_href is None
+    assert props.run_intent is not None
+
+
+def test_an_editor_still_gets_the_whole_publish_cluster(monkeypatch):
+    """The workflow is theirs to update, so nothing is taken away."""
+    props = _capture_top_bar(_bar_page(monkeypatch, can_edit=True), monkeypatch)
+
+    assert props.publish_label == "Update"
+    assert props.publish_intent is not None
+    assert props.api_href == "/agent/"
+    assert props.deploy_href == "/agent/"
 
 
 def test_the_bar_can_carry_no_run_control():

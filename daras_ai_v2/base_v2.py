@@ -538,8 +538,9 @@ class BasePage(BasePageV1):
         pr = self.current_pr
         items = []
 
-        # A root recipe is the template every run forks from; it has no versions.
-        if not pr.is_root():
+        # A root recipe does have versions - it is edited in place. Reading that history
+        # and writing it are the same privilege - on a root pr, a staff admin's.
+        if not pr.is_root() or self.can_edit_current_pr:
             items.append(
                 TopBarMenuItem(
                     key=self.MENU_VERSION_HISTORY,
@@ -641,6 +642,11 @@ class BasePage(BasePageV1):
                 icon_html=icons.share,
             )
 
+        # A view-only page has nothing to publish. All four go together, or the client
+        # keeps its Publish button for whatever entry is left. A run is never view-only.
+        view_only = self.is_view_only()
+        publish_label = None if view_only else self._top_bar_publish_label()
+
         usage_active = self.tab == RecipeTabs.usage
 
         gui.model_component(
@@ -650,16 +656,20 @@ class BasePage(BasePageV1):
                 title=identity.title if config.workspace_active else identity.name,
                 title_href=identity.href,
                 crumb_label=None if config.workspace_active else self.tab.label,
-                view_only=self.is_view_only(),
+                view_only=view_only,
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
                 parent=self._top_bar_parent(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
-                publish_label=self._top_bar_publish_label(),
-                publish_intent=PublishIntent(),
-                api_href=self.current_app_url(RecipeTabs.run_as_api),
-                deploy_href=self.current_app_url(RecipeTabs.integrations),
+                publish_label=publish_label,
+                publish_intent=PublishIntent() if publish_label else None,
+                api_href=(
+                    None if view_only else self.current_app_url(RecipeTabs.run_as_api)
+                ),
+                deploy_href=(
+                    None if view_only else self.current_app_url(RecipeTabs.integrations)
+                ),
                 share=share,
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
