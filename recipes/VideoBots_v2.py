@@ -422,10 +422,10 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             )
 
     def _render_settings_pane(self):
-        gui.markdown("## 💪 Capabilities")
+        gui.markdown("#### 💪 Capabilities")
 
         speech_recognition_enabled = switch_with_section(
-            label="### 🦻 Speech Recognition & Translation",
+            label="##### 🦻 Speech Recognition & Translation",
             key="_speech_recognition_enabled",
             control_keys=["user_language", "asr_model"],
             render_section=self.speech_recognition_settings,
@@ -439,7 +439,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             gui.session_state["user_language"] = None
 
         text_to_speech_enabled = switch_with_section(
-            label="### 🗣️ Text to Speech & Lipsync",
+            label="##### 🗣️ Text to Speech & Lipsync",
             key="_text_to_speech_enabled",
             control_keys=["tts_provider"],
             render_section=self.text_to_speech_settings,
@@ -448,7 +448,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             gui.session_state["tts_provider"] = None
 
         document_intelligence_enabled = switch_with_section(
-            label="### 🩻 Photo & Document Intelligence",
+            label="##### 🩻 Photo & Document Intelligence",
             key="_document_intelligence_enabled",
             control_keys=["document_model"],
             render_section=self.document_intelligence_settings,
@@ -457,7 +457,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             gui.session_state["document_model"] = None
 
         switch_with_section(
-            label="### 📊 Analytics & Evaluation",
+            label="##### 📊 Analytics & Evaluation",
             control_keys=["bulk_runs"],
             render_section=lambda: render_workflow_bulk_runs_list(
                 user=self.request.user,

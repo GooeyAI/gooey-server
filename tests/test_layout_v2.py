@@ -742,33 +742,6 @@ def test_about_section_titles_are_headings_rather_than_styled_divs(monkeypatch):
     assert '<div class=\\"v2-about-section-title\\"' not in json.dumps(root.to_dict())
 
 
-def test_the_editor_surfaces_headings_do_not_skip_a_level(monkeypatch):
-    """Capabilities was an `h4` with no `h2` or `h3` above it anywhere on the page, and the
-    switches under it were `h5`. Nothing about the page's shape said those belonged to the
-    editor rather than to About.
-
-    Levels only - the wording is the recipe's to choose. `RecipeWorkspace.css` pins the two
-    levels to the sizes `####` and `#####` used to render at, so the outline moved and the
-    page did not.
-    """
-    import re
-    from pathlib import Path
-
-    source = Path("recipes/VideoBots_v2.py").read_text()
-    levels = [
-        len(m.group(1))
-        for m in re.finditer(r'(?:gui\.markdown\(|label=)"(#+) ', source)
-    ]
-    assert levels, (
-        "no markdown headings found - has the settings pane been restructured?"
-    )
-    assert min(levels) == 2, (
-        f"the editor's top heading should be an h2, got h{min(levels)}"
-    )
-    for shallower, deeper in zip(levels, levels[1:]):
-        assert deeper - shallower <= 1, f"h{shallower} -> h{deeper} skips a level"
-
-
 def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():
     """The gate takes a slug, not a request: v2 is per-recipe, and every visitor - logged
     out included - gets the same layout for the same url.

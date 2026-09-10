@@ -826,11 +826,8 @@ class BasePage(BasePageV1):
         """What this workflow is. Version history lives in the title menu and Related
         Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
-        # The page's one h1. Visually hidden because the top bar already shows this name
-        # and About is not the place to say it twice - but the bar is chrome that repeats
-        # on every tab, so it is not the heading, and without this the page had none at all
-        # for a crawler or a screen reader. About is where it belongs: it is the surface
-        # that presents the workflow, and the only one guaranteed to be rendered.
+        # The page's one h1. Hidden because the top bar already shows the name - but that
+        # bar is chrome on every tab, so it cannot be the heading.
         with gui.tag("h1", className="visually-hidden"):
             gui.html(html.escape(self._workflow_identity().name))
         # The portrait leads; the top bar carries the title.
@@ -1613,6 +1610,10 @@ ABOUT_CSS = """
 & .v2-about-section-title {
     /* Names the section rather than saying anything itself, so it is set back from what it
        labels - the cards and the description are what should be read first. */
+    /* An h2 for the outline, so the global heading scale has to come back off it. */
+    font-family: inherit;
+    line-height: inherit;
+    margin-top: 0;
     font-size: 0.9375rem;
     font-weight: 500;
     color: var(--gooey-ink-muted);
@@ -1661,7 +1662,7 @@ ABOUT_CSS = """
 & .v2-about-meta-icon {
     display: inline-flex;
     align-items: center;
-    font-size: 1.5rem;
+    font-size: 22px;
     line-height: 1;
     color: var(--gooey-ink);
 }
@@ -1669,8 +1670,8 @@ ABOUT_CSS = """
 /* For icon html that arrives without a size of its own; anything carrying an inline one
    wins here and has to be asked for ABOUT_META_ICON_SIZE instead. */
 & .v2-about-meta-icon img {
-    height: 1.5rem;
-    width: 1.5rem;
+    height: 22px;
+    width: 22px;
     object-fit: contain;
 }
 
