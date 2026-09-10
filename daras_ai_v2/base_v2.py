@@ -1,6 +1,7 @@
 import html
 import inspect
 import typing
+from contextlib import contextmanager
 from functools import cached_property
 
 import pydantic
@@ -846,8 +847,11 @@ class BasePage(BasePageV1):
                 # meta groups keep their headings because a row of cards does need naming.
                 with gui.div(className="container-margin-reset v2-about-notes"):
                     gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
-            self._render_about_meta()
-            self._render_about_deployments()
+            # One row for both hooks, so Model and Deployments sit side by side rather
+            # than each opening a row of its own and stacking.
+            with gui.div(className="v2-about-groups"):
+                self._render_about_meta()
+                self._render_about_deployments()
 
     def _render_about_author(self, pr: PublishedRun):
         """Who published this, above the panel: their mark, their name, what else they have
@@ -999,22 +1003,17 @@ class BasePage(BasePageV1):
         base renders nothing."""
 
     def _render_about_deployments(self):
-        """The channels this workflow is live on, as cards beside Model and Tools.
+        """The channels this workflow is live on, as a group beside Model and Tools.
 
-        Its own `.v2-about-groups` row, since `_render_about_meta` is a per-recipe override a
-        base surface cannot reach into.
+        A group, not a row: `_render_about_content` owns the row both this and the
+        per-recipe `_render_about_meta` render into.
         """
         integrations = self._top_bar_integrations()
         if not integrations:
             return
-        with (
-            gui.div(className="v2-about-groups"),
-            gui.div(className="v2-about-group"),
-        ):
-            gui.html('<h2 class="v2-about-section-title">Deployments</h2>')
-            with gui.div(className="v2-about-meta"):
-                for it in integrations:
-                    gui.html(self._about_deployment_card(it))
+        with self._about_meta_group("Deployments", len(integrations)):
+            for it in integrations:
+                gui.html(self._about_deployment_card(it))
 
     def _about_deployment_card(self, it: TopBarIntegration) -> str:
         """One channel, carrying the same target as its chip in the bar."""
@@ -1032,6 +1031,20 @@ class BasePage(BasePageV1):
             f' name="{html.escape(self.SUBMIT_INTENT_KEY)}"'
             f' value="{html.escape(it.target.intent.model_dump_json())}">{body}</button>'
         )
+
+    @contextmanager
+    def _about_meta_group(self, title: str, count: int):
+        """A heading and the grid of cards under it, shared by Deployments and the per-recipe
+        `_render_about_meta` so the two groups in the row are built the same way."""
+        with gui.div(className="v2-about-group"):
+            gui.html(f'<h2 class="v2-about-section-title">{html.escape(title)}</h2>')
+            # The column count is set here rather than left to `auto-fill`, which materialises
+            # every track that fits and so made a two-card group as wide as a six-card one.
+            with gui.div(
+                className="v2-about-meta",
+                style={"--v2-about-cols": str(min(count, ABOUT_META_MAX_COLS))},
+            ):
+                yield
 
     @staticmethod
     def _about_meta_card_body(icon_html: str, label: str) -> str:
@@ -1412,6 +1425,9 @@ VARIABLES_DIALOG_CSS = """
 # creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
 ABOUT_META_ICON_SIZE = "1.375rem"
 
+# Cards per row before a group takes a second line.
+ABOUT_META_MAX_COLS = 6
+
 ABOUT_CSS = """
 /* The two measurements the meta cards are built from, named here so the card rule and the
    Python that asks a creator's logo for a size cannot drift apart.
@@ -1646,6 +1662,12 @@ ABOUT_CSS = """
     padding-top: var(--gooey-space-4);
 }
 
+/* `_render_about_meta` is a per-recipe hook and Deployments is conditional, so the row is
+   opened before either is known to have anything in it. */
+& .v2-about-groups:empty {
+    display: none;
+}
+
 /* Sizes to its own cards. With `min-width: 0` the group could be squeezed narrower than one
    card, which made the cards inside wrap into a column while the row still looked half empty.
    Whole groups wrap instead. */
@@ -1668,12 +1690,13 @@ ABOUT_CSS = """
     margin-bottom: var(--gooey-space-2);
 }
 
-/* `nowrap`: a group's cards belong on one line, and the group is what gives way when the row
-   runs out of width. Below lg they wrap - see the media query at the end. */
+/* A grid of fixed cards, six across before it takes a second row. `max-width` is what caps
+   the column count: the tracks are card-width, so six of them plus their five gaps is the
+   widest a row can be. */
 & .v2-about-meta {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: var(--gooey-space-2);
+    display: grid;
+    grid-template-columns: repeat(var(--v2-about-cols, 1), var(--v2-about-card-size));
+    gap: var(--gooey-space-4);
 }
 
 /* A small square tile: mark and chevron on the top row, the label under them.
@@ -1768,21 +1791,25 @@ ABOUT_CSS = """
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1.2;
+    /* `white-space: normal` because `button .gui-html-container` in app.css sets `nowrap`,
+       which this inherits - and a label that cannot wrap sets the card's automatic minimum
+       width, so the cards came out wider than the 96px they are given. */
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    /* Two lines, always: the clamp is the ceiling and `min-height` the floor, so a one-word
+       label reserves the same space a two-word one fills and every card is the same height. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    min-height: 2.4em;
+    overflow: hidden;
 }
 
 @media (max-width: 991.98px) {
-    /* One column: side by side there is not room for two groups plus their cards, and the
-       cards were being squeezed to the point the labels all ellipsised. */
+    /* Still a row - the cards are a fixed 96px, so two groups fit even on a phone - but a
+       tighter one, and whole groups wrap when they run out of width. */
     & .v2-about-groups {
-        flex-direction: column;
         gap: var(--gooey-space-5);
-    }
-
-    /* the group is full width now, so its cards may wrap within it */
-    & .v2-about-meta {
-        flex-wrap: wrap;
     }
 
     & {

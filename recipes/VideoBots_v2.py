@@ -274,17 +274,14 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
         if not cards:
             return
 
-        with gui.div(className="v2-about-groups"):
-            self._render_about_meta_group("Model, Knowledge base & Tools", cards)
+        self._render_about_meta_group("Model, Knowledge base & Tools", cards)
 
     def _render_about_meta_group(
         self, title: str, cards: list[tuple[str, str, ConfigPane]]
     ):
-        with gui.div(className="v2-about-group"):
-            gui.html(f'<h2 class="v2-about-section-title">{html.escape(title)}</h2>')
-            with gui.div(className="v2-about-meta"):
-                for icon, label, pane in cards:
-                    self._render_about_meta_card(icon=icon, label=label, pane=pane)
+        with self._about_meta_group(title, len(cards)):
+            for icon, label, pane in cards:
+                self._render_about_meta_card(icon=icon, label=label, pane=pane)
 
     def _about_model_summary(self) -> tuple[str, str] | None:
         """(icon html, label) for the selected LLM, or None if the run has not picked one."""
