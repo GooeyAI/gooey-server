@@ -1439,6 +1439,9 @@ ABOUT_CSS = """
     --v2-about-card-size: 96px;
     /* Keep in step with ABOUT_META_ICON_SIZE. */
     --v2-about-icon-size: 1.375rem;
+    /* Lines a card label always occupies - both its ceiling and its floor, which is what
+       fixes the card's height. Three fits "8 Knowledge sources" at this width. */
+    --v2-about-label-lines: 3;
 }
 
 /* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
@@ -1641,7 +1644,6 @@ ABOUT_CSS = """
 & .v2-about-notes {
     color: var(--gooey-ink);
     font-size: 0.875rem;
-    line-height: 1.4;
     /* The clamp's "…more" is drawn over the tail of the last line, so it carries an opaque
        background to cover it - white by default, which read as a chip against this panel. */
     --line-clamp-bg: var(--gooey-surface-100);
@@ -1796,12 +1798,13 @@ ABOUT_CSS = """
        width, so the cards came out wider than the 96px they are given. */
     white-space: normal;
     overflow-wrap: break-word;
-    /* Two lines, always: the clamp is the ceiling and `min-height` the floor, so a one-word
-       label reserves the same space a two-word one fills and every card is the same height. */
+    /* The same number of lines whatever the label says: the clamp is the ceiling and
+       `min-height` the floor, both read off one variable, so a two-word label reserves the
+       space a three-line one fills and the card's height cannot vary between cards. */
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    min-height: 2.4em;
+    -webkit-line-clamp: var(--v2-about-label-lines);
+    min-height: calc(var(--v2-about-label-lines) * 1.2em);
     overflow: hidden;
 }
 
