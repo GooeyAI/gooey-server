@@ -403,6 +403,46 @@ def test_about_deployment_cards_carry_the_chips_targets():
     assert page._pop_submit_intent() == intent
 
 
+def test_every_about_card_is_drawn_from_one_body():
+    """A deployment card and a config card are one object in the design, and were two copies
+    of the same markup here - so a change to the card's shape reached one and not the other.
+    Both go through `_about_meta_card_body` now.
+
+    The chevron is what that shape gained: the cards link somewhere, and nothing on them said
+    so. It is a constraint rather than a detail, because it is the affordance.
+    """
+    import json
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    page = object.__new__(VideoBotsPageV2)
+
+    deployment = page._about_deployment_card(
+        TopBarIntegration(
+            key="web",
+            label="Try in Web",
+            icon_html="<i class='brand'></i>",
+            target=LinkTarget(href="/chat/agent/"),
+        )
+    )
+
+    root = RenderTreeNode("root")
+    with NestingCtx(root):
+        page._render_about_meta_card(
+            icon="<i class='brand'></i>",
+            label="GPT-5",
+            pane=ConfigPane.llm_instructions,
+        )
+    config = json.dumps(root.to_dict())
+
+    for markup, which in ((deployment, "deployment"), (config, "config")):
+        assert "v2-about-meta-chevron" in markup, f"{which} card lost its chevron"
+        # the mark and the chevron share a row, which is what puts them at opposite ends
+        assert "v2-about-meta-head" in markup, f"{which} card lost its head row"
+        assert "v2-about-meta-icon" in markup
+        assert "v2-about-meta-label" in markup
+
+
 def test_narrow_surface_keeps_the_editor_for_a_view_only_viewer(monkeypatch):
     """Their one work tab is "How it works", which exists to show the configuration - so a
     phone keeps the editor. An editor on Split keeps the bot."""
@@ -905,19 +945,44 @@ def test_the_workspace_alone_does_not_host_an_unavailable_builder(monkeypatch):
     assert page._hosts_builder() is False
 
 
-def test_about_names_how_much_the_workflow_has_been_run():
-    """The metric the explore cards carry, formatted the same way, so a workflow reads the
-    same on its own page as in the gallery it was found in. What the owner has published
-    besides this belongs to their profile, not to the workflow being read about."""
+def test_about_names_what_else_the_owner_has_published(monkeypatch):
+    """The line qualifies the *name* it sits under, so it reports what else that workspace
+    has published rather than how much this one workflow has been run. This workflow's own
+    run count is on its explore card and in the bar's cost cluster.
+
+    Read through `public_workflow_count`, so the number under a workspace's name here is the
+    same one its profile page shows - two counts of "how many workflows" would drift.
+    """
+    from daras_ai_v2 import profiles
+
     page = object.__new__(VideoBotsPageV2)
-    subtitle = page._about_author_subtitle
+    counted = []
 
-    assert subtitle(SimpleNamespace(run_count=1)) == "1 run"
-    assert subtitle(SimpleNamespace(run_count=42)) == "42 runs"
-    # the same suffixes the cards use, so a busy workflow does not read as a phone number
-    assert subtitle(SimpleNamespace(run_count=1500)) == "1.5K runs"
-    assert subtitle(SimpleNamespace(run_count=1200000)) == "1.2M runs"
+    def fake_count(workspace):
+        counted.append(workspace)
+        return fake_count.value
 
-    # nothing to report yet: the line is left off rather than reading "0 runs"
-    assert subtitle(SimpleNamespace(run_count=0)) == ""
-    assert subtitle(SimpleNamespace(run_count=None)) == ""
+    monkeypatch.setattr(profiles, "public_workflow_count", fake_count)
+
+    workspace = SimpleNamespace()
+    pr = SimpleNamespace(workspace_id=7, workspace=workspace)
+
+    fake_count.value = 1
+    assert page._about_author_subtitle(pr) == "1 Published workflow"
+    fake_count.value = 12
+    assert page._about_author_subtitle(pr) == "12 Published workflows"
+    # the same suffixes the cards use, so a prolific workspace does not read as a phone number
+    fake_count.value = 1500
+    assert page._about_author_subtitle(pr) == "1.5K Published workflows"
+
+    # it is the *workspace* that is counted, not the run
+    assert counted and all(w is workspace for w in counted)
+
+    # nothing to report: the line is left off rather than reading "0 Published workflows"
+    fake_count.value = 0
+    assert page._about_author_subtitle(pr) == ""
+    # ...and an unowned run never reaches the query at all
+    counted.clear()
+    fake_count.value = 12
+    assert page._about_author_subtitle(SimpleNamespace(workspace_id=None)) == ""
+    assert counted == []

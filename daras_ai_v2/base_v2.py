@@ -830,33 +830,28 @@ class BasePage(BasePageV1):
             gui.html(html.escape(self._workflow_identity().name))
         # The portrait leads; the top bar carries the title.
         self._render_about_photo(pr)
-        # One panel answering "whose is this, what is it filed under, what is it" in that
-        # order. Tags and the description say the same thing at two lengths and the owner is
-        # who is saying it, so the three share a box; the cards below get their own, being a
-        # spec to scan rather than prose to read.
+        # Attribution stands on the page, not in the panel: it is who is speaking, and the
+        # panel is what they said. Above it in the design too, between the portrait and the
+        # box.
+        self._render_about_author(pr)
+        # One panel for the whole answer - what it is filed under, what it is, and how it is
+        # put together - rather than a box per kind of content. Two panels drew a seam
+        # through one continuous read, and the cards inside already carry their own edges.
         tags = list(pr.tags.all())
-        if pr.workspace_id or pr.notes or tags:
-            with gui.div(className="v2-about-panel"):
-                self._render_about_author(pr)
-                self._render_about_tags(tags)
-                if pr.notes:
-                    # the same heading the meta groups carry, so the panels read as a pair.
-                    # A real `gui.div` rather than `gui.html`: that wraps its body in a
-                    # `.gui-html-container`, which is `display: contents` and so generates no
-                    # box - the panel's spacing rule would land on the wrapper and vanish.
-                    with gui.tag("h2", className="v2-about-section-title"):
-                        gui.html("Description")
-                    with gui.div(className="container-margin-reset v2-about-notes"):
-                        gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
-        # `.v2-about-panel:empty` hides this for a recipe with neither cards nor
-        # deployments, which is what the base `_render_about_meta` renders.
         with gui.div(className="v2-about-panel"):
+            self._render_about_tags(tags)
+            if pr.notes:
+                # No heading over it. The description is the panel's subject, and a
+                # "Description" label above prose only says what the prose already is - the
+                # meta groups keep their headings because a row of cards does need naming.
+                with gui.div(className="container-margin-reset v2-about-notes"):
+                    gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
             self._render_about_meta()
             self._render_about_deployments()
 
     def _render_about_author(self, pr: PublishedRun):
-        """Who published this, at the head of the panel: their mark, their name, how much it
-        has been run, and Share opposite.
+        """Who published this, above the panel: their mark, their name, what else they have
+        published, and Share opposite.
 
         At every width. The top bar names the workspace too above lg, so the two repeat each
         other there - but About is the tab that presents the workflow, and a reader landing
@@ -896,21 +891,28 @@ class BasePage(BasePageV1):
                 gui.html(share)
 
     def _about_author_subtitle(self, pr: PublishedRun) -> str:
-        """The line under the owner's name: how much this workflow has been run.
+        """The line under the owner's name: what else this workspace has published.
 
-        The metric the explore cards carry, formatted the same way, so a workflow reads the
-        same on its own page as in the gallery it was found in. What the owner has published
-        besides this belongs to their profile rather than to the workflow you came here to
-        read about. Empty until there is a run to count - "0 runs" says less than nothing.
+        It qualifies the *name* it sits under, not the workflow - the block is an
+        attribution, and "what else have they made" is what tells you how much to trust it.
+        This workflow's own run count is on its explore card and in the top bar's cost
+        cluster, so it is not the number missing here.
+
+        `public_workflow_count` rather than a count of our own, so the number under a
+        workspace's name is the same one its profile page reports. Empty when there is
+        nothing to count - "0 published workflows" says less than nothing.
         """
         from daras_ai.text_format import format_number_with_suffix
+        from daras_ai_v2.profiles import public_workflow_count
         from django.utils.translation import ngettext
 
-        run_count = pr.run_count or 0
-        if not run_count:
+        if not pr.workspace_id:
             return ""
-        noun = ngettext(singular="run", plural="runs", number=run_count)
-        return f"{format_number_with_suffix(run_count)} {noun}"
+        count = public_workflow_count(pr.workspace)
+        if not count:
+            return ""
+        noun = ngettext(singular="workflow", plural="workflows", number=count)
+        return f"{format_number_with_suffix(count)} Published {noun}"
 
     def _about_share_button(self) -> str | None:
         """Share, opposite the author. Carries the same `ShareIntent` the bar's button does,
@@ -1016,10 +1018,7 @@ class BasePage(BasePageV1):
 
     def _about_deployment_card(self, it: TopBarIntegration) -> str:
         """One channel, carrying the same target as its chip in the bar."""
-        body = (
-            f'<span class="v2-about-meta-icon">{it.icon_html}</span>'
-            f'<span class="v2-about-meta-label">{html.escape(it.label)}</span>'
-        )
+        body = self._about_meta_card_body(it.icon_html, it.label)
         if isinstance(it.target, LinkTarget):
             return (
                 f'<a class="v2-about-meta-card"'
@@ -1032,6 +1031,26 @@ class BasePage(BasePageV1):
             f'<button type="submit" class="v2-about-meta-card"'
             f' name="{html.escape(self.SUBMIT_INTENT_KEY)}"'
             f' value="{html.escape(it.target.intent.model_dump_json())}">{body}</button>'
+        )
+
+    @staticmethod
+    def _about_meta_card_body(icon_html: str, label: str) -> str:
+        """The inside of one About card: mark and chevron on the top row, label under.
+
+        Shared by the deployment cards above and the per-recipe config cards in
+        `_render_about_meta`, which are one object in the design and were two copies of the
+        same markup here. A caller decides what the card *is*; what it looks like is this.
+
+        The chevron says the card goes somewhere. `fa-regular` rather than
+        `icons.chevron_right`, whose duotone solid is far heavier than anything else on the
+        card, and left unsized so `.v2-about-meta-chevron` owns its size.
+        """
+        return (
+            '<span class="v2-about-meta-head">'
+            f'<span class="v2-about-meta-icon">{icon_html}</span>'
+            '<i class="fa-regular fa-chevron-right v2-about-meta-chevron"></i>'
+            "</span>"
+            f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
         )
 
     def _render_solo_input_col(self) -> bool:
@@ -1286,11 +1305,16 @@ FILL_HEIGHT_EDITOR_CSS = """
 & .cm-editor {
     flex: 1 1 auto;
     min-height: 0;
-    /* 10px to match the model selector directly above it and the pane pills above that -
-       they read as one group, so they should share a corner. `overflow: hidden` because the
-       line-number gutter and the scroller both paint to the editor's edge; without it their
-       square corners show through the rounded ones. */
-    border-radius: var(--gooey-radius-sm);
+    /* 8px, matching the model selector directly above it - they read as one group, so they
+       should share a corner. `overflow: hidden` because the line-number gutter and the
+       scroller both paint to the editor's edge; without it their square corners show through
+       the rounded ones.
+
+       The border is what makes that corner visible at all: the editor is white on a white
+       card, so a radius with no edge to bend has nothing to show for itself - which is why
+       the design review read this as "no rounded corners on the instructions". */
+    border: 1px solid var(--gooey-line-default);
+    border-radius: var(--gooey-radius-xs);
     overflow: hidden;
 }
 
@@ -1384,11 +1408,23 @@ VARIABLES_DIALOG_CSS = """
 }
 """
 
-# Matches `.v2-about-meta-icon` below. Icon html that carries its own inline size - a model
+# Matches `--v2-about-icon-size` below. Icon html that carries its own inline size - a model
 # creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
-ABOUT_META_ICON_SIZE = "1.5rem"
+ABOUT_META_ICON_SIZE = "1.375rem"
 
 ABOUT_CSS = """
+/* The two measurements the meta cards are built from, named here so the card rule and the
+   Python that asks a creator's logo for a size cannot drift apart.
+
+   `--v2-about-card-width` used to be referenced by the card rule and declared nowhere at
+   all, which made that whole `flex` declaration invalid: the cards were falling back to
+   their `min-width: 10rem` floor rather than to any designed width. */
+& {
+    --v2-about-card-size: 96px;
+    /* Keep in step with ABOUT_META_ICON_SIZE. */
+    --v2-about-icon-size: 1.375rem;
+}
+
 /* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
    here scrolls unless this does - a description longer than the viewport is simply clipped.
    Split needs no equivalent because its working column has an `overflow-auto` pane inside;
@@ -1404,8 +1440,8 @@ ABOUT_CSS = """
 }
 
 /* No card around this content. The pane it sits in is already a surface, so a white box
-   inside it was a second frame around the same thing - only the description panel and the
-   meta chips carry their own background now. */
+   inside it was a second frame around the same thing - the one panel below is the only thing
+   here that carries a background of its own. */
 
 /* The portrait leads, centred and large: the top bar names the workflow, so this is what
    identifies it here. `CIRCLE_IMAGE_WORKFLOWS` (agents) get a round crop. */
@@ -1443,37 +1479,38 @@ ABOUT_CSS = """
     min-width: 0;
 }
 
-/* An outline control, matching the tag pills below it in border and text colour - the two sit
-   in the same box and should read as one family. `flex: 0 0 auto` keeps it at its natural
-   width while everything to its left gives way. */
+/* The design's Button style - Inter Bold 13 on a `bg/page` fill with a `line/strong` edge and
+   a soft drop shadow, so it reads as a raised control against the page rather than as an
+   outline borrowed from the tag pills below. `flex: 0 0 auto` keeps it at its natural width
+   while everything to its left gives way. */
 & .v2-about-share {
     display: inline-flex;
     align-items: center;
     gap: var(--gooey-space-2);
     flex: 0 0 auto;
-    padding: var(--gooey-space-2) var(--gooey-space-4);
-    border: 1px solid var(--gooey-line-default);
+    padding: var(--gooey-space-2) var(--gooey-space-3);
+    border: 1px solid var(--gooey-line-strong);
     border-radius: var(--gooey-radius-xs);
     background: var(--gooey-bg-page);
     color: var(--gooey-ink);
-    font-size: 0.9375rem;
-    font-weight: 500;
+    font-size: 0.8125rem;
+    font-weight: 700;
     line-height: 1.2;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 & .v2-about-share:hover {
-    border-color: var(--gooey-line-strong);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    border-color: var(--gooey-ink-muted);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
     color: var(--gooey-ink);
 }
 
-/* The gap belongs to whatever follows, not to the author or the tags. As a trailing margin it
-   stacked on the panel's own padding whenever nothing came after - a workflow with no tags
-   and no description showed a band of dead space under the author. Not a Bootstrap utility:
-   an element cannot know from its own class list whether anything follows it. */
-& .v2-about-author + *,
-& .v2-about-tags + * {
+/* The gap between the attribution and the panel under it. The author block sits on the page
+   now rather than inside the panel, so this is the one seam the panel's own `gap` does not
+   cover. As a trailing margin on the author it would show under a workflow that has no panel
+   to follow; `+ *` only spaces it from something that is actually there. */
+& .v2-about-author + * {
     margin-top: var(--gooey-space-4);
 }
 
@@ -1489,8 +1526,8 @@ ABOUT_CSS = """
 
 & .v2-about-author-photo {
     flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--gooey-radius-full);
     object-fit: cover;
 }
@@ -1498,11 +1535,16 @@ ABOUT_CSS = """
 & .v2-about-author-text {
     display: flex;
     flex-direction: column;
+    gap: var(--gooey-space-1);
     min-width: 0;
 }
 
+/* The design's UI style: Inter Medium 14, not the semibold of a heading. The two lines are an
+   attribution, and the name is the louder half of it by colour, not by weight. */
 & .v2-about-author-name {
-    font-weight: 600;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.2;
     color: var(--gooey-ink);
     /* a long workspace name ellipsises rather than widening the row past the pane */
     overflow: hidden;
@@ -1510,8 +1552,11 @@ ABOUT_CSS = """
     white-space: nowrap;
 }
 
+/* Meta: Inter Medium 12. */
 & .v2-about-author-meta {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
     color: var(--gooey-ink-muted);
     /* ellipsises with the name above it, rather than being the one thing that widens the row */
     overflow: hidden;
@@ -1527,12 +1572,12 @@ ABOUT_CSS = """
     text-decoration: none;
 }
 
-/* Above the Description heading, wrapping onto a second row rather than squeezing: a
-   workflow can carry a region, an industry and a language at once. */
+/* At the head of the panel, wrapping onto a second row rather than squeezing: a workflow can
+   carry a region, an industry and a language at once. */
 & .v2-about-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--gooey-space-2);
+    gap: var(--gooey-space-3);
 }
 
 /* Standing on the panel rather than lying in it: the page colour sits above the tint, where
@@ -1546,7 +1591,7 @@ ABOUT_CSS = """
     font-weight: 500;
     line-height: 120%;
     padding: var(--gooey-space-1) var(--gooey-space-3);
-    border-radius: var(--gooey-radius-sm) !important;
+    border-radius: var(--gooey-radius-xs) !important;
 }
 
 /* The pill is the link, so the anchor inside it should not announce itself separately. */
@@ -1556,45 +1601,49 @@ ABOUT_CSS = """
     text-decoration: none;
 }
 
-/* One panel per kind of answer: the description is prose to read, the meta groups are a spec
-   to scan. Only the cards inside carry their own surface. */
+/* One panel holding the whole answer - what it is filed under, what it is, how it is built.
+   A flex column, so the spacing between those parts is the panel's own `gap` rather than a
+   margin each of them has to carry and then cancel when it happens to be last. */
 & .v2-about-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gooey-space-4);
     background: var(--gooey-surface-100);
-    border-radius: var(--gooey-radius-lg);
-    padding: var(--gooey-space-4);
+    border-radius: var(--gooey-radius-md);
+    padding: var(--gooey-space-3);
 }
 
-& .v2-about-panel + .v2-about-panel {
-    margin-top: var(--gooey-space-4);
-}
-
-/* The meta panel is opened before its contents are known - `_render_about_meta` is a
-   per-recipe hook and the base renders nothing - so a recipe with no cards and no
-   deployments would leave an empty tinted box under the description. */
+/* The panel is opened before its contents are known - `_render_about_meta` is a per-recipe
+   hook and the base renders nothing - so a recipe with no tags, notes, cards or deployments
+   would leave an empty tinted box under the author. */
 & .v2-about-panel:empty {
     display: none;
 }
 
+/* Body/Small: Inter Regular 14 at 1.4, which is looser than the 1.2 the labels around it use
+   - this is the one run of prose on the surface, and it is read rather than scanned. */
 & .v2-about-notes {
     color: var(--gooey-ink);
+    font-size: 0.875rem;
+    line-height: 1.4;
     /* The clamp's "…more" is drawn over the tail of the last line, so it carries an opaque
        background to cover it - white by default, which read as a chip against this panel. */
     --line-clamp-bg: var(--gooey-surface-100);
 }
 
-/* Model and Tools & Integrations, side by side while there is room. Model holds one card, so
-   it takes only what it needs and the integrations group gets the rest. */
+/* A row of card groups. One group per row in practice now - the config cards share a heading
+   and Deployments emits a row of its own - but the wrapper is what spaces two rows apart. */
 & .v2-about-groups {
     display: flex;
     flex-wrap: wrap;
     gap: var(--gooey-space-6);
 }
 
-/* `_render_about_meta` and `_render_about_deployments` each emit a row of their own, and a
-   flex `gap` only spaces a container's own children - so without this Deployments sat flush
-   against the cards above it while the groups inside one row were properly spaced. */
-& .v2-about-groups + .v2-about-groups {
-    margin-top: var(--gooey-space-6);
+/* The design sets the cards further off the description than the panel's own `gap` does, and
+   only when there is something above them to be set off from - a workflow with no notes and
+   no tags opens the panel on its cards, which want no dead strip over them. */
+& .v2-about-panel > .v2-about-groups:not(:first-child) {
+    padding-top: var(--gooey-space-4);
 }
 
 /* Sizes to its own cards. With `min-width: 0` the group could be squeezed narrower than one
@@ -1606,11 +1655,13 @@ ABOUT_CSS = """
 }
 
 & .v2-about-section-title {
-    /* Names the section rather than saying anything itself, so it is set back from what it
-       labels - the cards and the description are what should be read first. */
-    font-size: 0.9375rem;
+    /* The design's UI style, in full-strength ink: with the cards' own labels dropped to 12
+       this is the largest text in the section, and a muted 15 read as the louder of the two.
+       It names the row; it should not also outrank it. */
+    font-size: 0.875rem;
     font-weight: 500;
-    color: var(--gooey-ink-muted);
+    line-height: 1.2;
+    color: var(--gooey-ink);
     /* `margin-bottom`, not the `margin` shorthand: the shorthand also sets `margin-top: 0`,
        which silently cancelled the gap the preceding tags row hands to whatever follows it -
        same specificity, and this rule comes later. */
@@ -1618,28 +1669,36 @@ ABOUT_CSS = """
 }
 
 /* `nowrap`: a group's cards belong on one line, and the group is what gives way when the row
-   runs out of width. Below lg they stack - see the media query at the end. */
+   runs out of width. Below lg they wrap - see the media query at the end. */
 & .v2-about-meta {
     display: flex;
     flex-wrap: nowrap;
-    gap: var(--gooey-space-6);
+    gap: var(--gooey-space-2);
 }
 
-/* Icon above label, not beside it: the label is the longer of the two and wraps, so a row
-   layout made every card as tall as its text anyway. Fixed width so a set of one lines up
-   with a set of three. */
+/* A small square tile: mark and chevron on the top row, the label under them.
+
+   Fixed width so a set of one lines up with a set of three, and `min-height` rather than a
+   height so a label that needs three lines grows the card instead of being cut off - the
+   design's own frame overflows by a couple of pixels at three lines. `stretch` (the default
+   `align-items` on the row) then brings the shorter cards up to the tallest, so the row still
+   reads as one set.
+
+   No fill: the card sits on the panel's tint with a hairline of its own, and the extra
+   surface the cards used to carry only muddied a box that is already a surface. */
 & .v2-about-meta-card {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: var(--gooey-space-5);
-    flex: 0 0 var(--v2-about-card-width);
-    min-width: 10rem;
-    padding: var(--gooey-space-3);
+    align-items: flex-start;
+    gap: var(--gooey-space-2);
+    flex: 0 0 var(--v2-about-card-size);
+    min-height: var(--v2-about-card-size);
+    padding: var(--gooey-space-4) var(--gooey-space-3) var(--gooey-space-3);
     border: 1px solid var(--gooey-line-default);
     border-radius: var(--gooey-radius-md);
-    background: var(--gooey-surface-50);
+    background: transparent;
     color: var(--gooey-ink);
+    text-align: left;
     text-decoration: none;
     transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
@@ -1650,33 +1709,68 @@ ABOUT_CSS = """
     color: var(--gooey-ink);
 }
 
-/* No chip behind it: at this size the glyph and a model creator's colour logo both read
-   fine on the card itself, and the extra surface only muddied a card that is already a
-   surface. */
+/* The card's top row: what it is on the left, where it goes on the right. */
+& .v2-about-meta-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gooey-space-2);
+    width: 100%;
+}
+
+/* One box, whatever is in it - a FontAwesome glyph or a model creator's logo. That box is
+   what "normalise the icon size" means at the level of layout; the ink inside it is the
+   next rule's job. */
 & .v2-about-meta-icon {
     display: inline-flex;
     align-items: center;
-    font-size: 1.5rem;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: var(--v2-about-icon-size);
+    height: var(--v2-about-icon-size);
     line-height: 1;
     color: var(--gooey-ink);
 }
 
-/* For icon html that arrives without a size of its own; anything carrying an inline one
-   wins here and has to be asked for ABOUT_META_ICON_SIZE instead. */
+/* A glyph's ink fills roughly 0.8 of the em it is set in, while a logo bitmap fills its frame
+   edge to edge - so at one font-size the logo reads a good third larger than the glyph beside
+   it, which is exactly what the design review picked up. Asking the glyph for the larger em
+   is what makes the two the same *visual* size. The box above still measures
+   `--v2-about-icon-size`, so the row's geometry does not move: the glyph simply overhangs its
+   own box symmetrically, and `overflow` is not clipped here. */
+& .v2-about-meta-icon > i,
+& .v2-about-meta-icon > svg {
+    font-size: calc(var(--v2-about-icon-size) / 0.8);
+    line-height: 1;
+}
+
+/* For icon html that arrives without a size of its own; anything carrying an inline one wins
+   here and has to be asked for ABOUT_META_ICON_SIZE instead. Either way it is bounded by the
+   box, so a logo can only ever be exactly as big as the box is. */
 & .v2-about-meta-icon img {
-    height: 1.5rem;
-    width: 1.5rem;
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
 }
 
+/* Points into the pane the card opens. Muted and small - it is an affordance, not a label. */
+& .v2-about-meta-chevron {
+    flex: 0 0 auto;
+    font-size: 0.875rem;
+    line-height: 1;
+    color: var(--gooey-ink-muted);
+}
+
+/* Meta: Inter Medium 12, wrapping. Was a single ellipsised line, which turned every card into
+   "GPT-5.2 • Ope…" at this width - a card 96px wide has no room to hold a model name on one
+   line, so the name gets the lines it needs and the row equalises around the tallest. */
 & .v2-about-meta-label {
+    width: 100%;
     min-width: 0;
-    font-size: 0.9375rem;
-    line-height: 1.3;
-    /* a long name ellipsises rather than wrapping, so every card in a row is the same height */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
 }
 
 @media (max-width: 991.98px) {
@@ -1687,35 +1781,22 @@ ABOUT_CSS = """
         gap: var(--gooey-space-5);
     }
 
-    /* matches the gap the groups inside a row use here */
-    & .v2-about-groups + .v2-about-groups {
-        margin-top: var(--gooey-space-5);
-    }
-
     /* the group is full width now, so its cards may wrap within it */
     & .v2-about-meta {
         flex-wrap: wrap;
     }
 
-    /* `1 1 0` rather than a basis: the cards share the row evenly instead of each taking its
-       own content width, so they stay equal here too. Capped at the width they have above
-       lg, or a group holding one card stretched it the whole width of the panel. */
-    & .v2-about-meta-card {
-        flex: 1 1 0;
-        max-width: 10rem;
-    }
-
     & {
         /* Clears the tab pills, which below lg float over the bottom of the viewport rather
-           than sitting in the top bar. On the container rather than the last panel: whether
-           the meta panel is the last *rendered* box depends on whether it was hidden as
-           empty, and a `:last-child` rule reads the DOM, not what is displayed.
+           than sitting in the top bar. On the container rather than the panel: the panel
+           hides itself when it has nothing in it, and a `:last-child` rule reads the DOM,
+           not what is displayed.
 
            Deliberately not a space token: this is the height of another element, not a step
            in the rhythm, and snapping it to the scale would either crowd the pills or leave
-           dead space under the last panel. */
+           dead space under the panel. */
         padding-bottom: 4.5rem;
-        /* The panels are the full width of the pane, which put their edges hard against the
+        /* The panel is the full width of the pane, which put its edges hard against the
            viewport's. Matches the `px-2` the editor column carries at this width, so the
            content edge holds still when the two tabs are switched between. */
         padding-left: var(--gooey-space-2);

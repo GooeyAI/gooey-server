@@ -250,31 +250,32 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     def _render_about_meta(self):
         """How this agent is put together. Each card links into the config pane that owns
         the setting."""
-        model = self._about_model_summary()
-
-        # Knowledge and Tools read as one idea - what the agent can reach outside itself -
-        # so they share a group, leaving the model on its own as the thing it *is*.
-        integrations: list[tuple[str, str, ConfigPane]] = []
+        # One group under one heading, in the order the design names them: what the agent
+        # *is*, then what it can reach outside itself. Two groups put a wide gap and a second
+        # heading between three cards that read as one row, and a group holding a single card
+        # was the width of its own heading.
+        cards: list[tuple[str, str, ConfigPane]] = []
+        if model := self._about_model_summary():
+            cards.append((*model, ConfigPane.llm_instructions))
         if documents := len(gui.session_state.get("documents") or []):
-            plural = "" if documents == 1 else "s"
-            integrations.append(
-                (icons.library, f"{documents} document{plural}", ConfigPane.knowledge)
+            noun = "source" if documents == 1 else "sources"
+            cards.append(
+                (
+                    icons.library,
+                    f"{documents} Knowledge {noun}",
+                    ConfigPane.knowledge,
+                )
             )
         if tools := len(gui.session_state.get("functions") or []):
-            plural = "" if tools == 1 else "s"
-            integrations.append((icons.code, f"{tools} tool{plural}", ConfigPane.tools))
+            noun = "Tool" if tools == 1 else "Tools"
+            cards.append((icons.code, f"{tools} {noun} called", ConfigPane.tools))
 
         # a row of zeroes says less than no row: skip the heading too, not just the cards
-        if not model and not integrations:
+        if not cards:
             return
 
         with gui.div(className="v2-about-groups"):
-            if model:
-                self._render_about_meta_group(
-                    "Model", [(*model, ConfigPane.llm_instructions)]
-                )
-            if integrations:
-                self._render_about_meta_group("Tools & Integrations", integrations)
+            self._render_about_meta_group("Model, Knowledge base & Tools", cards)
 
     def _render_about_meta_group(
         self, title: str, cards: list[tuple[str, str, ConfigPane]]
@@ -295,8 +296,9 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             # a model that has since been removed - its name is still better than nothing
             return icons.sparkles, name
         # `html_icon` writes the size inline, which beats any stylesheet, so the card's size
-        # is asked for here - left to its 1.1rem default the logo sat small beside the
-        # FontAwesome glyphs on the cards next to it.
+        # is asked for here rather than left to its 1.1rem default. `.v2-about-meta-icon`
+        # normalises what a creator's logo and a FontAwesome glyph *look* like at that size;
+        # this only makes sure the box it is normalising is the right one to begin with.
         icon = spec.creator and spec.creator.html_icon(size=ABOUT_META_ICON_SIZE)
         return icon or icons.sparkles, spec.label
 
@@ -308,12 +310,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 className="v2-about-meta-card",
             )
         ):
-            # icon over label, and no chevron: the whole card is the link, so an affordance
-            # arrow only competed with the icon for the eye
-            gui.html(
-                f'<span class="v2-about-meta-icon">{icon}</span>'
-                f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
-            )
+            # The same body the deployment cards use, so one change of shape reaches both.
+            gui.html(self._about_meta_card_body(icon, label))
 
     def _render_input_col(self):
         """The working column, shared by Edit and Split. Overridden here rather than per
