@@ -487,12 +487,11 @@ async def create_stt_llm_tts_session(
                 api_key = settings.PUBLICAI_API_KEY
                 base_url = "https://api.publicai.co/v1"
             elif model_id.startswith("AI71ai/"):
-                import modal
-                from modal_functions.agri_llm import app
+                from modal_functions import agri_llm
+                from daras_ai_v2.modal_utils import get_modal_web_url
 
-                modal_fn = modal.Function.from_name(app.name, "serve")
                 api_key = settings.MODAL_VLLM_API_KEY
-                base_url = str(furl(modal_fn.get_web_url()) / "v1")
+                base_url = str(furl(get_modal_web_url(agri_llm, "serve")) / "v1")
             else:
                 api_key = settings.OPENAI_API_KEY
                 base_url = NOT_GIVEN
