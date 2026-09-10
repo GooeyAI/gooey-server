@@ -1732,15 +1732,11 @@ ABOUT_CSS = """
     color: var(--gooey-ink);
 }
 
-/* A glyph's ink fills roughly 0.8 of the em it is set in, while a logo bitmap fills its frame
-   edge to edge - so at one font-size the logo reads a good third larger than the glyph beside
-   it, which is exactly what the design review picked up. Asking the glyph for the larger em
-   is what makes the two the same *visual* size. The box above still measures
-   `--v2-about-icon-size`, so the row's geometry does not move: the glyph simply overhangs its
-   own box symmetrically, and `overflow` is not clipped here. */
+/* The glyph is asked for the box's own size, so a FontAwesome icon and a creator's logo
+   occupy the same 22px square the design draws them in. */
 & .v2-about-meta-icon > i,
 & .v2-about-meta-icon > svg {
-    font-size: calc(var(--v2-about-icon-size) / 0.8);
+    font-size: var(--v2-about-icon-size);
     line-height: 1;
 }
 
@@ -1761,15 +1757,18 @@ ABOUT_CSS = """
     color: var(--gooey-ink-muted);
 }
 
-/* Meta: Inter Medium 12, wrapping. Was a single ellipsised line, which turned every card into
-   "GPT-5.2 • Ope…" at this width - a card 96px wide has no room to hold a model name on one
-   line, so the name gets the lines it needs and the row equalises around the tallest. */
+/* Meta: Inter Medium 12, over as many lines as the name needs.
+
+   `white-space: normal` because `button .gui-html-container` in app.css sets `nowrap`, which
+   this inherits - and a label that cannot wrap sets the card's automatic minimum width, so
+   the cards were coming out 129px and 141px wide instead of the 96px they are given. */
 & .v2-about-meta-label {
     width: 100%;
     min-width: 0;
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1.2;
+    white-space: normal;
     overflow-wrap: anywhere;
 }
 

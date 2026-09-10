@@ -388,8 +388,15 @@ button .gui-html-container,
    Family only, no weight: `.recipe-workspace-editor :where(h2)` already sets one at the same
    specificity as this selector, and which of two equal rules wins would come down to the
    order the bundler happens to emit two stylesheets in. */
+/* custom.css sets the heavy display face on bare `h1`-`h6`, and v2 uses heading tags for
+   structure - so its section labels were arriving in it. Inter unless said otherwise. */
+.v2-app-shell :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--gooey-font-ui);
+}
+
+/* The two places a heading is actually drawn as one. Both outrank the rule above. */
 .v2-app-shell .v2-about h1,
-.recipe-workspace-editor :where(h1, h2, h3) {
+.v2-app-shell .recipe-workspace-editor :is(h1, h2, h3) {
   font-family: var(--gooey-font-heading);
 }
 
