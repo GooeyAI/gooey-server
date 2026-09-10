@@ -18,7 +18,7 @@ import {
 } from "@remix-run/react";
 import path from "path";
 import { useDebouncedCallback } from "use-debounce";
-import { gooeyGuiRouteHeader, realtimeRefreshKey } from "~/consts";
+import { gooeyGuiRouteHeader, silentSubmitKey } from "~/consts";
 import { useEventSourceNullOk } from "~/event-source";
 import { fetchServerAPI } from "~/fetchServerAPI";
 import { handleRedirectResponse } from "~/handleRedirect";
@@ -138,6 +138,10 @@ function useRealtimeChannels({
 export type OnChange = (event?: {
   target: EventTarget | HTMLElement | null | undefined;
   currentTarget?: EventTarget | HTMLElement | null | undefined;
+  /** Persisting chrome state rather than recording a user edit: post the form, but without
+   *  the global progress bar. A real DOM event never carries this, so the form's own
+   *  `onChange` is unaffected. */
+  silent?: boolean;
 }) => void;
 
 function base64Decode(base64EncodedString: string): string {
@@ -175,7 +179,7 @@ function App() {
     )
       return;
     lastRealtimeEventRef.current = realtimeEvent;
-    onSubmit(undefined, { [realtimeRefreshKey]: realtimeEvent });
+    onSubmit(undefined, { [silentSubmitKey]: realtimeEvent });
   }, [navigation.state, realtimeEvent]);
 
   const onChange: OnChange = (event) => {
@@ -188,6 +192,14 @@ function App() {
       target instanceof HTMLElement &&
       target.hasAttribute("data-submit-disabled")
     ) {
+      return;
+    }
+
+    // A component persisting its own chrome state. Straight to the post, ahead of the
+    // debounce branches below: there is no input being typed into to debounce, and the
+    // marker is what keeps the progress bar out of it.
+    if (event && "silent" in event && event.silent) {
+      onSubmit(undefined, { [silentSubmitKey]: true });
       return;
     }
 

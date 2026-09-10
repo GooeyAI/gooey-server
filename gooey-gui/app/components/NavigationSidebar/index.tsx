@@ -77,7 +77,10 @@ export function NavigationSidebar({
       if (state[collapsed_state_key] === collapsed) return;
     }
     state[collapsed_state_key] = collapsed;
-    onChange();
+    // `silent`: this posts the form only to remember how wide the rail is, which is not a
+    // navigation and should not draw the page-load bar across the top of the app. Opening the
+    // nav flashed it on every click.
+    onChange({ target: null, silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, isMobile, collapsed_state_key]);
 

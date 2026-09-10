@@ -3,7 +3,7 @@ import { useFetchers, useNavigation } from "@remix-run/react";
 import NProgress from "nprogress";
 import nProgressStyles from "nprogress/nprogress.css";
 import { useEffect } from "react";
-import { realtimeRefreshKey } from "~/consts";
+import { silentSubmitKey } from "~/consts";
 
 export const globalProgressStyles: LinksFunction = () => {
   return [{ rel: "stylesheet", href: nProgressStyles }];
@@ -15,8 +15,10 @@ export const useGlobalProgress = () => {
   const navigation = useNavigation();
   const fetchers = useFetchers();
 
-  // realtime-driven refreshes tag their submission so they fetch without spinning
-  const isRealtimeRefresh = navigation.json?.hasOwnProperty(realtimeRefreshKey);
+  // Submits the user did not ask for - a realtime refresh, persisting whether the nav rail is
+  // collapsed - tag their body so they fetch without spinning. The bar means "the page you
+  // asked for is on its way"; it should not fire for the app talking to itself.
+  const isSilent = navigation.json?.hasOwnProperty(silentSubmitKey);
 
   useEffect(() => {
     if (!document.querySelector(parent)) return;
@@ -30,19 +32,19 @@ export const useGlobalProgress = () => {
         NProgress.done();
         break;
       case "submitting":
-        if (isRealtimeRefresh) break;
+        if (isSilent) break;
         if (!NProgress.isStarted()) {
           NProgress.start();
         }
         NProgress.set(0.3);
         break;
       case "loading":
-        if (isRealtimeRefresh) break;
+        if (isSilent) break;
         if (!NProgress.isStarted()) {
           NProgress.start();
         }
         NProgress.set(typeof navigation.formAction === "undefined" ? 0.3 : 0.7);
         break;
     }
-  }, [fetchers, navigation.formAction, isRealtimeRefresh, navigation.state]);
+  }, [fetchers, navigation.formAction, isSilent, navigation.state]);
 };
