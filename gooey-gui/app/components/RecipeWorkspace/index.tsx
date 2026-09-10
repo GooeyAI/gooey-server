@@ -57,8 +57,10 @@ export function RecipeWorkspace({
   return (
     <RecipeWorkspaceProvider key={config.storage_key} config={config}>
       <div
-        style={{ visibility: hydrated ? "visible" : "hidden" }}
-        className="recipe-workspace container-xxl py-lg-2"
+        className={clsx(
+          "recipe-workspace container-xxl py-lg-2",
+          !hydrated && "gooey-until-hydrated"
+        )}
       >
         <WorkspacePane
           className="recipe-workspace-about"

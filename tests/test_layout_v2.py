@@ -10,7 +10,7 @@ from furl import furl
 import gooey_gui as gui
 from fastapi import HTTPException
 
-from daras_ai_v2 import settings
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage as BasePageV1
 from daras_ai_v2.tab_spec import TabSpec
 from gooey_gui.types.recipe_top_bar_props import (
@@ -37,7 +37,7 @@ from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspaceTriggerProps,
 )
 from recipes.VideoBots import VideoBotsPage
-from recipes.VideoBots_v2 import VideoBotsPageV2
+from recipes.VideoBots_v2 import ConfigPane, VideoBotsPageV2
 from routers.root import RecipeTabs
 
 
@@ -607,6 +607,123 @@ def test_a_recipe_gets_the_base_tab_set_unless_it_says_otherwise(monkeypatch):
     assert not any(tab.desktop_only for key, tab in by_key.items() if key != "split"), (
         "only Split has nowhere to go below lg"
     )
+
+
+def _headings_in(node) -> list[tuple[int, str]]:
+    """Every heading the render tree emits, in document order, as (level, text).
+
+    Two shapes to look for: `gui.tag("h2", ...)` becomes a `tag` node carrying the element
+    name, and `gui.html("<h2 ...>")` carries the markup in its body.
+    """
+    import re
+
+    found = []
+    props = node.get("props") or {}
+    element = props.get("__reactjsxelement") or ""
+    if re.fullmatch(r"h[1-6]", element):
+        found.append((int(element[1]), ""))
+    for match in re.finditer(r"<h([1-6])\b[^>]*>(.*?)</h\1>", props.get("body") or ""):
+        found.append((int(match.group(1)), match.group(2)))
+    for child in node.get("children") or []:
+        found.extend(_headings_in(child))
+    return found
+
+
+def test_the_about_surface_carries_the_pages_one_h1(monkeypatch):
+    """A recipe page had no `h1` at all - the workflow's name lived in a `span` in the top
+    bar. The bar is chrome that repeats on every tab, so About is where the heading belongs:
+    it is the surface that presents the workflow, and layout v2 renders it whatever pane is
+    on screen.
+
+    Visually hidden, because the bar already shows the name and About should not say it
+    twice. Exactly one, which the always-render-three-surfaces design makes a real
+    constraint rather than a convention - an `h1` added to the editor would ship a second
+    one on every page.
+    """
+    from types import SimpleNamespace
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_pr",
+        property(
+            lambda self: SimpleNamespace(
+                workspace_id=None, notes="", tags=SimpleNamespace(all=list)
+            )
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_workflow_identity",
+        lambda self: SimpleNamespace(name="Farmer.CHAT Ag Advisory Agent"),
+    )
+    for noop in (
+        "_render_about_photo",
+        "_render_about_meta",
+        "_render_about_deployments",
+    ):
+        monkeypatch.setattr(VideoBotsPageV2, noop, lambda self, *a, **kw: None)
+
+    root = RenderTreeNode("root")
+    with NestingCtx(root):
+        page._render_about_content()
+
+    levels = [level for level, _ in _headings_in(root.to_dict())]
+    assert levels.count(1) == 1, f"expected exactly one h1, got {levels}"
+
+
+def test_about_section_titles_are_headings_rather_than_styled_divs(monkeypatch):
+    """These name the sections of the page, so they are headings. They were `div`s, which
+    left the whole About surface without a single one.
+
+    The class stays: it already sets the size, weight and colour, so swapping the element
+    changes the outline and nothing about the picture. The stylesheet carries a
+    zero-specificity `:where()` reset that keeps the browser's heading scale out of it.
+    """
+    import json
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    page = object.__new__(VideoBotsPageV2)
+    root = RenderTreeNode("root")
+    with NestingCtx(root):
+        page._render_about_meta_group(
+            "Model", [(icons.sparkles, "GPT-5", ConfigPane.llm_instructions)]
+        )
+
+    assert _headings_in(root.to_dict()) == [(2, "Model")]
+    # the shape it must never go back to
+    assert '<div class=\\"v2-about-section-title\\"' not in json.dumps(root.to_dict())
+
+
+def test_the_editor_surfaces_headings_do_not_skip_a_level(monkeypatch):
+    """Capabilities was an `h4` with no `h2` or `h3` above it anywhere on the page, and the
+    switches under it were `h5`. Nothing about the page's shape said those belonged to the
+    editor rather than to About.
+
+    Levels only - the wording is the recipe's to choose. `RecipeWorkspace.css` pins the two
+    levels to the sizes `####` and `#####` used to render at, so the outline moved and the
+    page did not.
+    """
+    import re
+    from pathlib import Path
+
+    source = Path("recipes/VideoBots_v2.py").read_text()
+    levels = [
+        len(m.group(1))
+        for m in re.finditer(r'(?:gui\.markdown\(|label=)"(#+) ', source)
+    ]
+    assert levels, (
+        "no markdown headings found - has the settings pane been restructured?"
+    )
+    assert min(levels) == 2, (
+        f"the editor's top heading should be an h2, got h{min(levels)}"
+    )
+    for shallower, deeper in zip(levels, levels[1:]):
+        assert deeper - shallower <= 1, f"h{shallower} -> h{deeper} skips a level"
 
 
 def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():

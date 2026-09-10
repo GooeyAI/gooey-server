@@ -497,6 +497,17 @@ export function RecipeTopBar({
         !atRoot && "gooey-topbar-stacked"
       )}
     >
+      {/* Everything held back for the first paint is revealed for an agent that runs no
+          JS: it never reaches hydration, so it would be handed a document of invisible
+          text. Lives here rather than in the app shell because this bar is the one part
+          of layout v2 on every tab - the workspace is not - and because it is a v2
+          concern, which `root.tsx` is not the place for. */}
+      <noscript
+        dangerouslySetInnerHTML={{
+          __html: "<style>.gooey-until-hydrated{visibility:visible}</style>",
+        }}
+      />
+
       <div className="gooey-topbar-left">
         {/* The way back below lg: the nav drawer at the root, the previous level elsewhere. */}
         <button
@@ -581,8 +592,10 @@ export function RecipeTopBar({
       {/* A single-view recipe does not need a selector unless Usage is available. */}
       {(config.views.length > 1 || !!usage_href) && (
         <div
-          className="gooey-topbar-tabs"
-          style={{ visibility: hydrated ? "visible" : "hidden" }}
+          className={clsx(
+            "gooey-topbar-tabs",
+            !hydrated && "gooey-until-hydrated"
+          )}
         >
           {config.views.map((view) => (
             <button

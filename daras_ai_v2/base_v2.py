@@ -821,6 +821,13 @@ class BasePage(BasePageV1):
         """What this workflow is. Version history lives in the title menu and Related
         Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
+        # The page's one h1. Visually hidden because the top bar already shows this name
+        # and About is not the place to say it twice - but the bar is chrome that repeats
+        # on every tab, so it is not the heading, and without this the page had none at all
+        # for a crawler or a screen reader. About is where it belongs: it is the surface
+        # that presents the workflow, and the only one guaranteed to be rendered.
+        with gui.tag("h1", className="visually-hidden"):
+            gui.html(html.escape(self._workflow_identity().name))
         # The portrait leads; the top bar carries the title.
         self._render_about_photo(pr)
         # One panel answering "whose is this, what is it filed under, what is it" in that
@@ -837,7 +844,7 @@ class BasePage(BasePageV1):
                     # A real `gui.div` rather than `gui.html`: that wraps its body in a
                     # `.gui-html-container`, which is `display: contents` and so generates no
                     # box - the panel's spacing rule would land on the wrapper and vanish.
-                    with gui.div(className="v2-about-section-title"):
+                    with gui.tag("h2", className="v2-about-section-title"):
                         gui.html("Description")
                     with gui.div(className="container-margin-reset v2-about-notes"):
                         gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
@@ -1002,7 +1009,7 @@ class BasePage(BasePageV1):
             gui.div(className="v2-about-groups"),
             gui.div(className="v2-about-group"),
         ):
-            gui.html('<div class="v2-about-section-title">Deployments</div>')
+            gui.html('<h2 class="v2-about-section-title">Deployments</h2>')
             with gui.div(className="v2-about-meta"):
                 for it in integrations:
                     gui.html(self._about_deployment_card(it))
