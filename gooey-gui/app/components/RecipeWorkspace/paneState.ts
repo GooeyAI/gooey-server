@@ -8,8 +8,7 @@ import type {
 
 export type WorkspaceLayout = SingleLayout | SplitLayout;
 
-export type PersistedWorkspaceState = {
-  version: 1;
+export type WorkspaceState = {
   layout: WorkspaceLayout;
   handled_run_id: string | null;
 };
@@ -23,36 +22,28 @@ export type WorkspaceControls = {
   closePreview: boolean;
 };
 
+/* The view a workspace opens on, derived from the url alone: the server sends
+   `initial_layout` per url - About on a published run, the work view on a saved run - so
+   the same url always opens the same way, for everyone. */
 export function initialWorkspaceState(
   config: PageShellConfig,
-  storage: { getItem(key: string): string | null },
   navigationState: unknown
-): PersistedWorkspaceState {
-  const stored = storedWorkspaceState(storage, config);
+): WorkspaceState {
   if (config.route_layout) {
     return {
-      version: 1,
       layout: config.route_layout,
-      handled_run_id: config.active_run_id ?? stored.handled_run_id,
+      handled_run_id: config.active_run_id ?? null,
     };
   }
 
   const navigationLayout = workspaceLayoutFromNavigationState(navigationState);
-  const initial = navigationLayout
-    ? { ...stored, layout: navigationLayout }
-    : stored;
-  return revealRunLayout(initial, config);
-}
-
-export function normalizeWorkspaceLayout(
-  value: unknown,
-  fallback: WorkspaceLayout
-): WorkspaceLayout {
-  if (isWorkspaceLayout(value)) {
-    return value;
-  }
-  const migrated = migrateLegacyLayout(value);
-  return migrated ?? fallback;
+  return revealRunLayout(
+    {
+      layout: navigationLayout ?? config.initial_layout,
+      handled_run_id: null,
+    },
+    config
+  );
 }
 
 export function workspaceLayoutNavigationState(layout: WorkspaceLayout): {
@@ -125,14 +116,13 @@ export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {
 }
 
 export function revealRunLayout(
-  state: PersistedWorkspaceState,
+  state: WorkspaceState,
   config: PageShellConfig
-): PersistedWorkspaceState {
+): WorkspaceState {
   if (!config.active_run_id || config.active_run_id === state.handled_run_id) {
     return state;
   }
   return {
-    version: 1,
     // The run counts as handled either way, so a view the user picked for this run is not
     // swapped out later by the same run arriving again.
     layout: shouldRevealRunOutput(state.layout)
@@ -286,57 +276,6 @@ export function layoutsEqual(
   return false;
 }
 
-function storedWorkspaceState(
-  storage: { getItem(key: string): string | null },
-  config: PageShellConfig
-): PersistedWorkspaceState {
-  let stored: unknown = null;
-  try {
-    const serialized = storage.getItem(config.storage_key);
-    if (serialized) {
-      stored = JSON.parse(serialized);
-    }
-  } catch {
-    return defaultWorkspaceState(config);
-  }
-  if (isPersistedWorkspaceState(stored)) {
-    return {
-      version: 1,
-      layout: normalizeWorkspaceLayout(stored.layout, config.initial_layout),
-      handled_run_id: stored.handled_run_id,
-    };
-  }
-  return {
-    version: 1,
-    layout: normalizeWorkspaceLayout(stored, config.initial_layout),
-    handled_run_id: null,
-  };
-}
-
-function defaultWorkspaceState(
-  config: PageShellConfig
-): PersistedWorkspaceState {
-  return {
-    version: 1,
-    layout: config.initial_layout,
-    handled_run_id: null,
-  };
-}
-
-function isPersistedWorkspaceState(
-  value: unknown
-): value is PersistedWorkspaceState {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const state = value as Partial<PersistedWorkspaceState>;
-  return (
-    state.version === 1 &&
-    isWorkspaceLayout(state.layout) &&
-    (state.handled_run_id === null || typeof state.handled_run_id === "string")
-  );
-}
-
 function isWorkspaceLayout(value: unknown): value is WorkspaceLayout {
   if (!value || typeof value !== "object") {
     return false;
@@ -353,37 +292,6 @@ function isWorkspaceLayout(value: unknown): value is WorkspaceLayout {
     isSurfaceId(layout.secondary) &&
     layout.primary !== layout.secondary
   );
-}
-
-function migrateLegacyLayout(value: unknown): WorkspaceLayout | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  const legacy = value as {
-    mode?: unknown;
-    editorOpen?: unknown;
-    previewOpen?: unknown;
-  };
-  if (
-    (legacy.mode !== "about" && legacy.mode !== "work") ||
-    typeof legacy.editorOpen !== "boolean" ||
-    typeof legacy.previewOpen !== "boolean"
-  ) {
-    return null;
-  }
-  if (legacy.mode === "about") {
-    if (legacy.previewOpen) {
-      return splitLayout("about", "preview");
-    }
-    return singleLayout("about");
-  }
-  if (legacy.editorOpen && legacy.previewOpen) {
-    return splitLayout("editor", "preview");
-  }
-  if (legacy.previewOpen) {
-    return singleLayout("preview");
-  }
-  return singleLayout("editor");
 }
 
 function layoutHasSurface(

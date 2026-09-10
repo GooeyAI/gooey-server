@@ -17,12 +17,12 @@ import {
   clearWorkspaceLayoutNavigationState,
   foldForNarrowViewport,
   initialWorkspaceState,
-  type PersistedWorkspaceState,
+  type WorkspaceState,
   type WorkspaceLayout,
 } from "./components/RecipeWorkspace/paneState";
 
 type WorkspaceEntry = {
-  value: PersistedWorkspaceState;
+  value: WorkspaceState;
   hydrated: boolean;
   hydrationToken: string;
 };
@@ -132,8 +132,7 @@ export function useWorkspaceLayout(config: PageShellConfig) {
   const context = useAppShellContext();
   const location = useLocation();
   const entry = context.workspaces[config.storage_key];
-  const fallback: PersistedWorkspaceState = {
-    version: 1,
+  const fallback: WorkspaceState = {
     layout: config.route_layout ?? config.initial_layout,
     handled_run_id: null,
   };
@@ -146,12 +145,7 @@ export function useWorkspaceLayout(config: PageShellConfig) {
       config.active_run_id ?? "",
       config.route_layout ? JSON.stringify(config.route_layout) : "",
     ].join(":");
-    const next = initialWorkspaceState(
-      config,
-      window.sessionStorage,
-      location.state
-    );
-    persistWorkspaceState(config.storage_key, next);
+    const next = initialWorkspaceState(config, location.state);
     context.hydrateWorkspace(config.storage_key, {
       value: next,
       hydrated: true,
@@ -173,7 +167,6 @@ export function useWorkspaceLayout(config: PageShellConfig) {
   const selectLayout = useCallback(
     (layout: WorkspaceLayout) => {
       const next = { ...current, layout };
-      persistWorkspaceState(config.storage_key, next);
       context.setWorkspace(config.storage_key, {
         value: next,
         hydrated: true,
@@ -295,17 +288,6 @@ function useAppShellContext(): AppShellContextValue {
     throw new Error("App shell hooks require AppShellProvider");
   }
   return context;
-}
-
-function persistWorkspaceState(
-  storageKey: string,
-  state: PersistedWorkspaceState
-) {
-  try {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(state));
-  } catch {
-    // The in-memory context remains usable when browser storage is unavailable.
-  }
 }
 
 function workspaceLayoutNavigationStatePresent(state: unknown): boolean {

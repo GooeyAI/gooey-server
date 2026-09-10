@@ -255,8 +255,8 @@ class BasePage(BasePageV1):
         return SurfaceId.preview
 
     def _workspace_storage_key(self) -> str:
-        # A run and the published run behind it open on different views, so they cannot share
-        # a remembered one - running stored the split and the published run opened on it.
+        # Identity, not storage: the client keys its in-memory workspace on this, so a run
+        # does not inherit the view of the published run it came from.
         sr, pr = self.current_sr_pr
         kind = "pr" if pr.saved_run_id == sr.id else "run"
         return f"gooey:recipe-layout:{self.workflow.value}:{pr.published_run_id}:{kind}"

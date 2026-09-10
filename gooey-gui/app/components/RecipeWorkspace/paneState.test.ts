@@ -9,7 +9,6 @@ import {
   initialWorkspaceState,
   isRootLayout,
   layoutsEqual,
-  normalizeWorkspaceLayout,
   paneRolesForLayout,
   revealRunLayout,
   shouldRevealRunOutput,
@@ -86,42 +85,21 @@ describe("workspace layout", () => {
     expect(layoutsEqual(edit, preview)).toBe(false);
   });
 
-  it("normalizes malformed and legacy stored layouts", () => {
-    expect(normalizeWorkspaceLayout(null, about)).toEqual(about);
-    expect(
-      normalizeWorkspaceLayout(
-        { mode: "work", editorOpen: true, previewOpen: false },
-        about
-      )
-    ).toEqual(edit);
-    expect(
-      normalizeWorkspaceLayout(
-        { mode: "about", editorOpen: true, previewOpen: true },
-        edit
-      )
-    ).toEqual(about);
-  });
 });
 
 describe("initialWorkspaceState", () => {
-  it("reads a versioned stored layout", () => {
-    const storage = {
-      getItem: () =>
-        JSON.stringify({ version: 1, layout: edit, handled_run_id: null }),
-    };
-    expect(initialWorkspaceState(baseConfig, storage, null)).toEqual({
-      version: 1,
-      layout: edit,
+  it("opens on the layout the url was given, remembering nothing", () => {
+    // The server answers per url - About on a published run, the work view on a saved one -
+    // so the same url opens the same way for everyone, every visit.
+    expect(initialWorkspaceState(baseConfig, null)).toEqual({
+      layout: about,
       handled_run_id: null,
     });
   });
 
-  it("lets navigation layout override storage", () => {
-    const storage = { getItem: () => JSON.stringify(edit) };
+  it("lets a navigation layout override the url's own", () => {
     const navigation = workspaceLayoutNavigationState(split);
-    expect(
-      initialWorkspaceState(baseConfig, storage, navigation).layout
-    ).toEqual(split);
+    expect(initialWorkspaceState(baseConfig, navigation).layout).toEqual(split);
     expect(workspaceLayoutFromNavigationState(navigation)).toEqual(split);
   });
 
@@ -131,23 +109,20 @@ describe("initialWorkspaceState", () => {
       route_layout: preview,
       active_run_id: "run-1",
     };
-    const storage = { getItem: () => JSON.stringify(edit) };
-    expect(initialWorkspaceState(config, storage, null)).toEqual({
-      version: 1,
+    expect(initialWorkspaceState(config, null)).toEqual({
       layout: preview,
       handled_run_id: "run-1",
     });
   });
 
   it("reveals a newly running run once", () => {
-    const config = { ...baseConfig, active_run_id: "run-1" };
-    const storage = { getItem: () => JSON.stringify(edit) };
-    const started = initialWorkspaceState(config, storage, null);
-    expect(started).toEqual({
-      version: 1,
-      layout: split,
-      handled_run_id: "run-1",
-    });
+    const config = {
+      ...baseConfig,
+      initial_layout: edit,
+      active_run_id: "run-1",
+    };
+    const started = initialWorkspaceState(config, null);
+    expect(started).toEqual({ layout: split, handled_run_id: "run-1" });
 
     const closed = {
       ...started,
@@ -162,9 +137,9 @@ describe("initialWorkspaceState", () => {
     const config = { ...baseConfig, active_run_id: "run-1" };
 
     for (const layout of [preview, about, split]) {
-      expect(
-        revealRunLayout({ version: 1, layout, handled_run_id: null }, config)
-      ).toEqual({ version: 1, layout, handled_run_id: "run-1" });
+      expect(revealRunLayout({ layout, handled_run_id: null }, config)).toEqual(
+        { layout, handled_run_id: "run-1" }
+      );
     }
   });
 
@@ -173,7 +148,7 @@ describe("initialWorkspaceState", () => {
     // out from under them, a beat after they chose it.
     const config = { ...baseConfig, active_run_id: "run-1" };
     const stayed = revealRunLayout(
-      { version: 1, layout: preview, handled_run_id: null },
+      { layout: preview, handled_run_id: null },
       config
     );
     expect(stayed.handled_run_id).toBe("run-1");
