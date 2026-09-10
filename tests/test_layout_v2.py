@@ -305,10 +305,12 @@ def test_can_edit_current_pr_answers_false_without_a_user_or_workspace(monkeypat
     assert page.can_edit_current_pr is False
 
 
-def test_entry_layout_opens_on_about_whoever_is_asking(monkeypatch):
-    """Ownership used to decide this - an editor was dropped straight into the work split.
-    Both tab sets lead with About, so `tabs[0]` answers for everyone."""
+def test_a_published_run_opens_on_about_and_a_saved_run_on_the_editor(monkeypatch):
+    """Ownership does not decide this any more - viewer and editor both land on About. What
+    the url names does: a saved run is work already underway, so it opens where the work is.
+    """
     about = SplitLayout(primary=SurfaceId.about, secondary=SurfaceId.preview)
+    work = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
     tabs = [TabSpec(key="about", label="About", layout=about)]
 
     page = object.__new__(VideoBotsPageV2)
@@ -319,15 +321,27 @@ def test_entry_layout_opens_on_about_whoever_is_asking(monkeypatch):
         monkeypatch.setattr(
             VideoBotsPageV2, "is_view_only", lambda self, v=view_only: v
         )
-        assert page.entry_layout(tabs) == about
+        page.current_sr_pr = (SimpleNamespace(id=7), SimpleNamespace(saved_run_id=7))
+        assert page.entry_layout(tabs) == about, f"view_only={view_only}"
 
-    # the url has no say either - a run opens on About and switches when it runs
-    page.request.query_params = {"run_id": "run-1"}
-    assert page.entry_layout(tabs) == about
+        page.current_sr_pr = (SimpleNamespace(id=99), SimpleNamespace(saved_run_id=7))
+        assert page.entry_layout(tabs) == work, f"view_only={view_only}"
 
-    page.request.query_params = {}
-    page.tab = RecipeTabs.run_as_api
-    assert page.entry_layout(tabs) == about
+
+def test_a_run_and_its_published_run_remember_their_layouts_apart():
+    """One key let each overwrite the other: running stored the split under the published
+    run, so the published run stopped opening on About."""
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(saved_run_id=7, published_run_id="abc")
+
+    page.current_sr_pr = (SimpleNamespace(id=7), pr)
+    pr_key = page._workspace_storage_key()
+    page.current_sr_pr = (SimpleNamespace(id=99), pr)
+    run_key = page._workspace_storage_key()
+
+    assert pr_key.endswith(":abc:pr")
+    assert run_key.endswith(":abc:run")
+    assert pr_key != run_key
 
 
 def test_document_tabs_drop_the_bootstrap_overflow_and_gutter_utilities():

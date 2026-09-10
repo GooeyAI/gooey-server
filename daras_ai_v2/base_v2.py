@@ -255,10 +255,11 @@ class BasePage(BasePageV1):
         return SurfaceId.preview
 
     def _workspace_storage_key(self) -> str:
-        return (
-            f"gooey:recipe-layout:{self.workflow.value}:"
-            f"{self.current_pr.published_run_id}"
-        )
+        # A run and the published run behind it open on different views, so they cannot share
+        # a remembered one - running stored the split and the published run opened on it.
+        sr, pr = self.current_sr_pr
+        kind = "pr" if pr.saved_run_id == sr.id else "run"
+        return f"gooey:recipe-layout:{self.workflow.value}:{pr.published_run_id}:{kind}"
 
     def _is_workspace_tab(self) -> bool:
         """Whether this tab draws the workspace, rather than being a document or a route."""
@@ -474,9 +475,12 @@ class BasePage(BasePageV1):
         self.submit_and_redirect()
 
     def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        """The view the workspace opens on: About, whoever is asking. Ownership no longer
-        decides it - both tab sets lead with About, so `tabs[0]` is it either way."""
-        return tabs[0].layout
+        """The published run opens on About, whoever is asking - it presents the workflow.
+        A saved run is work already underway, so it opens on the editor instead."""
+        sr, pr = self.current_sr_pr
+        if pr.saved_run_id == sr.id:
+            return tabs[0].layout
+        return self.work_layout()
 
     def work_layout(self) -> WorkspaceLayout:
         """The two-pane working view: the editor with its preview beside it."""
