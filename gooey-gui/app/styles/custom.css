@@ -922,6 +922,17 @@ button {
   transition: all 0.2s ease;
 }
 
+/* A hover label is annotation, not body copy. The content goes through `RenderedMarkdown`,
+   which wraps it in a `<p>` - and a `<p>` takes the page's own 1rem, so a two-word label like
+   "Close Preview" arrived the same size as the interface it was labelling.
+
+   On the box, not on `*`: a `<p>` inherits this, which is the case that was wrong, while a
+   help tooltip carrying real markdown keeps the heading sizes it was written with. */
+.gooey-tooltip-box {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
 .gooey-tooltip-box * {
   color: white !important;
   text-decoration-color: #fff !important;
