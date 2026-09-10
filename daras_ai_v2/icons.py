@@ -17,6 +17,8 @@ company_solid = '<i class="fa-solid fa-buildings"></i>'
 copy_solid = '<i class="fa-solid fa-copy"></i>'
 download_solid = '<i class="fa-solid fa-download"></i>'
 preview = '<i class="fa-solid fa-eye"></i>'
+# The v2 Preview tab: running the agent, not looking at it. `fa-regular` like the tabs beside it.
+play = '<i class="fa-regular fa-play"></i>'
 add = '<i class="fa-regular fa-add"></i>'
 code = '<i class="fa-regular fa-code"></i>'
 chat = '<i class="fa-regular fa-messages"></i>'

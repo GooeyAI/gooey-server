@@ -44,7 +44,7 @@ export function HistoryPage({
 }: CustomComponentProps & HistoryPageProps) {
   return (
     // `sidebar_page_wrapper` already supplies the container-xxl
-    <div className="my-4">
+    <div className="gooey-ds-page my-4">
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
         {/* mt-0 as well as mb-0: flex centres the margin box, and the app gives h1 a
             20px top margin */}

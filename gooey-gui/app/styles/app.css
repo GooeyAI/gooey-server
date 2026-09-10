@@ -314,6 +314,66 @@ button .gui-html-container,
   background-color: var(--bs-gray-200) !important;
 }
 
+/* ── The design system's webfonts ───────────────────────────────────────────
+   Declared here rather than as a <link> in root.tsx: a font is a stylesheet concern, it
+   belongs beside the `--gooey-font-*` tokens that name it, and this way nothing outside CSS
+   has to know the app uses a webfont. Same shape as the avenir face in custom.css.
+
+   Both are variable, so one file covers the whole weight range and `font-weight` here is
+   that range rather than a single value. `unicode-range` is what keeps this cheap: a
+   browser fetches a subset only if the page actually uses a character in it.
+
+   Pinned to the versioned gstatic paths (`/v20/`, `/v25/`) Google's own CSS serves, so the
+   files cannot change under us. To drop the third-party request entirely, commit the woff2
+   files next to basiercircle and point these at them - nothing else has to change. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2)
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa25L7W0Q5n-wU.woff2)
+    format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Domine";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/domine/v25/L0x8DFMnlVwD4h3hu_qnZypEiw.woff2)
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Domine";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/domine/v25/L0x8DFMnlVwD4h3htfqnZypEi0K3.woff2)
+    format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 /* Design-system tokens, prefixed because the design's own names are too generic to own
    globally. Each comment names the Figma token it comes from. A deliberate subset: only what
    the mobile header, its drawer and the pane pills use. The v2 desktop bar still runs an
@@ -367,15 +427,21 @@ button .gui-html-container,
 }
 
 /* ── The design system's typefaces, where the design system reaches ──────────
-   The v2 workspace shell and the navigation rail, not the whole app: v1's pages, the
-   marketing header and the Django-rendered templates are still on basiercircle, and
-   converting them is a migration of its own rather than part of matching this view.
+   The surfaces built on the design system, not the whole app: v1's `gui.*`-rendered pages,
+   the marketing header and the Django templates are still on basiercircle, and converting
+   them is a migration of its own.
 
-   `.v2-app-shell` is the v2 page shell; `.nav-sidebar` is the rail, which is shared chrome
-   and so reaches v1 pages too - deliberately, so the one piece of navigation on screen does
-   not change face when you move between a v1 and a v2 recipe. */
+   `.gooey-ds-page` is the opt-in marker a converted React page carries - Home, History and
+   the run grid wear it, and the next page to be converted only has to add it rather than
+   extend this list. `.ask-gooey-page` already had a root class of its own.
+
+   `.v2-app-shell` is the v2 recipe shell. `.nav-sidebar` is the rail, which is shared
+   chrome and so reaches v1 pages too - deliberately, so the one piece of navigation on
+   screen does not change face as you move between a v1 and a v2 page. */
 .v2-app-shell,
-.nav-sidebar {
+.nav-sidebar,
+.gooey-ds-page,
+.ask-gooey-page {
   font-family: var(--gooey-font-ui);
 }
 
@@ -390,7 +456,9 @@ button .gui-html-container,
    order the bundler happens to emit two stylesheets in. */
 /* custom.css sets the heavy display face on bare `h1`-`h6`, and v2 uses heading tags for
    structure - so its section labels were arriving in it. Inter unless said otherwise. */
-.v2-app-shell :is(h1, h2, h3, h4, h5, h6) {
+.v2-app-shell :is(h1, h2, h3, h4, h5, h6),
+.gooey-ds-page :is(h1, h2, h3, h4, h5, h6),
+.ask-gooey-page :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--gooey-font-ui);
 }
 

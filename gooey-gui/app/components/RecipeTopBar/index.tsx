@@ -49,9 +49,9 @@ type MenuEntry = {
 const PREVIEW_VIEW: WorkspaceView = {
   key: "preview",
   label: "Preview",
-  // The eye, same as `icons.preview` on the Preview tab an owner is given and same as the
-  // header button beside it - one destination should not be drawn two ways.
-  icon_html: '<i class="fa-solid fa-eye"></i>',
+  // Play, same as `icons.play` on the Preview tab an owner is given and same as the compact
+  // button below lg - one destination should not be drawn two ways.
+  icon_html: '<i class="fa-regular fa-play"></i>',
   layout: { kind: "single", surface: "preview" },
   desktop_only: false,
 };
@@ -669,7 +669,7 @@ export function RecipeTopBar({
             title="Preview"
             aria-label="Preview"
           >
-            <i className="fa-regular fa-eye" />
+            <i className="fa-regular fa-play" />
           </button>
         ) : (
           !!publish_label &&

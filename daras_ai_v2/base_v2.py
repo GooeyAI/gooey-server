@@ -778,7 +778,7 @@ class BasePage(BasePageV1):
             TabSpec(
                 key="preview",
                 label="Preview",
-                icon_html=icons.preview,
+                icon_html=icons.play,
                 layout=SingleLayout(surface=SurfaceId.preview),
             ),
             TabSpec(

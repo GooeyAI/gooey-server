@@ -11,7 +11,7 @@ export function RunGrid({
   empty_message,
 }: CustomComponentProps & RunGridProps) {
   return (
-    <div className="container-xxl py-4">
+    <div className="gooey-ds-page container-xxl py-4">
       <HistoryCardGrid
         cards={cards}
         loadMoreHref={load_more_href}
