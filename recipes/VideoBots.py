@@ -94,11 +94,10 @@ from daras_ai_v2.vector_search import (
     doc_url_to_text_pages,
 )
 from daras_ai_v2.web_widget_embed import (
-    chat_widget_input_to_request_body,
+    build_chat_widget_input_request_body,
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
-from daras_ai_v2.workflow_url_input import url_to_runs
 from functions.inbuilt_tools import GooeyToolkit, UpdateConversationTitleLLMTool
 from functions.models import FunctionTrigger
 from recipes.DocExtract import document_intelligence_settings
@@ -1182,14 +1181,8 @@ Translation Glossary for LLM Language (English) -> User Langauge
         )
 
     def on_send(self, input_data: dict):
-        edit_sr = None
-        if edit_run_url := input_data.get("edit_run_url"):
-            _, edit_sr, _ = url_to_runs(edit_run_url)
-        request_body, message_thread = chat_widget_input_to_request_body(
-            self.current_sr,
-            gui.session_state,
-            input_data,
-            edit_sr=edit_sr,
+        request_body, message_thread = build_chat_widget_input_request_body(
+            self.current_sr, gui.session_state, input_data
         )
         gui.session_state.update(request_body)
         self.submit_and_redirect(message_thread=message_thread)

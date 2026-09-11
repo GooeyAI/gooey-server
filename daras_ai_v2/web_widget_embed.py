@@ -1,15 +1,11 @@
-import copy
 import datetime
 from typing import Any, Iterator
-
-import yarl
 
 import gooey_gui as gui
 from bots.models import SavedRun
 from bots.models.message_thread import MessageThread
 from daras_ai_v2 import settings
 from daras_ai_v2.csv_lines import csv_decode_row
-from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
@@ -18,7 +14,6 @@ from daras_ai_v2.language_model import (
     get_entry_text,
 )
 from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
-from daras_ai_v2.query_params_util import extract_query_params
 
 
 def load_chat_widget_lib():
@@ -27,32 +22,17 @@ def load_chat_widget_lib():
     )
 
 
-def chat_widget_input_to_request_body(
+def build_chat_widget_input_request_body(
     sr: SavedRun,
     state: dict,
     input_data: dict,
-    *,
-    edit_sr: SavedRun | None = None,
 ) -> tuple[dict, MessageThread | None]:
     from daras_ai_v2.bots import handle_location_msg
 
-    if edit_sr:
-        request_body = _build_chat_widget_edit_request_body(
-            current_sr=sr,
-            state=state,
-            edit_sr=edit_sr,
-            input_prompt=input_data.get("input_prompt"),
-        )
-        # keep the conversation's own thread: create_new_run repoints last_run at
-        # the replacement, so the sidebar row moves rather than forking a new one
-        return request_body, edit_sr.message_thread
+    if input_data.get("edit_run_url"):
+        return build_chat_widget_edit_request_body(input_data)
 
-    ret = {
-        "input_prompt": input_data.get("input_prompt"),
-        "input_audio": input_data.get("input_audio") or None,
-        "input_images": input_data.get("input_images") or None,
-        "input_documents": input_data.get("input_documents") or None,
-    }
+    ret = _copy_raw_inputs(input_data)
     messages = (state.get("messages") or []).copy()
     if messages:
         ret["messages"] = messages
@@ -104,9 +84,7 @@ def chat_widget_input_to_request_body(
         assistant_entry = format_chat_entry(
             role=CHATML_ROLE_ASSISTANT,
             content_text=prev_output,
-        ) | {
-            "run_url": sr.get_app_url(),
-        }
+        ) | {"run_url": sr.get_app_url()}
         assistant_entry["extra_content"] = assistant_extra_content(
             sr, state, prev_output
         )
@@ -123,50 +101,40 @@ def chat_widget_input_to_request_body(
     return ret, message_thread
 
 
-def _build_chat_widget_edit_request_body(
-    *,
-    current_sr: SavedRun,
-    state: dict,
-    edit_sr: SavedRun,
-    input_prompt: str | None,
-) -> dict:
+def build_chat_widget_edit_request_body(
+    input_data: dict,
+) -> tuple[dict, MessageThread | None]:
     """
-    Re-run the turn that `edit_sr` produced, with new input (or the same input
-    when `input_prompt` is None). Its saved state
-    already holds the history from *before* that turn, so everything the user
-    said after it is dropped just by re-running it.
+    Re-run the turn that the run at `input_data["edit_run_url"]` produced. Like
+    a normal turn, only the turn's inputs and history are sent - everything else
+    is layered from the published run at submit time - rather than a snapshot of
+    the edited run's whole state, which would pin a stale bot script and settings.
+
+    No ownership check: editing never overwrites anything, it only creates a new
+    run under the caller's uid from state that is already viewable by run url.
+    The thread pointer it repoints is guarded by `_can_use_message_thread`.
     """
-    if edit_sr.uid != current_sr.uid:
-        raise UserError("You can only edit messages in your own conversations.")
-    if (edit_sr.run_id, edit_sr.uid) not in _editable_run_refs(current_sr, state):
-        raise UserError("This message can no longer be edited.")
+    from daras_ai_v2.workflow_url_input import url_to_runs
 
-    # deep copy so mutating the request body can't touch the source run's state
-    request_body = copy.deepcopy(edit_sr.state)
-    # a re-run sends no prompt: the turn is asked again exactly as it was
-    if input_prompt is not None:
-        request_body["input_prompt"] = input_prompt
-    return request_body
+    sr = url_to_runs(input_data["edit_run_url"])[1]
+    input_prompt = input_data.get("input_prompt")
+    if input_prompt is None:
+        # a re-run sends no prompt: the turn is asked again exactly as it was
+        state = sr.state
+    else:
+        state = input_data
+    ret = _copy_raw_inputs(state)
+    ret["messages"] = (sr.state.get("messages") or []).copy()
+    return ret, None
 
 
-def _editable_run_refs(current_sr: SavedRun, state: dict) -> set[tuple[str, str]]:
-    """
-    Every run the current conversation renders, as (run_id, uid).
-
-    `url_to_runs` does no ownership check, so this is what stops a client from
-    naming an arbitrary run and having its state — bot_script, documents,
-    variables — copied into a run of their own. Built from the server's state,
-    never from the request.
-    """
-    refs = {(current_sr.run_id, current_sr.uid)}
-    for entry in state.get("messages") or []:
-        run_url = entry.get("run_url")
-        if not run_url:
-            continue
-        _, run_id, uid = extract_query_params(yarl.URL(run_url).query)
-        if run_id and uid:
-            refs.add((run_id, uid))
-    return refs
+def _copy_raw_inputs(input_data: dict) -> dict[str, Any | None]:
+    return {
+        "input_prompt": input_data.get("input_prompt"),
+        "input_audio": input_data.get("input_audio") or None,
+        "input_images": input_data.get("input_images") or None,
+        "input_documents": input_data.get("input_documents") or None,
+    }
 
 
 def user_extra_content(
