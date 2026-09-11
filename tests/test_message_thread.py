@@ -13,6 +13,7 @@ from bots.models import (
 )
 from bots.models.message_thread import MessageThread
 from daras_ai_v2.exceptions import UserError
+from daras_ai_v2.language_model_body import LLMMessageExtraContent, to_llm_body
 from daras_ai_v2.web_widget_embed import (
     chat_widget_input_to_request_body,
     get_chat_widget_messages,
@@ -127,6 +128,7 @@ def test_chat_widget_moves_run_metadata_into_history(db_fixtures):
         "display_content": "display reply",
         "video": ["https://example.com/video.mp4"],
         "audio": ["https://example.com/audio.mp3"],
+        "created_at": sr.created_at.isoformat(),
     }
 
 
@@ -386,11 +388,11 @@ def test_chat_widget_edit_leaves_superseded_turns_attached(db_fixtures):
     assert thread.first_run == r1
 
 
-def test_chat_widget_records_created_at_alongside_the_run(db_fixtures):
+def test_chat_widget_records_created_at_in_extra_content(db_fixtures):
     """
-    The timestamp belongs to the turn's run, so it sits with the run url on the
-    assistant half, outside extra_content. Stored as isoformat because this
-    goes into the run's json state.
+    The timestamp belongs to the turn's run, so it is stored on the assistant
+    half. It is an isoformatted extra_content field because the history is
+    persisted into the run's JSON state.
     """
     sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
     request_body, _ = chat_widget_input_to_request_body(
@@ -406,7 +408,8 @@ def test_chat_widget_records_created_at_alongside_the_run(db_fixtures):
     user_msg, assistant_msg = request_body["messages"]
     assert "created_at" not in user_msg
     assert "created_at" not in user_msg.get("extra_content", {})
-    assert assistant_msg["created_at"] == sr.created_at.isoformat()
+    assert "created_at" not in assistant_msg
+    assert assistant_msg["extra_content"]["created_at"] == sr.created_at.isoformat()
 
 
 def test_get_chat_widget_messages_exports_created_at_on_both_halves():
@@ -421,7 +424,9 @@ def test_get_chat_widget_messages_exports_created_at_on_both_halves():
                 {
                     "role": "assistant",
                     "content": "reply",
-                    "created_at": "2026-08-13T10:30:00+00:00",
+                    "extra_content": {
+                        "created_at": "2026-08-13T10:30:00+00:00",
+                    },
                 },
             ],
             "input_prompt": "latest question",
@@ -437,7 +442,7 @@ def test_get_chat_widget_messages_exports_created_at_on_both_halves():
     assert messages[3]["created_at"] == "2026-08-13T11:00:00+00:00"
 
 
-def test_chat_widget_stamps_run_time_on_the_assistant_entry(db_fixtures):
+def test_chat_widget_stamps_run_time_in_assistant_extra_content(db_fixtures):
     """
     How long the answer took is a property of the run that produced it, so it
     rides along with the run url on the assistant half. Named as the streaming
@@ -458,7 +463,8 @@ def test_chat_widget_stamps_run_time_on_the_assistant_entry(db_fixtures):
     )
 
     user_msg, assistant_msg = request_body["messages"]
-    assert assistant_msg["run_time_sec"] == 3.5
+    assert "run_time_sec" not in assistant_msg
+    assert assistant_msg["extra_content"]["run_time_sec"] == 3.5
     assert "run_time_sec" not in user_msg
 
 
@@ -475,7 +481,7 @@ def test_chat_widget_omits_run_time_when_the_run_was_never_timed(db_fixtures):
         {"input_prompt": "follow up"},
     )
 
-    assert "run_time_sec" not in request_body["messages"][1]
+    assert "run_time_sec" not in request_body["messages"][1]["extra_content"]
 
 
 def test_get_chat_widget_messages_exports_run_time_on_assistant_messages():
@@ -484,7 +490,11 @@ def test_get_chat_widget_messages_exports_run_time_on_assistant_messages():
         {
             "messages": [
                 {"role": "user", "content": "hello"},
-                {"role": "assistant", "content": "reply", "run_time_sec": 3.5},
+                {
+                    "role": "assistant",
+                    "content": "reply",
+                    "extra_content": {"run_time_sec": 3.5},
+                },
             ],
             "input_prompt": "latest question",
             "output_text": ["latest reply"],
@@ -509,16 +519,12 @@ def test_get_chat_widget_messages_omits_run_time_while_still_running():
 
 
 def test_run_time_is_stripped_before_reaching_the_llm():
-    from daras_ai_v2.language_model_body import to_llm_body
-
     body = to_llm_body([{"role": "assistant", "content": "reply", "run_time_sec": 3.5}])
 
     assert "run_time_sec" not in body[0]
 
 
 def test_created_at_is_stripped_before_reaching_the_llm():
-    from daras_ai_v2.language_model_body import to_llm_body
-
     body = to_llm_body(
         [
             {
@@ -530,6 +536,18 @@ def test_created_at_is_stripped_before_reaching_the_llm():
     )
 
     assert "created_at" not in body[0]
+
+
+def test_extra_content_schema_includes_run_metadata():
+    extra_content = LLMMessageExtraContent.model_validate(
+        {
+            "created_at": "2026-08-13T10:30:00+00:00",
+            "run_time_sec": 3.5,
+        }
+    )
+
+    assert extra_content.created_at == "2026-08-13T10:30:00+00:00"
+    assert extra_content.run_time_sec == 3.5
 
 
 def test_get_chat_widget_messages_exports_historical_run_metadata():

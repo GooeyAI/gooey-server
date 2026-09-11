@@ -57,6 +57,8 @@ class LLMMessageExtraContent(pydantic.BaseModel):
     audio: str | list[str] | None = None
     video: list[str] | None = None
     documents: list[str] | None = None
+    created_at: str | None = None
+    run_time_sec: float | None = None
 
 
 class LLMMessage(pydantic.BaseModel):
