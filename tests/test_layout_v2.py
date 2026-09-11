@@ -762,6 +762,7 @@ def test_the_about_surface_carries_the_pages_one_h1(monkeypatch):
                 notes="",
                 tags=SimpleNamespace(all=list),
                 photo_url=None,
+                run_count=0,
             )
         ),
         raising=False,

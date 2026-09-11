@@ -22,6 +22,7 @@ const MAX_COLS = 6;
  *  filed under, what it is, and how it is put together. */
 export function RecipeAbout({
   heading,
+  heading_meta,
   photo_url,
   circle_photo,
   author,
@@ -35,7 +36,6 @@ export function RecipeAbout({
   const hasPanel = !!tags.length || !!notes || !!groups.length;
   return (
     <div className="v2-about">
-      <h1 className="visually-hidden">{heading}</h1>
       {!!photo_url && (
         <img
           className={clsx(
@@ -46,6 +46,9 @@ export function RecipeAbout({
           alt=""
         />
       )}
+      {/* Below lg the top bar shows the logo at the scroll top, so the name lives here. */}
+      <h1 className="v2-about-heading">{heading}</h1>
+      {!!heading_meta && <p className="v2-about-heading-meta">{heading_meta}</p>}
       {!!author && (
         <AuthorBlock
           author={author}
@@ -142,7 +145,7 @@ function GroupBlock({
   submitIntentKey: string;
 }) {
   return (
-    <div className="v2-about-group">
+    <div className={clsx("v2-about-group", `v2-about-group--${group.variant}`)}>
       <h2 className="v2-about-section-title">{group.title}</h2>
       {/* The column count follows the cards rather than `auto-fill`, which materialises
           every track that fits and made a two-card group as wide as a six-card one. */}
@@ -176,6 +179,10 @@ function MetaCard({
 }) {
   const { config, setActiveEditorPane } = useRecipeWorkspaceContext();
   const { selectLayout } = useWorkspaceLayout(config);
+  // The platform's own colour, used only by the full-width deployment buttons below lg.
+  const accent = card.accent
+    ? ({ "--v2-about-accent": card.accent } as React.CSSProperties)
+    : undefined;
   const body = (
     <>
       <span className="v2-about-meta-head">
@@ -191,7 +198,7 @@ function MetaCard({
   switch (card.target.kind) {
     case "link":
       return (
-        <a className="v2-about-meta-card" href={card.target.href}>
+        <a className="v2-about-meta-card" href={card.target.href} style={accent}>
           {body}
         </a>
       );
@@ -204,6 +211,7 @@ function MetaCard({
           className="v2-about-meta-card"
           name={submitIntentKey}
           value={card.target.value}
+          style={accent}
         >
           {body}
         </button>

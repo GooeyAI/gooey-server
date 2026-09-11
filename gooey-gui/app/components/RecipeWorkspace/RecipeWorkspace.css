@@ -482,3 +482,22 @@
 .gooey-until-hydrated {
   visibility: hidden;
 }
+
+/* Publish, beside Run at the foot of the editor below lg. The bar above gave it up when the
+   view pill took that corner, and this is the row that already carries the other verb. */
+.v2-editor-runbar-publish {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gooey-space-2);
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 var(--gooey-space-3);
+  border: 1px solid var(--gooey-line-default);
+  border-radius: var(--gooey-radius-xs);
+  background: var(--gooey-bg-page);
+  color: var(--gooey-ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}

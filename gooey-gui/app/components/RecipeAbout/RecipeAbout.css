@@ -50,6 +50,21 @@
 /* Who published this, at the head of the panel: the attribution on the left, Share opposite
    it. One row - a long workspace name ellipsises rather than pushing the button onto a line
    of its own. Bottom margin is on the element, in Bootstrap utilities. */
+/* The workflow's name. Above lg the top bar carries it and this is only the page's h1, so
+   it is hidden; below lg the bar shows the logo at the scroll top and this is the name. */
+.v2-about .v2-about-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.v2-about .v2-about-heading-meta {
+    display: none;
+}
+
 .v2-about .v2-about-author {
     display: flex;
     flex-wrap: nowrap;
@@ -272,7 +287,7 @@
     padding: var(--gooey-space-4) var(--gooey-space-3) var(--gooey-space-3);
     border: 1px solid var(--gooey-line-default);
     border-radius: var(--gooey-radius-md);
-    background: transparent;
+    background: var(--gooey-bg-page);
     color: var(--gooey-ink);
     text-align: left;
     text-decoration: none;
@@ -352,6 +367,81 @@
 }
 
 @media (max-width: 991.98px) {
+    /* The name reads as a heading here rather than being hidden. */
+    .v2-about .v2-about-heading {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+        white-space: normal;
+        margin: 0 0 var(--gooey-space-1);
+        font-size: 1.125rem;
+        font-weight: 500;
+        line-height: 1.3;
+        color: var(--gooey-ink);
+    }
+
+    .v2-about .v2-about-heading-meta {
+        display: block;
+        margin: 0 0 var(--gooey-space-4);
+        font-size: 0.875rem;
+        color: var(--gooey-ink-muted);
+    }
+
+    /* Deployments come before the config cards and read as buttons, not tiles - a channel
+       is something you go to, and at this width there is room to say so. */
+    .v2-about .v2-about-groups {
+        flex-direction: column;
+    }
+
+    .v2-about .v2-about-group--deployments {
+        order: -1;
+    }
+
+    .v2-about .v2-about-group--deployments .v2-about-section-title {
+        display: none;
+    }
+
+    .v2-about .v2-about-group--deployments .v2-about-meta {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .v2-about .v2-about-group--deployments .v2-about-meta-card {
+        flex: 0 0 auto;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: var(--gooey-space-2);
+        width: 100%;
+        min-height: 0;
+        padding: var(--gooey-space-3);
+        border-color: transparent;
+        border-radius: var(--gooey-radius-xs);
+        /* the platform's own colour, with the neutral card as the fallback */
+        background: var(--v2-about-accent, var(--gooey-surface-100));
+        color: var(--gooey-ink);
+        font-weight: 600;
+    }
+
+    /* one row: the mark beside the label, and no chevron to point anywhere */
+    .v2-about .v2-about-group--deployments .v2-about-meta-head {
+        width: auto;
+    }
+
+    .v2-about .v2-about-group--deployments .v2-about-meta-chevron {
+        display: none;
+    }
+
+    .v2-about .v2-about-group--deployments .v2-about-meta-label {
+        width: auto;
+        min-height: 0;
+        -webkit-line-clamp: none;
+        display: block;
+        font-size: 0.9375rem;
+    }
+
     /* Still a row - the cards are a fixed 96px, so two groups fit even on a phone - but a
        tighter one, and whole groups wrap when they run out of width. */
     .v2-about .v2-about-groups {

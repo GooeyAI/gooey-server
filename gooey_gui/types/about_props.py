@@ -60,13 +60,20 @@ class AboutCard(StrictComponentModel):
     icon_html: str
     label: str
     target: AboutCardTarget
+    # A platform's own colour, for the deployment buttons below lg. None keeps the card neutral.
+    accent: str | None = None
 
 
 class AboutGroup(StrictComponentModel):
-    """A heading and the grid of cards under it."""
+    """A heading and the grid of cards under it.
+
+    `variant` is what lets the deployments read as full-width buttons below lg, where the
+    design puts them right under the description rather than in the card grid.
+    """
 
     title: str
     cards: list[AboutCard] = []
+    variant: Literal["cards", "deployments"] = "cards"
 
 
 class RecipeAboutProps(pydantic.BaseModel):
@@ -78,6 +85,8 @@ class RecipeAboutProps(pydantic.BaseModel):
     # The page's one h1, visually hidden: the top bar already shows the name, but that bar
     # is chrome on every tab, so it cannot be the heading.
     heading: str
+    # What the name sits on below lg, where About shows it rather than the top bar
+    heading_meta: str | None = None
 
     photo_url: str | None = None
     circle_photo: bool = False

@@ -81,6 +81,7 @@ export function RecipeTopBar({
   config,
   title,
   title_href,
+  logo_image_url,
   photo_url,
   circle_photo,
   author,
@@ -125,6 +126,9 @@ export function RecipeTopBar({
   };
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Below lg About leads with the logo and hands the name over once you scroll - see
+  // `useScrolledPastTop`. The bar animates between the two rather than cutting.
+  const scrolled = useScrolledPastTop();
   const builder = useAppShellPanel(
     builder_panel_key,
     Boolean(builder_panel_key && state[builder_panel_key]),
@@ -196,6 +200,9 @@ export function RecipeTopBar({
   // is the way to it. Not on the work views: Edit pairs with the preview on a wide screen and
   // swaps to it from the sheet, and Preview is already there - the slot gives way to Update.
   const canShowPreview = builderOpen || activeViewSpec?.key === "about";
+  // Only About, and only at its scroll top: every other view keeps naming the workflow.
+  const showsLogo =
+    !builderOpen && activeViewSpec?.key === "about" && !scrolled;
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
   // Absent on a tab that carries no run control, where nothing is running as far as the
   // bar is concerned.
@@ -521,18 +528,36 @@ export function RecipeTopBar({
           />
         </button>
 
+        {/* On About, before the surface is scrolled, the bar says whose app this is rather
+            than which workflow - the name is in the surface itself there. Both are rendered
+            and cross-faded, so the swap animates and the pill slides rather than jumping. */}
+        {showsLogo && !!logo_image_url && (
+          <img
+            src={logo_image_url}
+            alt="Gooey.AI"
+            className="gooey-topbar-logo d-lg-none"
+          />
+        )}
+
         {photo_url && (
           <img
             src={photo_url}
             alt=""
             className={clsx(
               "gooey-topbar-avatar",
-              circle_photo && "gooey-topbar-avatar-circle"
+              circle_photo && "gooey-topbar-avatar-circle",
+              showsLogo && "gooey-topbar-identity-hidden"
             )}
           />
         )}
 
-        <div className="gooey-topbar-titleblock" ref={titleMenuRef}>
+        <div
+          className={clsx(
+            "gooey-topbar-titleblock",
+            showsLogo && "gooey-topbar-identity-hidden"
+          )}
+          ref={titleMenuRef}
+        >
           <div className="gooey-topbar-titlerow">
             {/* A heading that names another page is a link to it - a run points at the
                 workflow it came from. Where it names this page the server sends no href and
@@ -635,14 +660,23 @@ export function RecipeTopBar({
         {!!sheetEntries.length && (
           <button
             type="button"
-            className="gooey-topbar-menu-btn d-lg-none"
+            className="gooey-topbar-viewpill d-lg-none"
             onClick={() => setSheetOpen(true)}
-            title="More actions"
-            aria-label="More actions"
+            title="Switch view"
+            aria-label={`Switch view (currently ${activeViewSpec?.label ?? "More"})`}
             aria-haspopup="menu"
             aria-expanded={sheetOpen}
           >
-            <i className="fa-solid fa-ellipsis-vertical" />
+            {!!activeViewSpec?.icon_html && (
+              <span
+                className="gooey-topbar-viewpill-icon"
+                dangerouslySetInnerHTML={{ __html: activeViewSpec.icon_html }}
+              />
+            )}
+            <span className="gooey-topbar-viewpill-label">
+              {activeViewSpec?.label ?? "More"}
+            </span>
+            <i className="fa-regular fa-chevron-down" />
           </button>
         )}
 
@@ -654,7 +688,7 @@ export function RecipeTopBar({
             behaviour, and the form posted the publish intent. The save dialog opened on top
             of the preview. The keys keep the nodes apart; `preventDefault` stays as the
             direct guard on a control that must never submit. */}
-        {canShowPreview ? (
+        {canShowPreview && (
           <button
             key="topbar-action-preview"
             type="button"
@@ -668,31 +702,6 @@ export function RecipeTopBar({
           >
             <i className="fa-regular fa-play" />
           </button>
-        ) : (
-          !!publish_label &&
-          !!publish_intent && (
-            <button
-              key="topbar-action-publish"
-              type="submit"
-              name={submit_intent_key}
-              value={encodeSubmitIntent(publish_intent)}
-              className="gooey-topbar-action d-lg-none"
-              title={
-                has_unpublished_changes
-                  ? `${publish_label} (unpublished changes)`
-                  : publish_label
-              }
-              aria-label={publish_label}
-            >
-              <i className="fa-regular fa-floppy-disk" />
-              {has_unpublished_changes && (
-                <span
-                  className="gooey-topbar-dot"
-                  title="Unpublished changes"
-                />
-              )}
-            </button>
-          )
         )}
 
         {!!overflowEntries.length && (
@@ -875,6 +884,39 @@ export function RecipeTopBar({
         )}
       </div>
 
+      {/* About leads with the whole switcher below lg, and hands it to the pill on scroll -
+          the same `showsLogo` that swaps the identity, so the header never shows both. */}
+      {showsLogo && (
+        <div className="gooey-topbar-viewrow d-lg-none" role="tablist">
+          {views
+            .filter((view) => !view.desktop_only)
+            .map((view) => {
+              const active = view.key === activeViewSpec?.key;
+              return (
+                <button
+                  key={view.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  className={clsx(
+                    "gooey-topbar-viewrow-pill",
+                    active && "gooey-topbar-viewrow-pill--active"
+                  )}
+                  onClick={() => showView(view)}
+                >
+                  {!!view.icon_html && (
+                    <span
+                      className="gooey-topbar-viewrow-icon"
+                      dangerouslySetInnerHTML={{ __html: view.icon_html }}
+                    />
+                  )}
+                  {view.label}
+                </button>
+              );
+            })}
+        </div>
+      )}
+
       {sheetOpen && (
         <MobileActionSheet
           entries={sheetEntries}
@@ -1018,4 +1060,22 @@ function menuEntryFromTopBarItem(item: TopBarMenuItem): MenuEntry {
     target: item.target,
     isDanger: item.is_danger,
   };
+}
+
+/** Whether the tab body has been scrolled away from its top.
+ *
+ * The body is what scrolls below lg, not the window, so this listens on it rather than on
+ * `window`. Falls back to `false` while it has not mounted, which is the logo state.
+ */
+function useScrolledPastTop(threshold = 24) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const body = document.querySelector(".v2-workspace-body");
+    if (!body) return;
+    const onScroll = () => setScrolled(body.scrollTop > threshold);
+    onScroll();
+    body.addEventListener("scroll", onScroll, { passive: true });
+    return () => body.removeEventListener("scroll", onScroll);
+  }, [threshold]);
+  return scrolled;
 }

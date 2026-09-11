@@ -118,6 +118,8 @@ class RecipeTopBarProps(StrictComponentModel):
     # Where the heading points, from `get_title_breadcrumbs` - the workflow this run belongs
     # to. None when the title already names the page you are on.
     title_href: str | None = None
+    # Shown instead of the name below lg, on About, until the surface is scrolled.
+    logo_image_url: str | None = None
     photo_url: str | None = None
     circle_photo: bool = False
     author: TopBarAuthor | None = None
@@ -163,6 +165,10 @@ class EditorRunBarProps(StrictComponentModel):
 
     submit_intent_key: str
     run_intent: RunControlIntent
+    # Publish lives here below lg, where the bar above has no room for it.
+    publish_label: str | None = None
+    publish_intent: PublishIntent | None = None
+    has_unpublished_changes: bool = False
     cost_label: str | None = None
     cost_href: str | None = None
     cost_title: str | None = None
