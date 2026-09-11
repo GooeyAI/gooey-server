@@ -17,6 +17,7 @@ import {
   clearWorkspaceLayoutNavigationState,
   foldForNarrowViewport,
   initialWorkspaceState,
+  peekCarriedRunLayout,
   type WorkspaceState,
   type WorkspaceLayout,
 } from "./components/RecipeWorkspace/paneState";
@@ -132,8 +133,13 @@ export function useWorkspaceLayout(config: PageShellConfig) {
   const context = useAppShellContext();
   const location = useLocation();
   const entry = context.workspaces[config.storage_key];
+  // The carry too, not just the url's own view: after a run the storage key changes, so this
+  // first render has no entry and would lay out the work view before the effect corrects it.
   const fallback: WorkspaceState = {
-    layout: config.route_layout ?? config.initial_layout,
+    layout:
+      config.route_layout ??
+      peekCarriedRunLayout(config) ??
+      config.initial_layout,
     handled_run_id: null,
   };
   const current = entry?.value ?? fallback;

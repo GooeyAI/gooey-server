@@ -123,18 +123,27 @@ export function revealRunOutput(
 let carriedRunLayout: { layout: WorkspaceLayout; runId: string | null } | null =
   null;
 
-function carriedLayoutFor(config: PageShellConfig): WorkspaceLayout | null {
+/* Pure, so the first render can ask before the effect that binds it has run - that render
+   is the one that would otherwise lay out the run url's own view and animate away from it. */
+export function peekCarriedRunLayout(
+  config: PageShellConfig
+): WorkspaceLayout | null {
   if (!carriedRunLayout) return null;
+  // still on the page Run was pressed from; the run's own url has not arrived yet
   const runId = config.active_run_id ?? null;
-  if (carriedRunLayout.runId === null) {
-    // still on the page Run was pressed from; the run's own url has not arrived yet
-    if (!runId) return null;
-    carriedRunLayout = { layout: carriedRunLayout.layout, runId };
-    return carriedRunLayout.layout;
+  if (!runId) return null;
+  if (carriedRunLayout.runId === null) return carriedRunLayout.layout;
+  return carriedRunLayout.runId === runId ? carriedRunLayout.layout : null;
+}
+
+function carriedLayoutFor(config: PageShellConfig): WorkspaceLayout | null {
+  const layout = peekCarriedRunLayout(config);
+  if (layout) {
+    carriedRunLayout = { layout, runId: config.active_run_id ?? null };
+  } else if (carriedRunLayout && carriedRunLayout.runId !== null) {
+    carriedRunLayout = null;
   }
-  if (carriedRunLayout.runId === runId) return carriedRunLayout.layout;
-  carriedRunLayout = null;
-  return null;
+  return layout;
 }
 
 export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {
