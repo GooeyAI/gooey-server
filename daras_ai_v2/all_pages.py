@@ -18,6 +18,7 @@ from recipes.FaceInpainting import FaceInpaintingPage
 from recipes.Functions import FunctionsPage
 from recipes.GoogleGPT import GoogleGPTPage
 from recipes.GoogleImageGen import GoogleImageGenPage
+from recipes.ImageGenPage import ImageGenPage
 from recipes.ImageSegmentation import ImageSegmentationPage
 from recipes.Img2Img import Img2ImgPage
 from recipes.LetterWriter import LetterWriterPage
@@ -69,6 +70,7 @@ all_home_pages_by_category: dict[str, list[typing.Type[BasePage]]] = {
         Text2AudioPage,
     ],
     "Images": [
+        ImageGenPage,
         Img2ImgPage,
         CompareText2ImgPage,
         FaceInpaintingPage,

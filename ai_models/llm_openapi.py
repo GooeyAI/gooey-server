@@ -18,6 +18,10 @@ AudioModelMarker: typing.TypeAlias = typing.Annotated[
     str,
     Field(json_schema_extra={_MARKER: AIModelSpec.Categories.audio.value}),
 ]
+ImageModelMarker: typing.TypeAlias = typing.Annotated[
+    str,
+    Field(json_schema_extra={_MARKER: AIModelSpec.Categories.image.value}),
+]
 
 
 def patch_ai_model_schema_enums(schema, _cache=None):

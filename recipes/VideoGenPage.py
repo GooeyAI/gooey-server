@@ -127,14 +127,7 @@ class VideoGenPage(BasePage):
         for inputs in [request.inputs, request.audio_inputs]:
             if not inputs:
                 continue
-            for key in ["prompt", "negative_prompt"]:
-                text = inputs.get(key)
-                if not text:
-                    continue
-                # Render any template variables in the prompt
-                inputs[key] = render_prompt_vars(inputs[key], gui.session_state)
-                yield "Running safety checker..."
-                safety_checker(text=text)
+            yield from run_prompt_safety_checker(inputs)
 
     def render(self):
         video_models = list(
@@ -224,15 +217,15 @@ class VideoGenPage(BasePage):
             )
 
     def related_workflows(self) -> list:
-        from recipes.CompareText2Img import CompareText2ImgPage
         from recipes.DeforumSD import DeforumSDPage
+        from recipes.ImageGenPage import ImageGenPage
         from recipes.Lipsync import LipsyncPage
         from recipes.VideoBots import VideoBotsPage
 
         return [
             LipsyncPage,
             DeforumSDPage,
-            CompareText2ImgPage,
+            ImageGenPage,
             VideoBotsPage,
         ]
 
@@ -292,6 +285,16 @@ class VideoGenPage(BasePage):
             properties.pop("audio_inputs", None)
 
         return properties
+
+
+def run_prompt_safety_checker(inputs: dict) -> typing.Iterator[str | None]:
+    for key in ["prompt", "text_prompt", "negative_prompt"]:
+        text = inputs.get(key)
+        if not text:
+            continue
+        inputs[key] = render_prompt_vars(text, gui.session_state)
+        yield "Running safety checker..."
+        safety_checker(text=text)
 
 
 def generate_video(
@@ -431,7 +434,10 @@ def render_fields(
         return
 
     try:
-        input_schema = build_combined_input_schema(models, skip_fields=skip_fields)
+        input_schema = build_combined_input_schema(
+            models,
+            skip_fields=skip_fields,
+        )
     except Exception as e:
         gui.error(f"Error getting input fields: {e}")
         return
@@ -448,7 +454,7 @@ def render_fields(
         label = field.get("title") or name.title()
         if name in required_fields:
             label = "##### " + label
-        value = old_inputs.get(name) or field.get("default")
+        value = old_inputs.get(name, field.get("default"))
 
         new_inputs[name] = render_field(
             field=field, name=name, label=label, value=value
@@ -458,7 +464,8 @@ def render_fields(
 
 
 def build_combined_input_schema(
-    models: list[AIModelSpec], skip_fields: typing.Iterable[str] = ()
+    models: typing.Iterable[AIModelSpec],
+    skip_fields: typing.Iterable[str] = (),
 ) -> dict[str, typing.Any] | None:
     model_input_schemas = [
         schema
@@ -474,7 +481,7 @@ def build_combined_input_schema(
 
     schema = model_input_schemas[0]
     required_fields = set(schema.get("required", []))
-    ordered_fields = schema.get("x-fal-order-properties") or list(common_fields)
+    ordered_fields = list(schema.get("x-fal-order-properties") or list(common_fields))
     ordered_fields.sort(key=lambda x: x not in required_fields)
 
     properties = {}
@@ -500,6 +507,12 @@ def render_field(*, field: dict, name: str, label: str, value: typing.Any):
         help_text = None
     field = resolve_field_anyof(field)
     match field["type"]:
+        case ("string" | "integer" | "number") as _type if field.get("enum"):
+            selected_value = gui.selectbox(
+                label=label, value=value, help=help_text, options=field["enum"]
+            )
+            pytype = {"string": str, "integer": int, "number": float}[_type]
+            return pytype(selected_value)
         case "array" if "lora" in name or "url" in name:
             return gui.file_uploader(
                 label=label,
@@ -513,18 +526,12 @@ def render_field(*, field: dict, name: str, label: str, value: typing.Any):
                 value=value,
                 help=help_text,
             )
-        case ("string" | "integer" | "number") as _type if field.get("enum"):
-            v = gui.selectbox(
-                label=label, value=value, help=help_text, options=field["enum"]
-            )
-            pytype = {"string": str, "integer": int, "number": float}[_type]
-            return pytype(v)
         case "string":
             return gui.text_area(label=label, value=value, help=help_text)
         case "integer":
             minimum = field.get("minimum")
             maximum = field.get("maximum")
-            if minimum and maximum:
+            if minimum is not None and maximum is not None:
                 return gui.slider(
                     label=label,
                     min_value=minimum,
@@ -533,15 +540,14 @@ def render_field(*, field: dict, name: str, label: str, value: typing.Any):
                     step=1,
                     help=help_text,
                 )
-            else:
-                return gui.number_input(
-                    label=label,
-                    value=value,
-                    help=help_text,
-                    min_value=minimum,
-                    max_value=maximum,
-                    step=1,
-                )
+            return gui.number_input(
+                label=label,
+                value=value,
+                help=help_text,
+                min_value=minimum,
+                max_value=maximum,
+                step=1,
+            )
         case "number":
             return gui.number_input(
                 label=label,
@@ -565,11 +571,14 @@ def render_field(*, field: dict, name: str, label: str, value: typing.Any):
                 style=dict(maxHeight="300px"),
             )
             try:
-                return json.loads(json_str)
+                parsed_value = json.loads(json_str)
             except json.JSONDecodeError:
                 gui.error("Invalid JSON")
-            if not isinstance(value, dict):
+                return None
+            if not isinstance(parsed_value, dict):
                 gui.error("Value must be a JSON object")
+                return None
+            return parsed_value
 
 
 def resolve_field_anyof(field: dict) -> dict:
@@ -628,7 +637,7 @@ def get_url_from_result(result: dict | list | str | None) -> str | None:
         return None
     match result:
         case list():
-            return result[0]
+            return get_url_from_result(result[0])
         case dict():
             return result.get("url")
         case _:
