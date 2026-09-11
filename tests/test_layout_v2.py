@@ -1,4 +1,3 @@
-import html
 import json
 import re
 from contextlib import nullcontext
@@ -39,7 +38,7 @@ from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspaceTriggerProps,
 )
 from recipes.VideoBots import VideoBotsPage
-from recipes.VideoBots_v2 import ConfigPane, VideoBotsPageV2
+from recipes.VideoBots_v2 import VideoBotsPageV2
 from routers.root import RecipeTabs
 
 
@@ -685,7 +684,6 @@ def test_the_menu_keys_python_stamps_are_the_ones_the_sheet_looks_for():
     Python and the row silently vanishes from the phone menu: no type error, no failure,
     no log line. This is that missing check.
     """
-    import re
     from pathlib import Path
 
     from daras_ai_v2.base_v2 import BasePage as BasePageV2
@@ -729,7 +727,6 @@ def _headings_in(node) -> list[tuple[int, str]]:
     Two shapes to look for: `gui.tag("h2", ...)` becomes a `tag` node carrying the element
     name, and `gui.html("<h2 ...>")` carries the markup in its body.
     """
-    import re
 
     found = []
     props = node.get("props") or {}
@@ -1001,6 +998,24 @@ def test_the_publish_cluster_follows_view_only(
     assert (props.publish_intent is not None) is offered
     assert (props.api_href is not None) is offered
     assert (props.deploy_href is not None) is offered
+    # Share rides in the same control, so it goes too - a lone Share row left a button
+    # still labelled Publish. About keeps its own, which is derived separately.
+    if not is_root:
+        assert (props.share.kind != "none") is offered
+
+
+def test_about_keeps_its_own_share_when_the_bar_loses_the_cluster(monkeypatch):
+    """The bar's Share goes with the publish control on a view-only page; About's does not.
+    `_about_share_value` asks only whether there is a published url to share."""
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(workspace_id=7, is_root=lambda: False)
+    monkeypatch.setattr(VideoBotsPageV2, "current_pr", property(lambda self: pr))
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "is_view_only", lambda self: True, raising=False
+    )
+
+    assert page._about_share_value() is not None
 
 
 def test_a_logged_out_visitor_gets_no_publish_cluster_on_a_view_only_page(monkeypatch):

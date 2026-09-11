@@ -633,8 +633,15 @@ class BasePage(BasePageV1):
         identity = self._workflow_identity()
         cost_label, cost_title = self._top_bar_cost()
         can_manage_sharing = self.can_manage_sharing()
+
+        # A view-only page has nothing to publish, and the five go together: the client
+        # renders its Publish control for any entry left, so one stray href or a Share row
+        # leaves a button still labelled Publish. A run is never view-only.
+        view_only = self.is_view_only()
+        publish_label = None if view_only else self._top_bar_publish_label()
+
         # a root recipe has no published run behind it, so there is no published url to share
-        can_share = not pr.is_root()
+        can_share = not pr.is_root() and not view_only
         share = NoShare()
         if can_share and can_manage_sharing:
             share = ManageShare(icon_html=icons.share)
@@ -643,11 +650,6 @@ class BasePage(BasePageV1):
                 url=self.current_app_url(self.tab),
                 icon_html=icons.share,
             )
-
-        # A view-only page has nothing to publish. All four go together, or the client
-        # keeps its Publish button for whatever entry is left. A run is never view-only.
-        view_only = self.is_view_only()
-        publish_label = None if view_only else self._top_bar_publish_label()
 
         usage_active = self.tab == RecipeTabs.usage
 
