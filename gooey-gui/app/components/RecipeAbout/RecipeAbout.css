@@ -485,6 +485,7 @@
     z-index: 2;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--gooey-space-2);
     margin-bottom: var(--gooey-space-3);
     padding: var(--gooey-space-2) 0;

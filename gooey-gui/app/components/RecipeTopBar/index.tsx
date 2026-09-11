@@ -194,9 +194,11 @@ export function RecipeTopBar({
   // Ask Gooey carries its own title pill, so the bar neither repeats it nor goes on naming
   // the view underneath the panel.
   const crumb = builderOpen ? "" : crumb_label || activeViewSpec?.label || "";
-  // Only About, and only at its scroll top: every other view keeps naming the workflow.
-  const showsLogo =
-    !builderOpen && activeViewSpec?.key === "about" && !scrolled;
+  // About carries its own switcher, which sticks to the top of the surface - so the bar's
+  // pill would be a second copy of it at every scroll position, not just at the top.
+  const isAbout = !builderOpen && activeViewSpec?.key === "about";
+  // The logo leads About until it is scrolled; every other view keeps naming the workflow.
+  const showsLogo = isAbout && !scrolled;
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
   // Absent on a tab that carries no run control, where nothing is running as far as the
   // bar is concerned.
@@ -651,7 +653,7 @@ export function RecipeTopBar({
       <div className="gooey-topbar-right">
         {/* Below lg only these two render; the desktop cluster is hidden by CSS, and cost
             and Run return as the editor's own bottom bar. */}
-        {!!sheetEntries.length && (
+        {!!sheetEntries.length && !isAbout && (
           <button
             type="button"
             className="gooey-topbar-viewpill d-lg-none"
