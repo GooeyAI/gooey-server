@@ -197,6 +197,10 @@ export function RecipeTopBar({
   // About carries its own switcher, which sticks to the top of the surface - so the bar's
   // pill would be a second copy of it at every scroll position, not just at the top.
   const isAbout = !builderOpen && activeViewSpec?.key === "about";
+  // What the bar's pill says. The crumb below lg gives way to it rather than repeating it -
+  // a document tab (API, Deploy) has no view of its own, so its crumb still earns its place.
+  const pillLabel = activeViewSpec?.label ?? "More";
+  const showsPill = !isAbout;
   // The logo leads About until it is scrolled; every other view keeps naming the workflow.
   const showsLogo = isAbout && !scrolled;
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
@@ -473,8 +477,9 @@ export function RecipeTopBar({
   const titleContent = (
     <>
       <span className="gooey-topbar-title-text">{title}</span>
-      {/* Which level of the stack is on screen; above lg the active pill says so. */}
-      {!atRoot && !!crumb && (
+      {/* Which level of the stack is on screen; above lg the active pill says so, and below
+          lg the view pill does - so this only renders when it says something they do not. */}
+      {!atRoot && !!crumb && !(showsPill && crumb === pillLabel) && (
         <span className="gooey-topbar-crumb d-lg-none">
           <i
             className="fa-regular fa-chevron-right gooey-topbar-crumb-sep"
@@ -653,13 +658,13 @@ export function RecipeTopBar({
       <div className="gooey-topbar-right">
         {/* Below lg only these two render; the desktop cluster is hidden by CSS, and cost
             and Run return as the editor's own bottom bar. */}
-        {!!sheetEntries.length && !isAbout && (
+        {!!sheetEntries.length && showsPill && (
           <button
             type="button"
             className="gooey-topbar-viewpill d-lg-none"
             onClick={() => setSheetOpen(true)}
             title="Switch view"
-            aria-label={`Switch view (currently ${activeViewSpec?.label ?? "More"})`}
+            aria-label={`Switch view (currently ${pillLabel})`}
             aria-haspopup="menu"
             aria-expanded={sheetOpen}
           >
@@ -670,7 +675,7 @@ export function RecipeTopBar({
               />
             )}
             <span className="gooey-topbar-viewpill-label">
-              {activeViewSpec?.label ?? "More"}
+              {pillLabel}
             </span>
             <i className="fa-regular fa-chevron-down" />
           </button>
