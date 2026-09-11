@@ -37,7 +37,6 @@ from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspaceTriggerProps,
     WorkspaceEditorPane,
 )
-
 from recipes.VideoBots import VideoBotsPage
 from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
@@ -143,7 +142,9 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             gui.session_state["final_search_query"] = ""
             gui.rerun()
 
-        messages = get_chat_widget_messages(gui.session_state)
+        messages = get_chat_widget_messages(
+            gui.session_state, web_url=self.current_app_url()
+        )
 
         # fill branding with bot integration data if available
         bot_integration = (
@@ -173,6 +174,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             enablePhotoUpload=True,
             enableConversations=True,
             showToolCalls=True,
+            showRunLink=True,
+            showRunTime=True,
             branding=bot_branding,
             fillParent=True,
             enableSourcePreview=False,

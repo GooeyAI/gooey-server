@@ -1,10 +1,15 @@
+import copy
+import datetime
 from typing import Any, Iterator
+
+import yarl
 
 import gooey_gui as gui
 from bots.models import SavedRun
 from bots.models.message_thread import MessageThread
 from daras_ai_v2 import settings
 from daras_ai_v2.csv_lines import csv_decode_row
+from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model import (
     CHATML_ROLE_ASSISTANT,
     CHATML_ROLE_USER,
@@ -13,6 +18,7 @@ from daras_ai_v2.language_model import (
     get_entry_text,
 )
 from daras_ai_v2.language_model_openai_audio import is_realtime_audio_url
+from daras_ai_v2.query_params_util import extract_query_params
 
 
 def load_chat_widget_lib():
@@ -22,9 +28,24 @@ def load_chat_widget_lib():
 
 
 def chat_widget_input_to_request_body(
-    sr: SavedRun, state: dict, input_data: dict
+    sr: SavedRun,
+    state: dict,
+    input_data: dict,
+    *,
+    edit_sr: SavedRun | None = None,
 ) -> tuple[dict, MessageThread | None]:
     from daras_ai_v2.bots import handle_location_msg
+
+    if edit_sr:
+        request_body = _build_chat_widget_edit_request_body(
+            current_sr=sr,
+            state=state,
+            edit_sr=edit_sr,
+            input_prompt=input_data.get("input_prompt"),
+        )
+        # keep the conversation's own thread: create_new_run repoints last_run at
+        # the replacement, so the sidebar row moves rather than forking a new one
+        return request_body, edit_sr.message_thread
 
     ret = {
         "input_prompt": input_data.get("input_prompt"),
@@ -76,13 +97,19 @@ def chat_widget_input_to_request_body(
         if extra_content:
             user_entry["extra_content"] = extra_content
 
+        # a turn is produced by one run, and the assistant half is the half that
+        # run answered with - so the run is recorded here, once, and the user
+        # half is rendered from it rather than storing its own copy. The URL is
+        # used internally; serializable run metadata lives in extra_content.
         assistant_entry = format_chat_entry(
             role=CHATML_ROLE_ASSISTANT,
             content_text=prev_output,
-        ) | {"run_url": sr.get_app_url()}
-        extra_content = assistant_extra_content(state, prev_output)
-        if extra_content:
-            assistant_entry["extra_content"] = extra_content
+        ) | {
+            "run_url": sr.get_app_url(),
+        }
+        assistant_entry["extra_content"] = assistant_extra_content(
+            sr, state, prev_output
+        )
 
         # append previous input to the history
         ret["messages"] = messages + [user_entry, assistant_entry]
@@ -94,6 +121,52 @@ def chat_widget_input_to_request_body(
         message_thread = None
 
     return ret, message_thread
+
+
+def _build_chat_widget_edit_request_body(
+    *,
+    current_sr: SavedRun,
+    state: dict,
+    edit_sr: SavedRun,
+    input_prompt: str | None,
+) -> dict:
+    """
+    Re-run the turn that `edit_sr` produced, with new input (or the same input
+    when `input_prompt` is None). Its saved state
+    already holds the history from *before* that turn, so everything the user
+    said after it is dropped just by re-running it.
+    """
+    if edit_sr.uid != current_sr.uid:
+        raise UserError("You can only edit messages in your own conversations.")
+    if (edit_sr.run_id, edit_sr.uid) not in _editable_run_refs(current_sr, state):
+        raise UserError("This message can no longer be edited.")
+
+    # deep copy so mutating the request body can't touch the source run's state
+    request_body = copy.deepcopy(edit_sr.state)
+    # a re-run sends no prompt: the turn is asked again exactly as it was
+    if input_prompt is not None:
+        request_body["input_prompt"] = input_prompt
+    return request_body
+
+
+def _editable_run_refs(current_sr: SavedRun, state: dict) -> set[tuple[str, str]]:
+    """
+    Every run the current conversation renders, as (run_id, uid).
+
+    `url_to_runs` does no ownership check, so this is what stops a client from
+    naming an arbitrary run and having its state — bot_script, documents,
+    variables — copied into a run of their own. Built from the server's state,
+    never from the request.
+    """
+    refs = {(current_sr.run_id, current_sr.uid)}
+    for entry in state.get("messages") or []:
+        run_url = entry.get("run_url")
+        if not run_url:
+            continue
+        _, run_id, uid = extract_query_params(yarl.URL(run_url).query)
+        if run_id and uid:
+            refs.add((run_id, uid))
+    return refs
 
 
 def user_extra_content(
@@ -113,7 +186,11 @@ def user_extra_content(
     return ret
 
 
-def assistant_extra_content(state: dict, raw_output_text: str) -> dict[str, Any]:
+def assistant_extra_content(
+    sr: SavedRun,
+    state: dict,
+    raw_output_text: str,
+) -> dict[str, Any]:
     ret = {}
     output_text = (state.get("output_text") or [""])[0]
     if output_text and output_text != raw_output_text:
@@ -124,6 +201,12 @@ def assistant_extra_content(state: dict, raw_output_text: str) -> dict[str, Any]
     output_audio = state.get("output_audio")
     if output_audio:
         ret["audio"] = output_audio
+    # isoformat because this is persisted into the run's json state
+    ret["created_at"] = sr.created_at.isoformat()
+    if sr.run_time:
+        # named as the streaming api's final_response event names it, since
+        # both report how long the same run took to answer
+        ret["run_time_sec"] = sr.run_time.total_seconds()
     return ret
 
 
@@ -155,6 +238,10 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                 input_images=input_images,
                 input_audio=input_audio,
                 input_documents=input_documents,
+                web_url=web_url,
+                # a datetime here: this one is only serialized for the wire,
+                # where jsonable_encoder renders it as isoformat
+                created_at=state.get(StateKeys.created_at),
             ),
         )
 
@@ -210,6 +297,14 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                     type=event_type,
                     status=status,
                     detail=state.get(StateKeys.run_status) or "",
+                    # the run's created_at is when the question was asked; the
+                    # answer arrived a run time later
+                    created_at=finished_at(
+                        state.get(StateKeys.created_at),
+                        state.get(StateKeys.run_time),
+                    ),
+                    # absent until the run finishes, so nothing shows mid-answer
+                    run_time_sec=state.get(StateKeys.run_time),
                     raw_output_text=raw_output_text,
                     output_text=[text],
                     text=text,
@@ -225,44 +320,97 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
 
 
 def history_entries_to_widget_messages(entries: list[Any]) -> Iterator[Any]:
-    from daras_ai_v2.bots import parse_bot_html
+    for user_entry, assistant_entry in iter_user_assistant_pairs(entries):
+        if user_entry:
+            yield user_entry_to_widget_message(user_entry, assistant_entry)
+        if assistant_entry:
+            yield assistant_entry_to_widget_message(assistant_entry)
 
+
+def iter_user_assistant_pairs(
+    entries: list[Any],
+) -> Iterator[tuple[dict | None, dict | None]]:
+    # a turn is a user entry followed by the assistant entry that answered it.
+    # a turn's run is recorded on the assistant half, and only the immediately
+    # following half counts: a turn whose answer was never saved is yielded
+    # alone rather than borrowing a later turn's run, or editing it would re-run
+    # the wrong one. an assistant entry with no user half is also yielded alone.
+    # every other role (system, ...) is dropped
+    prev_user_entry = None
     for entry in entries:
         role = entry.get("role")
-
-        run_url = entry.get("run_url")
-        extra_content = entry.get("extra_content") or {}
-        text = extra_content.get("display_content", get_entry_text(entry)) or ""
-        audio = extra_content.get("audio")
-        video = extra_content.get("video")
-        documents = extra_content.get("documents")
-
         if role == CHATML_ROLE_USER:
-            msg = dict(
-                role=role,
-                input_prompt=text,
-                input_images=get_entry_images(entry) or [],
-            )
-            if audio:
-                msg["input_audio"] = audio
-            if documents:
-                msg["input_documents"] = documents
-            yield msg
-
+            if prev_user_entry:
+                yield prev_user_entry, None
+            prev_user_entry = entry
         elif role == CHATML_ROLE_ASSISTANT:
-            text = parse_bot_html(text)[1]
-            # buttons, text = parse_bot_html(text)[:2]
-            msg = dict(
-                role=role,
-                type="final_response",
-                status="completed",
-                output_text=[text],
-                buttons=[],
-            )
-            if run_url:
-                msg["web_url"] = run_url
-            if audio:
-                msg["output_audio"] = audio
-            if video:
-                msg["output_video"] = video
-            yield msg
+            yield prev_user_entry, entry
+            prev_user_entry = None
+    if prev_user_entry:
+        yield prev_user_entry, None
+
+
+def user_entry_to_widget_message(
+    user_entry: dict, assistant_entry: dict | None
+) -> dict:
+    extra_content = user_entry.get("extra_content") or {}
+    text = extra_content.get("display_content", get_entry_text(user_entry)) or ""
+    msg = dict(
+        role=CHATML_ROLE_USER,
+        input_prompt=text,
+        input_images=get_entry_images(user_entry) or [],
+    )
+    if assistant_entry:
+        if run_url := assistant_entry.get("run_url"):
+            # the widget only offers to edit a message it can point at a run
+            msg["web_url"] = run_url
+        assistant_extra_content = assistant_entry.get("extra_content") or {}
+        if created_at := assistant_extra_content.get("created_at"):
+            msg["created_at"] = created_at
+    if audio := extra_content.get("audio"):
+        msg["input_audio"] = audio
+    if documents := extra_content.get("documents"):
+        msg["input_documents"] = documents
+    return msg
+
+
+def assistant_entry_to_widget_message(assistant_entry: dict) -> dict:
+    from daras_ai_v2.bots import parse_bot_html
+
+    extra_content = assistant_entry.get("extra_content") or {}
+    text = extra_content.get("display_content", get_entry_text(assistant_entry)) or ""
+    text = parse_bot_html(text)[1]
+    # buttons, text = parse_bot_html(text)[:2]
+    msg = dict(
+        role=CHATML_ROLE_ASSISTANT,
+        type="final_response",
+        status="completed",
+        output_text=[text],
+        buttons=[],
+    )
+    if run_url := assistant_entry.get("run_url"):
+        msg["web_url"] = run_url
+    if audio := extra_content.get("audio"):
+        msg["output_audio"] = audio
+    if video := extra_content.get("video"):
+        msg["output_video"] = video
+    run_time_sec = extra_content.get("run_time_sec")
+    if created_at := extra_content.get("created_at"):
+        msg["created_at"] = finished_at(created_at, run_time_sec)
+    if run_time_sec:
+        msg["run_time_sec"] = run_time_sec
+    return msg
+
+
+def finished_at(
+    created_at: str | datetime.datetime | None, run_time_sec: float | None
+) -> str | datetime.datetime | None:
+    """
+    When a run's answer arrived: its created_at (when the question was asked)
+    plus how long it took. Unchanged while the run has no time yet.
+    """
+    if not created_at or not run_time_sec:
+        return created_at
+    if isinstance(created_at, str):
+        created_at = datetime.datetime.fromisoformat(created_at)
+    return (created_at + datetime.timedelta(seconds=run_time_sec)).isoformat()
