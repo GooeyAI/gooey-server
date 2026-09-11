@@ -23,6 +23,18 @@ WA_IMG_MAX_SIZE = 5 * 1024**2
 
 WA_MSG_MAX_SIZE = 1024
 
+# https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-reply-buttons-messages
+WA_MAX_REPLY_BTNS = 3
+WA_BTN_MAX_TITLE_LEN = 20
+WA_BTN_MAX_ID_LEN = 256
+
+# https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-list-messages
+WA_LIST_MAX_ROWS = 10
+WA_LIST_MAX_TITLE_LEN = 24
+WA_LIST_MAX_DESC_LEN = 72
+WA_LIST_MAX_ID_LEN = 200
+WA_LIST_BTN_LABEL = "Options"
+
 
 def get_wa_auth_header(access_token: str | None = None):
     return {"Authorization": f"Bearer {access_token or settings.WHATSAPP_ACCESS_TOKEN}"}
@@ -110,9 +122,12 @@ class WhatsappBot(BotInterface):
         )
 
     def get_interactive_msg_info(self) -> ButtonPressed:
+        interactive = self.input_message["interactive"]
+        # reply buttons & list (options menu) replies look the same, apart from the key
+        reply = interactive.get("button_reply") or interactive["list_reply"]
         return ButtonPressed(
-            button_id=self.input_message["interactive"]["button_reply"]["id"],
-            button_title=self.input_message["interactive"]["button_reply"]["title"],
+            button_id=reply["id"],
+            button_title=reply.get("title"),
             context_msg_id=self.input_message["context"]["id"],
         )
 
@@ -307,11 +322,12 @@ def _build_msg_buttons(
     buttons: list[ReplyButton],
     text: str | None = None,
     *,
-    max_title_len: int = 20,
-    max_id_len: int = 256,
+    max_title_len: int = WA_BTN_MAX_TITLE_LEN,
+    max_id_len: int = WA_BTN_MAX_ID_LEN,
 ) -> list[dict]:
     ret = []
     button_group = []
+    menu_rows = []
     for button in buttons:
         if any("send_location" in action for action in csv_decode_row(button["id"])):
             ret.append(_build_interactive_location_msg(text))
@@ -326,24 +342,30 @@ def _build_msg_buttons(
                     },
                 }
             )
+        elif button.get("menu"):
+            menu_rows.append(button)
+            continue
         else:
             button_group.append(button)
-            # group into 3 buttons per message
-            if len(button_group) < 3:
-                continue
-            ret.append(
-                _build_interactive_button_msg(
-                    button_group, text, max_title_len, max_id_len
-                )
-            )
-            button_group = []
+            continue
         # dont repeat text in subsequent messages
         text = "\u200b"
-    # send remaining buttons
-    if button_group:
+
+    for idx in range(0, len(button_group), WA_MAX_REPLY_BTNS):
         ret.append(
-            _build_interactive_button_msg(button_group, text, max_title_len, max_id_len)
+            _build_interactive_button_msg(
+                button_group[idx : idx + WA_MAX_REPLY_BTNS],
+                text,
+                max_title_len,
+                max_id_len,
+            )
         )
+        text = "\u200b"
+    for idx in range(0, len(menu_rows), WA_LIST_MAX_ROWS):
+        ret.append(
+            _build_interactive_list_msg(menu_rows[idx : idx + WA_LIST_MAX_ROWS], text)
+        )
+        text = "\u200b"
     return ret
 
 
@@ -383,6 +405,53 @@ def _build_interactive_button_msg(
         },
     }
     return interactive_message
+
+
+def _build_interactive_list_msg(
+    buttons: list[ReplyButton],
+    text: str | None,
+) -> dict:
+    # rows are grouped into sections by the <label> around their <select>
+    sections = []
+    for btn in buttons:
+        title = btn["title"]
+        row = {
+            "id": truncate_text_words(btn["id"], WA_LIST_MAX_ID_LEN),
+            "title": truncate_text_words(title, WA_LIST_MAX_TITLE_LEN),
+        }
+        description = btn.get("description") or (
+            title if len(title) > WA_LIST_MAX_TITLE_LEN else ""
+        )
+        if description:
+            row["description"] = truncate_text_words(description, WA_LIST_MAX_DESC_LEN)
+        section_title = btn.get("section") or ""
+        if sections and sections[-1]["title"] == section_title:
+            sections[-1]["rows"].append(row)
+        else:
+            sections.append({"title": section_title, "rows": [row]})
+    # the first <label> names the button that opens the menu
+    button_label = next((s["title"] for s in sections if s["title"]), "")
+    if len(sections) == 1:
+        sections[0].pop("title")
+    else:
+        # whatsapp requires a title on every section when there's more than one
+        for section in sections:
+            section["title"] = truncate_text_words(
+                section["title"] or WA_LIST_BTN_LABEL, WA_LIST_MAX_TITLE_LEN
+            )
+    return {
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "action": {
+                "button": truncate_text_words(
+                    button_label or WA_LIST_BTN_LABEL, WA_BTN_MAX_TITLE_LEN
+                ),
+                "sections": sections,
+            },
+            "body": {"text": _wa_body_text(text)},
+        },
+    }
 
 
 def _wa_body_text(text: str | None) -> str:

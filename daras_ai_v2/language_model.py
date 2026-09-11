@@ -1220,10 +1220,10 @@ def is_llm_chunk_large_enough(entry: dict, chunk_size: int) -> bool:
     if len(chunk) < chunk_size:
         return False
 
-    # if chunk contains buttons we wait for the buttons to be complete
-    if "<button" in chunk:
+    # if chunk contains buttons / options we wait for them to be complete
+    if "<button" in chunk or "<select" in chunk:
         doc = pq(f"<root>{chunk}</root>")
-        if doc("button"):
+        if doc("button, select"):
             last_part = doc.contents()[-1]
             # if the last part is not a string or is empty, we need to wait for more data
             if not (isinstance(last_part, str) and last_part.strip()):
