@@ -314,18 +314,8 @@ button .gui-html-container,
   background-color: var(--bs-gray-200) !important;
 }
 
-/* ── The design system's webfonts ───────────────────────────────────────────
-   Declared here rather than as a <link> in root.tsx: a font is a stylesheet concern, it
-   belongs beside the `--gooey-font-*` tokens that name it, and this way nothing outside CSS
-   has to know the app uses a webfont. Same shape as the avenir face in custom.css.
-
-   Both are variable, so one file covers the whole weight range and `font-weight` here is
-   that range rather than a single value. `unicode-range` is what keeps this cheap: a
-   browser fetches a subset only if the page actually uses a character in it.
-
-   Pinned to the versioned gstatic paths (`/v20/`, `/v25/`) Google's own CSS serves, so the
-   files cannot change under us. To drop the third-party request entirely, commit the woff2
-   files next to basiercircle and point these at them - nothing else has to change. */
+/* The design system's webfonts, beside the tokens that name them. Both are variable, so
+   `font-weight` is a range and `unicode-range` keeps unused subsets unfetched. */
 @font-face {
   font-family: "Inter";
   font-style: normal;
@@ -417,27 +407,14 @@ button .gui-html-container,
   --gooey-radius-pill: 32px; /* radius/pill - the drawer's top corners */
   --gooey-radius-full: 99px; /* radius/full - avatars, grab handle */
 
-  /* The design's two faces. `--gooey-font-ui` carries every UI, Meta, Body and Button style
-     in the set; `--gooey-font-heading` is the display face the Heading/* styles use. Both
-     fall back to basiercircle, which is what the rest of the app runs and what these
-     surfaces looked like before - so a blocked or slow webfont degrades to the old picture
-     rather than to Helvetica. Loaded in root.tsx. */
+  /* The design's two faces, falling back to basiercircle so a blocked webfont degrades to
+     the old picture rather than to Helvetica. */
   --gooey-font-ui: "Inter", basiercircle, sans-serif;
   --gooey-font-heading: "Domine", basiercircle, Georgia, serif;
 }
 
-/* ── The design system's typefaces, where the design system reaches ──────────
-   The surfaces built on the design system, not the whole app: v1's `gui.*`-rendered pages,
-   the marketing header and the Django templates are still on basiercircle, and converting
-   them is a migration of its own.
-
-   `.gooey-ds-page` is the opt-in marker a converted React page carries - Home, History and
-   the run grid wear it, and the next page to be converted only has to add it rather than
-   extend this list. `.ask-gooey-page` already had a root class of its own.
-
-   `.v2-app-shell` is the v2 recipe shell. `.nav-sidebar` is the rail, which is shared
-   chrome and so reaches v1 pages too - deliberately, so the one piece of navigation on
-   screen does not change face as you move between a v1 and a v2 page. */
+/* The surfaces built on the design system; v1 stays on basiercircle. `.gooey-ds-page` is
+   the marker a converted React page adds, so the next one needs no change here. */
 .v2-app-shell,
 .nav-sidebar,
 .gooey-ds-page,
@@ -445,29 +422,17 @@ button .gui-html-container,
   font-family: var(--gooey-font-ui);
 }
 
-/* Everything custom.css hands the heavy display face - not just headings, but `strong` and
-   the `.bold`/`.semibold` utilities the workflow cards title themselves with. Inheriting the
-   family from the page is not enough: each of those declares its own, so it has to be named
-   here or the card titles keep arriving in avenir.
-
-   `:is()` takes the specificity of its heaviest argument, so these land at two classes and
-   outrank both `.bold` and `.gui-md-container strong`. */
-.v2-app-shell :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold),
-.gooey-ds-page :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold),
-.ask-gooey-page :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold) {
+/* Mirrors the selector list custom.css hands the heavy face - headings, `strong`, and the
+   `.bold`/`.semibold` utilities - each of which declares its own family, so inheriting from
+   the page cannot reach them. Two `:is()`s keep this at two classes, which outranks both
+   `.bold` and `.gui-md-container strong`. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold) {
   font-family: var(--gooey-font-ui);
 }
 
-/* Only headings that are *drawn* as headings take the display face. v2 uses heading tags for
-   document structure and resets their look (see RecipeWorkspace.css), so a blanket
-   `h1, h2, ...` rule would set 14px section labels - which the design puts in Inter Medium -
-   in serif. Three places earn it: the workflow's h1, the prose headings in the editor's help
-   text, and Ask Gooey's "What will you build today?".
-
-   Below the UI rule on purpose: `.ask-gooey-page .ask-gooey-title` and
-   `.ask-gooey-page :is(...)` weigh the same, so this has to come second to win - which is
-   deterministic only because both live in this file. Family only, no weight: the editor's
-   own rule sets that. */
+/* Only headings *drawn* as headings: v2 uses heading tags for structure, so a blanket rule
+   would set 14px section labels in serif. Must stay below the rule above, which it ties. */
 .v2-app-shell .v2-about h1,
 .v2-app-shell .recipe-workspace-editor :is(h1, h2, h3),
 .ask-gooey-page .ask-gooey-title {

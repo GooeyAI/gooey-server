@@ -832,12 +832,10 @@ class BasePage(BasePageV1):
         # The portrait leads; the top bar carries the title.
         self._render_about_photo(pr)
         # Attribution stands on the page, not in the panel: it is who is speaking, and the
-        # panel is what they said. Above it in the design too, between the portrait and the
-        # box.
+        # panel is what they said.
         self._render_about_author(pr)
-        # One panel for the whole answer - what it is filed under, what it is, and how it is
-        # put together - rather than a box per kind of content. Two panels drew a seam
-        # through one continuous read, and the cards inside already carry their own edges.
+        # One panel for the whole answer, rather than a box per kind of content - two drew a
+        # seam through one continuous read.
         tags = list(pr.tags.all())
         with gui.div(className="v2-about-panel"):
             self._render_about_tags(tags)
@@ -1320,14 +1318,8 @@ FILL_HEIGHT_EDITOR_CSS = """
 & .cm-editor {
     flex: 1 1 auto;
     min-height: 0;
-    /* 8px, matching the model selector directly above it - they read as one group, so they
-       should share a corner. `overflow: hidden` because the line-number gutter and the
-       scroller both paint to the editor's edge; without it their square corners show through
-       the rounded ones.
-
-       The border is what makes that corner visible at all: the editor is white on a white
-       card, so a radius with no edge to bend has nothing to show for itself - which is why
-       the design review read this as "no rounded corners on the instructions". */
+    /* 8px to match the model selector above it. The border is what makes the corner visible
+       at all - white on a white card, a radius with no edge has nothing to show for itself. */
     border: 1px solid var(--gooey-line-default);
     border-radius: var(--gooey-radius-xs);
     overflow: hidden;
@@ -1431,12 +1423,8 @@ ABOUT_META_ICON_SIZE = "1.375rem"
 ABOUT_META_MAX_COLS = 6
 
 ABOUT_CSS = """
-/* The two measurements the meta cards are built from, named here so the card rule and the
-   Python that asks a creator's logo for a size cannot drift apart.
-
-   `--v2-about-card-width` used to be referenced by the card rule and declared nowhere at
-   all, which made that whole `flex` declaration invalid: the cards were falling back to
-   their `min-width: 10rem` floor rather than to any designed width. */
+/* What the meta cards are built from, named so the card rule and the Python that sizes a
+   creator's logo cannot drift apart. */
 & {
     --v2-about-card-size: 96px;
     /* Keep in step with ABOUT_META_ICON_SIZE. */
@@ -1500,10 +1488,8 @@ ABOUT_CSS = """
     min-width: 0;
 }
 
-/* The design's Button style - Inter Bold 13 on a `bg/page` fill with a `line/strong` edge and
-   a soft drop shadow, so it reads as a raised control against the page rather than as an
-   outline borrowed from the tag pills below. `flex: 0 0 auto` keeps it at its natural width
-   while everything to its left gives way. */
+/* The design's Button style. `flex: 0 0 auto` keeps it at its natural width while
+   everything to its left gives way. */
 & .v2-about-share {
     display: inline-flex;
     align-items: center;
@@ -1527,10 +1513,8 @@ ABOUT_CSS = """
     color: var(--gooey-ink);
 }
 
-/* The gap between the attribution and the panel under it. The author block sits on the page
-   now rather than inside the panel, so this is the one seam the panel's own `gap` does not
-   cover. As a trailing margin on the author it would show under a workflow that has no panel
-   to follow; `+ *` only spaces it from something that is actually there. */
+/* The one seam the panel's own `gap` does not cover. `+ *` rather than a trailing margin,
+   which would also show under a workflow with no panel to follow. */
 & .v2-about-author + * {
     margin-top: var(--gooey-space-4);
 }
@@ -1622,9 +1606,8 @@ ABOUT_CSS = """
     text-decoration: none;
 }
 
-/* One panel holding the whole answer - what it is filed under, what it is, how it is built.
-   A flex column, so the spacing between those parts is the panel's own `gap` rather than a
-   margin each of them has to carry and then cancel when it happens to be last. */
+/* One panel holding the whole answer. A flex column, so the spacing is the panel's `gap`
+   rather than a margin each part carries and then cancels when it happens to be last. */
 & .v2-about-panel {
     display: flex;
     flex-direction: column;
@@ -1634,9 +1617,8 @@ ABOUT_CSS = """
     padding: var(--gooey-space-3);
 }
 
-/* The panel is opened before its contents are known - `_render_about_meta` is a per-recipe
-   hook and the base renders nothing - so a recipe with no tags, notes, cards or deployments
-   would leave an empty tinted box under the author. */
+/* Opened before its contents are known - every part of it is conditional - so an otherwise
+   empty recipe would leave a tinted box under the author. */
 & .v2-about-panel:empty {
     display: none;
 }
@@ -1659,9 +1641,8 @@ ABOUT_CSS = """
     gap: var(--gooey-space-6);
 }
 
-/* The design sets the cards further off the description than the panel's own `gap` does, and
-   only when there is something above them to be set off from - a workflow with no notes and
-   no tags opens the panel on its cards, which want no dead strip over them. */
+/* Further off the description than the panel's `gap` alone, but only when something is
+   above them - a panel that opens on its cards wants no dead strip. */
 & .v2-about-panel > .v2-about-groups:not(:first-child) {
     padding-top: var(--gooey-space-4);
 }
@@ -1681,9 +1662,8 @@ ABOUT_CSS = """
 }
 
 & .v2-about-section-title {
-    /* The design's UI style, in full-strength ink: with the cards' own labels dropped to 12
-       this is the largest text in the section, and a muted 15 read as the louder of the two.
-       It names the row; it should not also outrank it. */
+    /* The design's UI style in full-strength ink: it names the row, so it should not also
+       outrank the cards under it. */
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.2;
@@ -1694,25 +1674,15 @@ ABOUT_CSS = """
     margin-bottom: var(--gooey-space-2);
 }
 
-/* A grid of fixed cards, six across before it takes a second row. `max-width` is what caps
-   the column count: the tracks are card-width, so six of them plus their five gaps is the
-   widest a row can be. */
+/* A grid of fixed cards; the column count comes from `_about_meta_group`, capped at six. */
 & .v2-about-meta {
     display: grid;
     grid-template-columns: repeat(var(--v2-about-cols, 1), var(--v2-about-card-size));
     gap: var(--gooey-space-4);
 }
 
-/* A small square tile: mark and chevron on the top row, the label under them.
-
-   Fixed width so a set of one lines up with a set of three, and `min-height` rather than a
-   height so a label that needs three lines grows the card instead of being cut off - the
-   design's own frame overflows by a couple of pixels at three lines. `stretch` (the default
-   `align-items` on the row) then brings the shorter cards up to the tallest, so the row still
-   reads as one set.
-
-   No fill: the card sits on the panel's tint with a hairline of its own, and the extra
-   surface the cards used to carry only muddied a box that is already a surface. */
+/* A square tile: mark and chevron on the top row, label under. Fixed width so a set of one
+   lines up with a set of three; no fill, since it sits on the panel's tint with its own edge. */
 & .v2-about-meta-card {
     display: flex;
     flex-direction: column;
@@ -1745,9 +1715,7 @@ ABOUT_CSS = """
     width: 100%;
 }
 
-/* One box, whatever is in it - a FontAwesome glyph or a model creator's logo. That box is
-   what "normalise the icon size" means at the level of layout; the ink inside it is the
-   next rule's job. */
+/* One box, whatever is in it - a FontAwesome glyph or a model creator's logo. */
 & .v2-about-meta-icon {
     display: inline-flex;
     align-items: center;
@@ -1767,9 +1735,8 @@ ABOUT_CSS = """
     line-height: 1;
 }
 
-/* For icon html that arrives without a size of its own; anything carrying an inline one wins
-   here and has to be asked for ABOUT_META_ICON_SIZE instead. Either way it is bounded by the
-   box, so a logo can only ever be exactly as big as the box is. */
+/* For icon html with no size of its own; anything carrying an inline one is asked for
+   ABOUT_META_ICON_SIZE instead. Either way the box bounds it. */
 & .v2-about-meta-icon img {
     max-width: 100%;
     max-height: 100%;
@@ -1784,25 +1751,20 @@ ABOUT_CSS = """
     color: var(--gooey-ink-muted);
 }
 
-/* Meta: Inter Medium 12, over as many lines as the name needs.
-
-   `white-space: normal` because `button .gui-html-container` in app.css sets `nowrap`, which
-   this inherits - and a label that cannot wrap sets the card's automatic minimum width, so
-   the cards were coming out 129px and 141px wide instead of the 96px they are given. */
+/* Meta: Inter Medium 12. `white-space: normal` undoes the `nowrap` inherited from
+   `button .gui-html-container`, which otherwise sets the card's minimum width. */
 & .v2-about-meta-label {
     width: 100%;
     min-width: 0;
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1.2;
-    /* `white-space: normal` because `button .gui-html-container` in app.css sets `nowrap`,
-       which this inherits - and a label that cannot wrap sets the card's automatic minimum
-       width, so the cards came out wider than the 96px they are given. */
+    /* Undoes the `nowrap` inherited from `button .gui-html-container`: a label that cannot
+       wrap sets the card's automatic minimum width. */
     white-space: normal;
     overflow-wrap: break-word;
-    /* The same number of lines whatever the label says: the clamp is the ceiling and
-       `min-height` the floor, both read off one variable, so a two-word label reserves the
-       space a three-line one fills and the card's height cannot vary between cards. */
+    /* The same number of lines whatever the label says - clamp as the ceiling, `min-height`
+       as the floor - so the card's height cannot vary between cards. */
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: var(--v2-about-label-lines);
@@ -1827,9 +1789,8 @@ ABOUT_CSS = """
            in the rhythm, and snapping it to the scale would either crowd the pills or leave
            dead space under the panel. */
         padding-bottom: 4.5rem;
-        /* The panel is the full width of the pane, which put its edges hard against the
-           viewport's. Matches the `px-2` the editor column carries at this width, so the
-           content edge holds still when the two tabs are switched between. */
+        /* Matches the `px-2` the editor column carries here, so the content edge holds
+           still when the two tabs are switched between. */
         padding-left: var(--gooey-space-2);
         padding-right: var(--gooey-space-2);
     }

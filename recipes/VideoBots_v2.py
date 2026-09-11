@@ -1,4 +1,3 @@
-import html
 import json
 from enum import Enum
 from functools import cached_property
@@ -23,11 +22,11 @@ from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
 from daras_ai_v2.tab_spec import SingleLayout, SurfaceId
-from django.utils.text import get_text_list
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
+from django.utils.text import get_text_list
 from gooey_gui.types.recipe_top_bar_props import (
     MenuIntent,
     SubmitTarget,
@@ -251,10 +250,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     def _render_about_meta(self):
         """How this agent is put together. Each card links into the config pane that owns
         the setting."""
-        # One group under one heading, in the order the design names them: what the agent
-        # *is*, then what it can reach outside itself. The heading names only the kinds the
-        # row actually holds, so a model on its own reads "Model" rather than promising two
-        # sections that are not there.
+        # One group, in the order the design names them. Each card also contributes its own
+        # word, so the heading names only the kinds the row actually holds.
         cards: list[tuple[str, str, ConfigPane]] = []
         kinds: list[str] = []
         if model := self._about_model_summary():
