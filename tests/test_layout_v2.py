@@ -1,4 +1,5 @@
 import html
+import json
 import re
 from contextlib import nullcontext
 from types import SimpleNamespace
@@ -23,6 +24,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     SubmitTarget,
     TopBarIntegration,
 )
+from gooey_gui.types.about_props import AboutCard
 from gooey_gui.types.sidebar_props import SidebarProps
 from gooey_gui.types.recipe_workspace_props import (
     PageShellConfig,
@@ -381,44 +383,46 @@ def test_submit_intent_is_consumed_once():
 
 def test_about_deployment_cards_carry_the_chips_targets():
     """A channel card in About is the same action as its chip in the bar - a link where the
-    chip navigates, and otherwise a submit carrying the intent that opens the chip's dialog,
-    since the page's form posts its submitter's name and value."""
+    chip navigates, otherwise a submit carrying the intent that opens the chip's dialog."""
     page = object.__new__(VideoBotsPageV2)
-
-    link = page._about_deployment_card(
+    intent = MenuIntent(item_key="demo:7")
+    page._top_bar_integrations = lambda: [
         TopBarIntegration(
             key="web",
             label="Try in Web",
             icon_html="<i></i>",
             target=LinkTarget(href="/chat/agent/"),
-        )
-    )
-    assert '<a class="v2-about-meta-card" href="/chat/agent/">' in link
-
-    intent = MenuIntent(item_key="demo:7")
-    submit = page._about_deployment_card(
+        ),
         TopBarIntegration(
             key="demo:7",
             label="Try in WhatsApp",
             icon_html="<i></i>",
             target=SubmitTarget(intent=intent),
-        )
-    )
-    assert 'type="submit"' in submit
-    assert f'name="{page.SUBMIT_INTENT_KEY}"' in submit
+        ),
+    ]
 
-    posted = re.search(r'value="([^"]*)"', submit).group(1)
-    gui.session_state[page.SUBMIT_INTENT_KEY] = html.unescape(posted)
+    group = page._about_deployment_group()
+    assert group.title == "Deployments"
+    link, submit = group.cards
+
+    assert link.target.kind == "link"
+    assert link.target.href == "/chat/agent/"
+
+    assert submit.target.kind == "submit"
+    # the encoded value round-trips through the same handler the chip's own post reaches
+    gui.session_state[page.SUBMIT_INTENT_KEY] = submit.target.value
     assert page._pop_submit_intent() == intent
+
+
+def test_a_workflow_with_no_deployments_gets_no_row():
+    page = object.__new__(VideoBotsPageV2)
+    page._top_bar_integrations = lambda: []
+    assert page._about_deployment_group() is None
 
 
 def test_the_about_meta_heading_names_only_what_the_row_holds(monkeypatch):
     """A model with no documents and no tools reads "Model", not a heading promising a
     knowledge base and tools that are not there."""
-    import json
-
-    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
-
     page = object.__new__(VideoBotsPageV2)
     monkeypatch.setattr(
         VideoBotsPageV2,
@@ -430,12 +434,8 @@ def test_the_about_meta_heading_names_only_what_the_row_holds(monkeypatch):
     def heading(**state):
         gui.session_state.clear()
         gui.session_state.update(state)
-        root = RenderTreeNode("root")
-        with NestingCtx(root):
-            page._render_about_meta()
-        found = _headings_in(root.to_dict())
-        # the renderer escapes the title, so `&` arrives as `&amp;`
-        return html.unescape(found[0][1]) if found else None
+        groups = page._about_meta_groups()
+        return groups[0].title if groups else None
 
     assert heading() == "Model"
     assert heading(documents=["a"]) == "Model & Knowledge base"
@@ -444,55 +444,43 @@ def test_the_about_meta_heading_names_only_what_the_row_holds(monkeypatch):
         "Model, Knowledge base & Tools"
     )
 
-    # ...and with no model either, the row and its heading go entirely
+    # ...and with no model either, the row goes entirely
     monkeypatch.setattr(
         VideoBotsPageV2, "_about_model_summary", lambda self: None, raising=False
     )
     gui.session_state.clear()
-    root = RenderTreeNode("root")
-    with NestingCtx(root):
-        page._render_about_meta()
-    assert json.dumps(root.to_dict()).count("v2-about-meta-card") == 0
+    assert page._about_meta_groups() == []
 
 
-def test_every_about_card_is_drawn_from_one_body():
-    """A deployment card and a config card are one object in the design, and were two copies
-    of the same markup here - so a change to the card's shape reached one and not the other.
-    Both go through `_about_meta_card_body` now.
-
-    The chevron is what that shape gained: the cards link somewhere, and nothing on them said
-    so. It is a constraint rather than a detail, because it is the affordance.
-    """
-    import json
-
-    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
-
+def test_every_about_card_is_one_kind_of_object(monkeypatch):
+    """A deployment card and a config card were two copies of the same markup. They are one
+    `AboutCard` now, so the component draws both and a change of shape cannot reach one and
+    not the other - only the target differs."""
     page = object.__new__(VideoBotsPageV2)
-
-    deployment = page._about_deployment_card(
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_about_model_summary",
+        lambda self: (icons.sparkles, "GPT-5"),
+        raising=False,
+    )
+    page._top_bar_integrations = lambda: [
         TopBarIntegration(
             key="web",
             label="Try in Web",
-            icon_html="<i class='brand'></i>",
+            icon_html="<i></i>",
             target=LinkTarget(href="/chat/agent/"),
         )
-    )
+    ]
+    gui.session_state.clear()
 
-    root = RenderTreeNode("root")
-    with NestingCtx(root):
-        page._render_about_meta_card(
-            icon="<i class='brand'></i>",
-            label="GPT-5",
-            pane=ConfigPane.llm_instructions,
-        )
-    config = json.dumps(root.to_dict())
+    cards = [card for group in page._about_groups() for card in group.cards]
+    assert len(cards) == 2
+    for card in cards:
+        assert isinstance(card, AboutCard)
+        assert card.icon_html and card.label and card.target
 
-    for markup, which in ((deployment, "deployment"), (config, "config")):
-        assert "v2-about-meta-chevron" in markup, f"{which} card lost its chevron"
-        # the mark and the chevron share a row, which is what puts them at opposite ends
-        assert "v2-about-meta-head" in markup, f"{which} card lost its head row"
-        assert "v2-about-meta-icon" in markup
-        assert "v2-about-meta-label" in markup
+    # the config card opens a pane; the deployment card navigates
+    assert [c.target.kind for c in cards] == ["pane", "link"]
 
 
 def test_narrow_surface_keeps_the_editor_for_a_view_only_viewer(monkeypatch):
@@ -757,18 +745,12 @@ def _headings_in(node) -> list[tuple[int, str]]:
 
 def test_the_about_surface_carries_the_pages_one_h1(monkeypatch):
     """A recipe page had no `h1` at all - the workflow's name lived in a `span` in the top
-    bar. The bar is chrome that repeats on every tab, so About is where the heading belongs:
-    it is the surface that presents the workflow, and layout v2 renders it whatever pane is
-    on screen.
+    bar. About carries it, and layout v2 renders that surface whatever pane is on screen.
 
-    Visually hidden, because the bar already shows the name and About should not say it
-    twice. Exactly one, which the always-render-three-surfaces design makes a real
-    constraint rather than a convention - an `h1` added to the editor would ship a second
-    one on every page.
+    The component hides it visually and is the only place it is emitted, so "exactly one"
+    is structural now; what Python still owes is the name itself.
     """
     from types import SimpleNamespace
-
-    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
 
     page = object.__new__(VideoBotsPageV2)
     monkeypatch.setattr(
@@ -776,7 +758,10 @@ def test_the_about_surface_carries_the_pages_one_h1(monkeypatch):
         "current_pr",
         property(
             lambda self: SimpleNamespace(
-                workspace_id=None, notes="", tags=SimpleNamespace(all=list)
+                workspace_id=None,
+                notes="",
+                tags=SimpleNamespace(all=list),
+                photo_url=None,
             )
         ),
         raising=False,
@@ -786,43 +771,22 @@ def test_the_about_surface_carries_the_pages_one_h1(monkeypatch):
         "_workflow_identity",
         lambda self: SimpleNamespace(name="Farmer.CHAT Ag Advisory Agent"),
     )
-    for noop in (
-        "_render_about_photo",
-        "_render_about_meta",
-        "_render_about_deployments",
-    ):
-        monkeypatch.setattr(VideoBotsPageV2, noop, lambda self, *a, **kw: None)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "_about_meta_groups", lambda self: [], raising=False
+    )
+    page._top_bar_integrations = lambda: []
+    page.request = SimpleNamespace(user=None)
+    gui.session_state.clear()
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
 
     root = RenderTreeNode("root")
     with NestingCtx(root):
         page._render_about_content()
 
-    levels = [level for level, _ in _headings_in(root.to_dict())]
-    assert levels.count(1) == 1, f"expected exactly one h1, got {levels}"
-
-
-def test_about_section_titles_are_headings_rather_than_styled_divs(monkeypatch):
-    """These name the sections of the page, so they are headings. They were `div`s, which
-    left the whole About surface without a single one.
-
-    The class stays: it already sets the size, weight and colour, so swapping the element
-    changes the outline and nothing about the picture. The stylesheet carries a
-    zero-specificity `:where()` reset that keeps the browser's heading scale out of it.
-    """
-    import json
-
-    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
-
-    page = object.__new__(VideoBotsPageV2)
-    root = RenderTreeNode("root")
-    with NestingCtx(root):
-        page._render_about_meta_group(
-            "Model", [(icons.sparkles, "GPT-5", ConfigPane.llm_instructions)]
-        )
-
-    assert _headings_in(root.to_dict()) == [(2, "Model")]
-    # the shape it must never go back to
-    assert '<div class=\\"v2-about-section-title\\"' not in json.dumps(root.to_dict())
+    props = json.dumps(root.to_dict())
+    assert "Farmer.CHAT Ag Advisory Agent" in props
+    assert "RecipeAbout" in props
 
 
 def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():

@@ -400,7 +400,7 @@ function WorkspacePane({
   );
 }
 
-function useRecipeWorkspaceContext() {
+export function useRecipeWorkspaceContext() {
   const value = useContext(RecipeWorkspaceContext);
   if (!value) {
     throw new Error(

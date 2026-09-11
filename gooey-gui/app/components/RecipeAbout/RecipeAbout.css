@@ -1,0 +1,376 @@
+/* The About surface. Was ABOUT_CSS inside base_v2.py, injected per render through
+   `gui.styled`; it lives with its component now and ships once with the bundle. */
+
+/* What the meta cards are built from, named so the card rule and the Python that sizes a
+   creator's logo cannot drift apart. */
+.v2-about {
+    --v2-about-card-size: 96px;
+    /* Keep in step with ABOUT_META_ICON_SIZE. px, not rem - it should not track
+       the root font size. */
+    --v2-about-icon-size: 22px;
+    /* Lines a card label always occupies - both its ceiling and its floor, which is what
+       fixes the card's height. Three fits "8 Knowledge sources" at this width. */
+    --v2-about-label-lines: 3;
+}
+
+/* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
+   here scrolls unless this does - a description longer than the viewport is simply clipped.
+   Split needs no equivalent because its working column has an `overflow-auto` pane inside;
+   About is one card, so the card's container is what has to scroll. */
+@media (min-width: 992px) {
+    .v2-about {
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        /* keeps the scrollbar off the card's border instead of on top of it */
+        padding-right: var(--gooey-space-2);
+    }
+}
+
+/* No card around this content. The pane it sits in is already a surface, so a white box
+   inside it was a second frame around the same thing - the one panel below is the only thing
+   here that carries a background of its own. */
+
+/* The portrait leads, centred and large: the top bar names the workflow, so this is what
+   identifies it here. `CIRCLE_IMAGE_WORKFLOWS` (agents) get a round crop. */
+.v2-about .v2-about-photo {
+    display: block;
+    width: 15rem;
+    height: 15rem;
+    max-width: 100%;
+    object-fit: cover;
+    border-radius: var(--gooey-radius-lg);
+    margin: var(--gooey-space-2) auto var(--gooey-space-6);
+}
+
+.v2-about .v2-about-photo-circle {
+    border-radius: 50%;
+}
+
+/* Who published this, at the head of the panel: the attribution on the left, Share opposite
+   it. One row - a long workspace name ellipsises rather than pushing the button onto a line
+   of its own. Bottom margin is on the element, in Bootstrap utilities. */
+.v2-about .v2-about-author {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gooey-space-2);
+}
+
+/* Every box between this row and the name has to be allowed to shrink, or the name never
+   reaches its ellipsis and the row grows instead - a flex item defaults to `min-width: auto`,
+   which resolves to its content. `> *` because what sits here varies: `gui.link`'s anchor
+   when the workspace has a profile to point at, and the row itself when it has not, since
+   `gui.dummy` renders no node. Share is exempt by its own `flex: 0 0 auto`. */
+.v2-about .v2-about-author > * {
+    min-width: 0;
+}
+
+/* The design's Button style. `flex: 0 0 auto` keeps it at its natural width while
+   everything to its left gives way. */
+.v2-about .v2-about-share {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gooey-space-2);
+    flex: 0 0 auto;
+    padding: var(--gooey-space-2) var(--gooey-space-3);
+    border: 1px solid var(--gooey-line-strong);
+    border-radius: var(--gooey-radius-xs);
+    background: var(--gooey-bg-page);
+    color: var(--gooey-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1.2;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.v2-about .v2-about-share:hover {
+    border-color: var(--gooey-ink-muted);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    color: var(--gooey-ink);
+}
+
+/* The one seam the panel's own `gap` does not cover. `+ *` rather than a trailing margin,
+   which would also show under a workflow with no panel to follow. */
+.v2-about .v2-about-author + * {
+    margin-top: var(--gooey-space-4);
+}
+
+/* Mark, then the name over what else this workspace has published. Left-aligned under a
+   centred portrait on purpose: two lines centred read as a caption to the picture, and this
+   is the workflow's attribution. */
+.v2-about .v2-about-author-row {
+    display: flex;
+    align-items: center;
+    gap: var(--gooey-space-3);
+    min-width: 0;
+}
+
+.v2-about .v2-about-author-photo {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--gooey-radius-full);
+    object-fit: cover;
+}
+
+.v2-about .v2-about-author-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gooey-space-1);
+    min-width: 0;
+}
+
+/* The design's UI style: Inter Medium 14, not the semibold of a heading. The two lines are an
+   attribution, and the name is the louder half of it by colour, not by weight. */
+.v2-about .v2-about-author-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--gooey-ink);
+    /* a long workspace name ellipsises rather than widening the row past the pane */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Meta: Inter Medium 12. */
+.v2-about .v2-about-author-meta {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--gooey-ink-muted);
+    /* ellipsises with the name above it, rather than being the one thing that widens the row */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The whole block is one link. Underlined at rest it read as a sentence with a link in it
+   rather than as the workflow's byline. */
+.v2-about .v2-about-author a,
+.v2-about .v2-about-author a:hover {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* At the head of the panel, wrapping onto a second row rather than squeezing: a workflow can
+   carry a region, an industry and a language at once. */
+.v2-about .v2-about-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gooey-space-3);
+}
+
+/* Standing on the panel rather than lying in it. The pill *is* the link, so it does not
+   announce itself with an underline on top of its own border. */
+.v2-about .v2-about-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gooey-space-1);
+    border: 1px solid var(--gooey-line-default);
+    border-radius: var(--gooey-radius-xs);
+    padding: var(--gooey-space-1) var(--gooey-space-3);
+    color: var(--gooey-ink-muted);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 120%;
+    text-decoration: none;
+}
+
+.v2-about .v2-about-tag:hover {
+    border-color: var(--gooey-line-strong);
+    color: var(--gooey-ink);
+    text-decoration: none;
+}
+
+/* One panel holding the whole answer. A flex column, so the spacing is the panel's `gap`
+   rather than a margin each part carries and then cancels when it happens to be last. */
+.v2-about .v2-about-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gooey-space-4);
+    background: var(--gooey-surface-100);
+    border-radius: var(--gooey-radius-md);
+    padding: var(--gooey-space-3);
+}
+
+/* Opened before its contents are known - every part of it is conditional - so an otherwise
+   empty recipe would leave a tinted box under the author. */
+.v2-about .v2-about-panel:empty {
+    display: none;
+}
+
+/* Body/Small: Inter Regular 14 at 1.4, which is looser than the 1.2 the labels around it use
+   - this is the one run of prose on the surface, and it is read rather than scanned. */
+.v2-about .v2-about-notes {
+    color: var(--gooey-ink);
+    font-size: 0.875rem;
+    /* The clamp's "…more" is drawn over the tail of the last line, so it carries an opaque
+       background to cover it - white by default, which read as a chip against this panel. */
+    --line-clamp-bg: var(--gooey-surface-100);
+}
+
+/* A row of card groups. One group per row in practice now - the config cards share a heading
+   and Deployments emits a row of its own - but the wrapper is what spaces two rows apart. */
+.v2-about .v2-about-groups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gooey-space-6);
+}
+
+/* Further off the description than the panel's `gap` alone, but only when something is
+   above them - a panel that opens on its cards wants no dead strip. */
+.v2-about .v2-about-panel > .v2-about-groups:not(:first-child) {
+    padding-top: var(--gooey-space-4);
+}
+
+/* `_render_about_meta` is a per-recipe hook and Deployments is conditional, so the row is
+   opened before either is known to have anything in it. */
+.v2-about .v2-about-groups:empty {
+    display: none;
+}
+
+/* Sizes to its own cards. With `min-width: 0` the group could be squeezed narrower than one
+   card, which made the cards inside wrap into a column while the row still looked half empty.
+   Whole groups wrap instead. */
+.v2-about .v2-about-group {
+    flex: 0 1 auto;
+    min-width: min-content;
+}
+
+.v2-about .v2-about-section-title {
+    /* An h2 for the outline, so the browser's heading scale comes back off it here - the
+       workspace-wide reset that used to do that is gone. */
+    font-family: inherit;
+    margin-top: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--gooey-ink);
+    margin-bottom: var(--gooey-space-2);
+}
+
+/* A grid of fixed cards; the column count comes from `_about_meta_group`, capped at six. */
+.v2-about .v2-about-meta {
+    display: grid;
+    grid-template-columns: repeat(var(--v2-about-cols, 1), var(--v2-about-card-size));
+    gap: var(--gooey-space-4);
+}
+
+/* A square tile: mark and chevron on the top row, label under. Fixed width so a set of one
+   lines up with a set of three; no fill, since it sits on the panel's tint with its own edge. */
+.v2-about .v2-about-meta-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--gooey-space-2);
+    flex: 0 0 var(--v2-about-card-size);
+    min-height: var(--v2-about-card-size);
+    padding: var(--gooey-space-4) var(--gooey-space-3) var(--gooey-space-3);
+    border: 1px solid var(--gooey-line-default);
+    border-radius: var(--gooey-radius-md);
+    background: transparent;
+    color: var(--gooey-ink);
+    text-align: left;
+    text-decoration: none;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.v2-about .v2-about-meta-card:hover {
+    border-color: var(--gooey-line-strong);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    color: var(--gooey-ink);
+}
+
+/* The card's top row: what it is on the left, where it goes on the right. */
+.v2-about .v2-about-meta-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gooey-space-2);
+    width: 100%;
+}
+
+/* One box, whatever is in it - a FontAwesome glyph or a model creator's logo. */
+.v2-about .v2-about-meta-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: var(--v2-about-icon-size);
+    height: var(--v2-about-icon-size);
+    line-height: 1;
+    color: var(--gooey-ink);
+}
+
+/* The glyph is asked for the box's own size, so a FontAwesome icon and a creator's logo
+   occupy the same 22px square the design draws them in. */
+.v2-about .v2-about-meta-icon > i,
+.v2-about .v2-about-meta-icon > svg {
+    font-size: var(--v2-about-icon-size);
+    line-height: 1;
+}
+
+/* For icon html with no size of its own; anything carrying an inline one is asked for
+   ABOUT_META_ICON_SIZE instead. Either way the box bounds it. */
+.v2-about .v2-about-meta-icon img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Points into the pane the card opens. Muted and small - it is an affordance, not a label. */
+.v2-about .v2-about-meta-chevron {
+    flex: 0 0 auto;
+    font-size: 0.875rem;
+    line-height: 1;
+    color: var(--gooey-ink-muted);
+}
+
+/* Meta: Inter Medium 12. `white-space: normal` undoes the `nowrap` inherited from
+   `button .gui-html-container`, which otherwise sets the card's minimum width. */
+.v2-about .v2-about-meta-label {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    /* Undoes the `nowrap` inherited from `button .gui-html-container`: a label that cannot
+       wrap sets the card's automatic minimum width. */
+    white-space: normal;
+    overflow-wrap: break-word;
+    /* The same number of lines whatever the label says - clamp as the ceiling, `min-height`
+       as the floor - so the card's height cannot vary between cards. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--v2-about-label-lines);
+    min-height: calc(var(--v2-about-label-lines) * 1.2em);
+    overflow: hidden;
+}
+
+@media (max-width: 991.98px) {
+    /* Still a row - the cards are a fixed 96px, so two groups fit even on a phone - but a
+       tighter one, and whole groups wrap when they run out of width. */
+    .v2-about .v2-about-groups {
+        gap: var(--gooey-space-5);
+    }
+
+    .v2-about {
+        /* Clears the tab pills, which below lg float over the bottom of the viewport rather
+           than sitting in the top bar. On the container rather than the panel: the panel
+           hides itself when it has nothing in it, and a `:last-child` rule reads the DOM,
+           not what is displayed.
+
+           Deliberately not a space token: this is the height of another element, not a step
+           in the rhythm, and snapping it to the scale would either crowd the pills or leave
+           dead space under the panel. */
+        padding-bottom: 4.5rem;
+        /* Matches the `px-2` the editor column carries here, so the content edge holds
+           still when the two tabs are switched between. */
+        padding-left: var(--gooey-space-2);
+        padding-right: var(--gooey-space-2);
+    }
+}

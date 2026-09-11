@@ -1,7 +1,5 @@
-import html
 import inspect
 import typing
-from contextlib import contextmanager
 from functools import cached_property
 
 import pydantic
@@ -60,6 +58,15 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarIntegration,
     TopBarMenuItem,
     TopBarParent,
+)
+from gooey_gui.types.about_props import (
+    AboutAuthor,
+    AboutCard,
+    AboutGroup,
+    AboutLinkTarget,
+    AboutSubmitTarget,
+    AboutTag,
+    RecipeAboutProps,
 )
 from gooey_gui.types.recipe_workspace_props import (
     EventControlTarget,
@@ -204,8 +211,7 @@ class BasePage(BasePageV1):
                 gui.model_component(RecipeSurfaceProps(surface=SurfaceId.about)),
                 gui.div(className="mt-1"),
             ):
-                with gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
-                    self._render_about_content()
+                self._render_about_content()
 
             with (
                 gui.model_component(RecipeSurfaceProps(surface=SurfaceId.editor)),
@@ -827,86 +833,45 @@ class BasePage(BasePageV1):
         """What this workflow is. Version history lives in the title menu and Related
         Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
-        # The page's one h1. Hidden because the top bar already shows the name - but that
-        # bar is chrome on every tab, so it cannot be the heading.
-        with gui.tag("h1", className="visually-hidden"):
-            gui.html(html.escape(self._workflow_identity().name))
-        # The portrait leads; the top bar carries the title.
-        self._render_about_photo(pr)
-        # Attribution stands on the page, not in the panel: it is who is speaking, and the
-        # panel is what they said.
-        self._render_about_author(pr)
-        # One panel for the whole answer, rather than a box per kind of content - two drew a
-        # seam through one continuous read.
-        tags = list(pr.tags.all())
-        with gui.div(className="v2-about-panel"):
-            self._render_about_tags(tags)
-            if pr.notes:
-                # Heading and prose in one box, so the panel's `gap` spaces the pair from
-                # what surrounds it and the heading's own margin does the rest.
-                with gui.div():
-                    with gui.tag("h2", className="v2-about-section-title"):
-                        gui.html("Description")
-                    with gui.div(className="container-margin-reset v2-about-notes"):
-                        gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
-            # One row for both hooks, so Model and Deployments sit side by side rather
-            # than each opening a row of its own and stacking.
-            with gui.div(className="v2-about-groups"):
-                self._render_about_meta()
-                self._render_about_deployments()
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
-    def _render_about_author(self, pr: PublishedRun):
-        """Who published this, above the panel: their mark, their name, what else they have
-        published, and Share opposite.
+        gui.model_component(
+            RecipeAboutProps(
+                heading=self._workflow_identity().name,
+                photo_url=pr.photo_url or None,
+                circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
+                author=self._about_author(pr),
+                share_value=self._about_share_value(),
+                submit_intent_key=self.SUBMIT_INTENT_KEY,
+                tags=self._about_tags(pr),
+                notes=pr.notes or None,
+                notes_line_clamp=ABOUT_NOTES_LINE_CLAMP,
+                groups=self._about_groups(),
+            )
+        )
 
-        At every width. The top bar names the workspace too above lg, so the two repeat each
-        other there - but About is the tab that presents the workflow, and a reader landing
-        on it should not have to look up at the chrome to find out whose it is. Read off
-        `pr.workspace` like the bar's line is, so the two cannot name different owners.
+    def _about_author(self, pr: PublishedRun) -> AboutAuthor | None:
+        """Who published this: their mark, their name, and what else they have published.
 
-        Not `render_author_from_workspace`: that draws one line with the name beside the
-        mark, and this stacks a count under the name. Bending the shared widget into two
-        shapes would reach the page header and the workflow cards that also use it.
+        Read off `pr.workspace` like the top bar's line is, so the two attributions cannot
+        name different owners. Not `render_author_from_workspace`: that draws one line with
+        the name beside the mark, and this stacks a count under it.
         """
         if not pr.workspace_id:
-            return
+            return None
         workspace = pr.workspace
-
-        subtitle = self._about_author_subtitle(pr)
-        link = self._about_author_href(workspace)
-        with gui.div(className="v2-about-author"):
-            with (
-                link and gui.link(to=link) or gui.dummy(),
-                gui.div(className="v2-about-author-row"),
-            ):
-                gui.html(
-                    f'<img class="v2-about-author-photo"'
-                    f' src="{html.escape(workspace.get_photo())}" alt="">'
-                )
-                with gui.div(className="v2-about-author-text"):
-                    gui.html(
-                        '<span class="v2-about-author-name">'
-                        f"{html.escape(workspace.display_name(self.request.user))}</span>"
-                    )
-                    if subtitle:
-                        gui.html(
-                            '<span class="v2-about-author-meta">'
-                            f"{html.escape(subtitle)}</span>"
-                        )
-            if share := self._about_share_button():
-                gui.html(share)
+        return AboutAuthor(
+            name=workspace.display_name(self.request.user),
+            photo_url=workspace.get_photo(),
+            subtitle=self._about_author_subtitle(pr) or None,
+            href=self._about_author_href(workspace),
+        )
 
     def _about_author_subtitle(self, pr: PublishedRun) -> str:
         """The line under the owner's name: what else this workspace has published.
 
-        It qualifies the *name* it sits under, not the workflow - the block is an
-        attribution, and "what else have they made" is what tells you how much to trust it.
-        This workflow's own run count is on its explore card and in the top bar's cost
-        cluster, so it is not the number missing here.
-
-        `public_workflow_count` rather than a count of our own, so the number under a
-        workspace's name is the same one its profile page reports. Empty when there is
-        nothing to count - "0 published workflows" says less than nothing.
+        It qualifies the *name* it sits under, not the workflow. Read through
+        `public_workflow_count` so this and the workspace's profile cannot drift.
         """
         from daras_ai.text_format import format_number_with_suffix
         from daras_ai_v2.profiles import public_workflow_count
@@ -920,30 +885,20 @@ class BasePage(BasePageV1):
         noun = ngettext(singular="workflow", plural="workflows", number=count)
         return f"{format_number_with_suffix(count)} Published {noun}"
 
-    def _about_share_button(self) -> str | None:
-        """Share, opposite the author. Carries the same `ShareIntent` the bar's button does,
-        so `_handle_top_bar_actions` opens the one share dialog on the page either way.
+    def _about_share_value(self) -> str | None:
+        """The encoded `ShareIntent`, or None when there is nothing to share.
 
-        No permission check beyond what the dialog itself needs: `render_share_modal` asserts
-        a user and a workspace, and disables the controls for anyone who cannot change them
-        (`render_share_options_for_team_workspace` gates on `can_user_delete_published_run`).
-        A root recipe has no published url to share, which is the bar's rule too.
+        The same intent the bar's button posts, so `_handle_top_bar_actions` opens the one
+        share dialog either way. A root recipe has no published url, which is the bar's rule.
         """
         pr = self.current_pr
         if not self.is_logged_in() or not pr.workspace_id or pr.is_root():
             return None
-        return (
-            f'<button type="submit" class="v2-about-share"'
-            f' name="{html.escape(self.SUBMIT_INTENT_KEY)}"'
-            f' value="{html.escape(ShareIntent().model_dump_json())}">'
-            f"{icons.share}<span>Share</span></button>"
-        )
+        return ShareIntent().model_dump_json()
 
     def _about_author_href(self, workspace: Workspace) -> str | None:
-        """Where the author block points. Same three answers `render_author_from_workspace`
-        gives, so the two attributions lead to the same page: your own workspace opens its
-        saved workflows, anyone else's opens their handle, and a workspace without one is
-        not a link at all."""
+        """Where the author block points. The same three answers
+        `render_author_from_workspace` gives, so the two attributions lead to one page."""
         from daras_ai_v2.fastapi_tricks import get_route_path
         from routers.account import saved_route
 
@@ -956,116 +911,53 @@ class BasePage(BasePageV1):
             return workspace.handle.get_app_url()
         return None
 
-    def _render_about_tags(self, tags: list):
-        """What this workflow is filed under, above the Description heading. Each pill
-        searches /explore/ for the rest of its kind.
-
-        The pill the page header and the workflow cards already use, rather than one of
-        About's own: a tag should be drawn one way wherever it is shown, and it is the same
-        link in all three places.
-        """
+    def _about_tags(self, pr: PublishedRun) -> list[AboutTag]:
+        """What this workflow is filed under. Each pill searches /explore/ for its kind."""
         from daras_ai_v2.fastapi_tricks import get_app_route_url
         from routers.root import explore_page
-        from widgets.saved_workflow import render_pill_with_link
         from widgets.workflow_search import SearchFilters
 
-        if not tags:
-            return
-        with gui.div(className="v2-about-tags"):
-            for tag in tags:
-                render_pill_with_link(
-                    tag.render(),
-                    link_to=get_app_route_url(
-                        explore_page,
-                        query_params=SearchFilters(tag=tag.name).get_query_params(),
-                    ),
-                    # `light` is the widget's default and every other caller puts it on a
-                    # white page, where it reads as a chip. On this panel's tint it is a
-                    # couple of values off the surface behind it and disappears - so no
-                    # background class, and the fill comes from the CSS below.
-                    text_bg=None,
-                    className="border",
-                )
+        return [
+            AboutTag(
+                label_html=tag.render(),
+                href=get_app_route_url(
+                    explore_page,
+                    query_params=SearchFilters(tag=tag.name).get_query_params(),
+                ),
+            )
+            for tag in pr.tags.all()
+        ]
 
-    def _render_about_photo(self, pr: PublishedRun):
-        """The workflow's portrait. `CIRCLE_IMAGE_WORKFLOWS` get a round crop, matching the
-        top bar and the rail."""
-        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+    def _about_groups(self) -> list[AboutGroup]:
+        """The card rows: how the workflow is put together, then where it is live."""
+        groups = self._about_meta_groups()
+        if deployments := self._about_deployment_group():
+            groups.append(deployments)
+        return groups
 
-        if not pr.photo_url:
-            return
-        circle = self.workflow in CIRCLE_IMAGE_WORKFLOWS
-        gui.html(
-            f'<img class="v2-about-photo{" v2-about-photo-circle" if circle else ""}"'
-            f' src="{html.escape(pr.photo_url)}" alt="">'
-        )
+    def _about_meta_groups(self) -> list[AboutGroup]:
+        """Hook: cards summarising how this workflow is built. Per-recipe, so none here."""
+        return []
 
-    def _render_about_meta(self):
-        """Hook: cards summarising how this workflow is put together. Per-recipe, so the
-        base renders nothing."""
-
-    def _render_about_deployments(self):
-        """The channels this workflow is live on, as a group beside Model and Tools.
-
-        A group, not a row: `_render_about_content` owns the row both this and the
-        per-recipe `_render_about_meta` render into.
-        """
+    def _about_deployment_group(self) -> AboutGroup | None:
+        """The channels this workflow is live on, each carrying its chip's own target."""
         integrations = self._top_bar_integrations()
         if not integrations:
-            return
-        with self._about_meta_group("Deployments", len(integrations)):
-            for it in integrations:
-                gui.html(self._about_deployment_card(it))
-
-    def _about_deployment_card(self, it: TopBarIntegration) -> str:
-        """One channel, carrying the same target as its chip in the bar."""
-        body = self._about_meta_card_body(it.icon_html, it.label)
-        if isinstance(it.target, LinkTarget):
-            return (
-                f'<a class="v2-about-meta-card"'
-                f' href="{html.escape(it.target.href)}">{body}</a>'
-            )
-        # The page's form copies its submitter's name and value into the state it posts, so
-        # a plain submit button reaches `_pop_submit_intent` by the same route the chip does
-        # and `_handle_menu_pick` opens the same dialog.
-        return (
-            f'<button type="submit" class="v2-about-meta-card"'
-            f' name="{html.escape(self.SUBMIT_INTENT_KEY)}"'
-            f' value="{html.escape(it.target.intent.model_dump_json())}">{body}</button>'
-        )
-
-    @contextmanager
-    def _about_meta_group(self, title: str, count: int):
-        """A heading and the grid of cards under it, shared by Deployments and the per-recipe
-        `_render_about_meta` so the two groups in the row are built the same way."""
-        with gui.div(className="v2-about-group"):
-            gui.html(f'<h2 class="v2-about-section-title">{html.escape(title)}</h2>')
-            # The column count is set here rather than left to `auto-fill`, which materialises
-            # every track that fits and so made a two-card group as wide as a six-card one.
-            with gui.div(
-                className="v2-about-meta",
-                style={"--v2-about-cols": str(min(count, ABOUT_META_MAX_COLS))},
-            ):
-                yield
-
-    @staticmethod
-    def _about_meta_card_body(icon_html: str, label: str) -> str:
-        """The inside of one About card: mark and chevron on the top row, label under.
-
-        Shared by the deployment cards above and the per-recipe config cards in
-        `_render_about_meta`, which are one object in the design and were two copies of the
-        same markup here. A caller decides what the card *is*; what it looks like is this.
-
-        The chevron says the card goes somewhere. `fa-regular` rather than
-        `icons.chevron_right`, whose duotone solid is far heavier than anything else on the
-        card, and left unsized so `.v2-about-meta-chevron` owns its size.
-        """
-        return (
-            '<span class="v2-about-meta-head">'
-            f'<span class="v2-about-meta-icon">{icon_html}</span>'
-            '<i class="fa-regular fa-chevron-right v2-about-meta-chevron"></i>'
-            "</span>"
-            f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
+            return None
+        return AboutGroup(
+            title="Deployments",
+            cards=[
+                AboutCard(
+                    icon_html=it.icon_html,
+                    label=it.label,
+                    target=(
+                        AboutLinkTarget(href=it.target.href)
+                        if isinstance(it.target, LinkTarget)
+                        else AboutSubmitTarget(value=it.target.intent.model_dump_json())
+                    ),
+                )
+                for it in integrations
+            ],
         )
 
     def _render_solo_input_col(self) -> bool:
@@ -1423,378 +1315,3 @@ ABOUT_META_ICON_SIZE = "22px"
 
 # Cards per row before a group takes a second line.
 ABOUT_META_MAX_COLS = 6
-
-ABOUT_CSS = """
-/* What the meta cards are built from, named so the card rule and the Python that sizes a
-   creator's logo cannot drift apart. */
-& {
-    --v2-about-card-size: 96px;
-    /* Keep in step with ABOUT_META_ICON_SIZE. px, not rem - it should not track
-       the root font size. */
-    --v2-about-icon-size: 22px;
-    /* Lines a card label always occupies - both its ceiling and its floor, which is what
-       fixes the card's height. Three fits "8 Knowledge sources" at this width. */
-    --v2-about-label-lines: 3;
-}
-
-/* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
-   here scrolls unless this does - a description longer than the viewport is simply clipped.
-   Split needs no equivalent because its working column has an `overflow-auto` pane inside;
-   About is one card, so the card's container is what has to scroll. */
-@media (min-width: 992px) {
-    & {
-        height: 100%;
-        min-height: 0;
-        overflow-y: auto;
-        /* keeps the scrollbar off the card's border instead of on top of it */
-        padding-right: var(--gooey-space-2);
-    }
-}
-
-/* No card around this content. The pane it sits in is already a surface, so a white box
-   inside it was a second frame around the same thing - the one panel below is the only thing
-   here that carries a background of its own. */
-
-/* The portrait leads, centred and large: the top bar names the workflow, so this is what
-   identifies it here. `CIRCLE_IMAGE_WORKFLOWS` (agents) get a round crop. */
-& .v2-about-photo {
-    display: block;
-    width: 15rem;
-    height: 15rem;
-    max-width: 100%;
-    object-fit: cover;
-    border-radius: var(--gooey-radius-lg);
-    margin: var(--gooey-space-2) auto var(--gooey-space-6);
-}
-
-& .v2-about-photo-circle {
-    border-radius: 50%;
-}
-
-/* Who published this, at the head of the panel: the attribution on the left, Share opposite
-   it. One row - a long workspace name ellipsises rather than pushing the button onto a line
-   of its own. Bottom margin is on the element, in Bootstrap utilities. */
-& .v2-about-author {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--gooey-space-2);
-}
-
-/* Every box between this row and the name has to be allowed to shrink, or the name never
-   reaches its ellipsis and the row grows instead - a flex item defaults to `min-width: auto`,
-   which resolves to its content. `> *` because what sits here varies: `gui.link`'s anchor
-   when the workspace has a profile to point at, and the row itself when it has not, since
-   `gui.dummy` renders no node. Share is exempt by its own `flex: 0 0 auto`. */
-& .v2-about-author > * {
-    min-width: 0;
-}
-
-/* The design's Button style. `flex: 0 0 auto` keeps it at its natural width while
-   everything to its left gives way. */
-& .v2-about-share {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--gooey-space-2);
-    flex: 0 0 auto;
-    padding: var(--gooey-space-2) var(--gooey-space-3);
-    border: 1px solid var(--gooey-line-strong);
-    border-radius: var(--gooey-radius-xs);
-    background: var(--gooey-bg-page);
-    color: var(--gooey-ink);
-    font-size: 0.8125rem;
-    font-weight: 700;
-    line-height: 1.2;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    transition: border-color 0.12s ease, box-shadow 0.12s ease;
-}
-
-& .v2-about-share:hover {
-    border-color: var(--gooey-ink-muted);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-    color: var(--gooey-ink);
-}
-
-/* The one seam the panel's own `gap` does not cover. `+ *` rather than a trailing margin,
-   which would also show under a workflow with no panel to follow. */
-& .v2-about-author + * {
-    margin-top: var(--gooey-space-4);
-}
-
-/* Mark, then the name over what else this workspace has published. Left-aligned under a
-   centred portrait on purpose: two lines centred read as a caption to the picture, and this
-   is the workflow's attribution. */
-& .v2-about-author-row {
-    display: flex;
-    align-items: center;
-    gap: var(--gooey-space-3);
-    min-width: 0;
-}
-
-& .v2-about-author-photo {
-    flex: 0 0 auto;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--gooey-radius-full);
-    object-fit: cover;
-}
-
-& .v2-about-author-text {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gooey-space-1);
-    min-width: 0;
-}
-
-/* The design's UI style: Inter Medium 14, not the semibold of a heading. The two lines are an
-   attribution, and the name is the louder half of it by colour, not by weight. */
-& .v2-about-author-name {
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.2;
-    color: var(--gooey-ink);
-    /* a long workspace name ellipsises rather than widening the row past the pane */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Meta: Inter Medium 12. */
-& .v2-about-author-meta {
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1.2;
-    color: var(--gooey-ink-muted);
-    /* ellipsises with the name above it, rather than being the one thing that widens the row */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* The whole block is one link. Underlined at rest it read as a sentence with a link in it
-   rather than as the workflow's byline. */
-& .v2-about-author a,
-& .v2-about-author a:hover {
-    color: inherit;
-    text-decoration: none;
-}
-
-/* At the head of the panel, wrapping onto a second row rather than squeezing: a workflow can
-   carry a region, an industry and a language at once. */
-& .v2-about-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gooey-space-3);
-}
-
-/* Standing on the panel rather than lying in it: the page colour sits above the tint, where
-   the widget's `light` default is within a couple of values of it. Geometry is the pane
-   pills' - both are chips, and the page should only have one idea of what a chip is.
-   `!important` on the border because Bootstrap's `.border` sets the shorthand with it. */
-& .v2-about-tags .badge {
-    border-color: var(--gooey-line-default) !important;
-    color: var(--gooey-ink-muted);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 120%;
-    padding: var(--gooey-space-1) var(--gooey-space-3);
-    border-radius: var(--gooey-radius-xs) !important;
-}
-
-/* The pill is the link, so the anchor inside it should not announce itself separately. */
-& .v2-about-tags .badge a,
-& .v2-about-tags .badge a:hover {
-    color: inherit;
-    text-decoration: none;
-}
-
-/* One panel holding the whole answer. A flex column, so the spacing is the panel's `gap`
-   rather than a margin each part carries and then cancels when it happens to be last. */
-& .v2-about-panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gooey-space-4);
-    background: var(--gooey-surface-100);
-    border-radius: var(--gooey-radius-md);
-    padding: var(--gooey-space-3);
-}
-
-/* Opened before its contents are known - every part of it is conditional - so an otherwise
-   empty recipe would leave a tinted box under the author. */
-& .v2-about-panel:empty {
-    display: none;
-}
-
-/* Body/Small: Inter Regular 14 at 1.4, which is looser than the 1.2 the labels around it use
-   - this is the one run of prose on the surface, and it is read rather than scanned. */
-& .v2-about-notes {
-    color: var(--gooey-ink);
-    font-size: 0.875rem;
-    /* The clamp's "…more" is drawn over the tail of the last line, so it carries an opaque
-       background to cover it - white by default, which read as a chip against this panel. */
-    --line-clamp-bg: var(--gooey-surface-100);
-}
-
-/* A row of card groups. One group per row in practice now - the config cards share a heading
-   and Deployments emits a row of its own - but the wrapper is what spaces two rows apart. */
-& .v2-about-groups {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gooey-space-6);
-}
-
-/* Further off the description than the panel's `gap` alone, but only when something is
-   above them - a panel that opens on its cards wants no dead strip. */
-& .v2-about-panel > .v2-about-groups:not(:first-child) {
-    padding-top: var(--gooey-space-4);
-}
-
-/* `_render_about_meta` is a per-recipe hook and Deployments is conditional, so the row is
-   opened before either is known to have anything in it. */
-& .v2-about-groups:empty {
-    display: none;
-}
-
-/* Sizes to its own cards. With `min-width: 0` the group could be squeezed narrower than one
-   card, which made the cards inside wrap into a column while the row still looked half empty.
-   Whole groups wrap instead. */
-& .v2-about-group {
-    flex: 0 1 auto;
-    min-width: min-content;
-}
-
-& .v2-about-section-title {
-    /* An h2 for the outline, so the browser's heading scale comes back off it here - the
-       workspace-wide reset that used to do that is gone. */
-    font-family: inherit;
-    margin-top: 0;
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.2;
-    color: var(--gooey-ink);
-    margin-bottom: var(--gooey-space-2);
-}
-
-/* A grid of fixed cards; the column count comes from `_about_meta_group`, capped at six. */
-& .v2-about-meta {
-    display: grid;
-    grid-template-columns: repeat(var(--v2-about-cols, 1), var(--v2-about-card-size));
-    gap: var(--gooey-space-4);
-}
-
-/* A square tile: mark and chevron on the top row, label under. Fixed width so a set of one
-   lines up with a set of three; no fill, since it sits on the panel's tint with its own edge. */
-& .v2-about-meta-card {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--gooey-space-2);
-    flex: 0 0 var(--v2-about-card-size);
-    min-height: var(--v2-about-card-size);
-    padding: var(--gooey-space-4) var(--gooey-space-3) var(--gooey-space-3);
-    border: 1px solid var(--gooey-line-default);
-    border-radius: var(--gooey-radius-md);
-    background: transparent;
-    color: var(--gooey-ink);
-    text-align: left;
-    text-decoration: none;
-    transition: border-color 0.12s ease, box-shadow 0.12s ease;
-}
-
-& .v2-about-meta-card:hover {
-    border-color: var(--gooey-line-strong);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-    color: var(--gooey-ink);
-}
-
-/* The card's top row: what it is on the left, where it goes on the right. */
-& .v2-about-meta-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--gooey-space-2);
-    width: 100%;
-}
-
-/* One box, whatever is in it - a FontAwesome glyph or a model creator's logo. */
-& .v2-about-meta-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: var(--v2-about-icon-size);
-    height: var(--v2-about-icon-size);
-    line-height: 1;
-    color: var(--gooey-ink);
-}
-
-/* The glyph is asked for the box's own size, so a FontAwesome icon and a creator's logo
-   occupy the same 22px square the design draws them in. */
-& .v2-about-meta-icon > i,
-& .v2-about-meta-icon > svg {
-    font-size: var(--v2-about-icon-size);
-    line-height: 1;
-}
-
-/* For icon html with no size of its own; anything carrying an inline one is asked for
-   ABOUT_META_ICON_SIZE instead. Either way the box bounds it. */
-& .v2-about-meta-icon img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-}
-
-/* Points into the pane the card opens. Muted and small - it is an affordance, not a label. */
-& .v2-about-meta-chevron {
-    flex: 0 0 auto;
-    font-size: 0.875rem;
-    line-height: 1;
-    color: var(--gooey-ink-muted);
-}
-
-/* Meta: Inter Medium 12. `white-space: normal` undoes the `nowrap` inherited from
-   `button .gui-html-container`, which otherwise sets the card's minimum width. */
-& .v2-about-meta-label {
-    width: 100%;
-    min-width: 0;
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1.2;
-    /* Undoes the `nowrap` inherited from `button .gui-html-container`: a label that cannot
-       wrap sets the card's automatic minimum width. */
-    white-space: normal;
-    overflow-wrap: break-word;
-    /* The same number of lines whatever the label says - clamp as the ceiling, `min-height`
-       as the floor - so the card's height cannot vary between cards. */
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: var(--v2-about-label-lines);
-    min-height: calc(var(--v2-about-label-lines) * 1.2em);
-    overflow: hidden;
-}
-
-@media (max-width: 991.98px) {
-    /* Still a row - the cards are a fixed 96px, so two groups fit even on a phone - but a
-       tighter one, and whole groups wrap when they run out of width. */
-    & .v2-about-groups {
-        gap: var(--gooey-space-5);
-    }
-
-    & {
-        /* Clears the tab pills, which below lg float over the bottom of the viewport rather
-           than sitting in the top bar. On the container rather than the panel: the panel
-           hides itself when it has nothing in it, and a `:last-child` rule reads the DOM,
-           not what is displayed.
-
-           Deliberately not a space token: this is the height of another element, not a step
-           in the rhythm, and snapping it to the scale would either crowd the pills or leave
-           dead space under the panel. */
-        padding-bottom: 4.5rem;
-        /* Matches the `px-2` the editor column carries here, so the content edge holds
-           still when the two tabs are switched between. */
-        padding-left: var(--gooey-space-2);
-        padding-right: var(--gooey-space-2);
-    }
-}
-"""

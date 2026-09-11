@@ -32,9 +32,13 @@ from gooey_gui.types.recipe_top_bar_props import (
     SubmitTarget,
     TopBarIntegration,
 )
+from gooey_gui.types.about_props import (
+    AboutCard,
+    AboutGroup,
+    AboutPaneTarget,
+)
 from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspacePanesProps,
-    RecipeWorkspaceTriggerProps,
     WorkspaceEditorPane,
 )
 
@@ -247,43 +251,50 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             if ref.is_open:
                 render_demo_dialog(ref, bi_id)
 
-    def _render_about_meta(self):
-        """How this agent is put together. Each card links into the config pane that owns
-        the setting."""
+    def _about_meta_groups(self) -> list[AboutGroup]:
+        """How this agent is put together. Each card opens the config pane that owns it."""
         # One group, in the order the design names them. Each card also contributes its own
         # word, so the heading names only the kinds the row actually holds.
-        cards: list[tuple[str, str, ConfigPane]] = []
+        cards: list[AboutCard] = []
         kinds: list[str] = []
         if model := self._about_model_summary():
-            cards.append((*model, ConfigPane.llm_instructions))
+            icon, label = model
+            cards.append(
+                self._about_pane_card(icon, label, ConfigPane.llm_instructions)
+            )
             kinds.append("Model")
         if documents := len(gui.session_state.get("documents") or []):
             noun = "source" if documents == 1 else "sources"
             cards.append(
-                (
-                    icons.library,
-                    f"{documents} Knowledge {noun}",
-                    ConfigPane.knowledge,
+                self._about_pane_card(
+                    icons.library, f"{documents} Knowledge {noun}", ConfigPane.knowledge
                 )
             )
             kinds.append("Knowledge base")
         if tools := len(gui.session_state.get("functions") or []):
             noun = "Tool" if tools == 1 else "Tools"
-            cards.append((icons.code, f"{tools} {noun} called", ConfigPane.tools))
+            cards.append(
+                self._about_pane_card(
+                    icons.code, f"{tools} {noun} called", ConfigPane.tools
+                )
+            )
             kinds.append("Tools")
 
         # a row of zeroes says less than no row: skip the heading too, not just the cards
         if not cards:
-            return
+            return []
+        return [AboutGroup(title=get_text_list(kinds, "&"), cards=cards)]
 
-        self._render_about_meta_group(get_text_list(kinds, "&"), cards)
-
-    def _render_about_meta_group(
-        self, title: str, cards: list[tuple[str, str, ConfigPane]]
-    ):
-        with self._about_meta_group(title, len(cards)):
-            for icon, label, pane in cards:
-                self._render_about_meta_card(icon=icon, label=label, pane=pane)
+    @staticmethod
+    def _about_pane_card(icon_html: str, label: str, pane: ConfigPane) -> AboutCard:
+        return AboutCard(
+            icon_html=icon_html,
+            label=label,
+            target=AboutPaneTarget(
+                layout=SingleLayout(surface=SurfaceId.editor),
+                editor_pane=pane.value,
+            ),
+        )
 
     def _about_model_summary(self) -> tuple[str, str] | None:
         """(icon html, label) for the selected LLM, or None if the run has not picked one."""
@@ -295,22 +306,9 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             # a model that has since been removed - its name is still better than nothing
             return icons.sparkles, name
         # `html_icon` writes the size inline, which beats any stylesheet, so the card's size
-        # is asked for here rather than left to its 1.1rem default. `.v2-about-meta-icon`
-        # normalises what a creator's logo and a FontAwesome glyph *look* like at that size;
-        # this only makes sure the box it is normalising is the right one to begin with.
+        # is asked for here rather than left to its 1.1rem default.
         icon = spec.creator and spec.creator.html_icon(size=ABOUT_META_ICON_SIZE)
         return icon or icons.sparkles, spec.label
-
-    def _render_about_meta_card(self, *, icon: str, label: str, pane: ConfigPane):
-        with gui.model_component(
-            RecipeWorkspaceTriggerProps(
-                layout=SingleLayout(surface=SurfaceId.editor),
-                editor_pane=pane.value,
-                className="v2-about-meta-card",
-            )
-        ):
-            # The same body the deployment cards use, so one change of shape reaches both.
-            gui.html(self._about_meta_card_body(icon, label))
 
     def _render_input_col(self):
         """The working column, shared by Edit and Split. Overridden here rather than per

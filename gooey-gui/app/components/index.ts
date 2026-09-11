@@ -22,6 +22,7 @@ export * from "./LoginForm";
 export * from "./PaymentRequired";
 export * from "./RunGrid";
 export * from "./NavigationSidebar";
+export * from "./RecipeAbout";
 export * from "./RecipeTopBar";
 export * from "./RecipeWorkspace";
 export * from "./Sidebar";
