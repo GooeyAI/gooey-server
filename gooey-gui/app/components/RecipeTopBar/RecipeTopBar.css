@@ -891,14 +891,15 @@ a.gooey-topbar-cost:hover {
 .gooey-topbar-titleblock {
   transition:
     opacity 180ms ease,
-    max-width 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    max-width 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .gooey-topbar-identity-hidden {
+  /* Instant on the way out, animated on the way back: a transition declared here applies
+     while the class is on, so removing it falls back to the rule above and eases in. */
+  transition: none;
   max-width: 0;
   opacity: 0;
-  transform: translateX(-8px);
   overflow: hidden;
   pointer-events: none;
 }
@@ -910,46 +911,3 @@ a.gooey-topbar-cost:hover {
   }
 }
 
-/* The switcher About leads with below lg, under the bar. Scrolls sideways rather than
-   wrapping - the bar is one row and this is the second, not a growing block. */
-.gooey-topbar-viewrow {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: var(--gooey-space-2);
-  min-width: 0;
-  margin-top: var(--gooey-space-2);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.gooey-topbar-viewrow::-webkit-scrollbar {
-  display: none;
-}
-
-.gooey-topbar-viewrow-pill {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  gap: var(--gooey-space-2);
-  padding: 6px var(--gooey-space-3);
-  border: 1px solid var(--gooey-line-default);
-  border-radius: var(--gooey-radius-pill);
-  background: var(--gooey-bg-page);
-  color: var(--gooey-ink-muted);
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.gooey-topbar-viewrow-pill--active {
-  border-color: var(--gooey-line-strong);
-  background: var(--gooey-surface-100);
-  color: var(--gooey-ink);
-}
-
-.gooey-topbar-viewrow-icon {
-  display: inline-flex;
-  align-items: center;
-}

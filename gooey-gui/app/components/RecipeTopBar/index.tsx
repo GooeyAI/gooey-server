@@ -140,8 +140,6 @@ export function RecipeTopBar({
   const navigate = useNavigate();
   const { layout, storedLayout, hydrated, isNarrow, selectLayout } =
     useWorkspaceLayout(config);
-  const previewView =
-    config.views.find((view) => view.key === "preview") ?? PREVIEW_VIEW;
   // Used wherever a layout has to be named. Not `config.views`, which is what the desktop
   // pill strip draws - the supplied Preview is reachable from the header and the sheet, both
   // of which are the narrow layout's, and a pill for it would be redundant beside them.
@@ -196,10 +194,6 @@ export function RecipeTopBar({
   // Ask Gooey carries its own title pill, so the bar neither repeats it nor goes on naming
   // the view underneath the panel.
   const crumb = builderOpen ? "" : crumb_label || activeViewSpec?.label || "";
-  // The two surfaces that talk *about* the bot rather than being it, so from either the eye
-  // is the way to it. Not on the work views: Edit pairs with the preview on a wide screen and
-  // swaps to it from the sheet, and Preview is already there - the slot gives way to Update.
-  const canShowPreview = builderOpen || activeViewSpec?.key === "about";
   // Only About, and only at its scroll top: every other view keeps naming the workflow.
   const showsLogo =
     !builderOpen && activeViewSpec?.key === "about" && !scrolled;
@@ -657,8 +651,7 @@ export function RecipeTopBar({
       <div className="gooey-topbar-right">
         {/* Below lg only these two render; the desktop cluster is hidden by CSS, and cost
             and Run return as the editor's own bottom bar. */}
-        {/* Only once the row has gone: the pill is what replaces it, not a second copy. */}
-        {!!sheetEntries.length && !showsLogo && (
+        {!!sheetEntries.length && (
           <button
             type="button"
             className="gooey-topbar-viewpill d-lg-none"
@@ -689,21 +682,6 @@ export function RecipeTopBar({
             behaviour, and the form posted the publish intent. The save dialog opened on top
             of the preview. The keys keep the nodes apart; `preventDefault` stays as the
             direct guard on a control that must never submit. */}
-        {canShowPreview && !showsLogo && (
-          <button
-            key="topbar-action-preview"
-            type="button"
-            className="gooey-topbar-action d-lg-none"
-            onClick={(e) => {
-              e.preventDefault();
-              showView(previewView);
-            }}
-            title="Preview"
-            aria-label="Preview"
-          >
-            <i className="fa-regular fa-play" />
-          </button>
-        )}
 
         {!!overflowEntries.length && (
           <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
@@ -885,39 +863,6 @@ export function RecipeTopBar({
         )}
       </div>
 
-      {/* About leads with the whole switcher below lg, and hands it to the pill on scroll -
-          the same `showsLogo` that swaps the identity, so the header never shows both. */}
-      {showsLogo && (
-        <div className="gooey-topbar-viewrow d-lg-none" role="tablist">
-          {views
-            .filter((view) => !view.desktop_only)
-            .map((view) => {
-              const active = view.key === activeViewSpec?.key;
-              return (
-                <button
-                  key={view.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={clsx(
-                    "gooey-topbar-viewrow-pill",
-                    active && "gooey-topbar-viewrow-pill--active"
-                  )}
-                  onClick={() => showView(view)}
-                >
-                  {!!view.icon_html && (
-                    <span
-                      className="gooey-topbar-viewrow-icon"
-                      dangerouslySetInnerHTML={{ __html: view.icon_html }}
-                    />
-                  )}
-                  {view.label}
-                </button>
-              );
-            })}
-        </div>
-      )}
-
       {sheetOpen && (
         <MobileActionSheet
           entries={sheetEntries}
@@ -1063,20 +1008,25 @@ function menuEntryFromTopBarItem(item: TopBarMenuItem): MenuEntry {
   };
 }
 
-/** Whether the tab body has been scrolled away from its top.
+/** Whether the About surface has been scrolled away from its top.
  *
- * The body is what scrolls below lg, not the window, so this listens on it rather than on
- * `window`. Falls back to `false` while it has not mounted, which is the logo state.
+ * The pane's own content box is what scrolls - the workspace and the tab body around it are
+ * both `overflow: hidden`, so binding to either watched an element whose `scrollTop` never
+ * moved. Listens in the capture phase on `document` because `scroll` does not bubble, and
+ * because the pane may not have mounted when this runs.
  */
 function useScrolledPastTop(threshold = 24) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const body = document.querySelector(".v2-workspace-body");
-    if (!body) return;
-    const onScroll = () => setScrolled(body.scrollTop > threshold);
-    onScroll();
-    body.addEventListener("scroll", onScroll, { passive: true });
-    return () => body.removeEventListener("scroll", onScroll);
+    const read = () => {
+      const pane = document.querySelector(
+        ".recipe-workspace-about .recipe-workspace-pane-content"
+      );
+      setScrolled(!!pane && pane.scrollTop > threshold);
+    };
+    read();
+    document.addEventListener("scroll", read, true);
+    return () => document.removeEventListener("scroll", read, true);
   }, [threshold]);
   return scrolled;
 }

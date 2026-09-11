@@ -473,3 +473,53 @@
         padding-right: var(--gooey-space-2);
     }
 }
+
+/* ------------------------------------------------------- the view switcher
+
+   Above About's content and below lg only. It belongs to the page rather than the bar, so
+   it scrolls with the surface - and sticks to the top of it once it gets there. Scrolls
+   sideways rather than wrapping: one row, however many views a recipe has. */
+.v2-about .v2-about-views {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--gooey-space-2);
+    margin-bottom: var(--gooey-space-3);
+    padding: var(--gooey-space-2) 0;
+    background: var(--gooey-bg-page);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.v2-about .v2-about-views::-webkit-scrollbar {
+    display: none;
+}
+
+.v2-about .v2-about-view {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: var(--gooey-space-2);
+    padding: 6px var(--gooey-space-3);
+    border: 1px solid var(--gooey-line-default);
+    border-radius: var(--gooey-radius-pill);
+    background: var(--gooey-bg-page);
+    color: var(--gooey-ink-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.v2-about .v2-about-view--active {
+    border-color: var(--gooey-line-strong);
+    background: var(--gooey-surface-100);
+    color: var(--gooey-ink);
+}
+
+.v2-about .v2-about-view-icon {
+    display: inline-flex;
+    align-items: center;
+}
