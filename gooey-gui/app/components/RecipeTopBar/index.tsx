@@ -657,7 +657,8 @@ export function RecipeTopBar({
       <div className="gooey-topbar-right">
         {/* Below lg only these two render; the desktop cluster is hidden by CSS, and cost
             and Run return as the editor's own bottom bar. */}
-        {!!sheetEntries.length && (
+        {/* Only once the row has gone: the pill is what replaces it, not a second copy. */}
+        {!!sheetEntries.length && !showsLogo && (
           <button
             type="button"
             className="gooey-topbar-viewpill d-lg-none"
@@ -688,7 +689,7 @@ export function RecipeTopBar({
             behaviour, and the form posted the publish intent. The save dialog opened on top
             of the preview. The keys keep the nodes apart; `preventDefault` stays as the
             direct guard on a control that must never submit. */}
-        {canShowPreview && (
+        {canShowPreview && !showsLogo && (
           <button
             key="topbar-action-preview"
             type="button"

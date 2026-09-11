@@ -367,6 +367,13 @@
 }
 
 @media (max-width: 991.98px) {
+    /* A portrait sized for the desktop column takes most of a phone's width. */
+    .v2-about .v2-about-photo {
+        width: 8rem;
+        height: 8rem;
+        margin-bottom: var(--gooey-space-4);
+    }
+
     /* The name reads as a heading here rather than being hidden. */
     .v2-about .v2-about-heading {
         position: static;
@@ -419,8 +426,10 @@
         padding: var(--gooey-space-3);
         border-color: transparent;
         border-radius: var(--gooey-radius-xs);
-        /* the platform's own colour, with the neutral card as the fallback */
-        background: var(--v2-about-accent, var(--gooey-surface-100));
+        /* the platform's own colour; without one it still has to read as a button, so the
+           fallback is the page against the panel's tint rather than the tint itself */
+        background: var(--v2-about-accent, var(--gooey-bg-page));
+        border-color: var(--gooey-line-default);
         color: var(--gooey-ink);
         font-weight: 600;
     }
