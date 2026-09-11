@@ -318,8 +318,15 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         workflow_sr = None
         workflow_url = ""
 
+    input_data = body.input_data or builder_sr.state
+    edit_sr = None
+    if edit_run_url := input_data.get("edit_run_url"):
+        _, edit_sr, _ = url_to_runs(edit_run_url)
     request_body, message_thread = chat_widget_input_to_request_body(
-        builder_sr, builder_sr.state, body.input_data or builder_sr.state
+        builder_sr,
+        builder_sr.state,
+        input_data,
+        edit_sr=edit_sr,
     )
     insert_gooey_builder_variables(request_body, workflow_url)
 

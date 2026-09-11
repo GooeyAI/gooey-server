@@ -41,15 +41,23 @@ export function GooeyEmbedPreview(
       const embedTarget = document.getElementById("gooey-embed");
       if (!embedTarget) return;
 
+      const sendMessage = (payload: unknown) => {
+        const btn = document.getElementById(
+          "onSendMessage"
+        ) as HTMLInputElement | null;
+        if (!btn) return;
+        btn.value = JSON.stringify(payload);
+        btn.click();
+      };
+
       controllerRef.current = {
         messages: propsRef.current.messages,
-        onSendMessage: (payload: unknown) => {
-          const btn = document.getElementById(
-            "onSendMessage"
-          ) as HTMLInputElement | null;
-          if (!btn) return;
-          btn.value = JSON.stringify(payload);
-          btn.click();
+        onSendMessage: sendMessage,
+        onEditQuery: (_messageId: string, input_data: any, webUrl?: string) => {
+          // webUrl identifies the run that produced the edited turn, so the
+          // server re-runs that turn rather than always the latest one
+          if (!webUrl) return;
+          sendMessage({ ...input_data, edit_run_url: webUrl });
         },
         onNewConversation: () => {
           document.getElementById("onNewConversation")?.click();
