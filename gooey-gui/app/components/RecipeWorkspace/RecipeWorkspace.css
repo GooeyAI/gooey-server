@@ -160,6 +160,13 @@
   overflow: hidden;
 }
 
+/* A pane fills the body, and its wrapper with it - the one `RecipeWorkspacePanes` requires
+   per pane - so an editor inside can size against a height instead of growing to its text. */
+.recipe-workspace-pane-panel,
+.recipe-workspace-pane-panel > * {
+  height: 100%;
+}
+
 /* The failure notice above the output. A flex item's automatic minimum size would hold it at
    its full content height, which the clipping pane above then cuts off - so it is allowed to
    shrink (`min-height: 0`), bounded (`max-height`) and given the scrollbar itself. */
@@ -470,46 +477,8 @@
   }
 }
 
-/* ── Held back until the stored layout has been read ────────────────────────
-   The workspace and the tab strip are hidden for the first paint so a restored pane
-   arrangement does not visibly swap in a moment later.
-
-   A class rather than an inline style, so the `<noscript>` in the top bar can take it back
-   with a plain rule instead of `!important`. Without that, an agent that never runs JS
-   never reaches hydration and is served a whole document of invisible text - which is what
-   most of this file's siblings are for a crawler. */
+/* Hidden for the first paint so a restored layout does not visibly swap in. A class, not
+   an inline style, so the top bar's `<noscript>` can take it back without `!important`. */
 .gooey-until-hydrated {
   visibility: hidden;
-}
-
-/* ── Heading semantics without the browser's type scale ─────────────────────
-   The workspace uses heading tags for structure - one h1 naming the workflow, an h2 per
-   section - so a crawler and a screen reader can see the shape of the page. The *look*
-   still comes from the component classes that were there when these were divs.
-
-   `:where()` so the reset carries no specificity at all: it beats the UA stylesheet, which
-   is the point, and loses to every author rule - `.v2-about-section-title` keeps setting
-   its own size, weight, colour and bottom margin exactly as before. Without it an h2
-   arrives at 2rem with 0.83em block margins and redraws a panel that was tuned as a div. */
-.recipe-workspace :where(h1, h2, h3, h4, h5, h6) {
-  font-size: inherit;
-  font-weight: inherit;
-  line-height: inherit;
-  margin: 0;
-}
-
-/* The editor's prose headings are the exception: they were markdown `####` and `#####` and
-   were sized by the UA on purpose. Their levels moved up to close a gap in the outline
-   (h2 -> h3, where before it was h4 -> h5 under no h2 at all), so the sizes are pinned here
-   to what those levels used to render at. Same picture, correct outline. */
-.recipe-workspace-editor :where(h2) {
-  font-size: 1.5rem;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-}
-
-.recipe-workspace-editor :where(h3) {
-  font-size: 1.25rem;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
 }

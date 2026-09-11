@@ -9,3 +9,9 @@
     font-size: 16px;
   }
 }
+
+/* CodeMirror rings a focused editor in 1px dotted #212121, which `.cm-theme` clips flush to
+   a dot in each rounded corner. Inputs here focus without one; the caret marks it. */
+.gui-input.code-editor-wrapper .cm-editor.cm-focused {
+  outline: none;
+}

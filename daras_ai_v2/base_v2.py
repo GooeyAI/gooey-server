@@ -256,10 +256,11 @@ class BasePage(BasePageV1):
         return SurfaceId.preview
 
     def _workspace_storage_key(self) -> str:
-        return (
-            f"gooey:recipe-layout:{self.workflow.value}:"
-            f"{self.current_pr.published_run_id}"
-        )
+        # Identity, not storage: the client keys its in-memory workspace on this, so a run
+        # does not inherit the view of the published run it came from.
+        sr, pr = self.current_sr_pr
+        kind = "pr" if pr.saved_run_id == sr.id else "run"
+        return f"gooey:recipe-layout:{self.workflow.value}:{pr.published_run_id}:{kind}"
 
     def _is_workspace_tab(self) -> bool:
         """Whether this tab draws the workspace, rather than being a document or a route."""
@@ -475,16 +476,10 @@ class BasePage(BasePageV1):
         self.submit_and_redirect()
 
     def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        """The view the workspace opens on. About for a view-only viewer, the work split for
-        anyone who can update the app.
-
-        Read off the same answer `get_tab_spec` reads, so the landing view and the tabs
-        offered cannot disagree: a view-only viewer is given About and How it works, and How
-        it works is a config form they have no way to save. About is what their half of the
-        tab set is for, so it is where they start - the root of a recipe and a published run
-        they cannot update alike.
-        """
-        if self.is_view_only():
+        """The published run opens on About, whoever is asking - it presents the workflow.
+        A saved run is work already underway, so it opens on the editor instead."""
+        sr, pr = self.current_sr_pr
+        if pr.saved_run_id == sr.id:
             return tabs[0].layout
         return self.work_layout()
 
@@ -539,8 +534,9 @@ class BasePage(BasePageV1):
         pr = self.current_pr
         items = []
 
-        # A root recipe is the template every run forks from; it has no versions.
-        if not pr.is_root():
+        # A root recipe does have versions - it is edited in place. Reading that history
+        # and writing it are the same privilege - on a root pr, a staff admin's.
+        if not pr.is_root() or self.can_edit_current_pr:
             items.append(
                 TopBarMenuItem(
                     key=self.MENU_VERSION_HISTORY,
@@ -642,6 +638,11 @@ class BasePage(BasePageV1):
                 icon_html=icons.share,
             )
 
+        # A view-only page has nothing to publish. All four go together, or the client
+        # keeps its Publish button for whatever entry is left. A run is never view-only.
+        view_only = self.is_view_only()
+        publish_label = None if view_only else self._top_bar_publish_label()
+
         usage_active = self.tab == RecipeTabs.usage
 
         gui.model_component(
@@ -651,16 +652,20 @@ class BasePage(BasePageV1):
                 title=identity.title if config.workspace_active else identity.name,
                 title_href=identity.href,
                 crumb_label=None if config.workspace_active else self.tab.label,
-                view_only=self.is_view_only(),
+                view_only=view_only,
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
                 parent=self._top_bar_parent(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
-                publish_label=self._top_bar_publish_label(),
-                publish_intent=PublishIntent(),
-                api_href=self.current_app_url(RecipeTabs.run_as_api),
-                deploy_href=self.current_app_url(RecipeTabs.integrations),
+                publish_label=publish_label,
+                publish_intent=PublishIntent() if publish_label else None,
+                api_href=(
+                    None if view_only else self.current_app_url(RecipeTabs.run_as_api)
+                ),
+                deploy_href=(
+                    None if view_only else self.current_app_url(RecipeTabs.integrations)
+                ),
                 share=share,
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
@@ -822,11 +827,8 @@ class BasePage(BasePageV1):
         """What this workflow is. Version history lives in the title menu and Related
         Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
-        # The page's one h1. Visually hidden because the top bar already shows this name
-        # and About is not the place to say it twice - but the bar is chrome that repeats
-        # on every tab, so it is not the heading, and without this the page had none at all
-        # for a crawler or a screen reader. About is where it belongs: it is the surface
-        # that presents the workflow, and the only one guaranteed to be rendered.
+        # The page's one h1. Hidden because the top bar already shows the name - but that
+        # bar is chrome on every tab, so it cannot be the heading.
         with gui.tag("h1", className="visually-hidden"):
             gui.html(html.escape(self._workflow_identity().name))
         # The portrait leads; the top bar carries the title.
@@ -1417,7 +1419,7 @@ VARIABLES_DIALOG_CSS = """
 
 # Matches `--v2-about-icon-size` below. Icon html that carries its own inline size - a model
 # creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
-ABOUT_META_ICON_SIZE = "1.375rem"
+ABOUT_META_ICON_SIZE = "22px"
 
 # Cards per row before a group takes a second line.
 ABOUT_META_MAX_COLS = 6
@@ -1427,8 +1429,9 @@ ABOUT_CSS = """
    creator's logo cannot drift apart. */
 & {
     --v2-about-card-size: 96px;
-    /* Keep in step with ABOUT_META_ICON_SIZE. */
-    --v2-about-icon-size: 1.375rem;
+    /* Keep in step with ABOUT_META_ICON_SIZE. px, not rem - it should not track
+       the root font size. */
+    --v2-about-icon-size: 22px;
     /* Lines a card label always occupies - both its ceiling and its floor, which is what
        fixes the card's height. Three fits "8 Knowledge sources" at this width. */
     --v2-about-label-lines: 3;
@@ -1662,15 +1665,14 @@ ABOUT_CSS = """
 }
 
 & .v2-about-section-title {
-    /* The design's UI style in full-strength ink: it names the row, so it should not also
-       outrank the cards under it. */
+    /* An h2 for the outline, so the browser's heading scale comes back off it here - the
+       workspace-wide reset that used to do that is gone. */
+    font-family: inherit;
+    margin-top: 0;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.2;
     color: var(--gooey-ink);
-    /* `margin-bottom`, not the `margin` shorthand: the shorthand also sets `margin-top: 0`,
-       which silently cancelled the gap the preceding tags row hands to whatever follows it -
-       same specificity, and this rule comes later. */
     margin-bottom: var(--gooey-space-2);
 }
 

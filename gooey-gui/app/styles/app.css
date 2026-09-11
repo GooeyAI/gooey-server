@@ -431,10 +431,9 @@ button .gui-html-container,
   font-family: var(--gooey-font-ui);
 }
 
-/* Only headings *drawn* as headings: v2 uses heading tags for structure, so a blanket rule
-   would set 14px section labels in serif. Must stay below the rule above, which it ties. */
+/* The two headings the design actually draws in the display face. Everything else in v2 uses
+   heading tags for structure. Must stay below the rule above, which it ties. */
 .v2-app-shell .v2-about h1,
-.v2-app-shell .recipe-workspace-editor :is(h1, h2, h3),
 .ask-gooey-page .ask-gooey-title {
   font-family: var(--gooey-font-heading);
 }

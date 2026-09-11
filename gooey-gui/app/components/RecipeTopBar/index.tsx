@@ -497,11 +497,8 @@ export function RecipeTopBar({
         !atRoot && "gooey-topbar-stacked"
       )}
     >
-      {/* Everything held back for the first paint is revealed for an agent that runs no
-          JS: it never reaches hydration, so it would be handed a document of invisible
-          text. Lives here rather than in the app shell because this bar is the one part
-          of layout v2 on every tab - the workspace is not - and because it is a v2
-          concern, which `root.tsx` is not the place for. */}
+      {/* An agent with no JS never reaches hydration, so it is shown what was held back.
+          Here rather than the app shell: this bar is the one part of v2 on every tab. */}
       <noscript
         dangerouslySetInnerHTML={{
           __html: "<style>.gooey-until-hydrated{visibility:visible}</style>",

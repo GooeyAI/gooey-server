@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
 import {
@@ -9,9 +9,9 @@ import {
   initialWorkspaceState,
   isRootLayout,
   layoutsEqual,
-  normalizeWorkspaceLayout,
   paneRolesForLayout,
   revealRunLayout,
+  revealRunOutput,
   shouldRevealRunOutput,
   singleLayout,
   splitLayout,
@@ -86,42 +86,21 @@ describe("workspace layout", () => {
     expect(layoutsEqual(edit, preview)).toBe(false);
   });
 
-  it("normalizes malformed and legacy stored layouts", () => {
-    expect(normalizeWorkspaceLayout(null, about)).toEqual(about);
-    expect(
-      normalizeWorkspaceLayout(
-        { mode: "work", editorOpen: true, previewOpen: false },
-        about
-      )
-    ).toEqual(edit);
-    expect(
-      normalizeWorkspaceLayout(
-        { mode: "about", editorOpen: true, previewOpen: true },
-        edit
-      )
-    ).toEqual(about);
-  });
 });
 
 describe("initialWorkspaceState", () => {
-  it("reads a versioned stored layout", () => {
-    const storage = {
-      getItem: () =>
-        JSON.stringify({ version: 1, layout: edit, handled_run_id: null }),
-    };
-    expect(initialWorkspaceState(baseConfig, storage, null)).toEqual({
-      version: 1,
-      layout: edit,
+  it("opens on the layout the url was given, remembering nothing", () => {
+    // The server answers per url - About on a published run, the work view on a saved one -
+    // so the same url opens the same way for everyone, every visit.
+    expect(initialWorkspaceState(baseConfig, null)).toEqual({
+      layout: about,
       handled_run_id: null,
     });
   });
 
-  it("lets navigation layout override storage", () => {
-    const storage = { getItem: () => JSON.stringify(edit) };
+  it("lets a navigation layout override the url's own", () => {
     const navigation = workspaceLayoutNavigationState(split);
-    expect(
-      initialWorkspaceState(baseConfig, storage, navigation).layout
-    ).toEqual(split);
+    expect(initialWorkspaceState(baseConfig, navigation).layout).toEqual(split);
     expect(workspaceLayoutFromNavigationState(navigation)).toEqual(split);
   });
 
@@ -131,23 +110,20 @@ describe("initialWorkspaceState", () => {
       route_layout: preview,
       active_run_id: "run-1",
     };
-    const storage = { getItem: () => JSON.stringify(edit) };
-    expect(initialWorkspaceState(config, storage, null)).toEqual({
-      version: 1,
+    expect(initialWorkspaceState(config, null)).toEqual({
       layout: preview,
       handled_run_id: "run-1",
     });
   });
 
   it("reveals a newly running run once", () => {
-    const config = { ...baseConfig, active_run_id: "run-1" };
-    const storage = { getItem: () => JSON.stringify(edit) };
-    const started = initialWorkspaceState(config, storage, null);
-    expect(started).toEqual({
-      version: 1,
-      layout: split,
-      handled_run_id: "run-1",
-    });
+    const config = {
+      ...baseConfig,
+      initial_layout: edit,
+      active_run_id: "run-1",
+    };
+    const started = initialWorkspaceState(config, null);
+    expect(started).toEqual({ layout: split, handled_run_id: "run-1" });
 
     const closed = {
       ...started,
@@ -162,9 +138,9 @@ describe("initialWorkspaceState", () => {
     const config = { ...baseConfig, active_run_id: "run-1" };
 
     for (const layout of [preview, about, split]) {
-      expect(
-        revealRunLayout({ version: 1, layout, handled_run_id: null }, config)
-      ).toEqual({ version: 1, layout, handled_run_id: "run-1" });
+      expect(revealRunLayout({ layout, handled_run_id: null }, config)).toEqual(
+        { layout, handled_run_id: "run-1" }
+      );
     }
   });
 
@@ -173,7 +149,7 @@ describe("initialWorkspaceState", () => {
     // out from under them, a beat after they chose it.
     const config = { ...baseConfig, active_run_id: "run-1" };
     const stayed = revealRunLayout(
-      { version: 1, layout: preview, handled_run_id: null },
+      { layout: preview, handled_run_id: null },
       config
     );
     expect(stayed.handled_run_id).toBe("run-1");
@@ -309,4 +285,54 @@ describe("workspace navigation", () => {
     expect(appRelativeHref("/agent/?run_id=32i1")).toBe("/agent/?run_id=32i1");
   });
 
+});
+
+describe("carrying the view through a run", () => {
+  // A run redirects to its own url, whose layout is the work view. Pressing Run is a
+  // continuation, not an arrival, so the view being worked in has to survive it.
+  const runConfig = {
+    ...baseConfig,
+    initial_layout: split,
+    active_run_id: "run-9",
+  };
+
+  it("keeps Preview where it is", () => {
+    revealRunOutput(preview, split, () => {});
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(preview);
+  });
+
+  it("keeps About where it is", () => {
+    revealRunOutput(about, split, () => {});
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(about);
+  });
+
+  it("moves the solo editor to the work view, and lands there", () => {
+    vi.stubGlobal("window", { setTimeout: (fn: () => void) => fn() });
+    const picked: unknown[] = [];
+    revealRunOutput(edit, split, (l) => picked.push(l));
+    expect(picked).toEqual([split]);
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(split);
+    vi.unstubAllGlobals();
+  });
+
+  it("survives the workspace re-rendering while the run is polled", () => {
+    // The regression: the carry was read once, and the ten re-renders after it fell back
+    // to the run url's own layout, so Preview lasted a frame and then became the split.
+    revealRunOutput(preview, split, () => {});
+    for (let i = 0; i < 10; i++) {
+      expect(initialWorkspaceState(runConfig, null).layout).toEqual(preview);
+    }
+  });
+
+  it("is dropped once a navigation leaves that run behind", () => {
+    revealRunOutput(preview, split, () => {});
+    initialWorkspaceState(runConfig, null);
+    expect(initialWorkspaceState(baseConfig, null).layout).toEqual(about);
+  });
+
+  it("loses to an explicit destination in navigation state", () => {
+    revealRunOutput(preview, split, () => {});
+    const navigation = workspaceLayoutNavigationState(about);
+    expect(initialWorkspaceState(runConfig, navigation).layout).toEqual(about);
+  });
 });
