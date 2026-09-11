@@ -3,30 +3,28 @@ from __future__ import annotations
 import typing
 from typing import Any
 
-from django.db.models import F
-import pydantic
-
-from bots.models.workflow import Workflow
-import gooey_gui as gui
 import fastapi
+import pydantic
+from django.db.models import F
 
+import gooey_gui as gui
 from bots.models import (
     BotIntegration,
-    SavedRun,
     PublishedRun,
+    SavedRun,
 )
+from bots.models.workflow import Workflow
 from daras_ai_v2 import exceptions, settings
 from daras_ai_v2.fastapi_tricks import fastapi_login_required
 from daras_ai_v2.web_widget_embed import (
-    load_chat_widget_lib,
-    chat_widget_input_to_request_body,
+    build_chat_widget_input_request_body,
     get_chat_widget_messages,
+    load_chat_widget_lib,
 )
 from routers.custom_api_router import CustomAPIRouter
-
+from widgets.errors import get_insufficient_credits_rerun_workspace
 from workspaces.models import Workspace
 from workspaces.widgets import get_current_workspace, set_current_workspace
-from widgets.errors import get_insufficient_credits_rerun_workspace
 
 if typing.TYPE_CHECKING:
     from daras_ai_v2.base import BasePage
@@ -320,14 +318,8 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         workflow_url = ""
 
     input_data = body.input_data or builder_sr.state
-    edit_sr = None
-    if edit_run_url := input_data.get("edit_run_url"):
-        _, edit_sr, _ = url_to_runs(edit_run_url)
-    request_body, message_thread = chat_widget_input_to_request_body(
-        builder_sr,
-        builder_sr.state,
-        input_data,
-        edit_sr=edit_sr,
+    request_body, message_thread = build_chat_widget_input_request_body(
+        builder_sr, builder_sr.state, input_data
     )
     insert_gooey_builder_variables(request_body, workflow_url)
 
