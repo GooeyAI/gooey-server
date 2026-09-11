@@ -191,7 +191,7 @@ def test_get_chat_widget_messages_does_not_borrow_a_later_turns_run():
                     "role": "assistant",
                     "content": "reply",
                     "run_url": "https://example.com/run-123",
-                    "created_at": "2026-08-13T10:30:00+00:00",
+                    "extra_content": {"created_at": "2026-08-13T10:30:00+00:00"},
                 },
             ]
         }
@@ -200,6 +200,7 @@ def test_get_chat_widget_messages_does_not_borrow_a_later_turns_run():
     assert "web_url" not in messages[0]
     assert "created_at" not in messages[0]
     assert messages[1]["web_url"] == "https://example.com/run-123"
+    assert messages[1]["created_at"] == "2026-08-13T10:30:00+00:00"
 
 
 def test_get_chat_widget_messages_sets_web_url_on_live_user_message():
@@ -267,6 +268,25 @@ def test_chat_widget_edit_allows_current_run(db_fixtures):
     )
 
     assert request_body["input_prompt"] == "edited"
+    assert request_body["messages"] == [{"role": "user", "content": "turn one"}]
+
+
+def test_chat_widget_rerun_keeps_the_turns_own_prompt(db_fixtures):
+    current_sr = _make_sr(
+        uid="user-a",
+        run_id="run-current",
+        state={
+            "input_prompt": "newest question",
+            "messages": [{"role": "user", "content": "turn one"}],
+        },
+    )
+
+    # a re-run names the run but sends no prompt
+    request_body, _ = chat_widget_input_to_request_body(
+        current_sr, current_sr.state, {}, edit_sr=current_sr
+    )
+
+    assert request_body["input_prompt"] == "newest question"
     assert request_body["messages"] == [{"role": "user", "content": "turn one"}]
 
 
@@ -415,7 +435,8 @@ def test_chat_widget_records_created_at_in_extra_content(db_fixtures):
 def test_get_chat_widget_messages_exports_created_at_on_both_halves():
     """
     A turn is one run, so both halves report that run's timestamp - the user
-    half reading it off the assistant entry that recorded it.
+    half reading it off the assistant entry that recorded it. Without a run
+    time there is nothing to shift the answer's stamp by.
     """
     messages = get_chat_widget_messages(
         {
@@ -484,6 +505,37 @@ def test_chat_widget_omits_run_time_when_the_run_was_never_timed(db_fixtures):
     assert "run_time_sec" not in request_body["messages"][1]["extra_content"]
 
 
+def test_get_chat_widget_messages_stamps_the_answer_when_it_arrived():
+    """
+    The run's created_at is when the question was asked. The answer came a
+    run time later, and that is what its own half reports.
+    """
+    messages = get_chat_widget_messages(
+        {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {
+                    "role": "assistant",
+                    "content": "reply",
+                    "extra_content": {
+                        "created_at": "2026-08-13T10:30:00+00:00",
+                        "run_time_sec": 3.5,
+                    },
+                },
+            ],
+            "input_prompt": "latest question",
+            "output_text": ["latest reply"],
+            "created_at": "2026-08-13T11:00:00+00:00",
+            "__run_time": 90,
+        }
+    )
+
+    assert messages[0]["created_at"] == "2026-08-13T10:30:00+00:00"
+    assert messages[1]["created_at"] == "2026-08-13T10:30:03.500000+00:00"
+    assert messages[2]["created_at"] == "2026-08-13T11:00:00+00:00"
+    assert messages[3]["created_at"] == "2026-08-13T11:01:30+00:00"
+
+
 def test_get_chat_widget_messages_exports_run_time_on_assistant_messages():
     """Only the response carries a run time - the outgoing half has none."""
     messages = get_chat_widget_messages(
@@ -519,8 +571,17 @@ def test_get_chat_widget_messages_omits_run_time_while_still_running():
 
 
 def test_run_time_is_stripped_before_reaching_the_llm():
-    body = to_llm_body([{"role": "assistant", "content": "reply", "run_time_sec": 3.5}])
+    body = to_llm_body(
+        [
+            {
+                "role": "assistant",
+                "content": "reply",
+                "extra_content": {"run_time_sec": 3.5},
+            }
+        ]
+    )
 
+    assert "extra_content" not in body[0]
     assert "run_time_sec" not in body[0]
 
 
@@ -530,11 +591,12 @@ def test_created_at_is_stripped_before_reaching_the_llm():
             {
                 "role": "user",
                 "content": "hello",
-                "created_at": "2026-08-13T10:30:00+00:00",
+                "extra_content": {"created_at": "2026-08-13T10:30:00+00:00"},
             }
         ]
     )
 
+    assert "extra_content" not in body[0]
     assert "created_at" not in body[0]
 
 

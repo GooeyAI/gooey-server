@@ -59,6 +59,10 @@ export function GooeyEmbedPreview(
           if (!webUrl) return;
           sendMessage({ ...input_data, edit_run_url: webUrl });
         },
+        // same server path as an edit, minus the prompt: the turn is replayed as-is
+        rerun: (webUrl: string) => {
+          sendMessage({ edit_run_url: webUrl });
+        },
         onNewConversation: () => {
           document.getElementById("onNewConversation")?.click();
         },

@@ -1,4 +1,5 @@
 import copy
+import datetime
 from typing import Any, Iterator
 
 import yarl
@@ -130,7 +131,8 @@ def _build_chat_widget_edit_request_body(
     input_prompt: str | None,
 ) -> dict:
     """
-    Re-run the turn that `edit_sr` produced, with new input. Its saved state
+    Re-run the turn that `edit_sr` produced, with new input (or the same input
+    when `input_prompt` is None). Its saved state
     already holds the history from *before* that turn, so everything the user
     said after it is dropped just by re-running it.
     """
@@ -141,7 +143,9 @@ def _build_chat_widget_edit_request_body(
 
     # deep copy so mutating the request body can't touch the source run's state
     request_body = copy.deepcopy(edit_sr.state)
-    request_body["input_prompt"] = input_prompt
+    # a re-run sends no prompt: the turn is asked again exactly as it was
+    if input_prompt is not None:
+        request_body["input_prompt"] = input_prompt
     return request_body
 
 
@@ -293,9 +297,12 @@ def get_chat_widget_messages(state: dict, web_url: str | None = None) -> list[An
                     type=event_type,
                     status=status,
                     detail=state.get(StateKeys.run_status) or "",
-                    # both halves of the turn are stamped with the run's own
-                    # created_at, so they carry the same timestamp
-                    created_at=state.get(StateKeys.created_at),
+                    # the run's created_at is when the question was asked; the
+                    # answer arrived a run time later
+                    created_at=finished_at(
+                        state.get(StateKeys.created_at),
+                        state.get(StateKeys.run_time),
+                    ),
                     # absent until the run finishes, so nothing shows mid-answer
                     run_time_sec=state.get(StateKeys.run_time),
                     raw_output_text=raw_output_text,
@@ -387,8 +394,23 @@ def assistant_entry_to_widget_message(assistant_entry: dict) -> dict:
         msg["output_audio"] = audio
     if video := extra_content.get("video"):
         msg["output_video"] = video
+    run_time_sec = extra_content.get("run_time_sec")
     if created_at := extra_content.get("created_at"):
-        msg["created_at"] = created_at
-    if run_time_sec := extra_content.get("run_time_sec"):
+        msg["created_at"] = finished_at(created_at, run_time_sec)
+    if run_time_sec:
         msg["run_time_sec"] = run_time_sec
     return msg
+
+
+def finished_at(
+    created_at: str | datetime.datetime | None, run_time_sec: float | None
+) -> str | datetime.datetime | None:
+    """
+    When a run's answer arrived: its created_at (when the question was asked)
+    plus how long it took. Unchanged while the run has no time yet.
+    """
+    if not created_at or not run_time_sec:
+        return created_at
+    if isinstance(created_at, str):
+        created_at = datetime.datetime.fromisoformat(created_at)
+    return (created_at + datetime.timedelta(seconds=run_time_sec)).isoformat()
