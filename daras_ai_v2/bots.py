@@ -111,6 +111,7 @@ class BotInterface:
         "text", "audio", "video", "image", "document", "interactive", "location"
     ]
     user_msg_id: str | None = None
+    reply_to_msg_id: str | None = None
     can_update_message: bool = False
 
     page_cls: typing.Type[BasePage] | None = None
@@ -797,6 +798,9 @@ def _cancel_active_run_and_merge_inputs(
     last_run.is_cancelled = True
     last_run.save(update_fields=["is_cancelled", "updated_at"])
     last_run.refresh_from_db()
+    # if the user already saw part of the old reply, quote the message that interrupted it
+    if bot.streaming_enabled and any(last_run.state.get("output_text") or []):
+        bot.reply_to_msg_id = bot.user_msg_id
     return _merge_run_inputs(last_run.state, request_body)
 
 
