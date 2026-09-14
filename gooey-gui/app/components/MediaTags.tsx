@@ -55,6 +55,7 @@ export function GooeyImg({
               it in on hover for mouse users, but keeps it always-on for
               touch (see .gui-media-expand-btn in app.css). */}
           <button
+            type="button"
             aria-label="Expand image"
             title="Expand image"
             className="gui-media-expand-btn"
@@ -143,6 +144,7 @@ export function GooeyVideo({
         >
           {media}
           <button
+            type="button"
             aria-label="Expand video"
             title="Expand video"
             className="gui-media-expand-btn"
