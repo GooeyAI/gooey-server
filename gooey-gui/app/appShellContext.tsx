@@ -17,6 +17,7 @@ import {
   clearWorkspaceLayoutNavigationState,
   foldForNarrowViewport,
   initialWorkspaceState,
+  workspaceHydrationToken,
   peekCarriedRunLayout,
   type WorkspaceState,
   type WorkspaceLayout,
@@ -146,11 +147,7 @@ export function useWorkspaceLayout(config: PageShellConfig) {
   const [isNarrow, setIsNarrow] = useState(false);
 
   useHydrationEffect(() => {
-    const hydrationToken = [
-      location.key,
-      config.active_run_id ?? "",
-      config.route_layout ? JSON.stringify(config.route_layout) : "",
-    ].join(":");
+    const hydrationToken = workspaceHydrationToken(config, location);
     const next = initialWorkspaceState(config, location.state);
     context.hydrateWorkspace(config.storage_key, {
       value: next,
@@ -161,7 +158,13 @@ export function useWorkspaceLayout(config: PageShellConfig) {
       clearWorkspaceLayoutNavigationState();
     }
     setIsNarrow(!window.matchMedia(WIDE_QUERY).matches);
-  }, [config.storage_key, config.active_run_id, location.key, location.state]);
+  }, [
+    config.storage_key,
+    config.active_run_id,
+    location.pathname,
+    location.search,
+    location.state,
+  ]);
 
   useEffect(() => {
     const wide = window.matchMedia(WIDE_QUERY);

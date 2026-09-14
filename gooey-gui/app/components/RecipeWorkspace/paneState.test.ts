@@ -19,6 +19,7 @@ import {
   workspaceLayoutFromNavigationState,
   workspaceLayoutNavigationState,
   workspaceHrefToNavigate,
+  workspaceHydrationToken,
 } from "./paneState";
 
 const about = splitLayout("about", "preview");
@@ -334,5 +335,44 @@ describe("carrying the view through a run", () => {
     revealRunOutput(preview, split, () => {});
     const navigation = workspaceLayoutNavigationState(about);
     expect(initialWorkspaceState(runConfig, navigation).layout).toEqual(about);
+  });
+});
+
+describe("what counts as arriving somewhere new", () => {
+  // The view is put back to the url's own whenever this changes, so a form post must not
+  // change it: the rail posts one to remember its width, and a run posts one per chunk.
+  const at = (pathname: string, search = "", state: unknown = null) => ({
+    pathname,
+    search,
+    state,
+  });
+
+  it("ignores a form post, which keeps the url and only changes location.key", () => {
+    const a = workspaceHydrationToken(baseConfig, at("/agent/my-bot/"));
+    const b = workspaceHydrationToken(baseConfig, at("/agent/my-bot/"));
+    expect(a).toBe(b);
+  });
+
+  it("changes when the url does", () => {
+    expect(workspaceHydrationToken(baseConfig, at("/agent/my-bot/"))).not.toBe(
+      workspaceHydrationToken(baseConfig, at("/agent/other-bot/"))
+    );
+    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
+      workspaceHydrationToken(baseConfig, at("/agent/", "?run_id=r1"))
+    );
+  });
+
+  it("changes when a run starts, so its own view can take over", () => {
+    const running = { ...baseConfig, active_run_id: "run-1" };
+    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
+      workspaceHydrationToken(running, at("/agent/"))
+    );
+  });
+
+  it("changes when a link names the view to open, even on the same url", () => {
+    const nav = workspaceLayoutNavigationState(split);
+    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
+      workspaceHydrationToken(baseConfig, at("/agent/", "", nav))
+    );
   });
 });

@@ -47,6 +47,23 @@ export function initialWorkspaceState(
   );
 }
 
+/* What counts as arriving somewhere new, and so as grounds for putting the view back to the
+   one the url asks for. Deliberately not `location.key`: a form post is a navigation with a
+   fresh key and the same url, and the rail posts one to remember its width while a run posts
+   one per chunk - each of which used to throw away whichever view had been picked. */
+export function workspaceHydrationToken(
+  config: PageShellConfig,
+  location: { pathname: string; search: string; state?: unknown }
+): string {
+  const navLayout = workspaceLayoutFromNavigationState(location.state);
+  return [
+    location.pathname + location.search,
+    config.active_run_id ?? "",
+    config.route_layout ? JSON.stringify(config.route_layout) : "",
+    navLayout ? JSON.stringify(navLayout) : "",
+  ].join("|");
+}
+
 export function workspaceLayoutNavigationState(layout: WorkspaceLayout): {
   workspaceLayout: WorkspaceLayout;
 } {
