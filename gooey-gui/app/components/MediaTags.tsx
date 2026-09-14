@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 import { Link } from "@remix-run/react";
@@ -214,24 +214,56 @@ function MediaPreviewDialog({
   alt?: string;
   children: React.ReactNode;
 }) {
-  // Prevent background scroll while open, and close on Escape.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
+  // Prevent background scroll while open, close on Escape, and manage focus:
+  // move focus into the dialog on open, trap Tab within it, and restore focus
+  // to the launching element on close.
   useEffect(() => {
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+
+    const getFocusable = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, video, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((el) => !el.hasAttribute("disabled"));
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || document.activeElement === dialogRef.current) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = original;
       window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused.current?.focus();
     };
   }, [onClose]);
 
   return ReactDOM.createPortal(
     <div
       role="presentation"
-      aria-label={alt || "Media preview"}
       onClick={onClose}
       style={{
         position: "fixed",
@@ -250,8 +282,11 @@ function MediaPreviewDialog({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-label={alt || "Media preview"}
+        tabIndex={-1}
         className="gui-media-preview-wrap"
         onClick={(e) => e.stopPropagation()}
         style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}
