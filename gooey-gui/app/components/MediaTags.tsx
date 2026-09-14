@@ -127,8 +127,12 @@ export function GooeyVideo({
         // The dialog already offers a bigger view, so the inline player only
         // needs play/pause/seek/volume - hiding native fullscreen & PiP avoids
         // two competing "make this bigger" affordances sitting side by side.
+        // controlsList is Chromium-only; Safari ignores it and keeps showing
+        // its own AirPlay icon in the same top-right corner as our expand
+        // button unless disableRemotePlayback is set too.
         controlsList={expandable ? "nofullscreen noremoteplayback" : undefined}
         disablePictureInPicture={expandable || undefined}
+        disableRemotePlayback={expandable || undefined}
         src={src}
       ></video>
     );
@@ -167,6 +171,7 @@ export function GooeyVideo({
             controls
             autoPlay
             playsInline
+            disableRemotePlayback
             style={mediaDialogStyle}
           ></video>
         </MediaPreviewDialog>
