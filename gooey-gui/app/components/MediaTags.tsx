@@ -272,9 +272,14 @@ function MediaPreviewDialog({
       onClick={onClose}
       style={{
         position: "fixed",
+        // No explicit width/height here on purpose - competing vw/vh
+        // lengths alongside inset:0 resolve against the safe-area-excluding
+        // layout viewport on iOS, which is what left a gap at the notch/
+        // Dynamic Island. Sized by inset:0 alone (matching
+        // gooey-web-widget's MediaPreview, confirmed not to have this gap),
+        // it resolves against the fixed-positioning containing block
+        // instead, which does extend edge-to-edge.
         inset: 0,
-        width: "100vw",
-        height: "100vh",
         zIndex: 999999,
         background: "rgba(255,255,255,0.85)",
         backdropFilter: "blur(16px) saturate(180%)",
