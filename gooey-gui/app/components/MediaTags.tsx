@@ -6,40 +6,6 @@ import { Link } from "@remix-run/react";
 import { urlToFilename } from "~/urlUtils";
 import "./MediaTags.css";
 
-// Not yet in this project's DOM lib (React 17 / an older TS target) - typed
-// just enough to call it.
-declare global {
-  interface Document {
-    startViewTransition?(update: () => void): { finished: Promise<void> };
-  }
-}
-
-// Morphs the media card's position/size/radius between the thumbnail and the
-// dialog (matched by view-transition-name on each side) - browser support
-// only (Chromium, Safari 18+), no dependency. Where it's unsupported, or the
-// user has asked for reduced motion, this just runs the update plainly, same
-// as the dialog opening/closing today.
-function withViewTransition(update: () => void) {
-  const start = typeof document !== "undefined" && document.startViewTransition;
-  const prefersReducedMotion =
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!start || prefersReducedMotion) {
-    update();
-    return;
-  }
-  // .call, not a bare start(...) - it's unbound from `document` once
-  // destructured into this local.
-  start.call(document, () => flushSync(update));
-}
-
-// React 17 has no useId - view-transition-name just needs *some* stable,
-// unique-per-instance identifier, and src (the media URL) already is one
-// without adding a hook. Sanitized into a valid CSS custom-ident.
-function mediaTransitionNameFor(src: string) {
-  return "gooey-media-" + src.replace(/[^a-zA-Z0-9_-]/g, "");
-}
-
 export function GooeyImg({
   src,
   caption,
@@ -67,10 +33,10 @@ export function GooeyImg({
   const clickable =
     enablePreviewDialog && !href && !currentSrc.startsWith("data:");
   // gui.image emits data: URIs for numpy-array inputs (tens of KB, bounded
-  // by a 128px resize) - computed only when actually needed, below
-  // `clickable`, so a non-clickable data: URI image doesn't run a regex
-  // over that whole string just to throw the result away.
-  const mediaTransitionName = clickable ? mediaTransitionNameFor(src) : "";
+  // by a 128px resize) - src is only sanitized into a name when actually
+  // needed, gated on `clickable`, so a non-clickable data: URI image
+  // doesn't run a regex over that whole string just to throw it away.
+  const mediaTransitionName = useMediaTransitionName(src, clickable);
 
   const openDialog = () => withViewTransition(() => setDialogOpen(true));
 
@@ -154,9 +120,9 @@ export function GooeyVideo({
 }) {
   const [previewIsValid, onError] = useImageValid(previewImg);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const mediaTransitionName = mediaTransitionNameFor(src);
 
   const expandable = enablePreviewDialog && !href;
+  const mediaTransitionName = useMediaTransitionName(src, expandable);
   const showingVideoElement = !(previewImg && previewIsValid);
   // The play/pause/mute overlay only makes sense against a real <video> -
   // the previewImg fallback is a static <img>, nothing to play or mute.
@@ -573,6 +539,57 @@ function MediaPreviewDialog({
       </div>
     </div>,
     document.body,
+  );
+}
+
+// Not yet in this project's DOM lib (React 17 / an older TS target) - typed
+// just enough to call it.
+declare global {
+  interface Document {
+    startViewTransition?(update: () => void): { finished: Promise<void> };
+  }
+}
+
+// Morphs the media card's position/size/radius between the thumbnail and the
+// dialog (matched by view-transition-name on each side) - browser support
+// only (Chromium, Safari 18+), no dependency. Where it's unsupported, or the
+// user has asked for reduced motion, this just runs the update plainly, same
+// as the dialog opening/closing today.
+function withViewTransition(update: () => void) {
+  const start = typeof document !== "undefined" && document.startViewTransition;
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!start || prefersReducedMotion) {
+    update();
+    return;
+  }
+  // .call, not a bare start(...) - it's unbound from `document` once
+  // destructured into this local.
+  start.call(document, () => flushSync(update));
+}
+
+// A src-based name alone collides whenever two expandable instances share a
+// source (e.g. Img2Img renders one expandable image per output in a loop) -
+// the browser sees a duplicate view-transition-name in the "before"
+// snapshot and aborts the transition for both. React 17 has no useId, so
+// the per-instance part comes from a plain module-level counter instead,
+// assigned once per instance via a lazily-initialized ref. Render order is
+// deterministic between the server and hydration, so this stays consistent
+// across both rather than needing anything client-only like Math.random().
+let mediaTransitionInstanceCounter = 0;
+
+function useMediaTransitionName(src: string, active: boolean | undefined) {
+  const instanceId = useRef<number>();
+  if (instanceId.current === undefined) {
+    instanceId.current = mediaTransitionInstanceCounter++;
+  }
+  if (!active) return "";
+  return (
+    "gooey-media-" +
+    src.replace(/[^a-zA-Z0-9_-]/g, "") +
+    "-" +
+    instanceId.current
   );
 }
 
