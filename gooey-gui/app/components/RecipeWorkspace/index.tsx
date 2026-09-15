@@ -171,7 +171,7 @@ export function RecipeWorkspacePanes({
         })}
       </div>
       <div
-        className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3"
+        className="gooey-thin-scroll flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3"
         style={{ minHeight: 0 }}
       >
         {panes.map((pane, index) => (

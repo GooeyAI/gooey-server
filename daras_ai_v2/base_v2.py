@@ -1,3 +1,4 @@
+import contextlib
 import html
 import inspect
 import typing
@@ -7,6 +8,8 @@ import pydantic
 
 import gooey_gui as gui
 from bots.models import (
+    MessageThread,
+    Platform,
     PublishedRun,
     RetentionPolicy,
     SavedRun,
@@ -19,6 +22,7 @@ from daras_ai_v2.base import (
 from daras_ai_v2.base import (
     RecipeRunState,
     StateKeys,
+    render_run_timeline,
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
@@ -39,7 +43,8 @@ from daras_ai_v2.tab_spec import (
 )
 from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
-from functions.base_llm_tool import functions_input
+from functions.base_llm_tool import functions_input, render_called_functions
+from functions.models import FunctionTrigger
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -70,10 +75,11 @@ from gooey_gui.types.recipe_workspace_props import (
 )
 from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
+from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
 from widgets.sidebar import sidebar_layout
-from widgets.workflow_cards import author_from_user, history_card
+from widgets.workflow_cards import author_from_user, history_card, mask_user_id
 from widgets.workflow_share import render_share_modal
 from workspaces.models import Workspace
 
@@ -1088,6 +1094,86 @@ class BasePage(BasePageV1):
         if not published_run.is_root() and published_run.workspace_id:
             return published_run.workspace
         return self.current_workspace
+
+    def render_debug_pane(self):
+        with gui.div(className="v2-debug"):
+            self._render_debug_run_details()
+            with gui.div(className="v2-debug-section v2-debug-timeline"):
+                render_run_timeline(self.current_sr)
+            with gui.div(className="v2-debug-section"):
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                )
+                self.render_steps()
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.post
+                )
+
+    def _render_debug_run_details(self):
+        sr = self.current_sr
+        thread = sr.message_thread
+        with gui.div(className="v2-debug-meta"):
+            if sr.platform is not None:
+                self._render_debug_source(Platform(sr.platform), thread)
+
+            if thread:
+                with self._debug_meta_row("Conversation"):
+                    # the last run is SET_NULL on delete, so the title may have no target
+                    link = (
+                        gui.link(to=thread.last_run.get_app_url())
+                        if thread.last_run_id
+                        else gui.dummy()
+                    )
+                    with link:
+                        gui.html(html.escape(thread.title or "Untitled conversation"))
+
+            with self._debug_meta_row("Run by"):
+                if sr.created_by:
+                    render_author_from_user(
+                        sr.created_by, responsive=False, image_size="22px"
+                    )
+                else:
+                    with gui.tag("span", className="text-muted"):
+                        gui.html("Unknown user")
+
+            with self._debug_meta_row("Charged to"):
+                if sr.workspace:
+                    render_author_from_workspace(
+                        sr.workspace,
+                        responsive=False,
+                        image_size="22px",
+                        current_workspace=self.current_workspace,
+                    )
+                else:
+                    with gui.tag("span", className="text-muted"):
+                        gui.html("No workspace")
+
+            if sr.parent:
+                with self._debug_meta_row("Parent run"):
+                    with gui.link(to=sr.parent.get_app_url()):
+                        gui.html(f"View run {icons.external_link}")
+
+    @staticmethod
+    def _render_debug_source(platform: Platform, thread: MessageThread | None):
+        """The platform badge, plus the masked end-user id for bot conversations."""
+        with gui.div(className="v2-debug-source"):
+            with gui.tag("span", className="v2-debug-platform"):
+                gui.html(platform.get_icon())
+                gui.html(html.escape(platform.get_title()))
+            conversation = thread and thread.bot_conversation
+            if conversation:
+                user = mask_user_id(conversation.get_display_name() or "")
+                with gui.tag("span", className="text-muted"):
+                    gui.html(html.escape(user))
+
+    @staticmethod
+    @contextlib.contextmanager
+    def _debug_meta_row(label: str):
+        """One grid row: the label cell, then the value cell as the context body."""
+        with gui.tag("span", className="text-muted"):
+            gui.html(label)
+        with gui.div(className="v2-debug-value"):
+            yield
 
     def _render_functions(self):
         if not self.functions_in_settings:
