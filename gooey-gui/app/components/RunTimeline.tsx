@@ -1,11 +1,10 @@
 import type { RunTimelineProps } from "@gooey-types/run_timeline_props";
-import type { CustomComponentProps } from "~/components";
 
 export function RunTimeline({
   created_at,
   started_at,
   finished_at,
-}: CustomComponentProps & RunTimelineProps) {
+}: RunTimelineProps) {
   const createdAt = new Date(created_at);
   const startedAt = new Date(started_at);
   const finishedAt = new Date(finished_at);

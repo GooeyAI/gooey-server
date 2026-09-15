@@ -515,21 +515,20 @@
 /* ------------------------------------------------------------ debug pane
 
    Markup comes from `BasePage.render_debug_pane` in base_v2.py. */
+/* ------------------------------------------------------------ debug pane
+
+   `BasePage.render_debug_pane` in base_v2.py: the RunDebugInfo component, then the
+   step widgets. */
 
 .v2-debug {
   font-size: 0.875rem;
 }
 
-/* Timeline and prompt details are separated by rules instead of headings; the
-   timeline's own labels and the step widgets already say what they are. */
+/* The step widgets follow the timeline under a rule rather than a heading. */
 .v2-debug-section {
   border-top: 1px solid var(--gooey-line-soft);
   padding-top: var(--gooey-space-4);
   margin-top: var(--gooey-space-2);
-}
-.v2-debug-timeline {
-  font-size: 0.8125rem;
-  overflow-x: auto;
 }
 
 /* The JSON viewer sizes its text in rem via its own emotion classes, so the pane's

@@ -6,6 +6,7 @@ import pydantic
 
 import gooey_gui as gui
 from bots.models import (
+    Platform,
     PublishedRun,
     RetentionPolicy,
     SavedRun,
@@ -18,7 +19,6 @@ from daras_ai_v2.base import (
 from daras_ai_v2.base import (
     RecipeRunState,
     StateKeys,
-    render_run_timeline,
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
@@ -81,12 +81,18 @@ from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspaceProps,
     WorkspacePaneControlProps,
 )
+from gooey_gui.types.run_debug_info_props import (
+    DebugSource,
+    RunDebugInfoProps,
+)
 from gooey_gui.types.run_grid_props import RunGridProps
+from gooey_gui.types.run_timeline_props import RunTimelineProps
 from routers.root import RecipeTabs
+from widgets.author import user_author, workspace_author
 from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
 from widgets.sidebar import sidebar_layout
-from widgets.workflow_cards import author_from_user, history_card
+from widgets.workflow_cards import author_from_user, history_card, mask_user_id
 from widgets.workflow_share import render_share_modal
 from workspaces.models import Workspace
 
@@ -1181,8 +1187,7 @@ class BasePage(BasePageV1):
 
     def render_debug_pane(self):
         with gui.div(className="v2-debug"):
-            with gui.div(className="v2-debug-section v2-debug-timeline"):
-                render_run_timeline(self.current_sr)
+            gui.model_component(self._debug_info_props())
             with gui.div(className="v2-debug-section"):
                 render_called_functions(
                     saved_run=self.current_sr, trigger=FunctionTrigger.pre
@@ -1191,6 +1196,53 @@ class BasePage(BasePageV1):
                 render_called_functions(
                     saved_run=self.current_sr, trigger=FunctionTrigger.post
                 )
+
+    def _debug_info_props(self) -> RunDebugInfoProps:
+        sr = self.current_sr
+        thread = sr.message_thread
+        # run_time is measured by the worker from when it starts executing, and
+        # updated_at is the final save, so the gap before that is the queue wait
+        props = RunDebugInfoProps(
+            timeline=RunTimelineProps(
+                created_at=sr.created_at,
+                started_at=sr.updated_at - sr.run_time,
+                finished_at=sr.updated_at,
+            )
+        )
+
+        if sr.platform is not None:
+            platform = Platform(sr.platform)
+            conversation = thread and thread.bot_conversation
+            props.source = DebugSource(
+                icon_html=platform.get_icon(),
+                title=platform.get_title(),
+                sender=conversation
+                and mask_user_id(conversation.get_display_name() or ""),
+            )
+
+        if thread:
+            props.conversation_title = thread.title or "Untitled conversation"
+            # the last run is SET_NULL on delete, so the title may have no target
+            if thread.last_run_id:
+                props.conversation_url = thread.last_run.get_app_url()
+
+        if sr.parent:
+            props.parent_run_url = sr.parent.get_app_url()
+
+        if user := self.current_sr_user:
+            props.run_by = user_author(user)
+
+        if sr.workspace:
+            # a logged-out viewer has no workspace of their own; the link falls back
+            try:
+                current_workspace = self.current_workspace
+            except Workspace.DoesNotExist:
+                current_workspace = None
+            props.charged_to = workspace_author(
+                sr.workspace, current_workspace=current_workspace
+            )
+
+        return props
 
     def _render_functions(self):
         if not self.functions_in_settings:
