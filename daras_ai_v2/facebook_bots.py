@@ -427,8 +427,9 @@ def _build_interactive_list_msg(
             sections[-1]["rows"].append(row)
         else:
             sections.append({"title": section_title, "rows": [row]})
-    # the first <label> names the button that opens the menu
-    button_label = next((s["title"] for s in sections if s["title"]), "")
+    # Unlabelled utility rows do not affect the menu's label.
+    section_titles = {s["title"] for s in sections if s["title"]}
+    button_label = section_titles.pop() if len(section_titles) == 1 else WA_LIST_BTN_LABEL
     if len(sections) == 1:
         sections[0].pop("title")
     else:

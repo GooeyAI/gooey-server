@@ -90,7 +90,7 @@ def test_wa_list_groups_rows_by_section():
         {"id": "4", "title": "D", "section": "Bikes"},
     ]
     action = _build_interactive_list_msg(buttons, "hi")["interactive"]["action"]
-    assert action["button"] == "Cars"
+    assert action["button"] == "Options"
     sections = action["sections"]
     assert [s["title"] for s in sections] == ["Cars", "Options", "Bikes"]
     assert [[r["title"] for r in s["rows"]] for s in sections] == [
@@ -112,6 +112,17 @@ def test_wa_list_single_section_names_the_button():
     )["interactive"]["action"]
     assert action["button"] == "Follow up questions"
     assert action["sections"] == [{"rows": [{"id": "1", "title": "A"}]}]
+
+
+def test_wa_list_utilities_do_not_override_single_section_title():
+    action = _build_interactive_list_msg(
+        [
+            {"id": "1", "title": "Weather", "section": "Local info"},
+            {"id": "NEW_CONVERSATION", "title": "New", "menu": True},
+        ],
+        "hi",
+    )["interactive"]["action"]
+    assert action["button"] == "Local info"
 
 
 def test_wa_list_preserves_localized_option_value():
