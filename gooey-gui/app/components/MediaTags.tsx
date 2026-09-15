@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 import { Link } from "@remix-run/react";
+import { urlToFilename } from "~/urlUtils";
 
 export function GooeyImg({
   src,
@@ -72,7 +73,11 @@ export function GooeyImg({
         img
       )}
       {clickable && dialogOpen && (
-        <MediaPreviewDialog onClose={() => setDialogOpen(false)} alt={caption}>
+        <MediaPreviewDialog
+          onClose={() => setDialogOpen(false)}
+          alt={caption}
+          src={src}
+        >
           <img src={src} alt={caption} style={mediaDialogStyle} />
         </MediaPreviewDialog>
       )}
@@ -108,9 +113,70 @@ export function GooeyVideo({
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const expandable = enablePreviewDialog && !href;
+  const showingVideoElement = !(previewImg && previewIsValid);
+  // The play/pause/mute overlay only makes sense against a real <video> -
+  // the previewImg fallback is a static <img>, nothing to play or mute.
+  const isPlayable = expandable && showingVideoElement;
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const wasPlayingBeforeDialog = useRef(false);
+
+  const [isMuted, setIsMuted] = useState(true);
+  const [userPaused, setUserPaused] = useState(false);
+  const [isIntersecting, setIsIntersecting] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(false);
+
+  const shouldPlay = isPlayable && !userPaused && isIntersecting;
+
+  // Drive actual playback from our own state - not just the autoPlay
+  // attribute - so pause/scroll/the dialog can all affect it afterwards.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !isPlayable) return;
+    if (shouldPlay) el.play().catch(() => {});
+    else el.pause();
+  }, [shouldPlay, isPlayable]);
+
+  // React's `muted` JSX prop only sets the *initial* value - toggling it via
+  // re-render doesn't reliably update the live DOM property, so drive it
+  // imperatively too.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.muted = isMuted;
+  }, [isMuted]);
+
+  // Pause (without counting it as a user pause) once scrolled out of view,
+  // and resume automatically once back in view - unless the user explicitly
+  // paused it themselves in the meantime, which should stick either way.
+  useEffect(() => {
+    if (!isPlayable || typeof IntersectionObserver === "undefined") return;
+    const el = wrapperRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsIntersecting(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isPlayable]);
+
+  const showControls = () => {
+    setControlsVisible(true);
+    clearTimeout(hideTimeoutRef.current);
+    hideTimeoutRef.current = setTimeout(() => setControlsVisible(false), 1500);
+  };
+  const hideControlsNow = () => {
+    clearTimeout(hideTimeoutRef.current);
+    setControlsVisible(false);
+  };
+  useEffect(() => () => clearTimeout(hideTimeoutRef.current), []);
 
   let media;
-  if (previewImg && previewIsValid) {
+  if (!showingVideoElement) {
     media = (
       <img
         className="gui-video"
@@ -122,15 +188,21 @@ export function GooeyVideo({
   } else {
     media = (
       <video
+        ref={videoRef}
         className="gui-video"
         {...props}
-        // The dialog already offers a bigger view, so the inline player only
-        // needs play/pause/seek/volume - hiding native fullscreen & PiP avoids
-        // two competing "make this bigger" affordances sitting side by side.
-        // controlsList is Chromium-only; Safari ignores it and keeps showing
-        // its own AirPlay icon in the same top-right corner as our expand
-        // button unless disableRemotePlayback is set too.
-        controlsList={expandable ? "nofullscreen noremoteplayback" : undefined}
+        // The dialog already offers a full native player, and native
+        // controls on the inline thumbnail is what caused the AirPlay-icon/
+        // corner-bleeding bugs (see gooey-web-widget's MediaPreview, which
+        // never shows controls inline either) - so drop them here in favor
+        // of our own play/pause + mute + expand overlay below. Still block
+        // PiP/AirPlay from the right-click context menu, since browsers can
+        // offer those even without visible controls.
+        controls={expandable ? false : props.controls}
+        autoPlay={expandable ? true : props.autoPlay}
+        muted={expandable ? true : props.muted}
+        loop={expandable ? true : props.loop}
+        playsInline={expandable ? true : props.playsInline}
         disablePictureInPicture={expandable || undefined}
         disableRemotePlayback={expandable || undefined}
         src={src}
@@ -143,29 +215,102 @@ export function GooeyVideo({
       <RenderedMarkdown body={caption} />
       {expandable ? (
         <div
-          className="gui-media-preview-wrap"
+          ref={wrapperRef}
+          className={
+            "gui-media-preview-wrap" +
+            (controlsVisible ? " gui-video-controls-visible" : "")
+          }
           style={{ position: "relative", maxWidth: 450 }}
+          onMouseMove={showControls}
+          onMouseLeave={hideControlsNow}
+          onClick={() => {
+            // A tap on the video itself (anything but a button, which stops
+            // propagation below) only reveals the overlay - it shouldn't
+            // also toggle mute/playback, or the same tap meant to reveal
+            // the buttons could catch someone off guard with sudden audio.
+            if (!controlsVisible) showControls();
+          }}
         >
           {media}
           <button
             type="button"
             aria-label="Expand video"
             title="Expand video"
-            className="gui-media-expand-btn"
-            onClick={() => setDialogOpen(true)}
-            style={expandButtonStyle}
+            className={
+              "gui-media-expand-btn" +
+              (isPlayable ? " gui-video-overlay-btn" : "")
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              wasPlayingBeforeDialog.current = !!shouldPlay;
+              setUserPaused(true);
+              setDialogOpen(true);
+            }}
+            style={videoExpandButtonStyle}
           >
             <i
               className="fa-solid fa-sm fa-up-right-and-down-left-from-center"
               aria-hidden="true"
             ></i>
           </button>
+          {isPlayable && (
+            <>
+              <button
+                type="button"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+                title={isMuted ? "Unmute" : "Mute"}
+                className="gui-video-overlay-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  showControls();
+                  setIsMuted((m) => !m);
+                }}
+                style={videoMuteButtonStyle}
+              >
+                <i
+                  className={
+                    "fa-solid " +
+                    (isMuted ? "fa-volume-xmark" : "fa-volume-high")
+                  }
+                  aria-hidden="true"
+                ></i>
+              </button>
+              <button
+                type="button"
+                aria-label={shouldPlay ? "Pause" : "Play"}
+                title={shouldPlay ? "Pause" : "Play"}
+                className="gui-video-overlay-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  showControls();
+                  setUserPaused((p) => !p);
+                }}
+                style={videoPlayPauseButtonStyle}
+              >
+                <i
+                  className={"fa-solid " + (shouldPlay ? "fa-pause" : "fa-play")}
+                  style={shouldPlay ? undefined : { marginLeft: 2 }}
+                  aria-hidden="true"
+                ></i>
+              </button>
+            </>
+          )}
         </div>
       ) : (
         media
       )}
       {expandable && dialogOpen && (
-        <MediaPreviewDialog onClose={() => setDialogOpen(false)} alt={caption}>
+        <MediaPreviewDialog
+          onClose={() => {
+            setDialogOpen(false);
+            // Only resume if it was actually playing before Expand was
+            // clicked - if the user had already paused it themselves, closing
+            // the dialog should respect that instead of overriding it.
+            if (wasPlayingBeforeDialog.current) setUserPaused(false);
+          }}
+          alt={caption}
+          src={src}
+        >
           <video
             src={src}
             controls
@@ -188,18 +333,12 @@ const mediaDialogStyle: React.CSSProperties = {
   objectFit: "contain",
 };
 
-const expandButtonStyle: React.CSSProperties = {
-  position: "absolute",
-  // Top corner, clear of the video's own control bar (bottom) so the two
-  // don't visually compete.
-  top: 8,
-  right: 8,
-  zIndex: 2,
+const circleButtonStyle: React.CSSProperties = {
   borderRadius: "50%",
   width: 28,
   height: 28,
   // Semi-transparent dark, like a player control overlay, so it reads
-  // clearly regardless of the video's own colors.
+  // clearly regardless of the media's own colors.
   background: "rgba(0,0,0,0.55)",
   color: "#fff",
   border: "none",
@@ -208,19 +347,137 @@ const expandButtonStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
+  flexShrink: 0,
+};
+
+const expandButtonStyle: React.CSSProperties = {
+  ...circleButtonStyle,
+  position: "absolute",
+  top: 8,
+  right: 8,
+  zIndex: 2,
+};
+
+// GooeyVideo's overlay mirrors where native video controls conventionally
+// put things (expand instead lives top-left, since top-right is where
+// Safari's own AirPlay icon claims - see disableRemotePlayback above; better
+// to own that corner with a control of ours than contest it again).
+const videoExpandButtonStyle: React.CSSProperties = {
+  ...circleButtonStyle,
+  position: "absolute",
+  top: 8,
+  left: 8,
+  zIndex: 2,
+};
+
+const videoMuteButtonStyle: React.CSSProperties = {
+  ...circleButtonStyle,
+  position: "absolute",
+  top: 8,
+  right: 8,
+  zIndex: 2,
+};
+
+const videoPlayPauseButtonStyle: React.CSSProperties = {
+  ...circleButtonStyle,
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  width: 44,
+  height: 44,
+  fontSize: 16,
+  zIndex: 2,
+};
+
+const mediaDialogSurfaceStyle: React.CSSProperties = {
+  position: "relative",
+  maxWidth: "90vw",
+  maxHeight: "90vh",
+  // A neutral dark surface (matching gooey-web-widget's MediaPreview) so
+  // photos/videos of any color sit against a consistent backdrop, distinct
+  // from the page's own light, blurred one behind it.
+  background: "#0b1021",
+  borderRadius: 12,
+  boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+};
+
+// position:fixed (not absolute) and anchored to the viewport corner, not
+// nested-but-relative-to the surface panel above - otherwise this floats on
+// top of the media itself and competes with the native control bar in
+// there, which is what it was doing before.
+const dialogActionBarStyle: React.CSSProperties = {
+  position: "fixed",
+  top: 16,
+  right: 16,
+  zIndex: 1000000,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const actionPillButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  height: 28,
+  padding: "0 12px",
+  borderRadius: 14,
+  background: "rgba(0,0,0,0.55)",
+  color: "#fff",
+  border: "none",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+  cursor: "pointer",
+  fontSize: 13,
+  fontWeight: 600,
+  whiteSpace: "nowrap",
 };
 
 function MediaPreviewDialog({
   onClose,
   alt,
+  src,
   children,
 }: {
   onClose: () => void;
   alt?: string;
+  src: string;
   children: React.ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(src);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = urlToFilename(src);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(src, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!navigator.clipboard) {
+      window.prompt("Copy this link", src);
+      return;
+    }
+    navigator.clipboard
+      .writeText(src)
+      .then(() => {
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 1500);
+      })
+      .catch(() => window.prompt("Copy this link", src));
+  };
 
   // Prevent background scroll while open, close on Escape, and manage focus:
   // move focus into the dialog on open, trap Tab within it, and restore focus
@@ -299,17 +556,42 @@ function MediaPreviewDialog({
         tabIndex={-1}
         className="gui-media-preview-wrap"
         onClick={(e) => e.stopPropagation()}
-        style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}
+        style={mediaDialogSurfaceStyle}
       >
-        <button
-          aria-label="Close preview"
-          title="Close preview"
-          className="gui-media-expand-btn"
-          onClick={onClose}
-          style={expandButtonStyle}
-        >
-          <i className="fa fa-times" aria-hidden="true"></i>
-        </button>
+        <div style={dialogActionBarStyle}>
+          {/* Labeled, unlike Close below - the download/copy icons alone
+              aren't obvious to everyone, and there's room for text here
+              since this bar floats over the backdrop rather than the media
+              itself. */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            style={actionPillButtonStyle}
+          >
+            <i className="fa-solid fa-download" aria-hidden="true"></i>
+            <span>Download</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            style={actionPillButtonStyle}
+          >
+            <i
+              className={`fa-solid ${linkCopied ? "fa-check" : "fa-link"}`}
+              aria-hidden="true"
+            ></i>
+            <span>{linkCopied ? "Copied" : "Copy link"}</span>
+          </button>
+          <button
+            type="button"
+            aria-label="Close preview"
+            title="Close preview"
+            onClick={onClose}
+            style={circleButtonStyle}
+          >
+            <i className="fa fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
         {children}
       </div>
     </div>,
