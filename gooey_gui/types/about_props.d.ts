@@ -73,6 +73,7 @@ export interface RecipeAboutProps {
   author: AboutAuthor | null;
   report_value: string | null;
   share_value: string | null;
+  share_url: string | null;
   submit_intent_key: string;
   tags: AboutTag[];
   notes: string | null;

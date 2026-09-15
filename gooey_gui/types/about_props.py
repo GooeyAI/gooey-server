@@ -81,8 +81,11 @@ class RecipeAboutProps(pydantic.BaseModel):
     author: AboutAuthor | None = None
     # the encoded pick that opens the report dialog, or None with nobody to attribute it to
     report_value: str | None = None
-    # the encoded ShareIntent, or None when there is nothing shareable
+    # the encoded ShareIntent, or None with no share dialog to open
     share_value: str | None = None
+    # the url for the browser's own share sheet, set instead of `share_value` for a visitor
+    # who has no dialog - the two are never both present
+    share_url: str | None = None
     submit_intent_key: str
 
     tags: list[AboutTag] = []

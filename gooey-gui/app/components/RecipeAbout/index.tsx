@@ -1,6 +1,7 @@
 import "./RecipeAbout.css";
 
 import clsx from "clsx";
+import { useState } from "react";
 
 import type {
   AboutAuthor,
@@ -25,6 +26,7 @@ export function RecipeAbout({
   circle_photo,
   author,
   share_value,
+  share_url,
   report_value,
   submit_intent_key,
   tags,
@@ -49,6 +51,7 @@ export function RecipeAbout({
         <AuthorBlock
           author={author}
           shareValue={share_value}
+          shareUrl={share_url}
           submitIntentKey={submit_intent_key}
         />
       )}
@@ -127,12 +130,15 @@ export function RecipeAbout({
 function AuthorBlock({
   author,
   shareValue,
+  shareUrl,
   submitIntentKey,
 }: {
   author: AboutAuthor;
   shareValue?: string | null;
+  shareUrl?: string | null;
   submitIntentKey: string;
 }) {
+  const { copied, shareNatively } = useNativeShare(shareUrl);
   const row = (
     <div className="v2-about-author-row">
       <img className="v2-about-author-photo" src={author.photo_url} alt="" />
@@ -159,8 +165,47 @@ function AuthorBlock({
           <span>Share</span>
         </button>
       )}
+      {!shareValue && !!shareUrl && (
+        // Nobody to open the share dialog for, so the browser's own sheet takes the url.
+        // `type="button"`: this must not submit the form it sits in.
+        <button
+          type="button"
+          className="v2-about-share"
+          onClick={shareNatively}
+          title="Share this workflow"
+        >
+          <i className="fa-regular fa-share-nodes" />
+          <span>{copied ? "Link copied" : "Share"}</span>
+        </button>
+      )}
     </div>
   );
+}
+
+/** The browser's share sheet, falling back to the clipboard where there is none - Firefox
+ *  on the desktop has no `navigator.share`, and nor does any insecure context. */
+function useNativeShare(url?: string | null) {
+  const [copied, setCopied] = useState(false);
+  const shareNatively = () => {
+    if (!url) return;
+    // A sheet the user dismisses rejects with AbortError; that is not a failure.
+    if (navigator.share) {
+      navigator.share({ title: document.title, url }).catch(() => {});
+      return;
+    }
+    if (!navigator.clipboard) {
+      window.prompt("Copy this link", url);
+      return;
+    }
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => window.prompt("Copy this link", url));
+  };
+  return { copied, shareNatively };
 }
 
 function GroupBlock({

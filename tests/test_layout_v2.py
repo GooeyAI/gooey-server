@@ -1069,6 +1069,38 @@ def test_about_keeps_its_own_share_when_the_bar_loses_the_cluster(monkeypatch):
     assert page._about_share_value() is not None
 
 
+def test_a_visitor_with_no_share_dialog_is_handed_the_url_instead(monkeypatch):
+    """The share dialog manages visibility, so it needs somebody to manage it for - logged
+    out there was no Share at all. About offers the browser's own sheet the url instead,
+    and never both: the component picks one, so the payload must not offer two."""
+    page = object.__new__(VideoBotsPageV2)
+    page.tab = RecipeTabs.run
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_pr",
+        property(lambda self: SimpleNamespace(workspace_id=7, is_root=lambda: False)),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/my-bot/"
+    )
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    assert page._about_share_value() is not None
+    assert page._about_share_url() is None
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: False)
+    assert page._about_share_value() is None
+    assert page._about_share_url() == "/agent/my-bot/"
+
+    # the recipe's own template is not a thing a visitor passes on, either way
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_pr",
+        property(lambda self: SimpleNamespace(workspace_id=7, is_root=lambda: True)),
+    )
+    assert page._about_share_url() is None
+
+
 def test_a_logged_out_visitor_gets_no_publish_cluster_on_a_view_only_page(monkeypatch):
     """Logged out is view-only everywhere it cannot edit, so it loses the cluster too -
     the bar's Run control is the way in from here."""

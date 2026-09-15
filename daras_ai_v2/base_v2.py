@@ -904,6 +904,7 @@ class BasePage(BasePageV1):
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._about_author(pr),
                 share_value=self._about_share_value(),
+                share_url=self._about_share_url(),
                 report_value=self._about_report_value(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
                 tags=self._about_tags(pr),
@@ -955,16 +956,28 @@ class BasePage(BasePageV1):
             return None
         return MenuIntent(item_key=self.MENU_REPORT).model_dump_json()
 
+    def _about_is_shareable(self) -> bool:
+        """Whether this page has a published url to pass on at all. A root recipe is the
+        recipe's own template, which is not something a visitor shares."""
+        pr = self.current_pr
+        return bool(pr.workspace_id) and not pr.is_root()
+
     def _about_share_value(self) -> str | None:
-        """The encoded `ShareIntent`, or None when there is nothing to share.
+        """The encoded `ShareIntent`, or None with no dialog to open.
 
         The same intent the bar's button posts, so `_handle_top_bar_actions` opens the one
-        share dialog either way. A root recipe has no published url, which is the bar's rule.
+        share dialog either way. That dialog manages visibility, so it needs somebody to
+        manage it for - a logged out visitor gets `_about_share_url` instead.
         """
-        pr = self.current_pr
-        if not self.is_logged_in() or not pr.workspace_id or pr.is_root():
+        if not self.is_logged_in() or not self._about_is_shareable():
             return None
         return ShareIntent().model_dump_json()
+
+    def _about_share_url(self) -> str | None:
+        """The url to hand the browser's own share sheet, for a visitor with no dialog."""
+        if self.is_logged_in() or not self._about_is_shareable():
+            return None
+        return self.current_app_url(self.tab)
 
     def _about_author_href(self, workspace: Workspace) -> str | None:
         """Where the author block points. The same three answers
