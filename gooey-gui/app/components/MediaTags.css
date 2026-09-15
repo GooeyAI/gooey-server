@@ -28,6 +28,12 @@
    has to move onto the wrapper - otherwise that gap sits inside the clip and
    the bottom corners never touch it. */
 .gui-media-preview-wrap {
+  /* A plain block element stretches to fill its parent's width without
+     this - it doesn't shrink-to-fit its content the way a flex item or
+     inline-block would, so without a cap here the wrapper ends up much
+     wider than the (450px-capped) media inside it, and the buttons
+     anchored to its edges land far from the actual video/image. */
+  max-width: 450px;
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 0.9rem;
@@ -189,6 +195,17 @@
   justify-content: center;
   padding: 24px;
   box-sizing: border-box;
+}
+
+/* Wraps the action bar + surface together as the actual role="dialog"
+   element (needed for aria-modal correctness - everything outside it is
+   treated as inert), without putting an overflow:hidden ancestor around
+   the (position:fixed) action bar - see the component for why. display:
+   flex here, and its default shrink-to-fit sizing as a flex item of the
+   backdrop, is what keeps this sized to the surface rather than
+   stretching to fill the backdrop the way a plain block would. */
+.gui-media-dialog-frame {
+  display: flex;
 }
 
 /* A neutral dark surface (matching gooey-web-widget's MediaPreview) so

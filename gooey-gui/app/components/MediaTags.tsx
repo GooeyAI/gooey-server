@@ -135,6 +135,21 @@ export function GooeyVideo({
   );
   const lastShowControlsAtRef = useRef(0);
   const wasPlayingBeforeDialog = useRef(false);
+  // A freshly-mounted <video> has no known size until its metadata loads,
+  // so it renders at the browser's fallback box (~300x150) in the meantime.
+  // The view transition's "after" snapshot is captured synchronously right
+  // as the dialog opens, so without this it captures that wrong size and
+  // the video visibly snaps to its real size right after the transition
+  // finishes. The inline video is already loaded, so its real dimensions
+  // are available immediately - captured at Expand time and applied to the
+  // dialog's video below as explicit pixel width/height (not just
+  // aspect-ratio - with both width and height otherwise auto, the surface's
+  // shrink-to-fit sizing can still fall back to the video's own unloaded
+  // intrinsic size, since aspect-ratio alone only constrains a relationship
+  // between width/height, it doesn't resolve a size by itself).
+  const dialogVideoSize = useRef<{ width: number; height: number } | undefined>(
+    undefined,
+  );
 
   const [isMuted, setIsMuted] = useState(true);
   const [userPaused, setUserPaused] = useState(false);
@@ -276,6 +291,23 @@ export function GooeyVideo({
             onClick={(e) => {
               e.stopPropagation();
               wasPlayingBeforeDialog.current = !!shouldPlay;
+              const el = videoRef.current;
+              if (el?.videoWidth && el?.videoHeight) {
+                // Natural size, scaled down (never up) to fit within
+                // 90vw x 90vh - matches what max-width/max-height alone
+                // would've done once metadata loaded, just resolved now.
+                const scale = Math.min(
+                  (window.innerWidth * 0.9) / el.videoWidth,
+                  (window.innerHeight * 0.9) / el.videoHeight,
+                  1,
+                );
+                dialogVideoSize.current = {
+                  width: Math.round(el.videoWidth * scale),
+                  height: Math.round(el.videoHeight * scale),
+                };
+              } else {
+                dialogVideoSize.current = undefined;
+              }
               withViewTransition(() => {
                 setUserPaused(true);
                 setDialogOpen(true);
@@ -357,6 +389,10 @@ export function GooeyVideo({
             playsInline
             disableRemotePlayback
             className="gui-media-dialog-content"
+            style={{
+              width: dialogVideoSize.current?.width,
+              height: dialogVideoSize.current?.height,
+            }}
           ></video>
         </MediaPreviewDialog>
       )}
@@ -505,9 +541,8 @@ function MediaPreviewDialog({
         aria-modal="true"
         aria-label={alt || "Media preview"}
         tabIndex={-1}
-        className="gui-media-preview-wrap gui-media-dialog-surface"
+        className="gui-media-dialog-frame"
         onClick={(e) => e.stopPropagation()}
-        style={{ viewTransitionName: mediaTransitionName }}
       >
         <div className="gui-media-dialog-action-bar">
           {/* Labeled, unlike Close below - the download/copy icons alone
@@ -543,7 +578,18 @@ function MediaPreviewDialog({
             <i className="fa fa-times" aria-hidden="true"></i>
           </button>
         </div>
-        {children}
+        {/* The action bar is position:fixed and needs to live inside the
+            role="dialog" element for aria-modal correctness (everything
+            outside it is treated as inert), but NOT inside this
+            overflow:hidden surface - browsers are inconsistent about
+            whether overflow:hidden clips a position:fixed descendant, and
+            it was clipping the action bar here. */}
+        <div
+          className="gui-media-preview-wrap gui-media-dialog-surface"
+          style={{ viewTransitionName: mediaTransitionName }}
+        >
+          {children}
+        </div>
       </div>
     </div>,
     document.body,
