@@ -530,6 +530,15 @@ function MediaPreviewDialog({
   const [linkCopied, setLinkCopied] = useState(false);
 
   const handleDownload = async () => {
+    // Safari/iOS only allow window.open() within the synchronous tick of a
+    // user gesture ("transient activation"), which the fetch below can
+    // easily outlive - so the fallback window.open() in the catch block
+    // could get silently popup-blocked right when it's needed. Open a blank
+    // placeholder synchronously now instead, then either close it (success)
+    // or navigate it to src (fallback). Can't pass noopener/noreferrer here
+    // since that severs the reference needed to do either - acceptable
+    // since src is our own trusted media URL, not an arbitrary/external one.
+    const fallbackWindow = window.open();
     try {
       const response = await fetch(src);
       // fetch() only rejects on a network failure - an HTTP error still
@@ -552,8 +561,10 @@ function MediaPreviewDialog({
         link.remove();
         URL.revokeObjectURL(blobUrl);
       }, 250);
+      fallbackWindow?.close();
     } catch {
-      window.open(src, "_blank", "noopener,noreferrer");
+      if (fallbackWindow) fallbackWindow.location.href = src;
+      else window.open(src, "_blank", "noopener,noreferrer");
     }
   };
 
