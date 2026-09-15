@@ -167,6 +167,7 @@ export function GooeyVideo({
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  const lastShowControlsAtRef = useRef(0);
   const wasPlayingBeforeDialog = useRef(false);
 
   const [isMuted, setIsMuted] = useState(true);
@@ -214,6 +215,15 @@ export function GooeyVideo({
   }, [isPlayable]);
 
   const showControls = () => {
+    // onMouseMove fires ~60 times/sec while the cursor is actively moving -
+    // resetting the hide-timer on every single one is wasted timer churn
+    // that multiplies across a page with several videos (e.g.
+    // CompareText2Img renders one per model). Once already visible, only
+    // actually reset it at most every 200ms; the very first call (from
+    // hidden) still runs immediately so revealing still feels instant.
+    const now = Date.now();
+    if (controlsVisible && now - lastShowControlsAtRef.current < 200) return;
+    lastShowControlsAtRef.current = now;
     setControlsVisible(true);
     clearTimeout(hideTimeoutRef.current);
     hideTimeoutRef.current = setTimeout(() => setControlsVisible(false), 1500);
