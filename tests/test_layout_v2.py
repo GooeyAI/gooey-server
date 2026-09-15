@@ -740,13 +740,9 @@ def _headings_in(node) -> list[tuple[int, str]]:
     return found
 
 
-def test_the_about_surface_carries_the_pages_one_h1(monkeypatch):
-    """A recipe page had no `h1` at all - the workflow's name lived in a `span` in the top
-    bar. About carries it, and layout v2 renders that surface whatever pane is on screen.
-
-    The component hides it visually and is the only place it is emitted, so "exactly one"
-    is structural now; what Python still owes is the name itself.
-    """
+def test_the_top_bar_is_sent_the_name_that_becomes_the_pages_h1(monkeypatch):
+    """The top bar's title is the h1 - the visible name, not a hidden stand-in, and the bar
+    is the one part of v2 on every tab. What Python owes is that name."""
     from types import SimpleNamespace
 
     page = object.__new__(VideoBotsPageV2)
@@ -782,8 +778,9 @@ def test_the_about_surface_carries_the_pages_one_h1(monkeypatch):
         page._render_about_content()
 
     props = json.dumps(root.to_dict())
-    assert "Farmer.CHAT Ag Advisory Agent" in props
     assert "RecipeAbout" in props
+    # About no longer draws a heading of its own; the name reaches the bar instead
+    assert "heading" not in json.loads(props)["children"][0]["props"]
 
 
 def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():

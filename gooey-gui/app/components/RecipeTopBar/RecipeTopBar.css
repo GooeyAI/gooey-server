@@ -849,3 +849,12 @@ a.gooey-topbar-cost:hover {
     transition: none !important;
   }
 }
+
+/* The h1 wraps the title control for the outline only; it generates no box, so the row's
+   flex layout and the global heading scale both stay off it. */
+.gooey-topbar-heading {
+  display: contents;
+  /* `display: contents` drops the box, not the inheritance - without this the heading
+     scale's heavy face would still reach the title text inside. */
+  font: inherit;
+}

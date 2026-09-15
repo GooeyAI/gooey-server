@@ -242,9 +242,11 @@
 }
 
 .v2-about .v2-about-section-title {
-    /* An h2 for the outline, so the browser's heading scale comes back off it here - the
-       workspace-wide reset that used to do that is gone. */
+    /* h2/h3 for the outline, so the app's heading scale comes back off it here. `h3` also
+       carries `inline-block` and letter-spacing, which is what these two undo. */
     font-family: inherit;
+    display: block;
+    letter-spacing: normal;
     margin-top: 0;
     font-size: 0.875rem;
     font-weight: 500;
@@ -333,6 +335,9 @@
 /* Meta: Inter Medium 12. `white-space: normal` undoes the `nowrap` inherited from
    `button .gui-html-container`, which otherwise sets the card's minimum width. */
 .v2-about .v2-about-meta-label {
+    /* An h4 for the outline; the heading scale's face and margins come back off it. */
+    font-family: inherit;
+    margin: 0;
     width: 100%;
     min-width: 0;
     font-size: 0.75rem;
@@ -373,4 +378,10 @@
         padding-left: var(--gooey-space-2);
         padding-right: var(--gooey-space-2);
     }
+}
+
+/* An h4 for the outline, generating no box - the pill's own flex layout is unchanged. */
+.v2-about .v2-about-tag-label {
+    display: contents;
+    font: inherit;
 }

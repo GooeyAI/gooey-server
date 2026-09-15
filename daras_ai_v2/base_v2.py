@@ -839,7 +839,6 @@ class BasePage(BasePageV1):
 
         gui.model_component(
             RecipeAboutProps(
-                heading=self._workflow_identity().name,
                 photo_url=pr.photo_url or None,
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._about_author(pr),

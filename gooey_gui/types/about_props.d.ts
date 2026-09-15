@@ -68,7 +68,6 @@ export interface AboutGroup {
  * component owns the markup and the payload carries only what varies.
  */
 export interface RecipeAboutProps {
-  heading: string;
   photo_url: string | null;
   circle_photo: boolean;
   author: AboutAuthor | null;

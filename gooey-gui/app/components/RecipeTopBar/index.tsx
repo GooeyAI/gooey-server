@@ -534,30 +534,33 @@ export function RecipeTopBar({
 
         <div className="gooey-topbar-titleblock" ref={titleMenuRef}>
           <div className="gooey-topbar-titlerow">
-            {/* A heading that names another page is a link to it - a run points at the
-                workflow it came from. Where it names this page the server sends no href and
-                it stays the menu's trigger, as it is on the workflow's own url. */}
-            {title_href ? (
-              <Link
-                to={title_href}
-                className="gooey-topbar-title gooey-topbar-title-link"
-                title={title}
-              >
-                {titleContent}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className="gooey-topbar-title"
-                onClick={() => setTitleMenuOpen((v) => !v)}
-                disabled={!title_menu_items.length || isNarrow}
-              >
-                {titleContent}
-                {!!title_menu_items.length && !isNarrow && (
-                  <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
-                )}
-              </button>
-            )}
+            {/* The page's h1, around the control only: `h1` takes phrasing content, which
+                `a` and `button` are and the row's `div` is not. */}
+            <h1 className="gooey-topbar-heading">
+              {/* A heading naming another page is a link to it; on its own url it stays
+                  the menu's trigger, which is why the server sends no href there. */}
+              {title_href ? (
+                <Link
+                  to={title_href}
+                  className="gooey-topbar-title gooey-topbar-title-link"
+                  title={title}
+                >
+                  {titleContent}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="gooey-topbar-title"
+                  onClick={() => setTitleMenuOpen((v) => !v)}
+                  disabled={!title_menu_items.length || isNarrow}
+                >
+                  {titleContent}
+                  {!!title_menu_items.length && !isNarrow && (
+                    <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+                  )}
+                </button>
+              )}
+            </h1>
             {/* Above lg the chevron is the only way to Versions, Duplicate and Delete, so
                 once the title itself navigates the menu needs a trigger of its own. */}
             {!!title_href && !!title_menu_items.length && !isNarrow && (

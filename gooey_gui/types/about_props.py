@@ -75,10 +75,6 @@ class RecipeAboutProps(pydantic.BaseModel):
 
     _component: str = "RecipeAbout"
 
-    # The page's one h1, visually hidden: the top bar already shows the name, but that bar
-    # is chrome on every tab, so it cannot be the heading.
-    heading: str
-
     photo_url: str | None = None
     circle_photo: bool = False
 

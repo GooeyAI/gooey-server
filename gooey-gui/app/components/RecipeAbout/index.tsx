@@ -21,7 +21,6 @@ const MAX_COLS = 6;
 /** What this workflow is: its portrait, who published it, and one panel holding what it is
  *  filed under, what it is, and how it is put together. */
 export function RecipeAbout({
-  heading,
   photo_url,
   circle_photo,
   author,
@@ -35,7 +34,6 @@ export function RecipeAbout({
   const hasPanel = !!tags.length || !!notes || !!groups.length;
   return (
     <div className="v2-about">
-      <h1 className="visually-hidden">{heading}</h1>
       {!!photo_url && (
         <img
           className={clsx(
@@ -57,13 +55,17 @@ export function RecipeAbout({
         <div className="v2-about-panel">
           {!!tags.length && (
             <div className="v2-about-tags">
+              {/* Names what the pills are for. Hidden: the pills read as tags already. */}
+              <h3 className="visually-hidden">Related AI Workflows</h3>
               {tags.map((tag) => (
                 <a
                   key={tag.href + tag.label_html}
                   className="v2-about-tag"
                   href={tag.href}
                 >
-                  <RenderedHTML body={tag.label_html} />
+                  <h4 className="v2-about-tag-label">
+                    <RenderedHTML body={tag.label_html} />
+                  </h4>
                 </a>
               ))}
             </div>
@@ -143,7 +145,7 @@ function GroupBlock({
 }) {
   return (
     <div className="v2-about-group">
-      <h2 className="v2-about-section-title">{group.title}</h2>
+      <h3 className="v2-about-section-title">{group.title}</h3>
       {/* The column count follows the cards rather than `auto-fill`, which materialises
           every track that fits and made a two-card group as wide as a six-card one. */}
       <div
@@ -184,7 +186,7 @@ function MetaCard({
         </span>
         <i className="fa-regular fa-chevron-right v2-about-meta-chevron" />
       </span>
-      <span className="v2-about-meta-label">{card.label}</span>
+      <h4 className="v2-about-meta-label">{card.label}</h4>
     </>
   );
 
