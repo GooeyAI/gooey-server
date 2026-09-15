@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactDOM, { flushSync } from "react-dom";
+import clsx from "clsx";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 import { Link } from "@remix-run/react";
 import { urlToFilename } from "~/urlUtils";
+import "./MediaTags.css";
 
 // Not yet in this project's DOM lib (React 17 / an older TS target) - typed
 // just enough to call it.
@@ -54,7 +56,6 @@ export function GooeyImg({
 }) {
   const [previewIsValid, onError] = useImageValid(previewImg);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const mediaTransitionName = mediaTransitionNameFor(src);
 
   let currentSrc;
   if (previewImg && previewIsValid) {
@@ -65,6 +66,11 @@ export function GooeyImg({
 
   const clickable =
     enablePreviewDialog && !href && !currentSrc.startsWith("data:");
+  // gui.image emits data: URIs for numpy-array inputs (tens of KB, bounded
+  // by a 128px resize) - computed only when actually needed, below
+  // `clickable`, so a non-clickable data: URI image doesn't run a regex
+  // over that whole string just to throw the result away.
+  const mediaTransitionName = clickable ? mediaTransitionNameFor(src) : "";
 
   const openDialog = () => withViewTransition(() => setDialogOpen(true));
 
@@ -84,29 +90,23 @@ export function GooeyImg({
       <RenderedMarkdown body={caption} />
       {clickable ? (
         <div
-          className="gui-media-preview-wrap"
-          style={{
-            position: "relative",
-            maxWidth: 450,
-            viewTransitionName: dialogOpen ? undefined : mediaTransitionName,
-          }}
+          className="gui-media-preview-wrap position-relative"
+          style={{ viewTransitionName: dialogOpen ? undefined : mediaTransitionName }}
         >
           {img}
           {/* Hover/cursor affordances (zoom-in cursor) aren't visible on
               touch devices, so show an explicit expand icon too - CSS fades
               it in on hover for mouse users, but keeps it always-on for
-              touch (see .gui-media-expand-btn in app.css). */}
+              touch (see .gui-media-expand-btn in MediaTags.css). */}
           <button
             type="button"
             aria-label="Expand image"
             title="Expand image"
-            className="gui-media-expand-btn"
+            className="gui-media-circle-btn gui-media-expand-position gui-media-expand-btn"
             onClick={openDialog}
-            style={mediaExpandButtonStyle}
           >
             <i
-              className="fa-solid fa-sm fa-up-right-and-down-left-from-center"
-              style={expandIconStyle}
+              className="fa-solid fa-sm fa-up-right-and-down-left-from-center gui-media-expand-icon"
               aria-hidden="true"
             ></i>
           </button>
@@ -121,7 +121,7 @@ export function GooeyImg({
           src={src}
           mediaTransitionName={mediaTransitionName}
         >
-          <img src={src} alt={caption} style={mediaDialogStyle} />
+          <img src={src} alt={caption} className="gui-media-dialog-content" />
         </MediaPreviewDialog>
       )}
     </>
@@ -265,15 +265,12 @@ export function GooeyVideo({
       {expandable ? (
         <div
           ref={wrapperRef}
-          className={
-            "gui-media-preview-wrap" +
-            (controlsVisible ? " gui-video-controls-visible" : "")
-          }
-          style={{
-            position: "relative",
-            maxWidth: 450,
-            viewTransitionName: dialogOpen ? undefined : mediaTransitionName,
-          }}
+          className={clsx(
+            "gui-media-preview-wrap",
+            "position-relative",
+            controlsVisible && "gui-video-controls-visible",
+          )}
+          style={{ viewTransitionName: dialogOpen ? undefined : mediaTransitionName }}
           onMouseMove={showControls}
           onMouseLeave={hideControlsNow}
           onClick={() => {
@@ -295,9 +292,11 @@ export function GooeyVideo({
             // whether the mouse has actually moved recently), so carrying
             // both classes left this the only button still visible once the
             // others faded out from under a motionless cursor.
-            className={
-              isPlayable ? "gui-video-overlay-btn" : "gui-media-expand-btn"
-            }
+            className={clsx(
+              "gui-media-circle-btn",
+              "gui-media-expand-position",
+              isPlayable ? "gui-video-overlay-btn" : "gui-media-expand-btn",
+            )}
             onClick={(e) => {
               e.stopPropagation();
               wasPlayingBeforeDialog.current = !!shouldPlay;
@@ -306,11 +305,9 @@ export function GooeyVideo({
                 setDialogOpen(true);
               });
             }}
-            style={mediaExpandButtonStyle}
           >
             <i
-              className="fa-solid fa-sm fa-up-right-and-down-left-from-center"
-              style={expandIconStyle}
+              className="fa-solid fa-sm fa-up-right-and-down-left-from-center gui-media-expand-icon"
               aria-hidden="true"
             ></i>
           </button>
@@ -320,19 +317,18 @@ export function GooeyVideo({
                 type="button"
                 aria-label={isMuted ? "Unmute" : "Mute"}
                 title={isMuted ? "Unmute" : "Mute"}
-                className="gui-video-overlay-btn"
+                className="gui-media-circle-btn gui-video-mute-btn gui-video-overlay-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   showControls();
                   setIsMuted((m) => !m);
                 }}
-                style={videoMuteButtonStyle}
               >
                 <i
-                  className={
-                    "fa-solid " +
-                    (isMuted ? "fa-volume-xmark" : "fa-volume-high")
-                  }
+                  className={clsx(
+                    "fa-solid",
+                    isMuted ? "fa-volume-xmark" : "fa-volume-high",
+                  )}
                   aria-hidden="true"
                 ></i>
               </button>
@@ -340,17 +336,19 @@ export function GooeyVideo({
                 type="button"
                 aria-label={shouldPlay ? "Pause" : "Play"}
                 title={shouldPlay ? "Pause" : "Play"}
-                className="gui-video-overlay-btn"
+                className="gui-media-circle-btn gui-video-playpause-btn gui-video-overlay-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   showControls();
                   setUserPaused((p) => !p);
                 }}
-                style={videoPlayPauseButtonStyle}
               >
                 <i
-                  className={"fa-solid " + (shouldPlay ? "fa-pause" : "fa-play")}
-                  style={shouldPlay ? undefined : { marginLeft: 2 }}
+                  className={clsx(
+                    "fa-solid",
+                    shouldPlay ? "fa-pause" : "fa-play",
+                    !shouldPlay && "gui-media-play-icon-offset",
+                  )}
                   aria-hidden="true"
                 ></i>
               </button>
@@ -382,128 +380,13 @@ export function GooeyVideo({
             autoPlay
             playsInline
             disableRemotePlayback
-            style={mediaDialogStyle}
+            className="gui-media-dialog-content"
           ></video>
         </MediaPreviewDialog>
       )}
     </>
   );
 }
-
-const mediaDialogStyle: React.CSSProperties = {
-  display: "block",
-  maxWidth: "90vw",
-  maxHeight: "90vh",
-  borderRadius: 8,
-  objectFit: "contain",
-};
-
-const circleButtonStyle: React.CSSProperties = {
-  borderRadius: "50%",
-  width: 28,
-  height: 28,
-  // Semi-transparent dark, like a player control overlay, so it reads
-  // clearly regardless of the media's own colors.
-  background: "rgba(0,0,0,0.55)",
-  color: "#fff",
-  border: "none",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  flexShrink: 0,
-};
-
-// FontAwesome's up-right-and-down-left-from-center points along the
-// opposite diagonal from iOS's native expand/fullscreen glyph (up-left +
-// down-right) - there's no separate icon asset for that diagonal, so rotate
-// this one 90deg to match instead.
-const expandIconStyle: React.CSSProperties = {
-  // A horizontal mirror (rather than a 90deg rotation) turns the up-right/
-  // down-left diagonal into up-left/down-right, matching iOS's native
-  // expand glyph - and unlike rotate(), scaleX doesn't change the glyph's
-  // own box shape, so it can't throw off the centering the parent button's
-  // flex layout already provides.
-  transform: "scaleX(-1)",
-};
-
-// Shared by GooeyImg and GooeyVideo, so the expand affordance sits in the
-// same corner on both. Top-left specifically because GooeyVideo's overlay
-// mirrors where native video controls conventionally put things, and
-// top-right is where Safari's own AirPlay icon claims - see
-// disableRemotePlayback above; better to own that corner with a mute
-// control of ours than contest it again.
-const mediaExpandButtonStyle: React.CSSProperties = {
-  ...circleButtonStyle,
-  position: "absolute",
-  top: 8,
-  left: 8,
-  zIndex: 2,
-};
-
-const videoMuteButtonStyle: React.CSSProperties = {
-  ...circleButtonStyle,
-  position: "absolute",
-  top: 8,
-  right: 8,
-  zIndex: 2,
-};
-
-const videoPlayPauseButtonStyle: React.CSSProperties = {
-  ...circleButtonStyle,
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  width: 44,
-  height: 44,
-  fontSize: 16,
-  zIndex: 2,
-};
-
-const mediaDialogSurfaceStyle: React.CSSProperties = {
-  position: "relative",
-  maxWidth: "90vw",
-  maxHeight: "90vh",
-  // A neutral dark surface (matching gooey-web-widget's MediaPreview) so
-  // photos/videos of any color sit against a consistent backdrop, distinct
-  // from the page's own light, blurred one behind it.
-  background: "#0b1021",
-  borderRadius: 12,
-  boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-};
-
-// position:fixed (not absolute) and anchored to the viewport corner, not
-// nested-but-relative-to the surface panel above - otherwise this floats on
-// top of the media itself and competes with the native control bar in
-// there, which is what it was doing before.
-const dialogActionBarStyle: React.CSSProperties = {
-  position: "fixed",
-  top: 16,
-  right: 16,
-  zIndex: 1000000,
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-};
-
-const actionPillButtonStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  height: 28,
-  padding: "0 12px",
-  borderRadius: 14,
-  background: "rgba(0,0,0,0.55)",
-  color: "#fff",
-  border: "none",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-  cursor: "pointer",
-  fontSize: 13,
-  fontWeight: 600,
-  whiteSpace: "nowrap",
-};
 
 function MediaPreviewDialog({
   onClose,
@@ -630,26 +513,7 @@ function MediaPreviewDialog({
     <div
       role="presentation"
       onClick={onClose}
-      style={{
-        position: "fixed",
-        // No explicit width/height here on purpose - competing vw/vh
-        // lengths alongside inset:0 resolve against the safe-area-excluding
-        // layout viewport on iOS, which is what left a gap at the notch/
-        // Dynamic Island. Sized by inset:0 alone (matching
-        // gooey-web-widget's MediaPreview, confirmed not to have this gap),
-        // it resolves against the fixed-positioning containing block
-        // instead, which does extend edge-to-edge.
-        inset: 0,
-        zIndex: 999999,
-        background: "rgba(255,255,255,0.85)",
-        backdropFilter: "blur(16px) saturate(180%)",
-        WebkitBackdropFilter: "blur(16px) saturate(180%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        boxSizing: "border-box",
-      }}
+      className="gui-media-dialog-backdrop"
     >
       <div
         ref={dialogRef}
@@ -657,11 +521,11 @@ function MediaPreviewDialog({
         aria-modal="true"
         aria-label={alt || "Media preview"}
         tabIndex={-1}
-        className="gui-media-preview-wrap"
+        className="gui-media-preview-wrap gui-media-dialog-surface"
         onClick={(e) => e.stopPropagation()}
-        style={{ ...mediaDialogSurfaceStyle, viewTransitionName: mediaTransitionName }}
+        style={{ viewTransitionName: mediaTransitionName }}
       >
-        <div style={dialogActionBarStyle}>
+        <div className="gui-media-dialog-action-bar">
           {/* Labeled, unlike Close below - the download/copy icons alone
               aren't obvious to everyone, and there's room for text here
               since this bar floats over the backdrop rather than the media
@@ -669,7 +533,7 @@ function MediaPreviewDialog({
           <button
             type="button"
             onClick={handleDownload}
-            style={actionPillButtonStyle}
+            className="gui-media-action-pill"
           >
             <i className="fa-solid fa-download" aria-hidden="true"></i>
             <span>Download</span>
@@ -677,7 +541,7 @@ function MediaPreviewDialog({
           <button
             type="button"
             onClick={handleCopyLink}
-            style={actionPillButtonStyle}
+            className="gui-media-action-pill"
           >
             <i
               className={`fa-solid ${linkCopied ? "fa-check" : "fa-link"}`}
@@ -690,7 +554,7 @@ function MediaPreviewDialog({
             aria-label="Close preview"
             title="Close preview"
             onClick={onClose}
-            style={circleButtonStyle}
+            className="gui-media-action-icon"
           >
             <i className="fa fa-times" aria-hidden="true"></i>
           </button>
