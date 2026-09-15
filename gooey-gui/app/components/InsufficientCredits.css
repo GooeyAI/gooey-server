@@ -7,6 +7,27 @@
   padding: 16px 18px;
 }
 
+/* Keep this fixed-size notice outside the output scroller. */
+.gooey-builder-insufficient-credits,
+.v2-run-error:has(.insufficient-credits) {
+  flex-shrink: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.gooey-builder-insufficient-credits > .insufficient-credits,
+.v2-run-error > .insufficient-credits {
+  max-width: none;
+  width: 100%;
+}
+
+/* Fade the output beneath the notice without tinting its contents. */
+:has(> .gooey-builder-insufficient-credits) #gooey-builder-embed,
+.v2-run-error:has(.insufficient-credits) ~ .v2-run-output {
+  mask-image: linear-gradient(to bottom, transparent, #000 2.5rem);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2.5rem);
+}
+
 .insufficient-credits__title {
   align-items: center;
   color: #2a2a2a;

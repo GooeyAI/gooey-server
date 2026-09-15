@@ -213,6 +213,27 @@ button .gui-html-container,
   border-radius: 0;
 }
 
+/* Opt-out of the 8px square bar above for dense scroll regions (sidebar, editor panes):
+   thin, rounded, no track. The webkit rules are the fallback for browsers without
+   `scrollbar-width`. */
+.gooey-thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.gooey-thin-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.gooey-thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gooey-thin-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
 [data-reach-tab-list] {
   margin: 1rem 0;
 }
@@ -444,9 +465,9 @@ button .gui-html-container,
    step by hand until it is converted. Only the pill's values are tokens - a token nothing
    references is a claim the codebase has not earned. */
 :root {
-  --gooey-status-ink: #070b1a;      /* settled states - queued, completed, neutral text */
-  --gooey-status-muted: #59617d;    /* captions, and the "starting" accent */
-  --gooey-status-line: #e4e4e7;     /* the neutral card/pill border */
+  --gooey-status-ink: #070b1a; /* settled states - queued, completed, neutral text */
+  --gooey-status-muted: #59617d; /* captions, and the "starting" accent */
+  --gooey-status-line: #e4e4e7; /* the neutral card/pill border */
 
   /* in-flight, in the brand cyan (the spinner accent in custom.css). The cyan itself
      is the marker; text uses the darkened -ink, which the cyan is far too light to do
@@ -456,11 +477,11 @@ button .gui-html-container,
   --gooey-status-running-bg: #e6faf7;
   --gooey-status-running-line: #a6ebe2;
 
-  --gooey-status-warn: #9d7b1f;     /* cancelled / stopped */
+  --gooey-status-warn: #9d7b1f; /* cancelled / stopped */
   --gooey-status-warn-bg: #fff7d8;
   --gooey-status-warn-line: #f0dc92;
 
-  --gooey-status-error: #b42318;    /* failed */
+  --gooey-status-error: #b42318; /* failed */
   --gooey-status-error-bg: #fff4f2;
   --gooey-status-error-line: #f5b8b0;
 }
@@ -498,8 +519,10 @@ button .gui-html-container,
   border-right: 1px solid #e0e0e0;
 }
 
-/* Default: fill whatever holds it - the standalone builder page has no panel around it. */
+/* Fill the space left below Builder headers and notices. */
 #gooey-builder-embed {
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
 }
 

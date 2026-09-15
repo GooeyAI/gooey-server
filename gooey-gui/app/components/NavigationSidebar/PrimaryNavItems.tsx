@@ -25,7 +25,7 @@ export function PrimaryNavItems({
 }) {
   return (
     <div className="px-2 nav-primary-items d-flex flex-column">
-      <div className="nav-scroll-region d-flex flex-column gap-1 mt-1">
+      <div className="nav-scroll-region gooey-thin-scroll d-flex flex-column gap-1 mt-1">
         {nav_items.map((item) => {
           const hasChildren = item.items.length > 0 || !!item.items_url;
           if (hasChildren && !railCollapsed) {

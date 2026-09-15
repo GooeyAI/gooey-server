@@ -18,8 +18,10 @@ def insufficient_credits_error(error_params: dict):
     current_workspace = error_params.get("current_workspace")
     price = error_params.get("price", None)
     current_user = request.user
-    personal_workspace = (
-        current_user and current_user.get_or_create_personal_workspace()[0]
+    rerun_workspace = get_insufficient_credits_rerun_workspace(
+        current_user=current_user,
+        sr=sr,
+        current_workspace=current_workspace,
     )
 
     show_upgrade = False
@@ -30,17 +32,14 @@ def insufficient_credits_error(error_params: dict):
         or sr.workspace not in current_user.cached_workspaces
     ):
         title = "Run failed (Not enough credits)"
-        rerun_workspace = current_workspace
 
     elif current_user.uid == sr.uid and len(current_user.cached_workspaces) <= 1:
         title = "You've run out of Gooey.AI credits"
-        rerun_workspace = personal_workspace
 
     else:
         title = (
             f"You've run out of credits in {sr.workspace.display_name(current_user)}"
         )
-        rerun_workspace = personal_workspace
         if not sr.workspace.is_personal and current_user in sr.workspace.get_admins():
             show_upgrade = True
 
@@ -85,6 +84,7 @@ def insufficient_credits_error(error_params: dict):
         isAnonymous=is_anonymous,
         verifiedEmailUserFreeCredits=settings.VERIFIED_EMAIL_USER_FREE_CREDITS,
         rerunKey=RERUN_KEY,
+        rerunEvent=error_params.get("rerun_event"),
         upgradeKey=UPGRADE_KEY,
         buyCreditsKey=BUY_CREDITS_KEY,
         price=price,
@@ -94,3 +94,14 @@ def insufficient_credits_error(error_params: dict):
         rerunWorkspaceBalance=(rerun_workspace.balance if rerun_workspace else None),
         rerunWorkspaceName=rerun_workspace_name,
     )
+
+
+def get_insufficient_credits_rerun_workspace(*, current_user, sr, current_workspace):
+    # Keep the current workspace when the run's workspace is inaccessible.
+    if (
+        not current_user
+        or not sr.workspace
+        or sr.workspace not in current_user.cached_workspaces
+    ):
+        return current_workspace
+    return current_user.get_or_create_personal_workspace()[0]

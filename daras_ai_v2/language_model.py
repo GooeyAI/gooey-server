@@ -180,6 +180,9 @@ def run_language_model(
         "Pleave provide exactly one of { prompt, messages }"
     )
 
+    # Accept this deprecated option for backward compatibility, but ignore its value.
+    avoid_repetition = False
+
     model: AIModelSpec = AIModelSpec.objects.get(name=model)
 
     if "gemini_live" in model.name:

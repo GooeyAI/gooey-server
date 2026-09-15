@@ -32,6 +32,9 @@ def chat_widget_input_to_request_body(
         "input_images": input_data.get("input_images") or None,
         "input_documents": input_data.get("input_documents") or None,
     }
+    messages = (state.get("messages") or []).copy()
+    if messages:
+        ret["messages"] = messages
 
     button_pressed: list[str] | None = input_data.get("button_pressed")
     if button_pressed:
@@ -82,7 +85,7 @@ def chat_widget_input_to_request_body(
             assistant_entry["extra_content"] = extra_content
 
         # append previous input to the history
-        ret["messages"] = state.get("messages", []) + [user_entry, assistant_entry]
+        ret["messages"] = messages + [user_entry, assistant_entry]
 
     any_prev_input = prev_chat_input or state.get("input_prompt")
     if any_prev_input and sr.message_thread and sr.message_thread.last_run_id == sr.id:
