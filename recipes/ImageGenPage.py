@@ -125,6 +125,7 @@ class ImageGenPage(BasePage):
                 caption=caption,
                 show_download_button=True,
                 previewImg=media_preview_img(image_url) if preview else None,
+                enable_preview_dialog=not preview,
             )
 
         prompt = self.preview_input(state)
