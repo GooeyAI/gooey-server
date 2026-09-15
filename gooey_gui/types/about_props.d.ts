@@ -71,6 +71,7 @@ export interface RecipeAboutProps {
   photo_url: string | null;
   circle_photo: boolean;
   author: AboutAuthor | null;
+  report_value: string | null;
   share_value: string | null;
   submit_intent_key: string;
   tags: AboutTag[];

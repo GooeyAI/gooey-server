@@ -783,6 +783,60 @@ def test_the_top_bar_is_sent_the_name_that_becomes_the_pages_h1(monkeypatch):
     assert "heading" not in json.loads(props)["children"][0]["props"]
 
 
+def test_the_about_report_button_round_trips_to_the_pick_that_opens_the_dialog(
+    monkeypatch,
+):
+    """About posts this through the same submitter path Share uses, so the value it carries
+    has to decode back to the key `_handle_menu_pick` switches on. Absent when logged out -
+    a report has to be attributable, which is v1's rule too."""
+    from types import SimpleNamespace
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_pr",
+        property(
+            lambda self: SimpleNamespace(
+                workspace_id=None,
+                notes="",
+                tags=SimpleNamespace(all=list),
+                photo_url=None,
+            )
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_workflow_identity",
+        lambda self: SimpleNamespace(name="Farmer.CHAT"),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "_about_meta_groups", lambda self: [], raising=False
+    )
+    page._top_bar_integrations = lambda: []
+    page.request = SimpleNamespace(user=None)
+
+    def about_props(logged_in: bool):
+        monkeypatch.setattr(
+            VideoBotsPageV2, "is_logged_in", lambda self: logged_in, raising=False
+        )
+        gui.session_state.clear()
+        root = RenderTreeNode("root")
+        with NestingCtx(root):
+            page._render_about_content()
+        return root.to_dict()["children"][0]["props"]
+
+    assert about_props(logged_in=False)["report_value"] is None
+
+    value = about_props(logged_in=True)["report_value"]
+    gui.session_state[page.SUBMIT_INTENT_KEY] = value
+    intent = page._pop_submit_intent()
+    assert isinstance(intent, MenuIntent)
+    assert intent.item_key == VideoBotsPageV2.MENU_REPORT
+
+
 def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():
     """The gate takes a slug, not a request: v2 is per-recipe, and every visitor - logged
     out included - gets the same layout for the same url.

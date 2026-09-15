@@ -25,6 +25,7 @@ export function RecipeAbout({
   circle_photo,
   author,
   share_value,
+  report_value,
   submit_intent_key,
   tags,
   notes,
@@ -91,6 +92,32 @@ export function RecipeAbout({
           )}
         </div>
       )}
+      {/* Closes the surface. Report is only offered to someone it can be attributed to,
+          so logged out this row is the two policy links. */}
+      <div className="v2-about-footer">
+        <a className="v2-about-footer-link" href="https://gooey.ai/privacy">
+          <i className="fa-regular fa-shield" />
+          <span>Privacy</span>
+        </a>
+        <a className="v2-about-footer-link" href="https://gooey.ai/terms">
+          <i className="fa-regular fa-file-pen" />
+          <span>Terms</span>
+        </a>
+        {!!report_value && (
+          // The submit-intent path Share uses: the form posts its submitter's name and
+          // value, which reaches `_handle_menu_pick` and opens the dialog.
+          <button
+            type="submit"
+            className="v2-about-footer-link"
+            name={submit_intent_key}
+            value={report_value}
+            title="Report this workflow"
+          >
+            <i className="fa-regular fa-flag" />
+            <span>Report</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

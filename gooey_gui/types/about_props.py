@@ -79,6 +79,8 @@ class RecipeAboutProps(pydantic.BaseModel):
     circle_photo: bool = False
 
     author: AboutAuthor | None = None
+    # the encoded pick that opens the report dialog, or None with nobody to attribute it to
+    report_value: str | None = None
     # the encoded ShareIntent, or None when there is nothing shareable
     share_value: str | None = None
     submit_intent_key: str

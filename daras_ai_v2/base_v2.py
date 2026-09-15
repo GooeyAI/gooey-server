@@ -413,6 +413,12 @@ class BasePage(BasePageV1):
             ):
                 self._render_version_history()
 
+        report_ref = gui.use_alert_dialog(key="report-modal")
+        if picked == self.MENU_REPORT:
+            report_ref.set_open(True)
+        if report_ref.is_open:
+            self._render_report_dialog(ref=report_ref)
+
         delete_ref = gui.use_confirm_dialog(key="--delete-run-modal")
         if picked == self.MENU_DELETE:
             delete_ref.set_open(True)
@@ -433,6 +439,60 @@ class BasePage(BasePageV1):
 
         if picked == self.MENU_DUPLICATE:
             self._duplicate_and_redirect()
+
+    REPORT_INAPPROPRIATE = "Inappropriate content"
+    REPORT_TYPES = ("Buggy Output", REPORT_INAPPROPRIATE, "Other")
+
+    def _render_report_dialog(self, *, ref):
+        """v1's report form, as a dialog. The run's output is not repeated inside it - in v2
+        it is already on screen in the pane behind."""
+        from daras_ai_v2.send_email import send_reported_run_email
+
+        with gui.alert_dialog(
+            ref=ref, modal_title=f"#### {icons.flag} Report a Workflow"
+        ):
+            gui.caption(
+                "These models are unmoderated, so a workflow's output can be wrong, broken, "
+                "or inappropriate. Tell us what went wrong and we will look into it."
+            )
+            gui.text_input("Workflow", disabled=True, value=self.title)
+            gui.text_input("Run URL", disabled=True, value=self.current_app_url())
+            report_type = gui.radio(
+                "Report Type", self.REPORT_TYPES, key="--report-type"
+            )
+            reason = gui.text_area(
+                "Reason for report",
+                key="--report-reason",
+                placeholder=(
+                    "Tell us why you are reporting this workflow - an error, poor output, "
+                    "inappropriate content - and what you expected instead."
+                ),
+            )
+            if not gui.button(
+                f"{icons.flag} Submit Report", type="primary", key="--report-submit"
+            ):
+                return
+            if not reason:
+                gui.error("Reason for report cannot be empty")
+                return
+
+            sr_user = self.current_sr_user
+            send_reported_run_email(
+                user=self.request.user,
+                run_uid=str(sr_user and sr_user.uid or ""),
+                url=self.current_app_url(),
+                recipe_name=self.title,
+                report_type=report_type,
+                reason_for_report=reason,
+                error_msg=gui.session_state.get(StateKeys.error_msg),
+            )
+            if report_type == self.REPORT_INAPPROPRIATE:
+                self.update_flag_for_run(is_flagged=True)
+
+            for key in ("--report-type", "--report-reason"):
+                gui.session_state.pop(key, None)
+            ref.set_open(False)
+            gui.rerun()
 
     def _duplicate_and_redirect(self) -> typing.NoReturn:
         """Copy this workflow into the current workspace and open the copy.
@@ -528,6 +588,7 @@ class BasePage(BasePageV1):
     SUBMIT_INTENT_KEY = "--recipe-submit-intent"
 
     # Stable item keys carried by MenuIntent.
+    MENU_REPORT = "--menu-report"
     MENU_VERSION_HISTORY = "--menu-version-history"
     MENU_DUPLICATE = "--menu-duplicate"
     MENU_DELETE = "--menu-delete"
@@ -843,6 +904,7 @@ class BasePage(BasePageV1):
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._about_author(pr),
                 share_value=self._about_share_value(),
+                report_value=self._about_report_value(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
                 tags=self._about_tags(pr),
                 notes=pr.notes or None,
@@ -885,6 +947,13 @@ class BasePage(BasePageV1):
             return ""
         noun = ngettext(singular="workflow", plural="workflows", number=count)
         return f"{format_number_with_suffix(count)} Published {noun}"
+
+    def _about_report_value(self) -> str | None:
+        """The encoded pick that opens the report dialog, or None with nobody to attribute
+        it to. v1 also hid this on a published run; About is where it is asked for."""
+        if not self.is_logged_in():
+            return None
+        return MenuIntent(item_key=self.MENU_REPORT).model_dump_json()
 
     def _about_share_value(self) -> str | None:
         """The encoded `ShareIntent`, or None when there is nothing to share.

@@ -385,3 +385,51 @@
     display: contents;
     font: inherit;
 }
+
+/* Closes the surface: one centred row at the end of the content, scrolling away with it. */
+.v2-about .v2-about-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: var(--gooey-space-3) var(--gooey-space-6);
+    margin-top: var(--gooey-space-6);
+    padding-top: var(--gooey-space-4);
+}
+
+/* A link and a submit button side by side, so the button is stripped back to look like one. */
+.v2-about .v2-about-footer-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gooey-space-2);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--gooey-ink-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.2;
+    text-decoration: none;
+}
+
+/* The rule goes on the word, not the row: `text-decoration` is painted across descendants
+   and a child cannot take it off, so an underline here would run under the glyph too.
+
+   Colour and thickness are stated rather than left to the global `a` rule, which draws
+   every link at 45% black and 0.6px - a hairline that reads as washed out here. */
+.v2-about .v2-about-footer-link > span {
+    text-decoration: underline;
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+}
+
+/* Muted at rest, ink on hover - the same shift the tags and meta cards above use. */
+.v2-about .v2-about-footer-link:hover {
+    color: var(--gooey-ink);
+}
+
+/* Sized off the label rather than its own value, so the pair stays in proportion. */
+.v2-about .v2-about-footer-link > i {
+    font-size: 1em;
+}
