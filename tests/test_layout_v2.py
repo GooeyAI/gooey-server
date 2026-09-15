@@ -1270,6 +1270,40 @@ def test_the_builders_panel_key_says_nothing_about_the_page(monkeypatch):
     assert "recipe-layout" not in GOOEY_BUILDER_STORAGE_KEY
 
 
+def test_the_debug_pane_does_not_demand_a_workspace(monkeypatch):
+    """`current_workspace` raises for a logged out visitor rather than answering None, and
+    the Debug pane asked for one only to decide whether a name links to your own saved runs.
+    Asking returned 500 for every public workflow page, to anyone not signed in - which is
+    the audience this release adds.
+    """
+    from pathlib import Path
+
+    from workspaces.models import Workspace
+
+    page = object.__new__(VideoBotsPageV2)
+
+    def raises(self):
+        raise Workspace.DoesNotExist("User must be logged in to get their workspace")
+
+    monkeypatch.setattr(VideoBotsPageV2, "current_workspace", property(raises))
+    assert page._current_workspace_or_none() is None
+
+    workspace = object()
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_workspace", property(lambda self: workspace)
+    )
+    assert page._current_workspace_or_none() is workspace
+
+    # and the pane reaches for it through that, not around it
+    source = Path("daras_ai_v2/base_v2.py").read_text()
+    details = source[
+        source.index("def _render_debug_run_details") : source.index(
+            "def _render_debug_source"
+        )
+    ]
+    assert "self.current_workspace" not in details
+
+
 def test_every_source_of_the_builders_panel_key_agrees():
     """Three places addressed this one panel - the pane it lives in, the rail's button and
     the top bar's - and each built its own key. Fixing two left the third still naming the

@@ -1174,6 +1174,14 @@ class BasePage(BasePageV1):
             return False
         return self._usage_workspace() in user.cached_workspaces
 
+    def _current_workspace_or_none(self) -> Workspace | None:
+        """`current_workspace` for somewhere that can do without one: it raises for a logged
+        out visitor, who now reaches surfaces that only members used to."""
+        try:
+            return self.current_workspace
+        except Workspace.DoesNotExist:
+            return None
+
     def _usage_workspace(self) -> Workspace:
         """Whose runs the tab lists: the app's workspace, or the viewer's on a root recipe."""
         published_run = self.current_pr
@@ -1226,7 +1234,10 @@ class BasePage(BasePageV1):
                         sr.workspace,
                         responsive=False,
                         image_size="22px",
-                        current_workspace=self.current_workspace,
+                        # Only decides whether the name links to your own saved runs. A
+                        # logged out visitor has no workspace to compare against, and
+                        # asking for one raises rather than answering None.
+                        current_workspace=self._current_workspace_or_none(),
                     )
                 else:
                     with gui.tag("span", className="text-muted"):
