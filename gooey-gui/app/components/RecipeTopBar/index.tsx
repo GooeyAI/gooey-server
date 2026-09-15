@@ -101,6 +101,7 @@ export function RecipeTopBar({
   crumb_label,
   deploy_href,
   builder_panel_key,
+  builder_storage_key,
   builder_new_event,
   usage_href,
   usage_active,
@@ -128,7 +129,10 @@ export function RecipeTopBar({
   const builder = useAppShellPanel(
     builder_panel_key,
     Boolean(builder_panel_key && state[builder_panel_key]),
-    builder_panel_key ? `${config.storage_key}:builder` : null
+    // The server's key, not one built from the workspace's: the rail addresses this same
+    // panel with the server's, and a key off `config.storage_key` moves with the published
+    // run - so saving a workflow closed the panel that had asked for the save.
+    builder_storage_key
   );
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);

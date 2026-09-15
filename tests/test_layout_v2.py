@@ -1242,6 +1242,27 @@ def test_the_builders_panel_key_says_nothing_about_the_page(monkeypatch):
     assert "recipe-layout" not in GOOEY_BUILDER_STORAGE_KEY
 
 
+def test_every_source_of_the_builders_panel_key_agrees():
+    """Three places addressed this one panel - the pane it lives in, the rail's button and
+    the top bar's - and each built its own key. Fixing two left the third still naming the
+    published run, which is the key that was actually written. They read one constant now.
+    """
+    from pathlib import Path
+
+    from daras_ai_v2.gooey_builder import GOOEY_BUILDER_STORAGE_KEY
+
+    sources = [
+        Path("daras_ai_v2/base_v2.py").read_text(),
+        Path("widgets/navigation_sidebar.py").read_text(),
+        Path("gooey-gui/app/components/RecipeTopBar/index.tsx").read_text(),
+    ]
+    for src in sources:
+        assert "_workspace_storage_key()}:builder" not in src
+        assert "}:builder`" not in src
+
+    assert GOOEY_BUILDER_STORAGE_KEY == "gooey:builder-open"
+
+
 def test_about_names_what_else_the_owner_has_published(monkeypatch):
     """The line qualifies the *name* it sits under, so it reports what else that workspace
     has published rather than how much this one workflow has been run. This workflow's own

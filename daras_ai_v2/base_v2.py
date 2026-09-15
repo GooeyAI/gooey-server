@@ -753,6 +753,9 @@ class BasePage(BasePageV1):
                 builder_panel_key=(
                     GOOEY_BUILDER_EVENT_KEY if self._can_launch_builder() else None
                 ),
+                builder_storage_key=(
+                    GOOEY_BUILDER_STORAGE_KEY if self._can_launch_builder() else None
+                ),
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
                     if self._can_launch_builder() and not builder_thread_is_empty(self)

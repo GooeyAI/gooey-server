@@ -10,6 +10,7 @@ from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
+    GOOEY_BUILDER_STORAGE_KEY,
 )
 from gooey_gui.types.navigation_sidebar_props import (
     BuilderIntent,
@@ -477,7 +478,9 @@ def _load_gooey_builder_data(
         photo_url=get_gooey_builder_photo_url(bi),
         name=bi.name,
         event_key=GOOEY_BUILDER_EVENT_KEY,
-        storage_key=(f"{page._workspace_storage_key()}:builder" if is_v2 else None),
+        # Not built from the workspace's key: the client resets a panel to its default when
+        # its key changes, and saving a workflow changes which published run that names.
+        storage_key=(GOOEY_BUILDER_STORAGE_KEY if is_v2 else None),
         open_href=open_href,
     )
 

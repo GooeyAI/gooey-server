@@ -88,6 +88,7 @@ export interface RecipeTopBarProps {
   view_only: boolean;
   crumb_label: string | null;
   builder_panel_key: string | null;
+  builder_storage_key: string | null;
   builder_new_event: string | null;
   usage_href: string | null;
   usage_active: boolean;
