@@ -46,6 +46,15 @@ from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
 from functions.base_llm_tool import functions_input, render_called_functions
 from functions.models import FunctionTrigger
+from gooey_gui.types.about_props import (
+    AboutAuthor,
+    AboutCard,
+    AboutGroup,
+    AboutLinkTarget,
+    AboutSubmitTarget,
+    AboutTag,
+    RecipeAboutProps,
+)
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -65,15 +74,6 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarIntegration,
     TopBarMenuItem,
     TopBarParent,
-)
-from gooey_gui.types.about_props import (
-    AboutAuthor,
-    AboutCard,
-    AboutGroup,
-    AboutLinkTarget,
-    AboutSubmitTarget,
-    AboutTag,
-    RecipeAboutProps,
 )
 from gooey_gui.types.recipe_workspace_props import (
     EventControlTarget,
@@ -463,7 +463,9 @@ class BasePage(BasePageV1):
         from daras_ai_v2.send_email import send_reported_run_email
 
         with gui.alert_dialog(
-            ref=ref, modal_title=f"#### {icons.flag} Report a Workflow"
+            ref=ref,
+            modal_title=f"#### {icons.flag} Report a Workflow",
+            unsafe_allow_html=True,
         ):
             gui.caption(
                 "These models are unmoderated, so a workflow's output can be wrong, broken, "
@@ -954,9 +956,10 @@ class BasePage(BasePageV1):
         It qualifies the *name* it sits under, not the workflow. Read through
         `public_workflow_count` so this and the workspace's profile cannot drift.
         """
+        from django.utils.translation import ngettext
+
         from daras_ai.text_format import format_number_with_suffix
         from daras_ai_v2.profiles import public_workflow_count
-        from django.utils.translation import ngettext
 
         if not pr.workspace_id:
             return ""
