@@ -768,6 +768,11 @@ def test_the_top_bar_is_sent_the_name_that_becomes_the_pages_h1(monkeypatch):
         VideoBotsPageV2, "_about_meta_groups", lambda self: [], raising=False
     )
     page._top_bar_integrations = lambda: []
+    # About always offers one way to share, and the url one needs a url for this tab
+    page.tab = RecipeTabs.run
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/"
+    )
     page.request = SimpleNamespace(user=None)
     gui.session_state.clear()
 
@@ -816,6 +821,10 @@ def test_the_about_report_button_round_trips_to_the_pick_that_opens_the_dialog(
         VideoBotsPageV2, "_about_meta_groups", lambda self: [], raising=False
     )
     page._top_bar_integrations = lambda: []
+    page.tab = RecipeTabs.run
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/"
+    )
     page.request = SimpleNamespace(user=None)
 
     def about_props(logged_in: bool):
@@ -1069,36 +1078,43 @@ def test_about_keeps_its_own_share_when_the_bar_loses_the_cluster(monkeypatch):
     assert page._about_share_value() is not None
 
 
-def test_a_visitor_with_no_share_dialog_is_handed_the_url_instead(monkeypatch):
-    """The share dialog manages visibility, so it needs somebody to manage it for - logged
-    out there was no Share at all. About offers the browser's own sheet the url instead,
-    and never both: the component picks one, so the payload must not offer two."""
+@pytest.mark.parametrize(
+    "logged_in,is_root,wants_dialog",
+    [
+        # a published run, to someone who could manage its visibility
+        (True, False, True),
+        # ... and to a visitor, who could not
+        (False, False, False),
+        # the recipe's own /agent/: nothing published to manage, whoever is asking
+        (True, True, False),
+        (False, True, False),
+    ],
+)
+def test_about_offers_the_dialog_or_the_url_but_never_neither(
+    monkeypatch, logged_in, is_root, wants_dialog
+):
+    """The dialog manages a published run's visibility, so it takes one and somebody to
+    manage it for. Everything else gets the url for the browser's own sheet - gating that
+    on the dialog's conditions too left /agent/ with no Share at all, for anyone.
+
+    Exactly one of the two, always: the component picks, so the payload must not offer both.
+    """
     page = object.__new__(VideoBotsPageV2)
     page.tab = RecipeTabs.run
     monkeypatch.setattr(
         VideoBotsPageV2,
         "current_pr",
-        property(lambda self: SimpleNamespace(workspace_id=7, is_root=lambda: False)),
+        property(lambda self: SimpleNamespace(workspace_id=7, is_root=lambda: is_root)),
     )
     monkeypatch.setattr(
         VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/my-bot/"
     )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: logged_in)
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
-    assert page._about_share_value() is not None
-    assert page._about_share_url() is None
-
-    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: False)
-    assert page._about_share_value() is None
-    assert page._about_share_url() == "/agent/my-bot/"
-
-    # the recipe's own template is not a thing a visitor passes on, either way
-    monkeypatch.setattr(
-        VideoBotsPageV2,
-        "current_pr",
-        property(lambda self: SimpleNamespace(workspace_id=7, is_root=lambda: True)),
-    )
-    assert page._about_share_url() is None
+    value, url = page._about_share_value(), page._about_share_url()
+    assert (value is not None) is wants_dialog
+    assert (url is not None) is not wants_dialog
+    assert bool(value) != bool(url), "About must offer exactly one way to share"
 
 
 def test_a_logged_out_visitor_gets_no_publish_cluster_on_a_view_only_page(monkeypatch):
