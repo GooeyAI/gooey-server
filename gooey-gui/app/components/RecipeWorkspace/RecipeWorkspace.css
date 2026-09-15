@@ -420,6 +420,17 @@
     margin-top: 0 !important;
   }
 
+  /* Debug is a dump - called functions, the step trace, the run timeline - read rather than
+     filled in, and at body size it wraps to a wall on a phone. `em` so anything that already
+     sizes itself relative to its text keeps its proportion. */
+  #editor-pane-debug {
+    font-size: 0.75rem;
+  }
+
+  #editor-pane-debug :where(h1, h2, h3, h4, h5, h6) {
+    font-size: 1.15em;
+  }
+
   /* Both work views start at the header's rule, so the page's top gutter showed as a strip of
      background between the two. `!important` to beat `pt-2`. About keeps its gutter - it is a
      card, and sits off the rule. */
