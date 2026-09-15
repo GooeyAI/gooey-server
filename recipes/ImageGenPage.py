@@ -17,7 +17,7 @@ from daras_ai_v2.fal_ai import format_pricing_notes, generate_on_fal
 from daras_ai_v2.preview_img import media_preview_img
 from daras_ai_v2.pydantic_validation import HttpUrlStr
 from daras_ai_v2.safety_checker import SAFETY_CHECKER_MSG
-from recipes.VideoGenPage import (
+from daras_ai_v2.ai_model_form import (
     build_combined_input_schema,
     get_url_from_result,
     render_fields,
