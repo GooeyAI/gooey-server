@@ -395,8 +395,8 @@ function MediaPreviewDialog({
     // could get silently popup-blocked right when it's needed. Open a blank
     // placeholder synchronously now instead, then either close it (success)
     // or navigate it to src (fallback). Can't pass noopener/noreferrer here
-    // since that severs the reference needed to do either - acceptable
-    // since src is our own trusted media URL, not an arbitrary/external one.
+    // since that severs the reference needed to do either, so the opener
+    // link is cut manually instead, right before navigating it below.
     const fallbackWindow = window.open();
     try {
       const response = await fetch(src);
@@ -422,8 +422,16 @@ function MediaPreviewDialog({
       }, 250);
       fallbackWindow?.close();
     } catch {
-      if (fallbackWindow) fallbackWindow.location.href = src;
-      else window.open(src, "_blank", "noopener,noreferrer");
+      if (fallbackWindow) {
+        // Without noopener, this window still holds a `window.opener` back
+        // to us - src isn't restricted to our own origin at the type level,
+        // so clear that link before navigating rather than trust it'll
+        // always be one of our own trusted media URLs.
+        fallbackWindow.opener = null;
+        fallbackWindow.location.href = src;
+      } else {
+        window.open(src, "_blank", "noopener,noreferrer");
+      }
     }
   };
 
