@@ -429,7 +429,9 @@ def _build_interactive_list_msg(
             sections.append({"title": section_title, "rows": [row]})
     # Unlabelled utility rows do not affect the menu's label.
     section_titles = {s["title"] for s in sections if s["title"]}
-    button_label = section_titles.pop() if len(section_titles) == 1 else WA_LIST_BTN_LABEL
+    button_label = (
+        section_titles.pop() if len(section_titles) == 1 else WA_LIST_BTN_LABEL
+    )
     if len(sections) == 1:
         sections[0].pop("title")
     else:
