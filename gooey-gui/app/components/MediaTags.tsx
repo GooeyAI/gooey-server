@@ -135,12 +135,17 @@ export function GooeyVideo({
 
   // Drive actual playback from our own state - not just the autoPlay
   // attribute - so pause/scroll/the dialog can all affect it afterwards.
+  // src is included even though it's not read directly: a recipe rerun can
+  // swap the video URL on this same component instance without shouldPlay
+  // itself changing, and the new source's autoPlay attribute would
+  // otherwise start it playing regardless of our (possibly still paused)
+  // state until something else happened to flip a dependency.
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !isPlayable) return;
     if (shouldPlay) el.play().catch(() => {});
     else el.pause();
-  }, [shouldPlay, isPlayable]);
+  }, [shouldPlay, isPlayable, src]);
 
   // React's `muted` JSX prop only sets the *initial* value - toggling it via
   // re-render doesn't reliably update the live DOM property, so drive it
@@ -466,11 +471,24 @@ function MediaPreviewDialog({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  // The caller passes an inline onClose, recreated on every render (and
+  // GooeyVideo's own state - mute, pause, scroll visibility - re-renders
+  // often); reading it via a ref instead of the closure lets the focus
+  // effect below depend on nothing but mount/unmount, rather than tearing
+  // down and re-running (bouncing focus out and back) on every one of those.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [linkCopied, setLinkCopied] = useState(false);
 
   const handleDownload = async () => {
     try {
       const response = await fetch(src);
+      // fetch() only rejects on a network failure - an HTTP error still
+      // resolves normally, so without this a 404/403 page gets downloaded
+      // as if it were the actual media file.
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -478,8 +496,13 @@ function MediaPreviewDialog({
       link.download = urlToFilename(src);
       document.body.appendChild(link);
       link.click();
-      link.remove();
-      URL.revokeObjectURL(blobUrl);
+      // Revoking immediately can race Safari/iOS's queued download
+      // navigation, invalidating the URL before it's actually read - match
+      // the delay downloadButton.tsx already uses for the same reason.
+      setTimeout(() => {
+        link.remove();
+        URL.revokeObjectURL(blobUrl);
+      }, 250);
     } catch {
       window.open(src, "_blank", "noopener,noreferrer");
     }
@@ -517,7 +540,7 @@ function MediaPreviewDialog({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -541,7 +564,7 @@ function MediaPreviewDialog({
       window.removeEventListener("keydown", handleKeyDown);
       previouslyFocused.current?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return ReactDOM.createPortal(
     <div
