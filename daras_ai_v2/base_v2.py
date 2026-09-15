@@ -1128,10 +1128,8 @@ class BasePage(BasePageV1):
                         gui.html(html.escape(thread.title or "Untitled conversation"))
 
             with self._debug_meta_row("Run by"):
-                if sr.created_by:
-                    render_author_from_user(
-                        sr.created_by, responsive=False, image_size="22px"
-                    )
+                if user := self.current_sr_user:
+                    render_author_from_user(user, responsive=False, image_size="22px")
                 else:
                     with gui.tag("span", className="text-muted"):
                         gui.html("Unknown user")
