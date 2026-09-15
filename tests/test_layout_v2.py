@@ -1212,6 +1212,36 @@ def test_the_workspace_alone_does_not_host_an_unavailable_builder(monkeypatch):
     assert page._hosts_builder() is False
 
 
+def test_the_builders_panel_key_says_nothing_about_the_page(monkeypatch):
+    """Whether the panel is open is the user's to say, and the client resets a panel to its
+    default whenever its storage key changes. Keyed on the workspace, the Builder closed
+    itself on every save: a save is a new published run, which was a new key.
+
+    So the same key on a published run, on a run of it, and on the next workflow along.
+    """
+    from daras_ai_v2.gooey_builder import GOOEY_BUILDER_STORAGE_KEY
+
+    keys = []
+    page = object.__new__(VideoBotsPageV2)
+    page.request = SimpleNamespace(session={})
+    monkeypatch.setattr(VideoBotsPageV2, "_hosts_builder", lambda self: True)
+    monkeypatch.setattr(
+        "daras_ai_v2.base_v2.sidebar_layout",
+        lambda **kw: keys.append(kw["storage_key"]) or (None, nullcontext()),
+    )
+
+    for sr_id, published_run_id in ((7, "abc"), (99, "abc"), (7, "xyz")):
+        page.current_sr_pr = (
+            SimpleNamespace(id=sr_id),
+            SimpleNamespace(saved_run_id=7, published_run_id=published_run_id),
+        )
+        page._builder_layout()
+
+    assert keys == [GOOEY_BUILDER_STORAGE_KEY] * 3
+    # the workspace's own key moves with all three; this one must not be built from it
+    assert "recipe-layout" not in GOOEY_BUILDER_STORAGE_KEY
+
+
 def test_about_names_what_else_the_owner_has_published(monkeypatch):
     """The line qualifies the *name* it sits under, so it reports what else that workspace
     has published rather than how much this one workflow has been run. This workflow's own

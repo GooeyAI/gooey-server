@@ -23,6 +23,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
+    GOOEY_BUILDER_STORAGE_KEY,
     GOOEY_BUILDER_TITLE,
     builder_thread_is_empty,
     can_launch_gooey_builder,
@@ -303,7 +304,10 @@ class BasePage(BasePageV1):
             session=self.request.session,
             disabled=False,
             client_only=True,
-            storage_key=f"{self._workspace_storage_key()}:builder",
+            # Not the workspace's key: the client resets a panel to its default whenever
+            # the key changes, so saving a workflow - a new published run, and a new key -
+            # closed the panel that asked for the save.
+            storage_key=GOOEY_BUILDER_STORAGE_KEY,
         )
 
     def _render_gooey_builder(self):
