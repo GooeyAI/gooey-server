@@ -1,8 +1,42 @@
 import React, { useEffect, useRef, useState } from "react";
-import ReactDOM from "react-dom";
+import ReactDOM, { flushSync } from "react-dom";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 import { Link } from "@remix-run/react";
 import { urlToFilename } from "~/urlUtils";
+
+// Not yet in this project's DOM lib (React 17 / an older TS target) - typed
+// just enough to call it.
+declare global {
+  interface Document {
+    startViewTransition?(update: () => void): { finished: Promise<void> };
+  }
+}
+
+// Morphs the media card's position/size/radius between the thumbnail and the
+// dialog (matched by view-transition-name on each side) - browser support
+// only (Chromium, Safari 18+), no dependency. Where it's unsupported, or the
+// user has asked for reduced motion, this just runs the update plainly, same
+// as the dialog opening/closing today.
+function withViewTransition(update: () => void) {
+  const start = typeof document !== "undefined" && document.startViewTransition;
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!start || prefersReducedMotion) {
+    update();
+    return;
+  }
+  // .call, not a bare start(...) - it's unbound from `document` once
+  // destructured into this local.
+  start.call(document, () => flushSync(update));
+}
+
+// React 17 has no useId - view-transition-name just needs *some* stable,
+// unique-per-instance identifier, and src (the media URL) already is one
+// without adding a hook. Sanitized into a valid CSS custom-ident.
+function mediaTransitionNameFor(src: string) {
+  return "gooey-media-" + src.replace(/[^a-zA-Z0-9_-]/g, "");
+}
 
 export function GooeyImg({
   src,
@@ -20,6 +54,7 @@ export function GooeyImg({
 }) {
   const [previewIsValid, onError] = useImageValid(previewImg);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const mediaTransitionName = mediaTransitionNameFor(src);
 
   let currentSrc;
   if (previewImg && previewIsValid) {
@@ -31,6 +66,8 @@ export function GooeyImg({
   const clickable =
     enablePreviewDialog && !href && !currentSrc.startsWith("data:");
 
+  const openDialog = () => withViewTransition(() => setDialogOpen(true));
+
   const img = (
     <img
       className={"gui-img" + (clickable ? " gui-img-clickable" : "")}
@@ -38,7 +75,7 @@ export function GooeyImg({
       src={currentSrc}
       onError={onError}
       {...props}
-      onClick={clickable ? () => setDialogOpen(true) : props.onClick}
+      onClick={clickable ? openDialog : props.onClick}
     />
   );
 
@@ -48,7 +85,11 @@ export function GooeyImg({
       {clickable ? (
         <div
           className="gui-media-preview-wrap"
-          style={{ position: "relative", maxWidth: 450 }}
+          style={{
+            position: "relative",
+            maxWidth: 450,
+            viewTransitionName: dialogOpen ? undefined : mediaTransitionName,
+          }}
         >
           {img}
           {/* Hover/cursor affordances (zoom-in cursor) aren't visible on
@@ -60,7 +101,7 @@ export function GooeyImg({
             aria-label="Expand image"
             title="Expand image"
             className="gui-media-expand-btn"
-            onClick={() => setDialogOpen(true)}
+            onClick={openDialog}
             style={mediaExpandButtonStyle}
           >
             <i
@@ -75,9 +116,10 @@ export function GooeyImg({
       )}
       {clickable && dialogOpen && (
         <MediaPreviewDialog
-          onClose={() => setDialogOpen(false)}
+          onClose={() => withViewTransition(() => setDialogOpen(false))}
           alt={caption}
           src={src}
+          mediaTransitionName={mediaTransitionName}
         >
           <img src={src} alt={caption} style={mediaDialogStyle} />
         </MediaPreviewDialog>
@@ -112,6 +154,7 @@ export function GooeyVideo({
 }) {
   const [previewIsValid, onError] = useImageValid(previewImg);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const mediaTransitionName = mediaTransitionNameFor(src);
 
   const expandable = enablePreviewDialog && !href;
   const showingVideoElement = !(previewImg && previewIsValid);
@@ -226,7 +269,11 @@ export function GooeyVideo({
             "gui-media-preview-wrap" +
             (controlsVisible ? " gui-video-controls-visible" : "")
           }
-          style={{ position: "relative", maxWidth: 450 }}
+          style={{
+            position: "relative",
+            maxWidth: 450,
+            viewTransitionName: dialogOpen ? undefined : mediaTransitionName,
+          }}
           onMouseMove={showControls}
           onMouseLeave={hideControlsNow}
           onClick={() => {
@@ -254,8 +301,10 @@ export function GooeyVideo({
             onClick={(e) => {
               e.stopPropagation();
               wasPlayingBeforeDialog.current = !!shouldPlay;
-              setUserPaused(true);
-              setDialogOpen(true);
+              withViewTransition(() => {
+                setUserPaused(true);
+                setDialogOpen(true);
+              });
             }}
             style={mediaExpandButtonStyle}
           >
@@ -314,12 +363,16 @@ export function GooeyVideo({
       {expandable && dialogOpen && (
         <MediaPreviewDialog
           onClose={() => {
-            setDialogOpen(false);
-            // Only resume if it was actually playing before Expand was
-            // clicked - if the user had already paused it themselves, closing
-            // the dialog should respect that instead of overriding it.
-            if (wasPlayingBeforeDialog.current) setUserPaused(false);
+            withViewTransition(() => {
+              setDialogOpen(false);
+              // Only resume if it was actually playing before Expand was
+              // clicked - if the user had already paused it themselves,
+              // closing the dialog should respect that instead of
+              // overriding it.
+              if (wasPlayingBeforeDialog.current) setUserPaused(false);
+            });
           }}
+          mediaTransitionName={mediaTransitionName}
           alt={caption}
           src={src}
         >
@@ -456,11 +509,13 @@ function MediaPreviewDialog({
   onClose,
   alt,
   src,
+  mediaTransitionName,
   children,
 }: {
   onClose: () => void;
   alt?: string;
   src: string;
+  mediaTransitionName: string;
   children: React.ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -593,7 +648,7 @@ function MediaPreviewDialog({
         tabIndex={-1}
         className="gui-media-preview-wrap"
         onClick={(e) => e.stopPropagation()}
-        style={mediaDialogSurfaceStyle}
+        style={{ ...mediaDialogSurfaceStyle, viewTransitionName: mediaTransitionName }}
       >
         <div style={dialogActionBarStyle}>
           {/* Labeled, unlike Close below - the download/copy icons alone
