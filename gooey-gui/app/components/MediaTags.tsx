@@ -61,7 +61,7 @@ export function GooeyImg({
             title="Expand image"
             className="gui-media-expand-btn"
             onClick={() => setDialogOpen(true)}
-            style={expandButtonStyle}
+            style={mediaExpandButtonStyle}
           >
             <i
               className="fa-solid fa-sm fa-up-right-and-down-left-from-center"
@@ -257,7 +257,7 @@ export function GooeyVideo({
               setUserPaused(true);
               setDialogOpen(true);
             }}
-            style={videoExpandButtonStyle}
+            style={mediaExpandButtonStyle}
           >
             <i
               className="fa-solid fa-sm fa-up-right-and-down-left-from-center"
@@ -362,14 +362,6 @@ const circleButtonStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const expandButtonStyle: React.CSSProperties = {
-  ...circleButtonStyle,
-  position: "absolute",
-  top: 8,
-  right: 8,
-  zIndex: 2,
-};
-
 // FontAwesome's up-right-and-down-left-from-center points along the
 // opposite diagonal from iOS's native expand/fullscreen glyph (up-left +
 // down-right) - there's no separate icon asset for that diagonal, so rotate
@@ -383,11 +375,13 @@ const expandIconStyle: React.CSSProperties = {
   transform: "scaleX(-1)",
 };
 
-// GooeyVideo's overlay mirrors where native video controls conventionally
-// put things (expand instead lives top-left, since top-right is where
-// Safari's own AirPlay icon claims - see disableRemotePlayback above; better
-// to own that corner with a control of ours than contest it again).
-const videoExpandButtonStyle: React.CSSProperties = {
+// Shared by GooeyImg and GooeyVideo, so the expand affordance sits in the
+// same corner on both. Top-left specifically because GooeyVideo's overlay
+// mirrors where native video controls conventionally put things, and
+// top-right is where Safari's own AirPlay icon claims - see
+// disableRemotePlayback above; better to own that corner with a mute
+// control of ours than contest it again.
+const mediaExpandButtonStyle: React.CSSProperties = {
   ...circleButtonStyle,
   position: "absolute",
   top: 8,
