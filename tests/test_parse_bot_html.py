@@ -114,6 +114,19 @@ def test_wa_list_single_section_names_the_button():
     assert action["sections"] == [{"rows": [{"id": "1", "title": "A"}]}]
 
 
+def test_wa_list_preserves_localized_option_value():
+    value = ("नमस्ते दुनिया " * 5).strip()
+    buttons, *_ = parse_bot_html(
+        f'<select><option value="{value}">नमस्ते</option></select>'
+    )
+
+    action = _build_interactive_list_msg(buttons, "hi")["interactive"]["action"]
+    row_id = action["sections"][0]["rows"][0]["id"]
+
+    assert len(row_id) <= 200
+    assert csv_decode_row(row_id)[-1] == value
+
+
 def _btn(i, **kwargs):
     return {"id": str(i), "title": f"B{i}", **kwargs}
 

@@ -120,6 +120,7 @@ class BotInterface:
     workspace: Workspace
     current_user: AppUser
     show_feedback_buttons: bool = False
+    show_new_conversation_button: bool = False
     streaming_enabled: bool = False
     input_glossary: str | None = None
     output_glossary: str | None = None
@@ -164,6 +165,7 @@ class BotInterface:
         self.current_user = self.bi.created_by
 
         self.show_feedback_buttons = self.bi.show_feedback_buttons
+        self.show_new_conversation_button = self.bi.show_new_conversation_button
         self.streaming_enabled = self.bi.streaming_enabled
 
     def lookup_bot_integration(
@@ -241,6 +243,7 @@ class BotInterface:
         audio: list[str] | None = None,
         video: list[str] | None = None,
         send_feedback_buttons: bool = False,
+        send_utility_buttons: bool = True,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
         should_translate: bool = False,
@@ -252,6 +255,7 @@ class BotInterface:
         :param audio: The audio URL to send
         :param video: The video URL to send
         :param send_feedback_buttons: Whether to send feedback buttons with the message
+        :param send_utility_buttons: Whether to send response utilities with this message
         :param documents: The document URLs to send
         :param update_msg_id: The message ID of the message to update in-place
         :param should_translate: The messages from the saved run itself should automatically be translated,
@@ -265,21 +269,30 @@ class BotInterface:
         if disable_feedback:
             send_feedback_buttons = False
 
-        if self.platform == Platform.WHATSAPP and any(
-            btn.get("menu") for btn in buttons
-        ):
-            # whatsapp is sending an options menu, which is the only place
-            # these extra options fit
-            buttons = (
-                _options_menu_buttons(
-                    show_new_conversation_button=self.bi.show_new_conversation_button,
+        if self.platform == Platform.WHATSAPP:
+            if send_utility_buttons:
+                utility_buttons = _options_menu_buttons(
+                    show_new_conversation_button=self.show_new_conversation_button,
                     send_feedback_buttons=send_feedback_buttons,
                     language=self.user_language,
                     glossary_url=self.output_glossary,
                 )
-                + buttons
-            )
-            # they are part of the menu now, dont send them again
+                menu_row_count = sum(bool(btn.get("menu")) for btn in buttons)
+                if menu_row_count + len(utility_buttons) <= 10:
+                    buttons += utility_buttons
+                elif utility_buttons:
+                    update_msg_id = self._send_msg(
+                        text=text,
+                        audio=audio,
+                        video=video,
+                        buttons=buttons,
+                        documents=documents,
+                        update_msg_id=update_msg_id,
+                    )
+                    return self._send_msg(
+                        buttons=utility_buttons,
+                        update_msg_id=update_msg_id,
+                    )
             send_feedback_buttons = False
 
         if buttons and send_feedback_buttons and self.platform != Platform.SLACK:
@@ -621,6 +634,7 @@ def _process_and_send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        send_utility_buttons=bool(streaming_done),
                     )
                     last_idx = len(text)
                 else:
@@ -631,6 +645,7 @@ def _process_and_send_msg(
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        send_utility_buttons=bool(streaming_done),
                     )
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
@@ -996,7 +1011,9 @@ def reset_convo(bot: BotInterface):
     bot.convo.reset_at = timezone.now()
     bot.convo.save(update_fields=["reset_at"])
     bot.send_msg(
-        text=bot.bi.new_conversation_button_text or RESET_MSG, should_translate=True
+        text=bot.bi.new_conversation_button_text or RESET_MSG,
+        should_translate=True,
+        send_utility_buttons=False,
     )
 
 
@@ -1036,7 +1053,7 @@ def _options_menu_buttons(
             {
                 "id": ButtonIds.new_conversation,
                 "title": "📝 New",
-                "description": "Start a new conversation on a different topic",
+                "description": "Start a new conversation",
                 "menu": True,
             }
         )

@@ -14,13 +14,12 @@ from daras_ai_v2.asr import (
     audio_bytes_to_wav,
 )
 from daras_ai_v2.bots import BotInterface, ReplyButton, ButtonPressed
-from daras_ai_v2.csv_lines import csv_decode_row
+from daras_ai_v2.csv_lines import csv_decode_row, unicode_unescape
 from daras_ai_v2.exceptions import UserError, raise_for_status
 from daras_ai_v2.scraping_proxy import requests_scraping_kwargs
 from daras_ai_v2.text_splitter import text_splitter
 
 WA_IMG_MAX_SIZE = 5 * 1024**2
-
 WA_MSG_MAX_SIZE = 1024
 
 # https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-reply-buttons-messages
@@ -58,7 +57,7 @@ class WhatsappBot(BotInterface):
             )
         except UserError as e:
             self.access_token = ""
-            self.send_msg(text=e.message)
+            self._send_msg(text=e.message)
             raise
         else:
             self.access_token = bi.wa_business_access_token
@@ -123,8 +122,7 @@ class WhatsappBot(BotInterface):
 
     def get_interactive_msg_info(self) -> ButtonPressed:
         interactive = self.input_message["interactive"]
-        # reply buttons & list (options menu) replies look the same, apart from the key
-        reply = interactive.get("button_reply") or interactive["list_reply"]
+        reply = interactive[interactive["type"]]
         return ButtonPressed(
             button_id=reply["id"],
             button_title=reply.get("title"),
@@ -416,7 +414,7 @@ def _build_interactive_list_msg(
     for btn in buttons:
         title = btn["title"]
         row = {
-            "id": truncate_text_words(btn["id"], WA_LIST_MAX_ID_LEN),
+            "id": truncate_text_words(unicode_unescape(btn["id"]), WA_LIST_MAX_ID_LEN),
             "title": truncate_text_words(title, WA_LIST_MAX_TITLE_LEN),
         }
         description = btn.get("description") or (
