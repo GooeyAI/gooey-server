@@ -65,6 +65,7 @@ export function GooeyImg({
           >
             <i
               className="fa-solid fa-sm fa-up-right-and-down-left-from-center"
+              style={expandIconStyle}
               aria-hidden="true"
             ></i>
           </button>
@@ -236,9 +237,14 @@ export function GooeyVideo({
             type="button"
             aria-label="Expand video"
             title="Expand video"
+            // isPlayable: governed only by the timer-driven group below,
+            // same as mute/play-pause - .gui-media-expand-btn's plain
+            // :hover rule fires independent of that timer (it doesn't care
+            // whether the mouse has actually moved recently), so carrying
+            // both classes left this the only button still visible once the
+            // others faded out from under a motionless cursor.
             className={
-              "gui-media-expand-btn" +
-              (isPlayable ? " gui-video-overlay-btn" : "")
+              isPlayable ? "gui-video-overlay-btn" : "gui-media-expand-btn"
             }
             onClick={(e) => {
               e.stopPropagation();
@@ -250,6 +256,7 @@ export function GooeyVideo({
           >
             <i
               className="fa-solid fa-sm fa-up-right-and-down-left-from-center"
+              style={expandIconStyle}
               aria-hidden="true"
             ></i>
           </button>
@@ -356,6 +363,19 @@ const expandButtonStyle: React.CSSProperties = {
   top: 8,
   right: 8,
   zIndex: 2,
+};
+
+// FontAwesome's up-right-and-down-left-from-center points along the
+// opposite diagonal from iOS's native expand/fullscreen glyph (up-left +
+// down-right) - there's no separate icon asset for that diagonal, so rotate
+// this one 90deg to match instead.
+const expandIconStyle: React.CSSProperties = {
+  // A horizontal mirror (rather than a 90deg rotation) turns the up-right/
+  // down-left diagonal into up-left/down-right, matching iOS's native
+  // expand glyph - and unlike rotate(), scaleX doesn't change the glyph's
+  // own box shape, so it can't throw off the centering the parent button's
+  // flex layout already provides.
+  transform: "scaleX(-1)",
 };
 
 // GooeyVideo's overlay mirrors where native video controls conventionally
