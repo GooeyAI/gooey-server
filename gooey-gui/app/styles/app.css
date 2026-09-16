@@ -667,7 +667,14 @@ button .gui-html-container,
   -webkit-appearance: none;
   height: 6px;
   margin-block: 0;
-  background: var(--gooey-surface-200);
+  /* The travelled part of the track in the accent. `--gooey-range-fill` is the thumb's
+     position as a percentage, kept current by GooeySlider (renderer.tsx); a hand-drawn
+     track has no other way to know where its thumb is. */
+  background: linear-gradient(
+    to right,
+    var(--gooey-accent) 0 var(--gooey-range-fill, 0%),
+    var(--gooey-surface-200) var(--gooey-range-fill, 0%)
+  );
   border-radius: var(--gooey-radius-full);
   outline: 0;
 }
@@ -694,7 +701,12 @@ button .gui-html-container,
   input[type="range"]:focus-visible {
   box-shadow: 0 0 0 3px var(--gooey-accent-ring);
 }
-:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page) .gui-input input:focus,
+/* `:not(.gui-input-select)`: react-select keeps a zero-width search input inside the
+   control, and a ring on that drew a pill-shaped "caret" beside the selected value. The
+   select gets its own ring on the control below. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input:not(.gui-input-select)
+  input:focus,
 :is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page) .gui-input textarea:focus,
 :is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page) .form-control:focus {
   border-color: var(--gooey-accent);
