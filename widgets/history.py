@@ -244,12 +244,6 @@ def _build_surface_tabs(
     ]
 
 
-def history_href_for_workflow(workflow: Workflow) -> str:
-    href = furl(get_route_path(history_page))
-    href.args["workflow"] = workflow.page_cls.canonical_slug()
-    return str(href)
-
-
 def _surface_href(
     surface: SavedRun.Surface,
     workflow: Workflow | None = None,

@@ -30,6 +30,17 @@ export interface SubmitTarget {
 export interface TopBarAuthor {
   label: string;
 }
+/**
+ * The published run a saved run belongs to.
+ *
+ * Present only while the url points at a saved run, so it doubles as that signal: the
+ * mobile sheet leads with the way back to the published run rather than repeating the
+ * actions that belong to it.
+ */
+export interface TopBarParent {
+  label: string;
+  href: string;
+}
 export interface TopBarIntegration {
   key: string;
   label: string;
@@ -64,6 +75,7 @@ export interface RecipeTopBarProps {
   photo_url: string | null;
   circle_photo: boolean;
   author: TopBarAuthor | null;
+  parent: TopBarParent | null;
   title_menu_items: TopBarMenuItem[];
   integrations: TopBarIntegration[];
   submit_intent_key: string;
@@ -76,10 +88,11 @@ export interface RecipeTopBarProps {
   view_only: boolean;
   crumb_label: string | null;
   builder_panel_key: string | null;
+  builder_storage_key: string | null;
   builder_new_event: string | null;
   usage_href: string | null;
   usage_active: boolean;
-  run_intent: RunIntent | StopIntent;
+  run_intent: (RunIntent | StopIntent) | null;
   cost_label: string | null;
   cost_href: string | null;
   cost_title: string | null;

@@ -2,7 +2,7 @@ import "~/styles/gooey-orbit-border.css";
 import "./NavigationSidebar.css";
 
 import clsx from "clsx";
-import { useLocation } from "@remix-run/react";
+import { useLocation, useNavigate } from "@remix-run/react";
 import type { CustomComponentProps } from "~/components";
 import type {
   NavAccountData,
@@ -10,15 +10,17 @@ import type {
 } from "@gooey-types/navigation_sidebar_props";
 import { useState, useEffect, useRef } from "react";
 import { useAppShellPanel, useNavDrawer } from "~/appShellContext";
+import { NARROW_QUERY } from "../RecipeWorkspace/breakpoints";
 import { AccountSection } from "./AccountSection";
-import { clearBuilderIntent, readBuilderIntent } from "./builderIntent";
+import {
+  builderOpenNavigationState,
+  builderTargetHref,
+  clearBuilderIntent,
+  readBuilderIntent,
+} from "./builderIntent";
 import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
 import { PrimaryNavItems } from "./PrimaryNavItems";
-
-// Below this width the rail becomes an off-canvas drawer (matches the CSS
-// breakpoint in NavigationSidebar.css).
-const MOBILE_MEDIA_QUERY = "(max-width: 991.98px)";
 
 export function NavigationSidebar({
   logo_image_url,
@@ -33,15 +35,24 @@ export function NavigationSidebar({
   state,
 }: CustomComponentProps & NavigationSidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const builderEventKey = gooey_builder?.event_key;
+  // Where to open the panel when this page cannot hold it - Deploy, API and Usage have no
+  // workspace beside it. Set means the panel is not here, whatever the last state of it
+  // was: the rail goes on offering the way in, and does not collapse for it.
+  const builderElsewhere = builderTargetHref(gooey_builder?.open_href);
   const builderInitiallyOpen = Boolean(
-    builderEventKey && state[builderEventKey]
+    builderEventKey && state[builderEventKey] && !builderElsewhere
   );
   const builder = useAppShellPanel(
     builderEventKey,
     builderInitiallyOpen,
     gooey_builder?.storage_key ?? null
   );
+  // Open *here*: a page that cannot hold the panel is not showing it, whatever the panel's
+  // last state was - so the rail keeps offering the way in rather than hiding the button
+  // for something that is not on screen.
+  const builderOpenHere = builder.open && !builderElsewhere;
   const navDrawer = useNavDrawer();
   const [collapsed, setCollapsed] = useState(
     builderInitiallyOpen || default_collapsed
@@ -63,7 +74,10 @@ export function NavigationSidebar({
       if (state[collapsed_state_key] === collapsed) return;
     }
     state[collapsed_state_key] = collapsed;
-    onChange();
+    // `silent`: this posts the form only to remember how wide the rail is, which is not a
+    // navigation and should not draw the page-load bar across the top of the app. Opening the
+    // nav flashed it on every click.
+    onChange({ target: null, silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, isMobile, collapsed_state_key]);
 
@@ -95,7 +109,7 @@ export function NavigationSidebar({
   }, [builderEventKey]);
 
   useEffect(() => {
-    const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
+    const mq = window.matchMedia(NARROW_QUERY);
     const update = () => {
       setIsMobile(mq.matches);
       if (mq.matches) {
@@ -133,6 +147,16 @@ export function NavigationSidebar({
     setCollapsed(true);
   }, [builderEventKey, builderIntent, location.key]);
 
+  // The intent rides along as navigation state, which the effect above acts on once the
+  // next page has committed - the same path the rail's saved-workflow links take.
+  const openBuilder = () => {
+    if (builderElsewhere) {
+      navigate(builderElsewhere, { state: builderOpenNavigationState() });
+      return;
+    }
+    builder.setOpen(true);
+  };
+
   const expandRail = (e?: React.MouseEvent) => {
     e?.preventDefault();
     setCollapsed(false);
@@ -160,10 +184,10 @@ export function NavigationSidebar({
         onDrawerOpen={() => navDrawer.setOpen(true)}
         onDrawerClose={() => navDrawer.setOpen(false)}
         gooey_builder={gooey_builder}
-        builderOpen={builder.open}
+        builderOpen={builderOpenHere}
         account={account}
         onSwitchWorkspace={switchWorkspace}
-        onBuilderOpen={() => builder.setOpen(true)}
+        onBuilderOpen={openBuilder}
       />
 
       <nav
@@ -190,11 +214,11 @@ export function NavigationSidebar({
         <NavigationFooter
           gooey_builder={gooey_builder}
           railCollapsed={railCollapsed}
-          builderOpen={builder.open}
+          builderOpen={builderOpenHere}
           isMobile={isMobile}
           account={account}
           onSwitchWorkspace={switchWorkspace}
-          onBuilderOpen={() => builder.setOpen(true)}
+          onBuilderOpen={openBuilder}
         />
       </nav>
     </div>

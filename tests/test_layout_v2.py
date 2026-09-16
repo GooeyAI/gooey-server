@@ -1,12 +1,16 @@
-import html
+import json
 import re
 from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pydantic
 import pytest
+from furl import furl
 
 import gooey_gui as gui
+from fastapi import HTTPException
+
+from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import BasePage as BasePageV1
 from daras_ai_v2.tab_spec import TabSpec
 from gooey_gui.types.recipe_top_bar_props import (
@@ -15,9 +19,11 @@ from gooey_gui.types.recipe_top_bar_props import (
     RecipeTopBarProps,
     RecipeSubmitIntent,
     RunIntent,
+    StopIntent,
     SubmitTarget,
     TopBarIntegration,
 )
+from gooey_gui.types.about_props import AboutCard
 from gooey_gui.types.sidebar_props import SidebarProps
 from gooey_gui.types.recipe_workspace_props import (
     PageShellConfig,
@@ -302,11 +308,10 @@ def test_can_edit_current_pr_answers_false_without_a_user_or_workspace(monkeypat
     assert page.can_edit_current_pr is False
 
 
-def test_entry_layout_lands_on_the_tab_set_it_was_given(monkeypatch):
-    """`is_view_only` picks both the tabs and the view they open on, so the two cannot
-    disagree. A view-only viewer's tabs are About and How it works, and How it works is a
-    config form they have no way to save - so About. Everyone who can update the app works,
-    and folds to the preview on a phone."""
+def test_a_published_run_opens_on_about_and_a_saved_run_on_the_editor(monkeypatch):
+    """Ownership does not decide this any more - viewer and editor both land on About. What
+    the url names does: a saved run is work already underway, so it opens where the work is.
+    """
     about = SplitLayout(primary=SurfaceId.about, secondary=SurfaceId.preview)
     work = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
     tabs = [TabSpec(key="about", label="About", layout=about)]
@@ -315,21 +320,31 @@ def test_entry_layout_lands_on_the_tab_set_it_was_given(monkeypatch):
     page.tab = RecipeTabs.run
     page.request = SimpleNamespace(query_params={})
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
-    assert page.entry_layout(tabs) == about
+    for view_only in (True, False):
+        monkeypatch.setattr(
+            VideoBotsPageV2, "is_view_only", lambda self, v=view_only: v
+        )
+        page.current_sr_pr = (SimpleNamespace(id=7), SimpleNamespace(saved_run_id=7))
+        assert page.entry_layout(tabs) == about, f"view_only={view_only}"
 
-    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: False)
-    assert page.entry_layout(tabs) == work
+        page.current_sr_pr = (SimpleNamespace(id=99), SimpleNamespace(saved_run_id=7))
+        assert page.entry_layout(tabs) == work, f"view_only={view_only}"
 
-    # The url has no say: whoever cannot update the app gets the view-only tab set, and so
-    # lands where that tab set starts.
-    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: True)
-    page.request.query_params = {"run_id": "run-1"}
-    assert page.entry_layout(tabs) == about
 
-    page.request.query_params = {}
-    page.tab = RecipeTabs.run_as_api
-    assert page.entry_layout(tabs) == about
+def test_a_run_and_its_published_run_remember_their_layouts_apart():
+    """One key let each overwrite the other: running stored the split under the published
+    run, so the published run stopped opening on About."""
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(saved_run_id=7, published_run_id="abc")
+
+    page.current_sr_pr = (SimpleNamespace(id=7), pr)
+    pr_key = page._workspace_storage_key()
+    page.current_sr_pr = (SimpleNamespace(id=99), pr)
+    run_key = page._workspace_storage_key()
+
+    assert pr_key.endswith(":abc:pr")
+    assert run_key.endswith(":abc:run")
+    assert pr_key != run_key
 
 
 def test_document_tabs_drop_the_bootstrap_overflow_and_gutter_utilities():
@@ -395,35 +410,124 @@ def test_v2_translates_insufficient_credits_rerun_to_run_intent():
 
 def test_about_deployment_cards_carry_the_chips_targets():
     """A channel card in About is the same action as its chip in the bar - a link where the
-    chip navigates, and otherwise a submit carrying the intent that opens the chip's dialog,
-    since the page's form posts its submitter's name and value."""
+    chip navigates, otherwise a submit carrying the intent that opens the chip's dialog."""
     page = object.__new__(VideoBotsPageV2)
+    intent = MenuIntent(item_key="demo:7")
+    page._top_bar_integrations = lambda: [
+        TopBarIntegration(
+            key="web",
+            label="Try in Web",
+            icon_html="<i></i>",
+            target=LinkTarget(href="/chat/agent/"),
+        ),
+        TopBarIntegration(
+            key="demo:7",
+            label="Try in WhatsApp",
+            icon_html="<i></i>",
+            target=SubmitTarget(intent=intent),
+        ),
+    ]
 
-    link = page._about_deployment_card(
+    group = page._about_deployment_group()
+    assert group.title == "Deployments"
+    link, submit = group.cards
+
+    assert link.target.kind == "link"
+    assert link.target.href == "/chat/agent/"
+
+    assert submit.target.kind == "submit"
+    # the encoded value round-trips through the same handler the chip's own post reaches
+    gui.session_state[page.SUBMIT_INTENT_KEY] = submit.target.value
+    assert page._pop_submit_intent() == intent
+
+
+def test_a_workflow_with_no_deployments_gets_no_row():
+    page = object.__new__(VideoBotsPageV2)
+    page._top_bar_integrations = lambda: []
+    assert page._about_deployment_group() is None
+
+
+def test_the_about_meta_heading_names_only_what_the_row_holds(monkeypatch):
+    """A model with no documents and no tools reads "Model", not a heading promising a
+    knowledge base and tools that are not there."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_about_model_summary",
+        lambda self: (icons.sparkles, "GPT-5"),
+        raising=False,
+    )
+
+    def heading(**state):
+        gui.session_state.clear()
+        gui.session_state.update(state)
+        groups = page._about_meta_groups()
+        return groups[0].title if groups else None
+
+    assert heading() == "Model"
+    assert heading(documents=["a"]) == "Model & Knowledge base"
+    assert heading(functions=["f"]) == "Model & Tools"
+    assert heading(documents=["a"], functions=["f"]) == (
+        "Model, Knowledge base & Tools"
+    )
+
+    # ...and with no model either, the row goes entirely
+    monkeypatch.setattr(
+        VideoBotsPageV2, "_about_model_summary", lambda self: None, raising=False
+    )
+    gui.session_state.clear()
+    assert page._about_meta_groups() == []
+
+
+def test_the_about_meta_cards_open_their_pane_in_the_work_view(monkeypatch):
+    """The editor alone would hide the preview these cards exist to change - so they target
+    the same split the Split tab does, not a solo editor."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_about_model_summary",
+        lambda self: (icons.sparkles, "GPT-5"),
+        raising=False,
+    )
+    gui.session_state.clear()
+    gui.session_state.update(documents=["a"], functions=["f"])
+
+    cards = [card for group in page._about_meta_groups() for card in group.cards]
+    assert len(cards) == 3
+    for card in cards:
+        assert card.target.layout == page.work_layout(), card.label
+        assert card.target.editor_pane
+
+
+def test_every_about_card_is_one_kind_of_object(monkeypatch):
+    """A deployment card and a config card were two copies of the same markup. They are one
+    `AboutCard` now, so the component draws both and a change of shape cannot reach one and
+    not the other - only the target differs."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_about_model_summary",
+        lambda self: (icons.sparkles, "GPT-5"),
+        raising=False,
+    )
+    page._top_bar_integrations = lambda: [
         TopBarIntegration(
             key="web",
             label="Try in Web",
             icon_html="<i></i>",
             target=LinkTarget(href="/chat/agent/"),
         )
-    )
-    assert '<a class="v2-about-meta-card" href="/chat/agent/">' in link
+    ]
+    gui.session_state.clear()
 
-    intent = MenuIntent(item_key="demo:7")
-    submit = page._about_deployment_card(
-        TopBarIntegration(
-            key="demo:7",
-            label="Try in WhatsApp",
-            icon_html="<i></i>",
-            target=SubmitTarget(intent=intent),
-        )
-    )
-    assert 'type="submit"' in submit
-    assert f'name="{page.SUBMIT_INTENT_KEY}"' in submit
+    cards = [card for group in page._about_groups() for card in group.cards]
+    assert len(cards) == 2
+    for card in cards:
+        assert isinstance(card, AboutCard)
+        assert card.icon_html and card.label and card.target
 
-    posted = re.search(r'value="([^"]*)"', submit).group(1)
-    gui.session_state[page.SUBMIT_INTENT_KEY] = html.unescape(posted)
-    assert page._pop_submit_intent() == intent
+    # the config card opens a pane; the deployment card navigates
+    assert [c.target.kind for c in cards] == ["pane", "link"]
 
 
 def test_narrow_surface_keeps_the_editor_for_a_view_only_viewer(monkeypatch):
@@ -485,7 +589,766 @@ def test_title_menu_offers_v1s_options(monkeypatch):
     assert [i.label for i in page._title_menu_items()][1] == "Save as New"
 
 
+def test_the_root_recipes_version_history_is_an_admins_to_see(monkeypatch):
+    """A root recipe is edited in place, so it does have versions - the menu hid them
+    anyway. Gated now on who may edit the template: a staff admin, on a root pr."""
+    from bots.models import WorkflowAccessLevel
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(
+        is_root=lambda: True, saved_run="sr", tags=SimpleNamespace(all=list)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "current_pr", property(lambda self: pr))
+    monkeypatch.setattr(VideoBotsPageV2, "current_sr", property(lambda self: "sr"))
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_workspace", property(lambda self: None)
+    )
+    # says yes to everyone, so Delete's absence below is the root check and not this
+    monkeypatch.setattr(
+        WorkflowAccessLevel, "can_user_delete_published_run", lambda **kw: True
+    )
+    page.request = SimpleNamespace(user=object())
+
+    def _may_edit(answer: bool):
+        monkeypatch.setattr(
+            VideoBotsPageV2, "can_edit_current_pr", property(lambda self: answer)
+        )
+        return [item.label for item in page._title_menu_items()]
+
+    assert "Versions" not in _may_edit(False)
+    assert _may_edit(True)[0] == "Versions"
+
+    # Delete stays off the root recipe for everyone: it is the recipe, not a run of it.
+    assert "Delete" not in _may_edit(True)
+
+
 def test_title_menu_is_empty_when_logged_out(monkeypatch):
     page = object.__new__(VideoBotsPageV2)
     monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: False)
     assert page._title_menu_items() == []
+
+
+def test_examples_route_redirects_to_the_explore_gallery_in_v2():
+    """A v2 page has no Examples tab - it is not in the top bar, and v1's card grid is not
+    what the shell renders - so the route hands off to explore, filtered to the workflow.
+
+    302, not 301: the fork list grows as recipes migrate, and a permanent redirect would
+    outlive a recipe's membership of it in every browser that cached it. No monkeypatch -
+    the gate answers off `all_pages_v2`, so this exercises the real one."""
+    from routers.root import examples_route
+
+    render = examples_route.__wrapped__
+
+    # the slug the tab is reached by, and an older one for the same recipe: one gallery
+    resp = render(request=SimpleNamespace(), page_slug="agent")
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "/explore/?workflow=bots"
+
+    resp = render(request=SimpleNamespace(), page_slug="video-bots")
+    assert resp.headers["location"] == "/explore/?workflow=bots"
+
+    # Opened from a published run, the tab still meant "show me the gallery": v1 filtered
+    # `_examples_tab` on the workflow alone, so the run in the url never changed what was
+    # rendered. It goes to the same gallery - redirecting back to the run would strip
+    # `/examples/` and reload the page the user was already on.
+    resp = render(
+        request=SimpleNamespace(),
+        page_slug="agent",
+        run_slug="base-copilot-w-search-rag-code-execution",
+        example_id="v1xm6uhp",
+    )
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "/explore/?workflow=bots"
+
+
+def test_examples_redirect_only_names_a_workflow_the_type_filter_can_hold(monkeypatch):
+    """`gui.selectbox` swaps a value it has no option for for the blank one, which blanks the
+    filter and bounces to the whole gallery - so the redirect either carries an option that
+    exists or does not happen. Sweeps the v2 forks, so a recipe forked before it is listed
+    on explore fails here rather than sending its Examples tab somewhere useless."""
+    import routers.root
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+    from routers.root import examples_route
+    from widgets import workflow_search
+
+    filter_options = workflow_search.workflow_filter_slugs()
+    assert filter_options, "no Type options at all - the check below would be vacuous"
+
+    for slug, page_cls in page_slug_map_v2.items():
+        resp = examples_route.__wrapped__(request=SimpleNamespace(), page_slug=slug)
+        assert furl(resp.headers["location"]).args["workflow"] in filter_options, slug
+
+    # and with no option to carry, the tab stays put rather than opening the whole gallery
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append(page_slug),
+    )
+    monkeypatch.setattr(workflow_search, "workflow_filter_slugs", set)
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    assert calls == ["agent"]
+
+
+def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
+    """A v1 page's tab bar offers Examples and renders it in place, so only a recipe forked
+    to v2 hands off. The fork is the whole decision - there is no user in it, so a logged
+    out visitor and an admin get the same answer for the same slug."""
+    import routers.root
+    from routers.root import RecipeTabs, examples_route
+
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append((page_slug, tab)),
+    )
+
+    # a recipe with no fork yet, a legacy api-only one, and an unknown slug that still needs
+    # to reach the 404 the tab already raises
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="qr-code")
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="translate")
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="not-a-recipe")
+
+    assert calls == [
+        ("qr-code", RecipeTabs.examples),
+        ("translate", RecipeTabs.examples),
+        ("not-a-recipe", RecipeTabs.examples),
+    ]
+
+    # and with the flag off, even the fork keeps its v1 tab - the kill switch reaches here
+    monkeypatch.setattr(settings, "ENABLE_LAYOUT_V2", False)
+    calls.clear()
+    examples_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    assert calls == [("agent", RecipeTabs.examples)]
+
+
+def test_the_menu_keys_python_stamps_are_the_ones_the_sheet_looks_for():
+    """These three strings are declared twice - once here, once as literals in
+    `RecipeTopBar/index.tsx` - because the mobile sheet reorders the title menu by key.
+
+    The generated prop *types* are checked by CI, but nothing checks a value. Rename one in
+    Python and the row silently vanishes from the phone menu: no type error, no failure,
+    no log line. This is that missing check.
+    """
+    from pathlib import Path
+
+    from daras_ai_v2.base_v2 import BasePage as BasePageV2
+
+    source = Path("gooey-gui/app/components/RecipeTopBar/index.tsx").read_text()
+    found = dict(re.findall(r'const (MENU_\w+?)_KEY = "([^"]+)";', source))
+    assert found, "no menu key constants found - has the top bar been restructured?"
+
+    expected = {
+        "MENU_VERSION_HISTORY": BasePageV2.MENU_VERSION_HISTORY,
+        "MENU_DUPLICATE": BasePageV2.MENU_DUPLICATE,
+        "MENU_DELETE": BasePageV2.MENU_DELETE,
+    }
+    assert found == expected
+
+
+def test_a_recipe_gets_the_base_tab_set_unless_it_says_otherwise(monkeypatch):
+    """The base spec is the one every fork inherits, so Split has to be desktop-only *here*.
+    It folds to a single pane below lg and the mobile sheet drops a desktop-only view -
+    without the flag the next recipe to migrate gets a Split row in its phone menu.
+
+    Also pins that VideoBots takes the base set rather than restating it: the two had
+    already drifted on this very flag.
+    """
+    from recipes.VideoBots_v2 import VideoBotsPageV2
+
+    monkeypatch.setattr(VideoBotsPageV2, "is_view_only", lambda self: False)
+    tabs = VideoBotsPageV2.get_tab_spec(VideoBotsPageV2.__new__(VideoBotsPageV2))
+
+    by_key = {tab.key: tab for tab in tabs}
+    assert set(by_key) == {"about", "edit", "preview", "split"}
+    assert by_key["split"].desktop_only is True
+    assert not any(tab.desktop_only for key, tab in by_key.items() if key != "split"), (
+        "only Split has nowhere to go below lg"
+    )
+
+
+def _headings_in(node) -> list[tuple[int, str]]:
+    """Every heading the render tree emits, in document order, as (level, text).
+
+    Two shapes to look for: `gui.tag("h2", ...)` becomes a `tag` node carrying the element
+    name, and `gui.html("<h2 ...>")` carries the markup in its body.
+    """
+
+    found = []
+    props = node.get("props") or {}
+    element = props.get("__reactjsxelement") or ""
+    if re.fullmatch(r"h[1-6]", element):
+        found.append((int(element[1]), ""))
+    for match in re.finditer(r"<h([1-6])\b[^>]*>(.*?)</h\1>", props.get("body") or ""):
+        found.append((int(match.group(1)), match.group(2)))
+    for child in node.get("children") or []:
+        found.extend(_headings_in(child))
+    return found
+
+
+def test_the_top_bar_is_sent_the_name_that_becomes_the_pages_h1(monkeypatch):
+    """The top bar's title is the h1 - the visible name, not a hidden stand-in, and the bar
+    is the one part of v2 on every tab. What Python owes is that name."""
+    from types import SimpleNamespace
+
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_pr",
+        property(
+            lambda self: SimpleNamespace(
+                workspace_id=None,
+                notes="",
+                tags=SimpleNamespace(all=list),
+                photo_url=None,
+            )
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_workflow_identity",
+        lambda self: SimpleNamespace(name="Farmer.CHAT Ag Advisory Agent"),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "_about_meta_groups", lambda self: [], raising=False
+    )
+    page._top_bar_integrations = lambda: []
+    # About always offers one way to share, and the url one needs a url for this tab
+    page.tab = RecipeTabs.run
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/"
+    )
+    page.request = SimpleNamespace(user=None)
+    gui.session_state.clear()
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    root = RenderTreeNode("root")
+    with NestingCtx(root):
+        page._render_about_content()
+
+    props = json.dumps(root.to_dict())
+    assert "RecipeAbout" in props
+    # About no longer draws a heading of its own; the name reaches the bar instead
+    assert "heading" not in json.loads(props)["children"][0]["props"]
+
+
+def test_the_about_report_button_round_trips_to_the_pick_that_opens_the_dialog(
+    monkeypatch,
+):
+    """About posts this through the same submitter path Share uses, so the value it carries
+    has to decode back to the key `_handle_menu_pick` switches on. Absent when logged out -
+    a report has to be attributable, which is v1's rule too."""
+    from types import SimpleNamespace
+
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_pr",
+        property(
+            lambda self: SimpleNamespace(
+                workspace_id=None,
+                notes="",
+                tags=SimpleNamespace(all=list),
+                photo_url=None,
+            )
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_workflow_identity",
+        lambda self: SimpleNamespace(name="Farmer.CHAT"),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "_about_meta_groups", lambda self: [], raising=False
+    )
+    page._top_bar_integrations = lambda: []
+    page.tab = RecipeTabs.run
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/"
+    )
+    page.request = SimpleNamespace(user=None)
+
+    def about_props(logged_in: bool):
+        monkeypatch.setattr(
+            VideoBotsPageV2, "is_logged_in", lambda self: logged_in, raising=False
+        )
+        gui.session_state.clear()
+        root = RenderTreeNode("root")
+        with NestingCtx(root):
+            page._render_about_content()
+        return root.to_dict()["children"][0]["props"]
+
+    assert about_props(logged_in=False)["report_value"] is None
+
+    value = about_props(logged_in=True)["report_value"]
+    gui.session_state[page.SUBMIT_INTENT_KEY] = value
+    intent = page._pop_submit_intent()
+    assert isinstance(intent, MenuIntent)
+    assert intent.item_key == VideoBotsPageV2.MENU_REPORT
+
+
+def test_layout_v2_is_scoped_to_the_forked_recipes_and_asks_nothing_of_the_user():
+    """The gate takes a slug, not a request: v2 is per-recipe, and every visitor - logged
+    out included - gets the same layout for the same url.
+
+    Sweeps `all_pages_v2` rather than naming slugs, so a recipe added to the fork list is
+    covered here the day it lands. The v1 half names real recipes on purpose: those urls
+    must keep answering in v1 whatever else changes."""
+    from daras_ai_v2.all_pages import page_slug_map
+    from daras_ai_v2.all_pages_v2 import page_slug_map_v2
+    from daras_ai_v2.layout_v2 import can_use_layout_v2
+
+    assert page_slug_map_v2, "no v2 forks at all - the sweep below would be vacuous"
+    for slug in page_slug_map_v2:
+        assert can_use_layout_v2(slug), slug
+
+    for slug in ["qr-code", "translate", "not-a-recipe"]:
+        assert not can_use_layout_v2(slug), slug
+
+    # every recipe without a fork, so migrating one cannot quietly change another
+    for slug in page_slug_map:
+        if slug not in page_slug_map_v2:
+            assert not can_use_layout_v2(slug), slug
+
+
+def test_usage_is_404_on_a_recipe_with_no_v2_fork(monkeypatch):
+    """v1's `render_selected_tab` has no case for this tab, so letting the route through
+    would render chrome around an empty body. The 404 is what keeps that unreachable."""
+    import routers.root
+    from routers.root import RecipeTabs, usage_route
+
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append((page_slug, tab)),
+    )
+
+    for slug in ["qr-code", "translate", "not-a-recipe"]:
+        with pytest.raises(HTTPException) as excinfo:
+            usage_route.__wrapped__(request=SimpleNamespace(), page_slug=slug)
+        assert excinfo.value.status_code == 404, slug
+    assert calls == [], "a page with no Usage tab still rendered one"
+
+    # the fork does have the tab
+    usage_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    assert calls == [("agent", RecipeTabs.usage)]
+
+
+def test_history_stays_per_recipe_outside_the_v2_forks(monkeypatch):
+    """A v2 fork renames this tab Usage. Everything else keeps its own History rather than
+    being sent to the global one: v2 is scoped per recipe, so this tab is too."""
+    import routers.root
+    from routers.root import RecipeTabs, history_route
+
+    calls = []
+    monkeypatch.setattr(
+        routers.root,
+        "render_recipe_page",
+        lambda request, page_slug, tab, example_id: calls.append((page_slug, tab)),
+    )
+
+    history_route.__wrapped__(request=SimpleNamespace(), page_slug="agent")
+    history_route.__wrapped__(request=SimpleNamespace(), page_slug="qr-code")
+    history_route.__wrapped__(request=SimpleNamespace(), page_slug="translate")
+
+    assert calls == [
+        ("agent", RecipeTabs.usage),
+        ("qr-code", RecipeTabs.history),
+        ("translate", RecipeTabs.history),
+    ]
+
+
+def test_usage_carries_no_run_control(monkeypatch):
+    """Usage reports on runs already made, so the bar offers no Run - and because it is left
+    out rather than hidden, there is nothing to relocate into the editor's bottom run bar on
+    a narrow screen either."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "_is_run_in_progress", lambda self: False)
+
+    page.tab = RecipeTabs.usage
+    assert page._top_bar_run_intent() is None
+
+    page.tab = RecipeTabs.run
+    assert page._top_bar_run_intent() == RunIntent()
+
+    # a run in progress offers Stop, and still nothing on Usage
+    monkeypatch.setattr(VideoBotsPageV2, "_is_run_in_progress", lambda self: True)
+    assert page._top_bar_run_intent() == StopIntent()
+    page.tab = RecipeTabs.usage
+    assert page._top_bar_run_intent() is None
+
+
+def test_usage_keeps_the_publish_control(monkeypatch):
+    """Only Run comes out of the Usage bar. Publishing is not a thing you do to a run, so
+    the tab has no say in the label - it stays permission-derived on every tab."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_edit_current_pr", property(lambda self: True)
+    )
+
+    page.tab = RecipeTabs.usage
+    assert page._top_bar_publish_label() == "Update"
+
+    page.tab = RecipeTabs.run
+    assert page._top_bar_publish_label() == "Update"
+
+
+def _capture_top_bar(page, monkeypatch) -> RecipeTopBarProps:
+    """Render the bar and hand back the one props object it sent to the client."""
+    split = SplitLayout(primary=SurfaceId.editor, secondary=SurfaceId.preview)
+    config = PageShellConfig(
+        storage_key="layout",
+        initial_layout=split,
+        run_layout=split,
+        views=[WorkspaceView(key="split", label="Split", layout=split)],
+        workspace_href="/agent/",
+        workspace_active=False,
+    )
+    captured = []
+    monkeypatch.setattr(
+        gui, "model_component", lambda props: captured.append(props) or nullcontext()
+    )
+    page._render_top_bar(config=config)
+    (props,) = captured
+    return props
+
+
+def _bar_page(
+    monkeypatch,
+    *,
+    can_edit: bool,
+    is_root: bool = True,
+    url_names_the_pr: bool = True,
+    logged_in: bool = True,
+):
+    """A page with the bar's other inputs stubbed down to nothing, so only the publish
+    cluster is in play."""
+    page = object.__new__(VideoBotsPageV2)
+    page.tab = RecipeTabs.run
+    page.current_sr_pr = (
+        SimpleNamespace(id=7),
+        SimpleNamespace(
+            is_root=lambda: is_root, saved_run_id=7 if url_names_the_pr else 99
+        ),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_edit_current_pr", property(lambda self: can_edit)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: logged_in)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_workflow_identity",
+        lambda self: SimpleNamespace(
+            title="Agent", name="Agent", href=None, photo_url=None, circle_photo=False
+        ),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_app_url",
+        lambda self, tab=RecipeTabs.run, **kw: "/agent/",
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_cost", lambda self: ("", ""))
+    monkeypatch.setattr(VideoBotsPageV2, "can_manage_sharing", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_author", lambda self: None)
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_parent", lambda self: None)
+    monkeypatch.setattr(VideoBotsPageV2, "_has_request_changed", lambda self: False)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_user_save_run", lambda self, sr, pr: False
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "_title_menu_items", lambda self: [])
+    monkeypatch.setattr(VideoBotsPageV2, "_top_bar_integrations", lambda self: [])
+    monkeypatch.setattr(VideoBotsPageV2, "get_credits_click_url", lambda self: "")
+    monkeypatch.setattr(VideoBotsPageV2, "_can_launch_builder", lambda self: False)
+    monkeypatch.setattr(VideoBotsPageV2, "_usage_href", lambda self: None)
+    return page
+
+
+@pytest.mark.parametrize(
+    "is_root,url_names_the_pr,can_edit,offered",
+    [
+        # the recipe's own template, to someone who cannot change it
+        (True, True, False, False),
+        # somebody else's published workflow: same page, same answer
+        (False, True, False, False),
+        # a run of either is the viewer's own work, whoever they are
+        (True, False, False, True),
+        (False, False, False, True),
+        # an editor keeps the lot, wherever they are standing
+        (True, True, True, True),
+        (False, True, True, True),
+    ],
+)
+def test_the_publish_cluster_follows_view_only(
+    monkeypatch, is_root, url_names_the_pr, can_edit, offered
+):
+    """All four move together - the client renders Publish for any entry left, so one
+    stray href keeps the button. A run is never view-only, hence the run rows."""
+    props = _capture_top_bar(
+        _bar_page(
+            monkeypatch,
+            can_edit=can_edit,
+            is_root=is_root,
+            url_names_the_pr=url_names_the_pr,
+        ),
+        monkeypatch,
+    )
+
+    assert (props.publish_label is not None) is offered
+    assert (props.publish_intent is not None) is offered
+    assert (props.api_href is not None) is offered
+    assert (props.deploy_href is not None) is offered
+    # Share rides in the same control, so it goes too - a lone Share row left a button
+    # still labelled Publish. About keeps its own, which is derived separately.
+    if not is_root:
+        assert (props.share.kind != "none") is offered
+
+
+def test_about_keeps_its_own_share_when_the_bar_loses_the_cluster(monkeypatch):
+    """The bar's Share goes with the publish control on a view-only page; About's does not.
+    `_about_share_value` asks only whether there is a published url to share."""
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(workspace_id=7, is_root=lambda: False)
+    monkeypatch.setattr(VideoBotsPageV2, "current_pr", property(lambda self: pr))
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "is_view_only", lambda self: True, raising=False
+    )
+
+    assert page._about_share_value() is not None
+
+
+@pytest.mark.parametrize(
+    "logged_in,is_root,wants_dialog",
+    [
+        # a published run, to someone who could manage its visibility
+        (True, False, True),
+        # ... and to a visitor, who could not
+        (False, False, False),
+        # the recipe's own /agent/: nothing published to manage, whoever is asking
+        (True, True, False),
+        (False, True, False),
+    ],
+)
+def test_about_offers_the_dialog_or_the_url_but_never_neither(
+    monkeypatch, logged_in, is_root, wants_dialog
+):
+    """The dialog manages a published run's visibility, so it takes one and somebody to
+    manage it for. Everything else gets the url for the browser's own sheet - gating that
+    on the dialog's conditions too left /agent/ with no Share at all, for anyone.
+
+    Exactly one of the two, always: the component picks, so the payload must not offer both.
+    """
+    page = object.__new__(VideoBotsPageV2)
+    page.tab = RecipeTabs.run
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "current_pr",
+        property(lambda self: SimpleNamespace(workspace_id=7, is_root=lambda: is_root)),
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/my-bot/"
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: logged_in)
+
+    value, url = page._about_share_value(), page._about_share_url()
+    assert (value is not None) is wants_dialog
+    assert (url is not None) is not wants_dialog
+    assert bool(value) != bool(url), "About must offer exactly one way to share"
+
+
+def test_a_logged_out_visitor_gets_no_publish_cluster_on_a_view_only_page(monkeypatch):
+    """Logged out is view-only everywhere it cannot edit, so it loses the cluster too -
+    the bar's Run control is the way in from here."""
+    props = _capture_top_bar(
+        _bar_page(monkeypatch, can_edit=False, logged_in=False), monkeypatch
+    )
+
+    assert props.publish_label is None
+    assert props.publish_intent is None
+    assert props.api_href is None
+    assert props.deploy_href is None
+    assert props.run_intent is not None
+
+
+def test_an_editor_still_gets_the_whole_publish_cluster(monkeypatch):
+    """The workflow is theirs to update, so nothing is taken away."""
+    props = _capture_top_bar(_bar_page(monkeypatch, can_edit=True), monkeypatch)
+
+    assert props.publish_label == "Update"
+    assert props.publish_intent is not None
+    assert props.api_href == "/agent/"
+    assert props.deploy_href == "/agent/"
+
+
+def test_the_bar_can_carry_no_run_control():
+    """`run_intent` has to be omittable for Usage to drop Run - it was a required prop."""
+    from gooey_gui.types.recipe_top_bar_props import RecipeTopBarProps
+
+    field = RecipeTopBarProps.model_fields["run_intent"]
+    assert not field.is_required(), "the bar has to be able to carry no run control"
+
+
+def test_the_bar_names_the_published_run_a_saved_run_belongs_to(monkeypatch):
+    """`parent` is the mobile sheet's way back to the published run, and by being present
+    only on a saved run it is also how the sheet knows which of its three menus to draw.
+    """
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2, "get_recipe_title", classmethod(lambda cls: "Copilot")
+    )
+
+    # the url points at the published run itself - no way back, there is nowhere back to
+    page.current_sr_pr = (SimpleNamespace(id=7), SimpleNamespace(saved_run_id=7))
+    assert page._top_bar_parent() is None
+
+    # a saved run carries the title of the published run it belongs to
+    pr = SimpleNamespace(
+        saved_run_id=7,
+        is_root=lambda: False,
+        title="Farmer.AI",
+        get_app_url=lambda: "/agent/farmer-ai-xyz/",
+    )
+    page.current_sr_pr = (SimpleNamespace(id=99), pr)
+    parent = page._top_bar_parent()
+    assert (parent.label, parent.href) == ("Farmer.AI", "/agent/farmer-ai-xyz/")
+
+    # a saved run of a root recipe falls back to the recipe, which is what it forked from
+    root_pr = SimpleNamespace(
+        saved_run_id=7,
+        is_root=lambda: True,
+        title="",
+        get_app_url=lambda: "/agent/",
+    )
+    page.current_sr_pr = (SimpleNamespace(id=99), root_pr)
+    assert page._top_bar_parent().label == "Copilot"
+
+
+def test_the_builder_panel_is_hosted_only_beside_the_workspace(monkeypatch):
+    """Deploy, API and Usage have no workspace for the panel to sit next to, and Deploy's
+    web preview breaks outright when it takes half the width. They still offer the way in:
+    availability stays tab-blind, or the mobile sheet would lose the row that navigates to
+    the workspace and opens it there."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "_can_launch_builder", lambda self: True)
+
+    for tab in (RecipeTabs.run, RecipeTabs.preview):
+        page.tab = tab
+        assert page._is_workspace_tab() is True, tab.name
+        assert page._hosts_builder() is True, tab.name
+
+    for tab in (RecipeTabs.integrations, RecipeTabs.run_as_api, RecipeTabs.usage):
+        page.tab = tab
+        assert page._is_workspace_tab() is False, tab.name
+        assert page._hosts_builder() is False, tab.name
+
+
+def test_the_workspace_alone_does_not_host_an_unavailable_builder(monkeypatch):
+    """Hosting is availability *and* the tab - a logged-out visitor gets no panel anywhere."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(VideoBotsPageV2, "_can_launch_builder", lambda self: False)
+
+    page.tab = RecipeTabs.run
+    assert page._hosts_builder() is False
+
+
+def test_the_builders_panel_key_says_nothing_about_the_page(monkeypatch):
+    """Whether the panel is open is the user's to say, and the client resets a panel to its
+    default whenever its storage key changes. Keyed on the workspace, the Builder closed
+    itself on every save: a save is a new published run, which was a new key.
+
+    So the same key on a published run, on a run of it, and on the next workflow along.
+    """
+    from daras_ai_v2.gooey_builder import GOOEY_BUILDER_STORAGE_KEY
+
+    keys = []
+    page = object.__new__(VideoBotsPageV2)
+    page.request = SimpleNamespace(session={})
+    monkeypatch.setattr(VideoBotsPageV2, "_hosts_builder", lambda self: True)
+    monkeypatch.setattr(
+        "daras_ai_v2.base_v2.sidebar_layout",
+        lambda **kw: keys.append(kw["storage_key"]) or (None, nullcontext()),
+    )
+
+    for sr_id, published_run_id in ((7, "abc"), (99, "abc"), (7, "xyz")):
+        page.current_sr_pr = (
+            SimpleNamespace(id=sr_id),
+            SimpleNamespace(saved_run_id=7, published_run_id=published_run_id),
+        )
+        page._builder_layout()
+
+    assert keys == [GOOEY_BUILDER_STORAGE_KEY] * 3
+    # the workspace's own key moves with all three; this one must not be built from it
+    assert "recipe-layout" not in GOOEY_BUILDER_STORAGE_KEY
+
+
+def test_every_source_of_the_builders_panel_key_agrees():
+    """Three places addressed this one panel - the pane it lives in, the rail's button and
+    the top bar's - and each built its own key. Fixing two left the third still naming the
+    published run, which is the key that was actually written. They read one constant now.
+    """
+    from pathlib import Path
+
+    from daras_ai_v2.gooey_builder import GOOEY_BUILDER_STORAGE_KEY
+
+    sources = [
+        Path("daras_ai_v2/base_v2.py").read_text(),
+        Path("widgets/navigation_sidebar.py").read_text(),
+        Path("gooey-gui/app/components/RecipeTopBar/index.tsx").read_text(),
+    ]
+    for src in sources:
+        assert "_workspace_storage_key()}:builder" not in src
+        assert "}:builder`" not in src
+
+    assert GOOEY_BUILDER_STORAGE_KEY == "gooey:builder-open"
+
+
+def test_about_names_what_else_the_owner_has_published(monkeypatch):
+    """The line qualifies the *name* it sits under, so it reports what else that workspace
+    has published rather than how much this one workflow has been run. This workflow's own
+    run count is on its explore card and in the bar's cost cluster.
+
+    Read through `public_workflow_count`, so the number under a workspace's name here is the
+    same one its profile page shows - two counts of "how many workflows" would drift.
+    """
+    from daras_ai_v2 import profiles
+
+    page = object.__new__(VideoBotsPageV2)
+    counted = []
+
+    def fake_count(workspace):
+        counted.append(workspace)
+        return fake_count.value
+
+    monkeypatch.setattr(profiles, "public_workflow_count", fake_count)
+
+    workspace = SimpleNamespace()
+    pr = SimpleNamespace(workspace_id=7, workspace=workspace)
+
+    fake_count.value = 1
+    assert page._about_author_subtitle(pr) == "1 Published workflow"
+    fake_count.value = 12
+    assert page._about_author_subtitle(pr) == "12 Published workflows"
+    # the same suffixes the cards use, so a prolific workspace does not read as a phone number
+    fake_count.value = 1500
+    assert page._about_author_subtitle(pr) == "1.5K Published workflows"
+
+    # it is the *workspace* that is counted, not the run
+    assert counted and all(w is workspace for w in counted)
+
+    # nothing to report: the line is left off rather than reading "0 Published workflows"
+    fake_count.value = 0
+    assert page._about_author_subtitle(pr) == ""
+    # ...and an unowned run never reaches the query at all
+    counted.clear()
+    fake_count.value = 12
+    assert page._about_author_subtitle(SimpleNamespace(workspace_id=None)) == ""
+    assert counted == []

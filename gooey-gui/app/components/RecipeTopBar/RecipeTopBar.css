@@ -322,14 +322,20 @@
   user-select: none;
 }
 
+/* The unpublished-changes marker, as a corner badge on whichever control carries it. Out of
+   the flow: in it, the button grew and shrank as a run was saved. */
 .gooey-topbar-dot {
-  display: inline-block;
+  position: absolute;
+  /* On the corner, not inside it - the desktop control ends in a chevron. Nothing clips
+     here; the bar lets its menus overflow too. */
+  top: -3px;
+  right: -3px;
   width: 6px;
   height: 6px;
-  margin-left: 6px;
   border-radius: 50%;
   background: var(--gooey-warn);
-  vertical-align: middle;
+  /* reads as a badge on the button's edge rather than a dot straddling it */
+  box-shadow: 0 0 0 1.5px var(--gooey-bg-page);
 }
 
 .gooey-topbar-cost {
@@ -584,14 +590,6 @@ a.gooey-topbar-cost:hover {
     justify-content: center;
   }
 
-  /* with no label to sit beside, the unpublished marker becomes a corner badge */
-  .gooey-topbar-publish .gooey-topbar-dot {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    margin: 0;
-  }
-
   /* keep truncating: with the pills gone to the bottom bar the header is one row of
      title + actions, and an untruncated title would push the actions off screen */
   .gooey-topbar-titleblock {
@@ -647,7 +645,16 @@ a.gooey-topbar-cost:hover {
 /* v2 mounts the panel inside the app shell, below the top bar. */
 .v2-app-shell .gooey-sidebar {
   height: 100%;
-  background-color: var(--gooey-surface-50);
+  /* The page's own colour, not the rail's tint: Ask Gooey is a surface *of* this page.
+     `#f9f9f9` is v1's and stays there. */
+  background-color: var(--gooey-bg-page);
+}
+
+/* ...and no rule down the seam. Both sides are `bg/page` here, so `Sidebar`'s `border-right`
+   drew a boundary the design does not have. */
+.v2-app-shell .gooey-sidebar-bordered,
+.v2-app-shell .gooey-sidebar-resizable {
+  border-right: 0;
 }
 
 /* Keep the v2 Builder inside the shell instead of covering the app header. */
@@ -806,4 +813,13 @@ a.gooey-topbar-cost:hover {
   .gooey-sidebar #gooey-builder-embed {
     transition: none !important;
   }
+}
+
+/* The h1 wraps the title control for the outline only; it generates no box, so the row's
+   flex layout and the global heading scale both stay off it. */
+.gooey-topbar-heading {
+  display: contents;
+  /* `display: contents` drops the box, not the inheritance - without this the heading
+     scale's heavy face would still reach the title text inside. */
+  font: inherit;
 }

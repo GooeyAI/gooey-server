@@ -60,6 +60,10 @@ class GooeyBuilderData(pydantic.BaseModel):
     name: str
     event_key: str
     storage_key: str | None = None
+    # Where to go before opening, for a page that cannot hold the panel: Deploy, API and
+    # Usage offer the way in but have no workspace beside it, so the rail navigates to the
+    # workspace and the panel opens on arrival. None where the page holds it already.
+    open_href: str | None = None
 
 
 class NavAccountData(pydantic.BaseModel):

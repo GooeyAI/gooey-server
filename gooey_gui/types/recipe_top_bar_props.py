@@ -60,6 +60,18 @@ class TopBarAuthor(StrictComponentModel):
     label: str
 
 
+class TopBarParent(StrictComponentModel):
+    """The published run a saved run belongs to.
+
+    Present only while the url points at a saved run, so it doubles as that signal: the
+    mobile sheet leads with the way back to the published run rather than repeating the
+    actions that belong to it.
+    """
+
+    label: str
+    href: str
+
+
 class TopBarIntegration(StrictComponentModel):
     key: str
     label: str
@@ -110,6 +122,8 @@ class RecipeTopBarProps(StrictComponentModel):
     circle_photo: bool = False
     author: TopBarAuthor | None = None
 
+    parent: TopBarParent | None = None
+
     title_menu_items: list[TopBarMenuItem] = pydantic.Field(default_factory=list)
     integrations: list[TopBarIntegration] = pydantic.Field(default_factory=list)
 
@@ -124,13 +138,18 @@ class RecipeTopBarProps(StrictComponentModel):
     view_only: bool = False
     crumb_label: str | None = None
     builder_panel_key: str | None = None
+    # Where the panel's open state is kept. Sent rather than derived here: the rail addresses
+    # the same panel, and two callers guessing at one key is how it ends up fighting itself.
+    builder_storage_key: str | None = None
     builder_new_event: str | None = None
     # Usage is a route rather than a client-side pane, but it shares the bar's view
     # selector. None hides it for viewers who cannot inspect the workflow's run data.
     usage_href: str | None = None
     usage_active: bool = False
 
-    run_intent: RunControlIntent
+    # None where the bar carries no run control at all: Usage lists the saved runs already
+    # made, so it offers neither Run nor the cost of one.
+    run_intent: RunControlIntent | None = None
     cost_label: str | None = None
     cost_href: str | None = None
     cost_title: str | None = None

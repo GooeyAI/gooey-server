@@ -9,6 +9,7 @@ import type {
   NavWorkflowItem,
 } from "@gooey-types/navigation_sidebar_props";
 import { fetchServerAPI } from "~/fetchServerAPI";
+import { GooeyTooltip } from "../GooeyTooltip";
 import { WorkflowList, WorkflowListSkeleton } from "./WorkflowList";
 
 export function PrimaryNavItems({
@@ -24,7 +25,7 @@ export function PrimaryNavItems({
 }) {
   return (
     <div className="px-2 nav-primary-items d-flex flex-column">
-      <div className="nav-scroll-region d-flex flex-column gap-1 mt-1">
+      <div className="nav-scroll-region gooey-thin-scroll d-flex flex-column gap-1 mt-1">
         {nav_items.map((item) => {
           const hasChildren = item.items.length > 0 || !!item.items_url;
           if (hasChildren && !railCollapsed) {
@@ -120,22 +121,34 @@ function NavItem({
   );
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 
-  if (!item.href) {
-    return (
-      <div className={className} onClick={stopPropagation}>
-        {content}
-      </div>
-    );
-  }
+  // Collapsed there is no text in the row at all, so the icon needs a name of its own.
+  const label = collapsed ? item.label : undefined;
 
-  return (
+  const row = !item.href ? (
+    <div className={className} onClick={stopPropagation} aria-label={label}>
+      {content}
+    </div>
+  ) : (
     <Link
       className={className}
       to={item.href}
       onClick={stopPropagation} // avoid opening the sidebar
+      aria-label={label}
     >
       {content}
     </Link>
+  );
+
+  // Collapsed, the row is an icon and nothing else, so the label has to be reachable some
+  // other way. `GooeyTooltip` rather than a `title` attribute, because that is what every
+  // other icon-only control in v2 uses (the pane controls, the top bar's compact actions) -
+  // and the browser's own tooltip is both slower to appear and styled nothing like them.
+  // `aria-label` regardless of width: a tooltip is a hover affordance, not an accessible name.
+  if (!collapsed) return row;
+  return (
+    <GooeyTooltip content={item.label} placement="right" fitContent>
+      {row}
+    </GooeyTooltip>
   );
 }
 

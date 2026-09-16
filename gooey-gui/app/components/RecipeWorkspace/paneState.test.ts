@@ -1,23 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
 import {
   activeViewForLayouts,
+  appRelativeHref,
   collapsePane,
   foldForNarrowViewport,
   initialWorkspaceState,
   isRootLayout,
+  layoutForEditorPane,
   layoutsEqual,
-  normalizeWorkspaceLayout,
   paneRolesForLayout,
-  paneVisibility,
   revealRunLayout,
+  revealRunOutput,
+  shouldRevealRunOutput,
   singleLayout,
   splitLayout,
   workspaceControlsForLayout,
   workspaceLayoutFromNavigationState,
   workspaceLayoutNavigationState,
-  workspaceTargetForLayout,
+  workspaceHrefToNavigate,
+  workspaceHydrationToken,
 } from "./paneState";
 
 const about = splitLayout("about", "preview");
@@ -84,43 +87,21 @@ describe("workspace layout", () => {
     expect(layoutsEqual(split, about)).toBe(false);
     expect(layoutsEqual(edit, preview)).toBe(false);
   });
-
-  it("normalizes malformed and legacy stored layouts", () => {
-    expect(normalizeWorkspaceLayout(null, about)).toEqual(about);
-    expect(
-      normalizeWorkspaceLayout(
-        { mode: "work", editorOpen: true, previewOpen: false },
-        about
-      )
-    ).toEqual(edit);
-    expect(
-      normalizeWorkspaceLayout(
-        { mode: "about", editorOpen: true, previewOpen: true },
-        edit
-      )
-    ).toEqual(about);
-  });
 });
 
 describe("initialWorkspaceState", () => {
-  it("reads a versioned stored layout", () => {
-    const storage = {
-      getItem: () =>
-        JSON.stringify({ version: 1, layout: edit, handled_run_id: null }),
-    };
-    expect(initialWorkspaceState(baseConfig, storage, null)).toEqual({
-      version: 1,
-      layout: edit,
+  it("opens on the layout the url was given, remembering nothing", () => {
+    // The server answers per url - About on a published run, the work view on a saved one -
+    // so the same url opens the same way for everyone, every visit.
+    expect(initialWorkspaceState(baseConfig, null)).toEqual({
+      layout: about,
       handled_run_id: null,
     });
   });
 
-  it("lets navigation layout override storage", () => {
-    const storage = { getItem: () => JSON.stringify(edit) };
+  it("lets a navigation layout override the url's own", () => {
     const navigation = workspaceLayoutNavigationState(split);
-    expect(
-      initialWorkspaceState(baseConfig, storage, navigation).layout
-    ).toEqual(split);
+    expect(initialWorkspaceState(baseConfig, navigation).layout).toEqual(split);
     expect(workspaceLayoutFromNavigationState(navigation)).toEqual(split);
   });
 
@@ -130,29 +111,63 @@ describe("initialWorkspaceState", () => {
       route_layout: preview,
       active_run_id: "run-1",
     };
-    const storage = { getItem: () => JSON.stringify(edit) };
-    expect(initialWorkspaceState(config, storage, null)).toEqual({
-      version: 1,
+    expect(initialWorkspaceState(config, null)).toEqual({
       layout: preview,
       handled_run_id: "run-1",
     });
   });
 
   it("reveals a newly running run once", () => {
-    const config = { ...baseConfig, active_run_id: "run-1" };
-    const storage = { getItem: () => JSON.stringify(edit) };
-    const started = initialWorkspaceState(config, storage, null);
-    expect(started).toEqual({
-      version: 1,
-      layout: split,
-      handled_run_id: "run-1",
-    });
+    const config = {
+      ...baseConfig,
+      initial_layout: edit,
+      active_run_id: "run-1",
+    };
+    const started = initialWorkspaceState(config, null);
+    expect(started).toEqual({ layout: split, handled_run_id: "run-1" });
 
     const closed = {
       ...started,
       layout: collapsePane(started.layout, "preview"),
     };
     expect(revealRunLayout(closed, config)).toEqual(closed);
+  });
+
+  it("leaves About and Preview where they are when a run starts", () => {
+    // Those views were chosen to show something in particular, and a run is no reason to
+    // take it away - Preview *is* the output, and About keeps the preview beside it.
+    const config = { ...baseConfig, active_run_id: "run-1" };
+
+    for (const layout of [preview, about, split]) {
+      expect(revealRunLayout({ layout, handled_run_id: null }, config)).toEqual(
+        { layout, handled_run_id: "run-1" }
+      );
+    }
+  });
+
+  it("marks the run handled even when the view does not change", () => {
+    // Otherwise the same run arriving again would find the user on Edit and swap the view
+    // out from under them, a beat after they chose it.
+    const config = { ...baseConfig, active_run_id: "run-1" };
+    const stayed = revealRunLayout(
+      { layout: preview, handled_run_id: null },
+      config
+    );
+    expect(stayed.handled_run_id).toBe("run-1");
+
+    const thenEdited = { ...stayed, layout: edit };
+    expect(revealRunLayout(thenEdited, config)).toEqual(thenEdited);
+  });
+});
+
+describe("shouldRevealRunOutput", () => {
+  it("is true only for the editor on its own", () => {
+    // The one view a run would start out of sight from.
+    expect(shouldRevealRunOutput(edit)).toBe(true);
+    expect(shouldRevealRunOutput(preview)).toBe(false);
+    expect(shouldRevealRunOutput(about)).toBe(false);
+    expect(shouldRevealRunOutput(split)).toBe(false);
+    expect(shouldRevealRunOutput(singleLayout("about"))).toBe(false);
   });
 });
 
@@ -171,6 +186,29 @@ describe("responsive layout", () => {
   it("leaves wide and single layouts unchanged", () => {
     expect(foldForNarrowViewport(split, "preview", false)).toEqual(split);
     expect(foldForNarrowViewport(edit, "preview", true)).toEqual(edit);
+  });
+
+  it("keeps a config pane reachable when the split folds away from it", () => {
+    // An About card naming a pane, tapped on a phone by someone whose narrow surface is the
+    // chat: the split would fold to the chat, so the editor alone stands in for it.
+    expect(layoutForEditorPane(split, "knowledge", "preview", true)).toEqual(
+      edit
+    );
+    expect(layoutForEditorPane(split, "knowledge", "editor", true)).toEqual(
+      split
+    );
+    expect(layoutForEditorPane(split, "knowledge", "preview", false)).toEqual(
+      split
+    );
+  });
+
+  it("leaves a target that names no pane alone", () => {
+    expect(layoutForEditorPane(preview, null, "preview", true)).toEqual(
+      preview
+    );
+    expect(layoutForEditorPane(about, undefined, "preview", true)).toEqual(
+      about
+    );
   });
 
   it("calls the root what the fold shows, not what is stored", () => {
@@ -246,7 +284,7 @@ describe("view selection", () => {
 describe("workspace navigation", () => {
   it("strips an absolute app origin", () => {
     expect(
-      workspaceTargetForLayout(
+      workspaceHrefToNavigate(
         false,
         "https://gooey.ai/agent/?run_id=run-1&uid=user-1"
       )
@@ -254,11 +292,159 @@ describe("workspace navigation", () => {
   });
 
   it("does not navigate when the workspace is active", () => {
-    expect(workspaceTargetForLayout(true, "/agent/")).toBeNull();
+    expect(workspaceHrefToNavigate(true, "/agent/")).toBeNull();
   });
 
-  it("hides panes until storage hydration completes", () => {
-    expect(paneVisibility(false)).toBe("hidden");
-    expect(paneVisibility(true)).toBe("visible");
+  it("relativizes any server-sent href, keeping the query", () => {
+    // Handed an absolute url, `navigate` resolves it against the origin and 404s on
+    // `/http://localhost:3000/agent/...` - so every navigation off a server-sent href has
+    // to come through here, the rail's Ask Gooey included.
+    expect(
+      appRelativeHref("http://localhost:3000/agent/?run_id=32i1&uid=1rEt")
+    ).toBe("/agent/?run_id=32i1&uid=1rEt");
+    expect(appRelativeHref("https://gooey.ai/agent/#tools")).toBe(
+      "/agent/#tools"
+    );
+    // already a path: left exactly as it is
+    expect(appRelativeHref("/agent/?run_id=32i1")).toBe("/agent/?run_id=32i1");
+  });
+});
+
+describe("carrying the view through a run", () => {
+  // A run redirects to its own url, whose layout is the work view. Pressing Run is a
+  // continuation, not an arrival, so the view being worked in has to survive it.
+  const runConfig = {
+    ...baseConfig,
+    initial_layout: split,
+    active_run_id: "run-9",
+  };
+
+  it("keeps Preview where it is", () => {
+    revealRunOutput(preview, split, () => {});
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(preview);
+  });
+
+  it("keeps About where it is", () => {
+    revealRunOutput(about, split, () => {});
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(about);
+  });
+
+  it("moves the solo editor to the work view, and lands there", () => {
+    vi.stubGlobal("window", { setTimeout: (fn: () => void) => fn() });
+    const picked: unknown[] = [];
+    revealRunOutput(edit, split, (l) => picked.push(l));
+    expect(picked).toEqual([split]);
+    expect(initialWorkspaceState(runConfig, null).layout).toEqual(split);
+    vi.unstubAllGlobals();
+  });
+
+  it("survives the workspace re-rendering while the run is polled", () => {
+    // The regression: the carry was read once, and the ten re-renders after it fell back
+    // to the run url's own layout, so Preview lasted a frame and then became the split.
+    revealRunOutput(preview, split, () => {});
+    for (let i = 0; i < 10; i++) {
+      expect(initialWorkspaceState(runConfig, null).layout).toEqual(preview);
+    }
+  });
+
+  it("is dropped once a navigation leaves that run behind", () => {
+    revealRunOutput(preview, split, () => {});
+    initialWorkspaceState(runConfig, null);
+    expect(initialWorkspaceState(baseConfig, null).layout).toEqual(about);
+  });
+
+  it("loses to an explicit destination in navigation state", () => {
+    revealRunOutput(preview, split, () => {});
+    const navigation = workspaceLayoutNavigationState(about);
+    expect(initialWorkspaceState(runConfig, navigation).layout).toEqual(about);
+  });
+});
+
+describe("what counts as arriving somewhere new", () => {
+  // The view is put back to the url's own whenever this changes, so a form post must not
+  // change it: the rail posts one to remember its width, and a run posts one per chunk.
+  const at = (pathname: string, search = "", state: unknown = null) => ({
+    pathname,
+    search,
+    state,
+  });
+
+  it("ignores a form post, which keeps the url and only changes location.key", () => {
+    const a = workspaceHydrationToken(baseConfig, at("/agent/my-bot/"));
+    const b = workspaceHydrationToken(baseConfig, at("/agent/my-bot/"));
+    expect(a).toBe(b);
+  });
+
+  it("changes when the url does", () => {
+    expect(workspaceHydrationToken(baseConfig, at("/agent/my-bot/"))).not.toBe(
+      workspaceHydrationToken(baseConfig, at("/agent/other-bot/"))
+    );
+    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
+      workspaceHydrationToken(baseConfig, at("/agent/", "?run_id=r1"))
+    );
+  });
+
+  it("changes when a run starts, so its own view can take over", () => {
+    const running = { ...baseConfig, active_run_id: "run-1" };
+    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
+      workspaceHydrationToken(running, at("/agent/"))
+    );
+  });
+
+  it("changes when a link names the view to open, even on the same url", () => {
+    const nav = workspaceLayoutNavigationState(split);
+    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
+      workspaceHydrationToken(baseConfig, at("/agent/", "", nav))
+    );
+  });
+});
+
+describe("leaving a document tab for a view", () => {
+  // Usage, API and Deploy are routes, not panes, so picking a view on one navigates. The
+  // pick has to ride along: the workspace opens on the view its own url asks for, which
+  // threw the pick away and landed on About however you chose to leave.
+  it("hands the chosen view to the navigation, and it wins on arrival", () => {
+    const chosen = singleLayout("editor");
+    const nav = workspaceLayoutNavigationState(chosen);
+
+    expect(workspaceLayoutFromNavigationState(nav)).toEqual(chosen);
+    expect(initialWorkspaceState(baseConfig, nav).layout).toEqual(chosen);
+
+    // and without it you get the url's own view, which is the bug
+    expect(initialWorkspaceState(baseConfig, null).layout).toEqual(about);
+  });
+
+  it("survives the run reveal, which reads Edit as nowhere to see output", () => {
+    // Leaving Usage keeps the run in the url, so the workspace arrives with an
+    // `active_run_id`. Edit is a lone editor, which `shouldRevealRunOutput` treats as
+    // grounds to swap in the work view - and that turned the pick into Split.
+    const leavingUsage = { ...baseConfig, active_run_id: "run-1" };
+    const nav = workspaceLayoutNavigationState(edit);
+
+    expect(shouldRevealRunOutput(edit)).toBe(true);
+    expect(initialWorkspaceState(leavingUsage, nav).layout).toEqual(edit);
+    // and the run counts as handled, so a later render cannot swap it either
+    expect(initialWorkspaceState(leavingUsage, nav).handled_run_id).toBe(
+      "run-1"
+    );
+  });
+
+  it("still reveals the output for a run nobody picked a view for", () => {
+    const starting = {
+      ...baseConfig,
+      initial_layout: edit,
+      active_run_id: "run-2",
+    };
+    expect(initialWorkspaceState(starting, null).layout).toEqual(split);
+  });
+
+  it("is actually passed by the top bar's view picker", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/components/RecipeTopBar/index.tsx", "utf8");
+    const chooseView = src.slice(
+      src.indexOf("const chooseView"),
+      src.indexOf("const handleRun")
+    );
+    expect(chooseView).toContain("workspaceLayoutNavigationState(view.layout)");
   });
 });

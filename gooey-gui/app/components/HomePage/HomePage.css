@@ -313,6 +313,12 @@
 /* the phone number / handle / name a run is filed under carries the card's
    identity, so it sits a step above the timestamp beside it - bootstrap 5.2 has
    no .fw-medium to say this with */
+/* Card titles at the design system's UI weight. They carried `.bold` (700) plus the avenir
+   face; at Inter's real 700 that read heavier than the card wanted. */
+.workflow-card-title {
+  font-weight: 500;
+}
+
 .history-card-byline .card-byline-name {
   font-weight: 600;
 }

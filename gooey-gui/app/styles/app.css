@@ -259,6 +259,27 @@ button .gui-html-container,
   border-radius: 0;
 }
 
+/* Opt-out of the 8px square bar above for dense scroll regions (sidebar, editor panes):
+   thin, rounded, no track. The webkit rules are the fallback for browsers without
+   `scrollbar-width`. */
+.gooey-thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.gooey-thin-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.gooey-thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gooey-thin-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
 [data-reach-tab-list] {
   margin: 1rem 0;
 }
@@ -360,6 +381,56 @@ button .gui-html-container,
   background-color: var(--bs-gray-200) !important;
 }
 
+/* The design system's webfonts, beside the tokens that name them. Both are variable, so
+   `font-weight` is a range and `unicode-range` keeps unused subsets unfetched. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2)
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa25L7W0Q5n-wU.woff2)
+    format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Domine";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/domine/v25/L0x8DFMnlVwD4h3hu_qnZypEiw.woff2)
+    format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Domine";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(https://fonts.gstatic.com/s/domine/v25/L0x8DFMnlVwD4h3htfqnZypEi0K3.woff2)
+    format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 /* Design-system tokens, prefixed because the design's own names are too generic to own
    globally. Each comment names the Figma token it comes from. A deliberate subset: only what
    the mobile header, its drawer and the pane pills use. The v2 desktop bar still runs an
@@ -374,10 +445,11 @@ button .gui-html-container,
   --gooey-bg-page: #fffefd; /* bg - outline button fill */
   --gooey-scrim: rgb(10 16 33 / 30%); /* the drawer's backdrop */
 
+  --gooey-line-strong: #b9b9b9; /* line/strong - hover border, selected control */
+  --gooey-ink-muted: #4b587a; /* ink-muted (= text/secondary) - secondary label, cost readout */
+
   /* Not in the Figma set - added because the v2 surfaces need them and had been carrying
      one-off hexes instead. Replace with the design's own once it defines them. */
-  --gooey-line-strong: #c9c9c9; /* a border under hover or on a selected control */
-  --gooey-ink-muted: #6b6b6b; /* secondary label, menu heading, cost readout */
   --gooey-danger: #c0392b; /* destructive action */
   --gooey-warn: #f0a020; /* the unpublished-changes dot */
   --gooey-ok-wash: #eaf6ee; /* the run bar's cost tint */
@@ -401,6 +473,36 @@ button .gui-html-container,
   --gooey-radius-lg: 16px; /* panels, the About portrait */
   --gooey-radius-pill: 32px; /* radius/pill - the drawer's top corners */
   --gooey-radius-full: 99px; /* radius/full - avatars, grab handle */
+
+  /* The design's two faces, falling back to basiercircle so a blocked webfont degrades to
+     the old picture rather than to Helvetica. */
+  --gooey-font-ui: "Inter", basiercircle, sans-serif;
+  --gooey-font-heading: "Domine", basiercircle, Georgia, serif;
+}
+
+/* The surfaces built on the design system; v1 stays on basiercircle. `.gooey-ds-page` is
+   the marker a converted React page adds, so the next one needs no change here. */
+.v2-app-shell,
+.nav-sidebar,
+.gooey-ds-page,
+.ask-gooey-page {
+  font-family: var(--gooey-font-ui);
+}
+
+/* Mirrors the selector list custom.css hands the heavy face - headings, `strong`, and the
+   `.bold`/`.semibold` utilities - each of which declares its own family, so inheriting from
+   the page cannot reach them. Two `:is()`s keep this at two classes, which outranks both
+   `.bold` and `.gui-md-container strong`. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold) {
+  font-family: var(--gooey-font-ui);
+}
+
+/* The two headings the design actually draws in the display face. Everything else in v2 uses
+   heading tags for structure. Must stay below the rule above, which it ties. */
+.v2-app-shell .v2-about h1,
+.ask-gooey-page .ask-gooey-title {
+  font-family: var(--gooey-font-heading);
 }
 
 /* Run state, as the history card's status pill reports it (HomePage.css). The warn and
@@ -409,9 +511,9 @@ button .gui-html-container,
    step by hand until it is converted. Only the pill's values are tokens - a token nothing
    references is a claim the codebase has not earned. */
 :root {
-  --gooey-status-ink: #070b1a;      /* settled states - queued, completed, neutral text */
-  --gooey-status-muted: #59617d;    /* captions, and the "starting" accent */
-  --gooey-status-line: #e4e4e7;     /* the neutral card/pill border */
+  --gooey-status-ink: #070b1a; /* settled states - queued, completed, neutral text */
+  --gooey-status-muted: #59617d; /* captions, and the "starting" accent */
+  --gooey-status-line: #e4e4e7; /* the neutral card/pill border */
 
   /* in-flight, in the brand cyan (the spinner accent in custom.css). The cyan itself
      is the marker; text uses the darkened -ink, which the cyan is far too light to do
@@ -421,11 +523,11 @@ button .gui-html-container,
   --gooey-status-running-bg: #e6faf7;
   --gooey-status-running-line: #a6ebe2;
 
-  --gooey-status-warn: #9d7b1f;     /* cancelled / stopped */
+  --gooey-status-warn: #9d7b1f; /* cancelled / stopped */
   --gooey-status-warn-bg: #fff7d8;
   --gooey-status-warn-line: #f0dc92;
 
-  --gooey-status-error: #b42318;    /* failed */
+  --gooey-status-error: #b42318; /* failed */
   --gooey-status-error-bg: #fff4f2;
   --gooey-status-error-line: #f5b8b0;
 }

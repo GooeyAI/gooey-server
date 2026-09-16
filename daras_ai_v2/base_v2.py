@@ -1,4 +1,3 @@
-import html
 import inspect
 import typing
 from functools import cached_property
@@ -24,6 +23,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
+    GOOEY_BUILDER_STORAGE_KEY,
     GOOEY_BUILDER_TITLE,
     builder_thread_is_empty,
     can_launch_gooey_builder,
@@ -39,7 +39,17 @@ from daras_ai_v2.tab_spec import (
 )
 from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
-from functions.base_llm_tool import functions_input
+from functions.base_llm_tool import functions_input, render_called_functions
+from functions.models import FunctionTrigger
+from gooey_gui.types.about_props import (
+    AboutAuthor,
+    AboutCard,
+    AboutGroup,
+    AboutLinkTarget,
+    AboutSubmitTarget,
+    AboutTag,
+    RecipeAboutProps,
+)
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -50,6 +60,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     PublishIntent,
     RecipeSubmitIntent,
     RecipeTopBarProps,
+    RunControlIntent,
     RunIntent,
     ShareIntent,
     StopIntent,
@@ -57,6 +68,7 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarAuthor,
     TopBarIntegration,
     TopBarMenuItem,
+    TopBarParent,
 )
 from gooey_gui.types.recipe_workspace_props import (
     EventControlTarget,
@@ -72,6 +84,7 @@ from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
 from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
+from widgets.run_debug_info import run_debug_info_props
 from widgets.sidebar import sidebar_layout
 from widgets.workflow_cards import author_from_user, history_card
 from widgets.workflow_share import render_share_modal
@@ -165,7 +178,7 @@ class BasePage(BasePageV1):
         self._handle_top_bar_actions()
 
     def _page_shell_config(self, tabs: list[TabSpec]) -> PageShellConfig:
-        workspace_active = self.tab in {RecipeTabs.run, RecipeTabs.preview}
+        workspace_active = self._is_workspace_tab()
         route_layout = None
         if self.tab == RecipeTabs.preview:
             route_layout = SingleLayout(surface=SurfaceId.preview)
@@ -201,8 +214,7 @@ class BasePage(BasePageV1):
                 gui.model_component(RecipeSurfaceProps(surface=SurfaceId.about)),
                 gui.div(className="mt-1"),
             ):
-                with gui.styled(ABOUT_CSS), gui.div(className="v2-about"):
-                    self._render_about_content()
+                self._render_about_content()
 
             with (
                 gui.model_component(RecipeSurfaceProps(surface=SurfaceId.editor)),
@@ -253,21 +265,39 @@ class BasePage(BasePageV1):
         return SurfaceId.preview
 
     def _workspace_storage_key(self) -> str:
-        return (
-            f"gooey:recipe-layout:{self.workflow.value}:"
-            f"{self.current_pr.published_run_id}"
-        )
+        # Identity, not storage: the client keys its in-memory workspace on this, so a run
+        # does not inherit the view of the published run it came from.
+        sr, pr = self.current_sr_pr
+        kind = "pr" if pr.saved_run_id == sr.id else "run"
+        return f"gooey:recipe-layout:{self.workflow.value}:{pr.published_run_id}:{kind}"
 
-    def _can_show_builder(self) -> bool:
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+    def _is_workspace_tab(self) -> bool:
+        """Whether this tab draws the workspace, rather than being a document or a route."""
+        return self.tab in {RecipeTabs.run, RecipeTabs.preview}
+
+    def _can_launch_builder(self) -> bool:
+        """Whether Ask Gooey is available for this workflow at all.
+
+        Availability, not presence: every tab offers the way in, because a tab that cannot
+        hold the panel navigates to the workspace and opens it there.
+        """
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return can_launch_gooey_builder(self.request, workspace)
 
+    def _hosts_builder(self) -> bool:
+        """Whether this page draws the panel itself.
+
+        Only beside the workspace. Deploy, API and Usage are documents and routes with no
+        workspace next to the panel to talk about, and Deploy's web preview breaks outright
+        when the panel takes half its width.
+        """
+        return self._can_launch_builder() and self._is_workspace_tab()
+
     def _builder_layout(self):
         """(builder pane, body pane), or `(None, dummy)` when the Builder is unavailable."""
-        if not self._can_show_builder():
+        if not self._hosts_builder():
             return None, gui.dummy()
 
         return sidebar_layout(
@@ -275,7 +305,10 @@ class BasePage(BasePageV1):
             session=self.request.session,
             disabled=False,
             client_only=True,
-            storage_key=f"{self._workspace_storage_key()}:builder",
+            # Not the workspace's key: the client resets a panel to its default whenever
+            # the key changes, so saving a workflow - a new published run, and a new key -
+            # closed the panel that asked for the save.
+            storage_key=GOOEY_BUILDER_STORAGE_KEY,
         )
 
     def _render_gooey_builder(self):
@@ -388,6 +421,12 @@ class BasePage(BasePageV1):
             ):
                 self._render_version_history()
 
+        report_ref = gui.use_alert_dialog(key="report-modal")
+        if picked == self.MENU_REPORT:
+            report_ref.set_open(True)
+        if report_ref.is_open:
+            self._render_report_dialog(ref=report_ref)
+
         delete_ref = gui.use_confirm_dialog(key="--delete-run-modal")
         if picked == self.MENU_DELETE:
             delete_ref.set_open(True)
@@ -408,6 +447,62 @@ class BasePage(BasePageV1):
 
         if picked == self.MENU_DUPLICATE:
             self._duplicate_and_redirect()
+
+    REPORT_INAPPROPRIATE = "Inappropriate content"
+    REPORT_TYPES = ("Buggy Output", REPORT_INAPPROPRIATE, "Other")
+
+    def _render_report_dialog(self, *, ref):
+        """v1's report form, as a dialog. The run's output is not repeated inside it - in v2
+        it is already on screen in the pane behind."""
+        from daras_ai_v2.send_email import send_reported_run_email
+
+        with gui.alert_dialog(
+            ref=ref,
+            modal_title=f"#### {icons.flag} Report a Workflow",
+            unsafe_allow_html=True,
+        ):
+            gui.caption(
+                "These models are unmoderated, so a workflow's output can be wrong, broken, "
+                "or inappropriate. Tell us what went wrong and we will look into it."
+            )
+            gui.text_input("Workflow", disabled=True, value=self.title)
+            gui.text_input("Run URL", disabled=True, value=self.current_app_url())
+            report_type = gui.radio(
+                "Report Type", self.REPORT_TYPES, key="--report-type"
+            )
+            reason = gui.text_area(
+                "Reason for report",
+                key="--report-reason",
+                placeholder=(
+                    "Tell us why you are reporting this workflow - an error, poor output, "
+                    "inappropriate content - and what you expected instead."
+                ),
+            )
+            if not gui.button(
+                f"{icons.flag} Submit Report", type="primary", key="--report-submit"
+            ):
+                return
+            if not reason:
+                gui.error("Reason for report cannot be empty")
+                return
+
+            sr_user = self.current_sr_user
+            send_reported_run_email(
+                user=self.request.user,
+                run_uid=str(sr_user and sr_user.uid or ""),
+                url=self.current_app_url(),
+                recipe_name=self.title,
+                report_type=report_type,
+                reason_for_report=reason,
+                error_msg=gui.session_state.get(StateKeys.error_msg),
+            )
+            if report_type == self.REPORT_INAPPROPRIATE:
+                self.update_flag_for_run(is_flagged=True)
+
+            for key in ("--report-type", "--report-reason"):
+                gui.session_state.pop(key, None)
+            ref.set_open(False)
+            gui.rerun()
 
     def _duplicate_and_redirect(self) -> typing.NoReturn:
         """Copy this workflow into the current workspace and open the copy.
@@ -457,16 +552,10 @@ class BasePage(BasePageV1):
         self.submit_and_redirect()
 
     def entry_layout(self, tabs: list[TabSpec]) -> WorkspaceLayout:
-        """The view the workspace opens on. About for a view-only viewer, the work split for
-        anyone who can update the app.
-
-        Read off the same answer `get_tab_spec` reads, so the landing view and the tabs
-        offered cannot disagree: a view-only viewer is given About and How it works, and How
-        it works is a config form they have no way to save. About is what their half of the
-        tab set is for, so it is where they start - the root of a recipe and a published run
-        they cannot update alike.
-        """
-        if self.is_view_only():
+        """The published run opens on About, whoever is asking - it presents the workflow.
+        A saved run is work already underway, so it opens on the editor instead."""
+        sr, pr = self.current_sr_pr
+        if pr.saved_run_id == sr.id:
             return tabs[0].layout
         return self.work_layout()
 
@@ -485,9 +574,8 @@ class BasePage(BasePageV1):
         """
         if not self.request.user:
             return False
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return WorkflowAccessLevel.can_user_edit_published_run(
             workspace=workspace, user=self.request.user, pr=self.current_pr
@@ -509,6 +597,7 @@ class BasePage(BasePageV1):
     SUBMIT_INTENT_KEY = "--recipe-submit-intent"
 
     # Stable item keys carried by MenuIntent.
+    MENU_REPORT = "--menu-report"
     MENU_VERSION_HISTORY = "--menu-version-history"
     MENU_DUPLICATE = "--menu-duplicate"
     MENU_DELETE = "--menu-delete"
@@ -521,8 +610,9 @@ class BasePage(BasePageV1):
         pr = self.current_pr
         items = []
 
-        # A root recipe is the template every run forks from; it has no versions.
-        if not pr.is_root():
+        # A root recipe does have versions - it is edited in place. Reading that history
+        # and writing it are the same privilege - on a root pr, a staff admin's.
+        if not pr.is_root() or self.can_edit_current_pr:
             items.append(
                 TopBarMenuItem(
                     key=self.MENU_VERSION_HISTORY,
@@ -579,10 +669,8 @@ class BasePage(BasePageV1):
             return False
         if user.is_admin():
             return True
-        try:
-            return self.current_workspace.id == pr.workspace_id
-        except Workspace.DoesNotExist:
-            return False
+        workspace = self._current_workspace_or_none()
+        return bool(workspace and workspace.id == pr.workspace_id)
 
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars."""
@@ -613,8 +701,15 @@ class BasePage(BasePageV1):
         identity = self._workflow_identity()
         cost_label, cost_title = self._top_bar_cost()
         can_manage_sharing = self.can_manage_sharing()
+
+        # A view-only page has nothing to publish, and the five go together: the client
+        # renders its Publish control for any entry left, so one stray href or a Share row
+        # leaves a button still labelled Publish. A run is never view-only.
+        view_only = self.is_view_only()
+        publish_label = None if view_only else self._top_bar_publish_label()
+
         # a root recipe has no published run behind it, so there is no published url to share
-        can_share = not pr.is_root()
+        can_share = not pr.is_root() and not view_only
         share = NoShare()
         if can_share and can_manage_sharing:
             share = ManageShare(icon_html=icons.share)
@@ -624,9 +719,8 @@ class BasePage(BasePageV1):
                 icon_html=icons.share,
             )
 
-        is_running = self._is_run_in_progress()
-
         usage_active = self.tab == RecipeTabs.usage
+        can_launch_builder = self._can_launch_builder()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -635,32 +729,40 @@ class BasePage(BasePageV1):
                 title=identity.title if config.workspace_active else identity.name,
                 title_href=identity.href,
                 crumb_label=None if config.workspace_active else self.tab.label,
-                view_only=self.is_view_only(),
+                view_only=view_only,
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
                 author=self._top_bar_author(),
+                parent=self._top_bar_parent(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
-                publish_label=self._top_bar_publish_label(),
-                publish_intent=PublishIntent(),
-                api_href=self.current_app_url(RecipeTabs.run_as_api),
-                deploy_href=self.current_app_url(RecipeTabs.integrations),
+                publish_label=publish_label,
+                publish_intent=PublishIntent() if publish_label else None,
+                api_href=(
+                    None if view_only else self.current_app_url(RecipeTabs.run_as_api)
+                ),
+                deploy_href=(
+                    None if view_only else self.current_app_url(RecipeTabs.integrations)
+                ),
                 share=share,
                 has_unpublished_changes=self._has_request_changed()
                 or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 title_menu_items=self._title_menu_items(),
                 integrations=self._top_bar_integrations(),
-                run_intent=StopIntent() if is_running else RunIntent(),
+                run_intent=self._top_bar_run_intent(),
                 cost_label=None if usage_active else (cost_label or None),
                 cost_href=(
                     None if usage_active else (self.get_credits_click_url() or None)
                 ),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
-                    GOOEY_BUILDER_EVENT_KEY if self._can_show_builder() else None
+                    GOOEY_BUILDER_EVENT_KEY if can_launch_builder else None
+                ),
+                builder_storage_key=(
+                    GOOEY_BUILDER_STORAGE_KEY if can_launch_builder else None
                 ),
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
-                    if self._can_show_builder() and not builder_thread_is_empty(self)
+                    if can_launch_builder and not builder_thread_is_empty(self)
                     else None
                 ),
                 # a route rather than a pane, and empty for anyone who cannot read the
@@ -698,6 +800,36 @@ class BasePage(BasePageV1):
             )
         return None
 
+    def _top_bar_run_intent(self) -> RunControlIntent | None:
+        """Run or Stop, or None where the bar carries no run control at all.
+
+        Usage lists the saved runs already made rather than being somewhere to make one.
+        Left out here rather than hidden in the bar, so there is nothing to relocate into
+        the editor's bottom bar on a narrow screen either.
+        """
+        if self.tab == RecipeTabs.usage:
+            return None
+        return StopIntent() if self._is_run_in_progress() else RunIntent()
+
+    def _top_bar_parent(self) -> TopBarParent | None:
+        """The published run this saved run belongs to, or None on the published run itself.
+
+        A saved run is somewhere you work, while Deploy, Share and Versions act on the
+        published run behind it - so the mobile sheet leads with the way back there instead
+        of offering them. A saved run of a root recipe answers with the recipe, which is
+        what it forked from.
+        """
+        sr, pr = self.current_sr_pr
+        if pr.saved_run_id == sr.id:
+            return None
+        # `get_recipe_title` reaches for the root published run, so it is only asked when
+        # there is no title of our own to use
+        if pr.is_root():
+            label = self.get_recipe_title()
+        else:
+            label = pr.title or self.get_recipe_title()
+        return TopBarParent(label=label, href=pr.get_app_url())
+
     def _top_bar_publish_label(self) -> str:
         """Permission-derived label for the publish action."""
         if not self.is_logged_in():
@@ -731,17 +863,21 @@ class BasePage(BasePageV1):
             TabSpec(
                 key="preview",
                 label="Preview",
-                icon_html=icons.preview,
+                icon_html=icons.play,
                 layout=SingleLayout(surface=SurfaceId.preview),
             ),
             TabSpec(
                 key="split",
                 label="Split",
-                icon_html=icons.run,
+                icon_html=icons.split,
                 layout=SplitLayout(
                     primary=SurfaceId.editor,
                     secondary=SurfaceId.preview,
                 ),
+                # Two panes side by side has nowhere to go below lg, where every layout
+                # folds to one. The mobile sheet drops a desktop-only view, so this is what
+                # keeps Split out of it.
+                desktop_only=True,
             ),
         ]
 
@@ -771,198 +907,149 @@ class BasePage(BasePageV1):
         """What this workflow is. Version history lives in the title menu and Related
         Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
-        # The portrait leads; the top bar carries the title.
-        self._render_about_photo(pr)
-        # One panel answering "whose is this, what is it filed under, what is it" in that
-        # order. Tags and the description say the same thing at two lengths and the owner is
-        # who is saying it, so the three share a box; the cards below get their own, being a
-        # spec to scan rather than prose to read.
-        tags = list(pr.tags.all())
-        if pr.workspace_id or pr.notes or tags:
-            with gui.div(className="v2-about-panel"):
-                self._render_about_author(pr)
-                self._render_about_tags(tags)
-                if pr.notes:
-                    # the same heading the meta groups carry, so the panels read as a pair.
-                    # A real `gui.div` rather than `gui.html`: that wraps its body in a
-                    # `.gui-html-container`, which is `display: contents` and so generates no
-                    # box - the panel's spacing rule would land on the wrapper and vanish.
-                    with gui.div(className="v2-about-section-title"):
-                        gui.html("Description")
-                    with gui.div(className="container-margin-reset v2-about-notes"):
-                        gui.write(pr.notes, line_clamp=ABOUT_NOTES_LINE_CLAMP)
-        # `.v2-about-panel:empty` hides this for a recipe with neither cards nor
-        # deployments, which is what the base `_render_about_meta` renders.
-        with gui.div(className="v2-about-panel"):
-            self._render_about_meta()
-            self._render_about_deployments()
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
-    def _render_about_author(self, pr: PublishedRun):
-        """Who published this, at the head of the panel: their mark, their name, how much
-        else they have published, and Share opposite.
+        gui.model_component(
+            RecipeAboutProps(
+                photo_url=pr.photo_url or None,
+                circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
+                author=self._about_author(pr),
+                share_value=self._about_share_value(),
+                share_url=self._about_share_url(),
+                report_value=self._about_report_value(),
+                submit_intent_key=self.SUBMIT_INTENT_KEY,
+                tags=self._about_tags(pr),
+                notes=pr.notes or None,
+                notes_line_clamp=ABOUT_NOTES_LINE_CLAMP,
+                groups=self._about_groups(),
+            )
+        )
 
-        At every width. The top bar names the workspace too above lg, so the two repeat each
-        other there - but About is the tab that presents the workflow, and a reader landing
-        on it should not have to look up at the chrome to find out whose it is. Read off
-        `pr.workspace` like the bar's line is, so the two cannot name different owners.
+    def _about_author(self, pr: PublishedRun) -> AboutAuthor | None:
+        """Who published this: their mark, their name, and what else they have published.
 
-        Not `render_author_from_workspace`: that draws one line with the name beside the
-        mark, and this stacks a count under the name. Bending the shared widget into two
-        shapes would reach the page header and the workflow cards that also use it.
+        Read off `pr.workspace` like the top bar's line is, so the two attributions cannot
+        name different owners. Not `render_author_from_workspace`: that draws one line with
+        the name beside the mark, and this stacks a count under it.
         """
-        from daras_ai.text_format import format_number_with_suffix
-        from daras_ai_v2.profiles import public_workflow_count
+        if not pr.workspace_id:
+            return None
+        workspace = pr.workspace
+        return AboutAuthor(
+            name=workspace.display_name(self.request.user),
+            photo_url=workspace.get_photo(),
+            subtitle=self._about_author_subtitle(pr) or None,
+            href=self._about_author_href(workspace),
+        )
+
+    def _about_author_subtitle(self, pr: PublishedRun) -> str:
+        """The line under the owner's name: what else this workspace has published.
+
+        It qualifies the *name* it sits under, not the workflow. Read through
+        `public_workflow_count` so this and the workspace's profile cannot drift.
+        """
         from django.utils.translation import ngettext
 
+        from daras_ai.text_format import format_number_with_suffix
+        from daras_ai_v2.profiles import public_workflow_count
+
         if not pr.workspace_id:
-            return
-        workspace = pr.workspace
-
-        count = public_workflow_count(workspace)
+            return ""
+        count = public_workflow_count(pr.workspace)
+        if not count:
+            return ""
         noun = ngettext(singular="workflow", plural="workflows", number=count)
-        subtitle = f"{format_number_with_suffix(count)} Published {noun}"
+        return f"{format_number_with_suffix(count)} Published {noun}"
 
-        link = self._about_author_href(workspace)
-        with gui.div(className="v2-about-author"):
-            with (
-                link and gui.link(to=link) or gui.dummy(),
-                gui.div(className="v2-about-author-row"),
-            ):
-                gui.html(
-                    f'<img class="v2-about-author-photo"'
-                    f' src="{html.escape(workspace.get_photo())}" alt="">'
-                )
-                with gui.div(className="v2-about-author-text"):
-                    gui.html(
-                        '<span class="v2-about-author-name">'
-                        f"{html.escape(workspace.display_name(self.request.user))}</span>"
-                    )
-                    gui.html(
-                        f'<span class="v2-about-author-meta">{html.escape(subtitle)}</span>'
-                    )
-            if share := self._about_share_button():
-                gui.html(share)
+    def _about_report_value(self) -> str | None:
+        """The encoded pick that opens the report dialog, or None with nobody to attribute
+        it to. v1 also hid this on a published run; About is where it is asked for."""
+        if not self.is_logged_in():
+            return None
+        return MenuIntent(item_key=self.MENU_REPORT).model_dump_json()
 
-    def _about_share_button(self) -> str | None:
-        """Share, opposite the author. Carries the same `ShareIntent` the bar's button does,
-        so `_handle_top_bar_actions` opens the one share dialog on the page either way.
+    def _about_share_value(self) -> str | None:
+        """The encoded `ShareIntent`, or None with no dialog to open.
 
-        No permission check beyond what the dialog itself needs: `render_share_modal` asserts
-        a user and a workspace, and disables the controls for anyone who cannot change them
-        (`render_share_options_for_team_workspace` gates on `can_user_delete_published_run`).
-        A root recipe has no published url to share, which is the bar's rule too.
+        The same intent the bar's button posts, so `_handle_top_bar_actions` opens the one
+        share dialog either way. That dialog manages a published run's visibility, so it
+        takes one to manage and somebody to manage it for.
         """
         pr = self.current_pr
         if not self.is_logged_in() or not pr.workspace_id or pr.is_root():
             return None
-        return (
-            f'<button type="submit" class="v2-about-share"'
-            f' name="{html.escape(self.SUBMIT_INTENT_KEY)}"'
-            f' value="{html.escape(ShareIntent().model_dump_json())}">'
-            f"{icons.share}<span>Share</span></button>"
-        )
+        return ShareIntent().model_dump_json()
+
+    def _about_share_url(self) -> str | None:
+        """The url for the browser's own share sheet, wherever there is no dialog.
+
+        Not the dialog's conditions over again: those are about managing a published run,
+        and the sheet asks for nothing but a url. A page a visitor can read is a page they
+        can pass on - the recipe's own `/agent/` most of all.
+        """
+        if self._about_share_value():
+            return None
+        return self.current_app_url(self.tab)
 
     def _about_author_href(self, workspace: Workspace) -> str | None:
-        """Where the author block points. Same three answers `render_author_from_workspace`
-        gives, so the two attributions lead to the same page: your own workspace opens its
-        saved workflows, anyone else's opens their handle, and a workspace without one is
-        not a link at all."""
+        """Where the author block points. The same three answers
+        `render_author_from_workspace` gives, so the two attributions lead to one page."""
         from daras_ai_v2.fastapi_tricks import get_route_path
         from routers.account import saved_route
 
-        try:
-            if workspace == self.current_workspace:
-                return get_route_path(saved_route)
-        except Workspace.DoesNotExist:
-            pass
+        if workspace == self._current_workspace_or_none():
+            return get_route_path(saved_route)
         if workspace.handle_id:
             return workspace.handle.get_app_url()
         return None
 
-    def _render_about_tags(self, tags: list):
-        """What this workflow is filed under, above the Description heading. Each pill
-        searches /explore/ for the rest of its kind.
-
-        The pill the page header and the workflow cards already use, rather than one of
-        About's own: a tag should be drawn one way wherever it is shown, and it is the same
-        link in all three places.
-        """
+    def _about_tags(self, pr: PublishedRun) -> list[AboutTag]:
+        """What this workflow is filed under. Each pill searches /explore/ for its kind."""
         from daras_ai_v2.fastapi_tricks import get_app_route_url
         from routers.root import explore_page
-        from widgets.saved_workflow import render_pill_with_link
         from widgets.workflow_search import SearchFilters
 
-        if not tags:
-            return
-        with gui.div(className="v2-about-tags"):
-            for tag in tags:
-                render_pill_with_link(
-                    tag.render(),
-                    link_to=get_app_route_url(
-                        explore_page,
-                        query_params=SearchFilters(tag=tag.name).get_query_params(),
-                    ),
-                    # `light` is the widget's default and every other caller puts it on a
-                    # white page, where it reads as a chip. On this panel's tint it is a
-                    # couple of values off the surface behind it and disappears - so no
-                    # background class, and the fill comes from the CSS below.
-                    text_bg=None,
-                    className="border",
-                )
+        return [
+            AboutTag(
+                label_html=tag.render(),
+                href=get_app_route_url(
+                    explore_page,
+                    query_params=SearchFilters(tag=tag.name).get_query_params(),
+                ),
+            )
+            for tag in pr.tags.all()
+        ]
 
-    def _render_about_photo(self, pr: PublishedRun):
-        """The workflow's portrait. `CIRCLE_IMAGE_WORKFLOWS` get a round crop, matching the
-        top bar and the rail."""
-        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+    def _about_groups(self) -> list[AboutGroup]:
+        """The card rows: how the workflow is put together, then where it is live."""
+        groups = self._about_meta_groups()
+        if deployments := self._about_deployment_group():
+            groups.append(deployments)
+        return groups
 
-        if not pr.photo_url:
-            return
-        circle = self.workflow in CIRCLE_IMAGE_WORKFLOWS
-        gui.html(
-            f'<img class="v2-about-photo{" v2-about-photo-circle" if circle else ""}"'
-            f' src="{html.escape(pr.photo_url)}" alt="">'
-        )
+    def _about_meta_groups(self) -> list[AboutGroup]:
+        """Hook: cards summarising how this workflow is built. Per-recipe, so none here."""
+        return []
 
-    def _render_about_meta(self):
-        """Hook: cards summarising how this workflow is put together. Per-recipe, so the
-        base renders nothing."""
-
-    def _render_about_deployments(self):
-        """The channels this workflow is live on, as cards beside Model and Tools.
-
-        Its own `.v2-about-groups` row, since `_render_about_meta` is a per-recipe override a
-        base surface cannot reach into.
-        """
+    def _about_deployment_group(self) -> AboutGroup | None:
+        """The channels this workflow is live on, each carrying its chip's own target."""
         integrations = self._top_bar_integrations()
         if not integrations:
-            return
-        with (
-            gui.div(className="v2-about-groups"),
-            gui.div(className="v2-about-group"),
-        ):
-            gui.html('<div class="v2-about-section-title">Deployments</div>')
-            with gui.div(className="v2-about-meta"):
-                for it in integrations:
-                    gui.html(self._about_deployment_card(it))
-
-    def _about_deployment_card(self, it: TopBarIntegration) -> str:
-        """One channel, carrying the same target as its chip in the bar."""
-        body = (
-            f'<span class="v2-about-meta-icon">{it.icon_html}</span>'
-            f'<span class="v2-about-meta-label">{html.escape(it.label)}</span>'
-        )
-        if isinstance(it.target, LinkTarget):
-            return (
-                f'<a class="v2-about-meta-card"'
-                f' href="{html.escape(it.target.href)}">{body}</a>'
-            )
-        # The page's form copies its submitter's name and value into the state it posts, so
-        # a plain submit button reaches `_pop_submit_intent` by the same route the chip does
-        # and `_handle_menu_pick` opens the same dialog.
-        return (
-            f'<button type="submit" class="v2-about-meta-card"'
-            f' name="{html.escape(self.SUBMIT_INTENT_KEY)}"'
-            f' value="{html.escape(it.target.intent.model_dump_json())}">{body}</button>'
+            return None
+        return AboutGroup(
+            title="Deployments",
+            cards=[
+                AboutCard(
+                    icon_html=it.icon_html,
+                    label=it.label,
+                    target=(
+                        AboutLinkTarget(href=it.target.href)
+                        if isinstance(it.target, LinkTarget)
+                        else AboutSubmitTarget(value=it.target.intent.model_dump_json())
+                    ),
+                )
+                for it in integrations
+            ],
         )
 
     def _render_solo_input_col(self) -> bool:
@@ -1014,9 +1101,6 @@ class BasePage(BasePageV1):
     def render_selected_tab(self):
         """Render document-style tabs reached by URL."""
         match self.tab:
-            case RecipeTabs.examples:
-                self._examples_tab()
-
             case RecipeTabs.history:
                 self._history_tab()
 
@@ -1082,12 +1166,39 @@ class BasePage(BasePageV1):
             return False
         return self._usage_workspace() in user.cached_workspaces
 
+    def _current_workspace_or_none(self) -> Workspace | None:
+        """`current_workspace` for somewhere that can do without one: it raises for a logged
+        out visitor, who now reaches surfaces that only members used to."""
+        try:
+            return self.current_workspace
+        except Workspace.DoesNotExist:
+            return None
+
     def _usage_workspace(self) -> Workspace:
         """Whose runs the tab lists: the app's workspace, or the viewer's on a root recipe."""
         published_run = self.current_pr
         if not published_run.is_root() and published_run.workspace_id:
             return published_run.workspace
         return self.current_workspace
+
+    def render_debug_pane(self):
+        with gui.div(className="v2-debug"):
+            gui.model_component(
+                run_debug_info_props(
+                    self.current_sr,
+                    run_by=self.current_sr_user,
+                    # a logged-out viewer has no workspace of their own; the link falls back
+                    current_workspace=self._current_workspace_or_none(),
+                )
+            )
+            with gui.div(className="v2-debug-section"):
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                )
+                self.render_steps()
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.post
+                )
 
     def _render_functions(self):
         if not self.functions_in_settings:
@@ -1220,11 +1331,10 @@ FILL_HEIGHT_EDITOR_CSS = """
 & .cm-editor {
     flex: 1 1 auto;
     min-height: 0;
-    /* 10px to match the model selector directly above it and the pane pills above that -
-       they read as one group, so they should share a corner. `overflow: hidden` because the
-       line-number gutter and the scroller both paint to the editor's edge; without it their
-       square corners show through the rounded ones. */
-    border-radius: var(--gooey-radius-sm);
+    /* 8px to match the model selector above it. The border is what makes the corner visible
+       at all - white on a white card, a radius with no edge has nothing to show for itself. */
+    border: 1px solid var(--gooey-line-default);
+    border-radius: var(--gooey-radius-xs);
     overflow: hidden;
 }
 
@@ -1318,342 +1428,6 @@ VARIABLES_DIALOG_CSS = """
 }
 """
 
-# Matches `.v2-about-meta-icon` below. Icon html that carries its own inline size - a model
+# Matches `--v2-about-icon-size` below. Icon html that carries its own inline size - a model
 # creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
-ABOUT_META_ICON_SIZE = "1.5rem"
-
-ABOUT_CSS = """
-/* Above lg SPLIT_PANES_CSS makes every column `height: 100%; overflow: hidden`, so nothing
-   here scrolls unless this does - a description longer than the viewport is simply clipped.
-   Split needs no equivalent because its working column has an `overflow-auto` pane inside;
-   About is one card, so the card's container is what has to scroll. */
-@media (min-width: 992px) {
-    & {
-        height: 100%;
-        min-height: 0;
-        overflow-y: auto;
-        /* keeps the scrollbar off the card's border instead of on top of it */
-        padding-right: var(--gooey-space-2);
-    }
-}
-
-/* No card around this content. The pane it sits in is already a surface, so a white box
-   inside it was a second frame around the same thing - only the description panel and the
-   meta chips carry their own background now. */
-
-/* The portrait leads, centred and large: the top bar names the workflow, so this is what
-   identifies it here. `CIRCLE_IMAGE_WORKFLOWS` (agents) get a round crop. */
-& .v2-about-photo {
-    display: block;
-    width: 15rem;
-    height: 15rem;
-    max-width: 100%;
-    object-fit: cover;
-    border-radius: var(--gooey-radius-lg);
-    margin: var(--gooey-space-2) auto var(--gooey-space-6);
-}
-
-& .v2-about-photo-circle {
-    border-radius: 50%;
-}
-
-/* Who published this, at the head of the panel: the attribution on the left, Share opposite
-   it. One row - a long workspace name ellipsises rather than pushing the button onto a line
-   of its own. Bottom margin is on the element, in Bootstrap utilities. */
-& .v2-about-author {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--gooey-space-2);
-}
-
-/* Every box between this row and the name has to be allowed to shrink, or the name never
-   reaches its ellipsis and the row grows instead - a flex item defaults to `min-width: auto`,
-   which resolves to its content. `> *` because what sits here varies: `gui.link`'s anchor
-   when the workspace has a profile to point at, and the row itself when it has not, since
-   `gui.dummy` renders no node. Share is exempt by its own `flex: 0 0 auto`. */
-& .v2-about-author > * {
-    min-width: 0;
-}
-
-/* An outline control, matching the tag pills below it in border and text colour - the two sit
-   in the same box and should read as one family. `flex: 0 0 auto` keeps it at its natural
-   width while everything to its left gives way. */
-& .v2-about-share {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--gooey-space-2);
-    flex: 0 0 auto;
-    padding: var(--gooey-space-2) var(--gooey-space-4);
-    border: 1px solid var(--gooey-line-default);
-    border-radius: var(--gooey-radius-xs);
-    background: var(--gooey-bg-page);
-    color: var(--gooey-ink);
-    font-size: 0.9375rem;
-    font-weight: 500;
-    line-height: 1.2;
-    transition: border-color 0.12s ease, box-shadow 0.12s ease;
-}
-
-& .v2-about-share:hover {
-    border-color: var(--gooey-line-strong);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-    color: var(--gooey-ink);
-}
-
-/* The gap belongs to whatever follows, not to the author or the tags. As a trailing margin it
-   stacked on the panel's own padding whenever nothing came after - a workflow with no tags
-   and no description showed a band of dead space under the author. Not a Bootstrap utility:
-   an element cannot know from its own class list whether anything follows it. */
-& .v2-about-author + *,
-& .v2-about-tags + * {
-    margin-top: var(--gooey-space-4);
-}
-
-/* Mark, then the name over what else this workspace has published. Left-aligned under a
-   centred portrait on purpose: two lines centred read as a caption to the picture, and this
-   is the workflow's attribution. */
-& .v2-about-author-row {
-    display: flex;
-    align-items: center;
-    gap: var(--gooey-space-3);
-    min-width: 0;
-}
-
-& .v2-about-author-photo {
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--gooey-radius-full);
-    object-fit: cover;
-}
-
-& .v2-about-author-text {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-& .v2-about-author-name {
-    font-weight: 600;
-    color: var(--gooey-ink);
-    /* a long workspace name ellipsises rather than widening the row past the pane */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-& .v2-about-author-meta {
-    font-size: 0.875rem;
-    color: var(--gooey-ink-muted);
-    /* ellipsises with the name above it, rather than being the one thing that widens the row */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* The whole block is one link. Underlined at rest it read as a sentence with a link in it
-   rather than as the workflow's byline. */
-& .v2-about-author a,
-& .v2-about-author a:hover {
-    color: inherit;
-    text-decoration: none;
-}
-
-/* Above the Description heading, wrapping onto a second row rather than squeezing: a
-   workflow can carry a region, an industry and a language at once. */
-& .v2-about-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gooey-space-2);
-}
-
-/* Standing on the panel rather than lying in it: the page colour sits above the tint, where
-   the widget's `light` default is within a couple of values of it. Geometry is the pane
-   pills' - both are chips, and the page should only have one idea of what a chip is.
-   `!important` on the border because Bootstrap's `.border` sets the shorthand with it. */
-& .v2-about-tags .badge {
-    border-color: var(--gooey-line-default) !important;
-    color: var(--gooey-ink-muted);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 120%;
-    padding: var(--gooey-space-1) var(--gooey-space-3);
-    border-radius: var(--gooey-radius-sm) !important;
-}
-
-/* The pill is the link, so the anchor inside it should not announce itself separately. */
-& .v2-about-tags .badge a,
-& .v2-about-tags .badge a:hover {
-    color: inherit;
-    text-decoration: none;
-}
-
-/* One panel per kind of answer: the description is prose to read, the meta groups are a spec
-   to scan. Only the cards inside carry their own surface. */
-& .v2-about-panel {
-    background: var(--gooey-surface-100);
-    border-radius: var(--gooey-radius-lg);
-    padding: var(--gooey-space-4);
-}
-
-& .v2-about-panel + .v2-about-panel {
-    margin-top: var(--gooey-space-4);
-}
-
-/* The meta panel is opened before its contents are known - `_render_about_meta` is a
-   per-recipe hook and the base renders nothing - so a recipe with no cards and no
-   deployments would leave an empty tinted box under the description. */
-& .v2-about-panel:empty {
-    display: none;
-}
-
-& .v2-about-notes {
-    color: var(--gooey-ink);
-    /* The clamp's "…more" is drawn over the tail of the last line, so it carries an opaque
-       background to cover it - white by default, which read as a chip against this panel. */
-    --line-clamp-bg: var(--gooey-surface-100);
-}
-
-/* Model and Tools & Integrations, side by side while there is room. Model holds one card, so
-   it takes only what it needs and the integrations group gets the rest. */
-& .v2-about-groups {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gooey-space-6);
-}
-
-/* `_render_about_meta` and `_render_about_deployments` each emit a row of their own, and a
-   flex `gap` only spaces a container's own children - so without this Deployments sat flush
-   against the cards above it while the groups inside one row were properly spaced. */
-& .v2-about-groups + .v2-about-groups {
-    margin-top: var(--gooey-space-6);
-}
-
-/* Sizes to its own cards. With `min-width: 0` the group could be squeezed narrower than one
-   card, which made the cards inside wrap into a column while the row still looked half empty.
-   Whole groups wrap instead. */
-& .v2-about-group {
-    flex: 0 1 auto;
-    min-width: min-content;
-}
-
-& .v2-about-section-title {
-    /* Names the section rather than saying anything itself, so it is set back from what it
-       labels - the cards and the description are what should be read first. */
-    font-size: 0.9375rem;
-    font-weight: 500;
-    color: var(--gooey-ink-muted);
-    /* `margin-bottom`, not the `margin` shorthand: the shorthand also sets `margin-top: 0`,
-       which silently cancelled the gap the preceding tags row hands to whatever follows it -
-       same specificity, and this rule comes later. */
-    margin-bottom: var(--gooey-space-2);
-}
-
-/* `nowrap`: a group's cards belong on one line, and the group is what gives way when the row
-   runs out of width. Below lg they stack - see the media query at the end. */
-& .v2-about-meta {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: var(--gooey-space-6);
-}
-
-/* Icon above label, not beside it: the label is the longer of the two and wraps, so a row
-   layout made every card as tall as its text anyway. Fixed width so a set of one lines up
-   with a set of three. */
-& .v2-about-meta-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: var(--gooey-space-5);
-    flex: 0 0 var(--v2-about-card-width);
-    min-width: 10rem;
-    padding: var(--gooey-space-3);
-    border: 1px solid var(--gooey-line-default);
-    border-radius: var(--gooey-radius-md);
-    background: var(--gooey-surface-50);
-    color: var(--gooey-ink);
-    text-decoration: none;
-    transition: border-color 0.12s ease, box-shadow 0.12s ease;
-}
-
-& .v2-about-meta-card:hover {
-    border-color: var(--gooey-line-strong);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-    color: var(--gooey-ink);
-}
-
-/* No chip behind it: at this size the glyph and a model creator's colour logo both read
-   fine on the card itself, and the extra surface only muddied a card that is already a
-   surface. */
-& .v2-about-meta-icon {
-    display: inline-flex;
-    align-items: center;
-    font-size: 1.5rem;
-    line-height: 1;
-    color: var(--gooey-ink);
-}
-
-/* For icon html that arrives without a size of its own; anything carrying an inline one
-   wins here and has to be asked for ABOUT_META_ICON_SIZE instead. */
-& .v2-about-meta-icon img {
-    height: 1.5rem;
-    width: 1.5rem;
-    object-fit: contain;
-}
-
-& .v2-about-meta-label {
-    min-width: 0;
-    font-size: 0.9375rem;
-    line-height: 1.3;
-    /* a long name ellipsises rather than wrapping, so every card in a row is the same height */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-@media (max-width: 991.98px) {
-    /* One column: side by side there is not room for two groups plus their cards, and the
-       cards were being squeezed to the point the labels all ellipsised. */
-    & .v2-about-groups {
-        flex-direction: column;
-        gap: var(--gooey-space-5);
-    }
-
-    /* matches the gap the groups inside a row use here */
-    & .v2-about-groups + .v2-about-groups {
-        margin-top: var(--gooey-space-5);
-    }
-
-    /* the group is full width now, so its cards may wrap within it */
-    & .v2-about-meta {
-        flex-wrap: wrap;
-    }
-
-    /* `1 1 0` rather than a basis: the cards share the row evenly instead of each taking its
-       own content width, so they stay equal here too. Capped at the width they have above
-       lg, or a group holding one card stretched it the whole width of the panel. */
-    & .v2-about-meta-card {
-        flex: 1 1 0;
-        max-width: 10rem;
-    }
-
-    & {
-        /* Clears the tab pills, which below lg float over the bottom of the viewport rather
-           than sitting in the top bar. On the container rather than the last panel: whether
-           the meta panel is the last *rendered* box depends on whether it was hidden as
-           empty, and a `:last-child` rule reads the DOM, not what is displayed.
-
-           Deliberately not a space token: this is the height of another element, not a step
-           in the rhythm, and snapping it to the scale would either crowd the pills or leave
-           dead space under the last panel. */
-        padding-bottom: 4.5rem;
-        /* The panels are the full width of the pane, which put their edges hard against the
-           viewport's. Matches the `px-2` the editor column carries at this width, so the
-           content edge holds still when the two tabs are switched between. */
-        padding-left: var(--gooey-space-2);
-        padding-right: var(--gooey-space-2);
-    }
-}
-"""
+ABOUT_META_ICON_SIZE = "22px"

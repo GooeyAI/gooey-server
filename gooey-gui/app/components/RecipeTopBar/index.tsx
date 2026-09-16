@@ -16,15 +16,20 @@ import {
   useWorkspaceLayout,
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
+import { useCopyToClipboard } from "~/useCopyToClipboard";
+import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import {
   activeViewForLayouts,
   isRootLayout,
   layoutsEqual,
-  paneVisibility,
-  workspaceTargetForLayout,
+  revealRunOutput,
+  workspaceHrefToNavigate,
+  workspaceLayoutNavigationState,
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
 import { isIntegrationLabelled } from "./integrationChips";
+import type { SheetSlot } from "./sheetSlots";
+import { sheetAudience, sheetSlots } from "./sheetSlots";
 import { encodeSubmitIntent } from "./submitIntent";
 
 type TopBarTarget = LinkTarget | SubmitTarget;
@@ -46,11 +51,26 @@ type MenuEntry = {
 const PREVIEW_VIEW: WorkspaceView = {
   key: "preview",
   label: "Preview",
-  // The eye, same as `icons.preview` on the Preview tab an owner is given and same as the
-  // header button beside it - one destination should not be drawn two ways.
-  icon_html: '<i class="fa-solid fa-eye"></i>',
+  // Play, same as `icons.play` on the Preview tab an owner is given and same as the compact
+  // button below lg - one destination should not be drawn two ways.
+  icon_html: '<i class="fa-regular fa-play"></i>',
   layout: { kind: "single", surface: "preview" },
   desktop_only: false,
+};
+
+// `BasePage.MENU_*` - the keys Python stamps on the title-menu items, so the sheet can put
+// them in its own order rather than taking the list as it comes.
+const MENU_VERSION_HISTORY_KEY = "--menu-version-history";
+const MENU_DUPLICATE_KEY = "--menu-duplicate";
+const MENU_DELETE_KEY = "--menu-delete";
+
+// Where a "Run of <name>" row lands: the published run's own About. There is no
+// per-surface url to link to, so the layout rides along as navigation state, which the next
+// page reads while it hydrates.
+const ABOUT_LAYOUT: WorkspaceLayout = {
+  kind: "split",
+  primary: "about",
+  secondary: "preview",
 };
 
 // the Publish menu's own entries, distinguishable from anything the server declares
@@ -66,6 +86,7 @@ export function RecipeTopBar({
   photo_url,
   circle_photo,
   author,
+  parent,
   title_menu_items,
   integrations,
   submit_intent_key,
@@ -82,34 +103,28 @@ export function RecipeTopBar({
   crumb_label,
   deploy_href,
   builder_panel_key,
+  builder_storage_key,
   builder_new_event,
   usage_href,
   usage_active,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
-  const [shareCopied, setShareCopied] = useState(false);
+  const { copied: shareCopied, copyUrl } = useCopyToClipboard();
   const copyShareUrl = () => {
     if (share.kind !== "copy") {
       return;
     }
-    if (!navigator.clipboard) {
-      window.prompt("Copy this link", share.url);
-      return;
-    }
-    navigator.clipboard
-      .writeText(share.url)
-      .then(() => {
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 2000);
-      })
-      .catch(() => window.prompt("Copy this link", share.url));
+    copyUrl(share.url);
   };
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const builder = useAppShellPanel(
     builder_panel_key,
     Boolean(builder_panel_key && state[builder_panel_key]),
-    builder_panel_key ? `${config.storage_key}:builder` : null
+    // The server's key, not one built from the workspace's: the rail addresses this same
+    // panel with the server's, and a key off `config.storage_key` moves with the published
+    // run - so saving a workflow closed the panel that had asked for the save.
+    builder_storage_key
   );
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -122,10 +137,9 @@ export function RecipeTopBar({
   // Used wherever a layout has to be named. Not `config.views`, which is what the desktop
   // pill strip draws - the supplied Preview is reachable from the header and the sheet, both
   // of which are the narrow layout's, and a pill for it would be redundant beside them.
-  const views =
-    previewView === PREVIEW_VIEW
-      ? [...config.views, PREVIEW_VIEW]
-      : config.views;
+  const views = config.views.some((view) => view.key === "preview")
+    ? config.views
+    : [...config.views, PREVIEW_VIEW];
   const activeViewSpec = activeViewForLayouts(
     views,
     layout,
@@ -134,17 +148,20 @@ export function RecipeTopBar({
   );
   const chooseView = (view: WorkspaceView) => {
     selectLayout(view.layout);
-    const target = workspaceTargetForLayout(
+    const target = workspaceHrefToNavigate(
       config.workspace_active,
       config.workspace_href
     );
     if (target) {
-      navigate(target);
+      // Carry the pick. A document tab is a route, so leaving one is a real navigation, and
+      // the workspace opens on the view its url asks for - which threw the `selectLayout`
+      // above away and landed on About whichever view you had picked to leave by.
+      navigate(target, { state: workspaceLayoutNavigationState(view.layout) });
     }
   };
   const handleRun = () => {
-    if (config.workspace_active && run_intent.kind === "run") {
-      window.setTimeout(() => selectLayout(config.run_layout), 0);
+    if (config.workspace_active && run_intent?.kind === "run") {
+      revealRunOutput(layout, config.run_layout, selectLayout);
     }
   };
 
@@ -179,7 +196,9 @@ export function RecipeTopBar({
   // swaps to it from the sheet, and Preview is already there - the slot gives way to Update.
   const canShowPreview = builderOpen || activeViewSpec?.key === "about";
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
-  const isRunning = run_intent.kind === "stop";
+  // Absent on a tab that carries no run control, where nothing is running as far as the
+  // bar is concerned.
+  const isRunning = run_intent?.kind === "stop";
 
   const setBuilder = (open: boolean) => {
     if (builder_panel_key) {
@@ -212,7 +231,7 @@ export function RecipeTopBar({
     // Usage is a page rather than a pane and does not draw the panel, so it has to be left
     // behind first. The panel is commanded open before the navigation and stays open across
     // it, so it is up when the workspace arrives.
-    const target = workspaceTargetForLayout(
+    const target = workspaceHrefToNavigate(
       config.workspace_active,
       config.workspace_href
     );
@@ -221,10 +240,17 @@ export function RecipeTopBar({
     }
   };
 
-  const titleMenuRef = useDismissOnOutsideClick(() => setTitleMenuOpen(false));
-  const overflowRef = useDismissOnOutsideClick(() => setOverflowOpen(false));
-  const publishMenuRef = useDismissOnOutsideClick(() =>
-    setPublishMenuOpen(false)
+  const titleMenuRef = useDismissOnOutsideClick(
+    () => setTitleMenuOpen(false),
+    titleMenuOpen
+  );
+  const overflowRef = useDismissOnOutsideClick(
+    () => setOverflowOpen(false),
+    overflowOpen
+  );
+  const publishMenuRef = useDismissOnOutsideClick(
+    () => setPublishMenuOpen(false),
+    publishMenuOpen
   );
 
   const publishEntries: MenuEntry[] = [];
@@ -287,15 +313,19 @@ export function RecipeTopBar({
       mobileOnly: true,
     })),
   ];
-  const viewEntry = (key: string): SheetEntry[] => {
-    const view = config.views.find((candidate) => candidate.key === key);
-    if (!view) {
+  const viewEntry = (key: string, label?: string): SheetEntry[] => {
+    const view = views.find((candidate) => candidate.key === key);
+    // The sheet only exists below lg, so a view that asks to be desktop-only has no
+    // business in it - Split is one, and it is why this guard is here rather than assumed.
+    if (!view || view.desktop_only) {
       return [];
     }
     return [
       {
         key: `--sheet-view-${view.key}`,
-        label: view.label,
+        // The sheet names a couple of the surfaces differently from the desktop pills, which
+        // have the room to be terser - so the label is overridable here.
+        label: label ?? view.label,
         iconHtml: view.icon_html ?? undefined,
         onPick: () => showView(view),
       },
@@ -317,90 +347,122 @@ export function RecipeTopBar({
         ]
       : [];
 
-  // The way into Ask Gooey from the surfaces it is not already covering. Not from About,
-  // whose header offers the preview instead, and not while the panel is up, where the sheet
-  // offers New Chat. Nor from API or Deploy, which do not show the panel at all.
-  const builderEntry: SheetEntry[] =
-    !builderOpen &&
-    !!builder_panel_key &&
-    (usage_active ||
-      activeViewSpec?.key === "edit" ||
-      activeViewSpec?.key === "preview")
+  // The way into Ask Gooey. Not while the panel is already up, where the sheet offers New
+  // Chat instead. What it offers to do depends on whose published run it is: your own is
+  // edited, someone else's is remixed into a copy, and a saved run is just worked on.
+  const builderEntry = (label: string): SheetEntry[] =>
+    !builderOpen && !!builder_panel_key
       ? [
           {
             key: "--sheet-builder",
-            label: "Ask Gooey",
+            label,
             iconClass: "fa-regular fa-sparkles",
             onPick: showBuilder,
           },
         ]
       : [];
 
-  const otherWorkView = activeViewSpec?.key === "edit" ? "preview" : "edit";
+  // A control on the Ask Gooey panel, so it is only offered while that panel is up.
+  const newChatEntry: SheetEntry[] =
+    builder_new_event && builderOpen
+      ? [
+          {
+            key: "--sheet-new-chat",
+            label: "New Chat",
+            iconClass: "fa-regular fa-pen-to-square",
+            onPick: () =>
+              window.dispatchEvent(new CustomEvent(builder_new_event)),
+          },
+        ]
+      : [];
 
-  const sheetEntries: SheetEntry[] = view_only
+  // The channels this published run is deployed to, as rows of their own. No group heading:
+  // the menu is one flat list, and with a channel or two at the top of it a heading is more
+  // furniture than help.
+  const integrationEntries: SheetEntry[] = integrations.map((it) => ({
+    key: it.key,
+    label: it.label,
+    iconHtml: it.icon_html,
+    href: it.target.kind === "link" ? it.target.href : undefined,
+    submitIntent: it.target.kind === "submit" ? it.target.intent : undefined,
+    onPick: () => setBuilder(false),
+  }));
+
+  const sheetEntry = (entries: MenuEntry[], key: string): SheetEntry[] =>
+    entries
+      .filter((item) => item.key === key)
+      .map((item) => ({
+        key: item.key,
+        label: item.label,
+        iconHtml: item.iconHtml ?? undefined,
+        href: item.target?.kind === "link" ? item.target.href : undefined,
+        submitIntent:
+          item.target?.kind === "submit" ? item.target.intent : undefined,
+        onPick: item.onPick ?? (() => setBuilder(false)),
+      }));
+
+  // Named so the three menus below read as the orders they are, rather than as index
+  // arithmetic over `publishEntries` and `title_menu_items`.
+  const saveEntry = sheetEntry(publishEntries, PUBLISH_ITEM_KEY);
+  const shareEntry = sheetEntry(publishEntries, SHARE_ITEM_KEY);
+  const apiEntry = sheetEntry(publishEntries, API_ITEM_KEY);
+  const deployEntry = sheetEntry(publishEntries, DEPLOY_ITEM_KEY);
+  const versionsEntry = sheetEntry(titleEntries, MENU_VERSION_HISTORY_KEY);
+  const duplicateEntry = sheetEntry(titleEntries, MENU_DUPLICATE_KEY);
+  const deleteEntry = sheetEntry(titleEntries, MENU_DELETE_KEY);
+
+  // Where a saved run's menu leads: back to the published run it belongs to, opening on
+  // About. The layout rides along in the navigation state, read while the next page
+  // hydrates.
+  const parentEntry: SheetEntry[] = parent
     ? [
-        // `views`, so a tab set that names no Preview of its own still offers the bot here.
-        // A visitor's does not, and the header's eye only appears from About - which left
-        // How it works with no route to the thing it is describing.
-        ...views
-          .filter((view) => !view.desktop_only)
-          .map((view) => ({
-            key: `--sheet-view-${view.key}`,
-            label: view.label,
-            iconHtml: view.icon_html ?? undefined,
-            onPick: () => showView(view),
-          })),
-        ...usageEntry,
-        ...(builder_panel_key
-          ? [
-              {
-                key: "--sheet-remix",
-                label: "Ask Gooey to Edit",
-                iconClass: "fa-regular fa-shuffle",
-                onPick: () => setBuilder(true),
-              },
-            ]
-          : []),
+        {
+          key: "--sheet-parent",
+          label: `Run of ${parent.label}`,
+          iconClass: "fa-regular fa-circle-info",
+          href: parent.href,
+          navigationLayout: ABOUT_LAYOUT,
+          onPick: () => setBuilder(false),
+        },
       ]
-    : [
-        ...viewEntry("about"),
-        // A control on the Ask Gooey panel, so it is only offered while that panel is up.
-        ...(builder_new_event && builderOpen
-          ? [
-              {
-                key: "--sheet-new-chat",
-                label: "New Chat",
-                iconClass: "fa-regular fa-pen-to-square",
-                onPick: () =>
-                  window.dispatchEvent(new CustomEvent(builder_new_event)),
-              },
-            ]
-          : []),
-        ...viewEntry(otherWorkView),
-        ...builderEntry,
-        ...usageEntry,
-        ...titleEntries.map((item) => ({
-          key: item.key,
-          label: item.label,
-          iconHtml: item.iconHtml ?? undefined,
-          href: item.target?.kind === "link" ? item.target.href : undefined,
-          submitIntent:
-            item.target?.kind === "submit" ? item.target.intent : undefined,
-        })),
-        ...overflowEntries
-          .filter((item) => item.key !== PUBLISH_ITEM_KEY)
-          .map((item) => ({
-            key: item.key,
-            label: item.label,
-            iconHtml: item.iconHtml ?? undefined,
-            href: item.target?.kind === "link" ? item.target.href : undefined,
-            submitIntent:
-              item.target?.kind === "submit" ? item.target.intent : undefined,
-            heading: item.heading,
-            onPick: item.onPick ?? (() => setBuilder(false)),
-          })),
-      ];
+    : [];
+
+  const audience = sheetAudience({ onSavedRun: !!parent, viewOnly: view_only });
+
+  /* Every row the sheet can hold. `sheetSlots` picks which of them appear and in what order;
+     the labels are here because they are the one thing that varies with who is looking - a
+     visitor configures nothing, so their row explains rather than edits, and Ask Gooey
+     edits your own published run, remixes someone else's and just works on a saved run. */
+  const slotEntries: Record<SheetSlot, SheetEntry[]> = {
+    parent: parentEntry,
+    integrations: integrationEntries,
+    about: viewEntry("about"),
+    preview: viewEntry("preview"),
+    edit:
+      audience === "visitor"
+        ? viewEntry("how-it-works", "How it Works")
+        : viewEntry("edit"),
+    newChat: newChatEntry,
+    builder: builderEntry(
+      {
+        savedRun: "Ask Gooey",
+        visitor: "Ask Gooey to Remix",
+        editor: "Ask Gooey to Edit",
+      }[audience]
+    ),
+    usage: usageEntry,
+    save: saveEntry,
+    deploy: deployEntry,
+    share: shareEntry,
+    api: apiEntry,
+    versions: versionsEntry,
+    duplicate: duplicateEntry,
+    delete: deleteEntry,
+  };
+
+  const sheetEntries: SheetEntry[] = sheetSlots(audience).flatMap(
+    (slot) => slotEntries[slot]
+  );
 
   // Shared by the two forms the heading takes. The crumb sits inside it so a long name
   // ellipsises against it rather than pushing it off the row.
@@ -434,6 +496,14 @@ export function RecipeTopBar({
         !atRoot && "gooey-topbar-stacked"
       )}
     >
+      {/* An agent with no JS never reaches hydration, so it is shown what was held back.
+          Here rather than the app shell: this bar is the one part of v2 on every tab. */}
+      <noscript
+        dangerouslySetInnerHTML={{
+          __html: "<style>.gooey-until-hydrated{visibility:visible}</style>",
+        }}
+      />
+
       <div className="gooey-topbar-left">
         {/* The way back below lg: the nav drawer at the root, the previous level elsewhere. */}
         <button
@@ -463,30 +533,33 @@ export function RecipeTopBar({
 
         <div className="gooey-topbar-titleblock" ref={titleMenuRef}>
           <div className="gooey-topbar-titlerow">
-            {/* A heading that names another page is a link to it - a run points at the
-                workflow it came from. Where it names this page the server sends no href and
-                it stays the menu's trigger, as it is on the workflow's own url. */}
-            {title_href ? (
-              <Link
-                to={title_href}
-                className="gooey-topbar-title gooey-topbar-title-link"
-                title={title}
-              >
-                {titleContent}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className="gooey-topbar-title"
-                onClick={() => setTitleMenuOpen((v) => !v)}
-                disabled={!title_menu_items.length || isNarrow}
-              >
-                {titleContent}
-                {!!title_menu_items.length && !isNarrow && (
-                  <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
-                )}
-              </button>
-            )}
+            {/* The page's h1, around the control only: `h1` takes phrasing content, which
+                `a` and `button` are and the row's `div` is not. */}
+            <h1 className="gooey-topbar-heading">
+              {/* A heading naming another page is a link to it; on its own url it stays
+                  the menu's trigger, which is why the server sends no href there. */}
+              {title_href ? (
+                <Link
+                  to={title_href}
+                  className="gooey-topbar-title gooey-topbar-title-link"
+                  title={title}
+                >
+                  {titleContent}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="gooey-topbar-title"
+                  onClick={() => setTitleMenuOpen((v) => !v)}
+                  disabled={!title_menu_items.length || isNarrow}
+                >
+                  {titleContent}
+                  {!!title_menu_items.length && !isNarrow && (
+                    <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+                  )}
+                </button>
+              )}
+            </h1>
             {/* Above lg the chevron is the only way to Versions, Duplicate and Delete, so
                 once the title itself navigates the menu needs a trigger of its own. */}
             {!!title_href && !!title_menu_items.length && !isNarrow && (
@@ -518,8 +591,10 @@ export function RecipeTopBar({
       {/* A single-view recipe does not need a selector unless Usage is available. */}
       {(config.views.length > 1 || !!usage_href) && (
         <div
-          className="gooey-topbar-tabs"
-          style={{ visibility: paneVisibility(hydrated) }}
+          className={clsx(
+            "gooey-topbar-tabs",
+            !hydrated && "gooey-until-hydrated"
+          )}
         >
           {config.views.map((view) => (
             <button
@@ -575,13 +650,15 @@ export function RecipeTopBar({
 
         {/* Preview from About and from Ask Gooey, Update from the work views.
 
-            `preventDefault` because the two share a slot: choosing Preview leaves About, so
-            React patches this very node into the submit button below before the browser runs
-            the click's activation behaviour, and the form was posting the publish intent -
-            the save dialog opened on top of the preview. Cancelling the default action is
-            immune to that ordering; re-keying the pair would not be. */}
+            Two different controls, so they carry distinct keys: without them React reuses
+            one DOM node for both, and choosing Preview leaves About - so React patched this
+            node into the submit button below before the browser ran the click's activation
+            behaviour, and the form posted the publish intent. The save dialog opened on top
+            of the preview. The keys keep the nodes apart; `preventDefault` stays as the
+            direct guard on a control that must never submit. */}
         {canShowPreview ? (
           <button
+            key="topbar-action-preview"
             type="button"
             className="gooey-topbar-action d-lg-none"
             onClick={(e) => {
@@ -591,12 +668,13 @@ export function RecipeTopBar({
             title="Preview"
             aria-label="Preview"
           >
-            <i className="fa-regular fa-eye" />
+            <i className="fa-regular fa-play" />
           </button>
         ) : (
           !!publish_label &&
           !!publish_intent && (
             <button
+              key="topbar-action-publish"
               type="submit"
               name={submit_intent_key}
               value={encodeSubmitIntent(publish_intent)}
@@ -772,27 +850,31 @@ export function RecipeTopBar({
           </span>
         )}
 
-        <button
-          type="submit"
-          name={submit_intent_key}
-          value={encodeSubmitIntent(run_intent)}
-          className={clsx(
-            "gooey-topbar-run",
-            isRunning && "gooey-topbar-run-stop"
-          )}
-          onClick={handleRun}
-          title={isRunning ? "Stop this run" : "Run"}
-          aria-label={isRunning ? "Stop this run" : "Run"}
-        >
-          {isRunning ? (
-            <i className="fa-regular fa-xmark-large" />
-          ) : (
-            <i className="fa-solid fa-play" />
-          )}
-          <span className="gooey-topbar-btn-label">
-            {isRunning ? "Stop" : "Run"}
-          </span>
-        </button>
+        {/* Omitted, not disabled, where the server sends no run intent: Usage lists the
+            saved runs already made, so a Run control has nothing to do there. */}
+        {!!run_intent && (
+          <button
+            type="submit"
+            name={submit_intent_key}
+            value={encodeSubmitIntent(run_intent)}
+            className={clsx(
+              "gooey-topbar-run",
+              isRunning && "gooey-topbar-run-stop"
+            )}
+            onClick={handleRun}
+            title={isRunning ? "Stop this run" : "Run"}
+            aria-label={isRunning ? "Stop this run" : "Run"}
+          >
+            {isRunning ? (
+              <i className="fa-regular fa-xmark-large" />
+            ) : (
+              <i className="fa-solid fa-play" />
+            )}
+            <span className="gooey-topbar-btn-label">
+              {isRunning ? "Stop" : "Run"}
+            </span>
+          </button>
+        )}
       </div>
 
       {sheetOpen && (
@@ -819,11 +901,12 @@ function Menu({
 }) {
   if (!open || !items.length) return null;
   return (
-    <div className="gooey-topbar-menu">
+    <div className="gooey-topbar-menu" role="menu">
       {items.map((item) =>
         item.heading ? (
           <div
             key={item.key}
+            role="presentation"
             className={clsx(
               "gooey-topbar-menu-heading",
               item.mobileOnly && "d-lg-none"
@@ -835,6 +918,7 @@ function Menu({
           <Link
             key={item.key}
             to={item.target.href}
+            role="menuitem"
             onClick={onDismiss}
             className={clsx(
               "gooey-topbar-menu-item",
@@ -858,6 +942,7 @@ function Menu({
                 ? encodeSubmitIntent(item.target.intent)
                 : undefined
             }
+            role="menuitem"
             className={clsx(
               "gooey-topbar-menu-item",
               item.isDanger && "text-danger",
@@ -890,15 +975,40 @@ function Icon({ html, className }: { html?: string; className?: string }) {
   );
 }
 
-function useDismissOnOutsideClick(onDismiss: () => void) {
+/** Dismiss a menu on a click outside it or on Escape, and return focus to its trigger.
+ *
+ *  Only listens while the menu is open: `onDismiss` is an inline arrow at every call site,
+ *  so listing it as a dependency re-bound two document listeners on every render of the
+ *  bar - three menus' worth, most of them for menus that were shut. It is held in a ref
+ *  instead, which is also what lets the effect depend on `open` alone. */
+function useDismissOnOutsideClick(onDismiss: () => void, open: boolean) {
   const ref = useRef<HTMLDivElement>(null);
+  const dismiss = useRef(onDismiss);
+  dismiss.current = onDismiss;
+
   useEffect(() => {
-    const handle = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        dismiss.current();
+      }
     };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [onDismiss]);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Focus is inside the menu that is closing, so it has to be put somewhere the user
+      // can carry on from - the trigger is the only thing that outlives the menu.
+      const trigger = ref.current?.querySelector("button");
+      dismiss.current();
+      if (trigger instanceof HTMLElement) trigger.focus();
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
   return ref;
 }
 

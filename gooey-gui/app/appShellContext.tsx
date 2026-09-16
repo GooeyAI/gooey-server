@@ -5,21 +5,26 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
 
 import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
+import { WIDE_QUERY } from "./components/RecipeWorkspace/breakpoints";
 import {
   clearWorkspaceLayoutNavigationState,
   foldForNarrowViewport,
   initialWorkspaceState,
-  type PersistedWorkspaceState,
+  workspaceHydrationToken,
+  peekCarriedRunLayout,
+  type WorkspaceState,
   type WorkspaceLayout,
 } from "./components/RecipeWorkspace/paneState";
 
 type WorkspaceEntry = {
-  value: PersistedWorkspaceState;
+  value: WorkspaceState;
   hydrated: boolean;
   hydrationToken: string;
 };
@@ -53,6 +58,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   );
   const [panels, setPanels] = useState<Record<string, PanelEntry>>({});
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+  const panelsRef = useRef(panels);
+  panelsRef.current = panels;
 
   const setWorkspace = useCallback((key: string, entry: WorkspaceEntry) => {
     setWorkspaces((current) => ({ ...current, [key]: entry }));
@@ -71,16 +78,19 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     setPanels((current) => ({ ...current, [key]: entry }));
   }, []);
 
+  // The storage key lives in the entry, so the write needs the current one - but a state
+  // updater has to stay pure (React runs it twice in StrictMode), so the key is read out
+  // through a ref and persisted here rather than inside the updater.
   const setPanelOpen = useCallback((key: string, open: boolean) => {
+    const storageKey = panelsRef.current[key]?.storageKey ?? null;
+    persistPanelOpen(storageKey, open);
     setPanels((current) => {
       const entry = current[key];
-      const storageKey = entry?.storageKey ?? null;
-      persistPanelOpen(storageKey, open);
       return {
         ...current,
         [key]: {
           open,
-          storageKey,
+          storageKey: entry?.storageKey ?? storageKey,
           hydrated: entry?.hydrated ?? true,
           commanded: true,
         },
@@ -88,19 +98,33 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Memoised because every workspace pane consumes this: an unmemoised literal made one
+  // drawer tap re-render the whole workspace tree. The setters are already stable, so only
+  // a real state change invalidates it.
+  const value = useMemo(
+    () => ({
+      workspaces,
+      setWorkspace,
+      hydrateWorkspace,
+      panels,
+      setPanel,
+      setPanelOpen,
+      navDrawerOpen,
+      setNavDrawerOpen,
+    }),
+    [
+      workspaces,
+      setWorkspace,
+      hydrateWorkspace,
+      panels,
+      setPanel,
+      setPanelOpen,
+      navDrawerOpen,
+    ]
+  );
+
   return (
-    <AppShellContext.Provider
-      value={{
-        workspaces,
-        setWorkspace,
-        hydrateWorkspace,
-        panels,
-        setPanel,
-        setPanelOpen,
-        navDrawerOpen,
-        setNavDrawerOpen,
-      }}
-    >
+    <AppShellContext.Provider value={value}>
       {children}
     </AppShellContext.Provider>
   );
@@ -110,26 +134,21 @@ export function useWorkspaceLayout(config: PageShellConfig) {
   const context = useAppShellContext();
   const location = useLocation();
   const entry = context.workspaces[config.storage_key];
-  const fallback: PersistedWorkspaceState = {
-    version: 1,
-    layout: config.route_layout ?? config.initial_layout,
+  // The carry too, not just the url's own view: after a run the storage key changes, so this
+  // first render has no entry and would lay out the work view before the effect corrects it.
+  const fallback: WorkspaceState = {
+    layout:
+      config.route_layout ??
+      peekCarriedRunLayout(config) ??
+      config.initial_layout,
     handled_run_id: null,
   };
   const current = entry?.value ?? fallback;
   const [isNarrow, setIsNarrow] = useState(false);
 
   useHydrationEffect(() => {
-    const hydrationToken = [
-      location.key,
-      config.active_run_id ?? "",
-      config.route_layout ? JSON.stringify(config.route_layout) : "",
-    ].join(":");
-    const next = initialWorkspaceState(
-      config,
-      window.sessionStorage,
-      location.state
-    );
-    persistWorkspaceState(config.storage_key, next);
+    const hydrationToken = workspaceHydrationToken(config, location);
+    const next = initialWorkspaceState(config, location.state);
     context.hydrateWorkspace(config.storage_key, {
       value: next,
       hydrated: true,
@@ -139,7 +158,13 @@ export function useWorkspaceLayout(config: PageShellConfig) {
       clearWorkspaceLayoutNavigationState();
     }
     setIsNarrow(!window.matchMedia(WIDE_QUERY).matches);
-  }, [config.storage_key, config.active_run_id, location.key, location.state]);
+  }, [
+    config.storage_key,
+    config.active_run_id,
+    location.pathname,
+    location.search,
+    location.state,
+  ]);
 
   useEffect(() => {
     const wide = window.matchMedia(WIDE_QUERY);
@@ -151,7 +176,6 @@ export function useWorkspaceLayout(config: PageShellConfig) {
   const selectLayout = useCallback(
     (layout: WorkspaceLayout) => {
       const next = { ...current, layout };
-      persistWorkspaceState(config.storage_key, next);
       context.setWorkspace(config.storage_key, {
         value: next,
         hydrated: true,
@@ -273,19 +297,6 @@ function useAppShellContext(): AppShellContextValue {
     throw new Error("App shell hooks require AppShellProvider");
   }
   return context;
-}
-
-const WIDE_QUERY = "(min-width: 992px)";
-
-function persistWorkspaceState(
-  storageKey: string,
-  state: PersistedWorkspaceState
-) {
-  try {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(state));
-  } catch {
-    // The in-memory context remains usable when browser storage is unavailable.
-  }
 }
 
 function workspaceLayoutNavigationStatePresent(state: unknown): boolean {

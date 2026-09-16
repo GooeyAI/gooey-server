@@ -1,7 +1,14 @@
 import "./RecipeWorkspace.css";
 
 import clsx from "clsx";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 
 import type { EditorRunBarProps } from "@gooey-types/recipe_top_bar_props";
@@ -22,7 +29,7 @@ import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
   collapsePane,
   paneRolesForLayout,
-  paneVisibility,
+  revealRunOutput,
   workspaceControlsForLayout,
 } from "./paneState";
 import { namedSurfaceSlots } from "./surfaceSlots";
@@ -50,8 +57,10 @@ export function RecipeWorkspace({
   return (
     <RecipeWorkspaceProvider key={config.storage_key} config={config}>
       <div
-        style={{ visibility: paneVisibility(hydrated) }}
-        className="recipe-workspace container-xxl py-lg-2"
+        className={clsx(
+          "recipe-workspace py-lg-2",
+          !hydrated && "gooey-until-hydrated"
+        )}
       >
         <WorkspacePane
           className="recipe-workspace-about"
@@ -171,13 +180,16 @@ export function RecipeWorkspacePanes({
         })}
       </div>
       <div
-        className="flex-grow-1 overflow-auto pt-2 pe-1 pe-lg-3"
+        // Both: `scrollbar-gutter` keeps the pane's two margins equal, the thin scrollbar
+        // is theirs. Still no `pe-*` - that sat on top of the editor's own inset.
+        className="recipe-workspace-pane-scroll gooey-thin-scroll flex-grow-1 overflow-auto pt-2"
         style={{ minHeight: 0 }}
       >
         {panes.map((pane, index) => (
           <div
             key={pane.id}
             id={`editor-pane-${pane.id}`}
+            className="recipe-workspace-pane-panel"
             role="tabpanel"
             aria-labelledby={`editor-pane-tab-${pane.id}`}
             hidden={pane.id !== selectedPane}
@@ -245,14 +257,13 @@ export function EditorRunBar({
   cost_title,
 }: CustomComponentProps & EditorRunBarProps) {
   const { config } = useRecipeWorkspaceContext();
-  const { selectLayout } = useWorkspaceLayout(config);
+  const { layout, selectLayout } = useWorkspaceLayout(config);
   const isRunning = run_intent.kind === "stop";
   const runLabel = isRunning ? "Stop this run" : "Run";
-  // Show the output the moment a run starts, as the bar above does. A tick late, so the form
-  // this button submits has posted before the layout moves under it.
+  // Show the output the moment a run starts, as the bar above does and on the same terms.
   const handleRun = () => {
     if (run_intent.kind === "run") {
-      window.setTimeout(() => selectLayout(config.run_layout), 0);
+      revealRunOutput(layout, config.run_layout, selectLayout);
     }
   };
   return (
@@ -344,14 +355,20 @@ function WorkspacePane({
   rightControls?: ReactNode;
 }) {
   const open = role !== "closed";
-  const paneRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (open) {
-      paneRef.current?.removeAttribute("inert");
-      return;
-    }
-    paneRef.current?.setAttribute("inert", "");
-  }, [open]);
+  // Applied as the node attaches rather than from an effect: an effect runs after paint,
+  // which left a closed pane in the tab order for the first commit. React 17 has no `inert`
+  // prop, so the attribute is still set by hand - just at the right moment.
+  const paneRef = useCallback(
+    (node: HTMLElement | null) => {
+      if (!node) return;
+      if (open) {
+        node.removeAttribute("inert");
+      } else {
+        node.setAttribute("inert", "");
+      }
+    },
+    [open]
+  );
 
   return (
     <section
@@ -385,7 +402,7 @@ function WorkspacePane({
   );
 }
 
-function useRecipeWorkspaceContext() {
+export function useRecipeWorkspaceContext() {
   const value = useContext(RecipeWorkspaceContext);
   if (!value) {
     throw new Error(

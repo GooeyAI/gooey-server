@@ -1,4 +1,3 @@
-import html
 import json
 from enum import Enum
 from functools import cached_property
@@ -22,19 +21,23 @@ from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
-from daras_ai_v2.tab_spec import SingleLayout, SplitLayout, SurfaceId, TabSpec
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
+from django.utils.text import get_text_list
 from gooey_gui.types.recipe_top_bar_props import (
     MenuIntent,
     SubmitTarget,
     TopBarIntegration,
 )
+from gooey_gui.types.about_props import (
+    AboutCard,
+    AboutGroup,
+    AboutPaneTarget,
+)
 from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspacePanesProps,
-    RecipeWorkspaceTriggerProps,
     WorkspaceEditorPane,
 )
 from recipes.VideoBots import VideoBotsPage
@@ -250,82 +253,53 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             if ref.is_open:
                 render_demo_dialog(ref, bi_id)
 
-    def get_tab_spec(self) -> list[TabSpec]:
-        """The agent tab set. Deploy is absent - its body is reached through the
-        `/integrations/` url via `render_selected_tab()`."""
-        if self.is_view_only():
-            return self.get_viewer_tab_spec()
-        return [
-            TabSpec(
-                key="about",
-                label="About",
-                icon_html=icons.info,
-                layout=SplitLayout(
-                    primary=SurfaceId.about,
-                    secondary=SurfaceId.preview,
-                ),
-            ),
-            TabSpec(
-                key="edit",
-                label="Edit",
-                icon_html=icons.edit,
-                layout=SingleLayout(surface=SurfaceId.editor),
-            ),
-            TabSpec(
-                key="preview",
-                label="Preview",
-                icon_html=icons.preview,
-                layout=SingleLayout(surface=SurfaceId.preview),
-            ),
-            TabSpec(
-                key="split",
-                label="Split",
-                icon_html=icons.split,
-                layout=SplitLayout(
-                    primary=SurfaceId.editor,
-                    secondary=SurfaceId.preview,
-                ),
-                desktop_only=True,
-            ),
-        ]
-
-    def _render_about_meta(self):
-        """How this agent is put together. Each card links into the config pane that owns
-        the setting."""
-        model = self._about_model_summary()
-
-        # Knowledge and Tools read as one idea - what the agent can reach outside itself -
-        # so they share a group, leaving the model on its own as the thing it *is*.
-        integrations: list[tuple[str, str, ConfigPane]] = []
-        if documents := len(gui.session_state.get("documents") or []):
-            plural = "" if documents == 1 else "s"
-            integrations.append(
-                (icons.library, f"{documents} document{plural}", ConfigPane.knowledge)
+    def _about_meta_groups(self) -> list[AboutGroup]:
+        """How this agent is put together. Each card opens the config pane that owns it."""
+        # One group, in the order the design names them. Each card also contributes its own
+        # word, so the heading names only the kinds the row actually holds.
+        cards: list[AboutCard] = []
+        kinds: list[str] = []
+        if model := self._about_model_summary():
+            icon, label = model
+            cards.append(
+                self._about_pane_card(icon, label, ConfigPane.llm_instructions)
             )
+            kinds.append("Model")
+        if documents := len(gui.session_state.get("documents") or []):
+            noun = "source" if documents == 1 else "sources"
+            cards.append(
+                self._about_pane_card(
+                    icons.library, f"{documents} Knowledge {noun}", ConfigPane.knowledge
+                )
+            )
+            kinds.append("Knowledge base")
         if tools := len(gui.session_state.get("functions") or []):
-            plural = "" if tools == 1 else "s"
-            integrations.append((icons.code, f"{tools} tool{plural}", ConfigPane.tools))
+            noun = "Tool" if tools == 1 else "Tools"
+            cards.append(
+                self._about_pane_card(
+                    icons.code, f"{tools} {noun} called", ConfigPane.tools
+                )
+            )
+            kinds.append("Tools")
 
         # a row of zeroes says less than no row: skip the heading too, not just the cards
-        if not model and not integrations:
-            return
+        if not cards:
+            return []
+        return [AboutGroup(title=get_text_list(kinds, "&"), cards=cards)]
 
-        with gui.div(className="v2-about-groups"):
-            if model:
-                self._render_about_meta_group(
-                    "Model", [(*model, ConfigPane.llm_instructions)]
-                )
-            if integrations:
-                self._render_about_meta_group("Tools & Integrations", integrations)
-
-    def _render_about_meta_group(
-        self, title: str, cards: list[tuple[str, str, ConfigPane]]
-    ):
-        with gui.div(className="v2-about-group"):
-            gui.html(f'<div class="v2-about-section-title">{html.escape(title)}</div>')
-            with gui.div(className="v2-about-meta"):
-                for icon, label, pane in cards:
-                    self._render_about_meta_card(icon=icon, label=label, pane=pane)
+    def _about_pane_card(
+        self, icon_html: str, label: str, pane: ConfigPane
+    ) -> AboutCard:
+        return AboutCard(
+            icon_html=icon_html,
+            label=label,
+            target=AboutPaneTarget(
+                # The work view, not the editor alone: these open a pane to change something,
+                # and the preview beside it is how you see what the change did.
+                layout=self.work_layout(),
+                editor_pane=pane.value,
+            ),
+        )
 
     def _about_model_summary(self) -> tuple[str, str] | None:
         """(icon html, label) for the selected LLM, or None if the run has not picked one."""
@@ -337,25 +311,9 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             # a model that has since been removed - its name is still better than nothing
             return icons.sparkles, name
         # `html_icon` writes the size inline, which beats any stylesheet, so the card's size
-        # is asked for here - left to its 1.1rem default the logo sat small beside the
-        # FontAwesome glyphs on the cards next to it.
+        # is asked for here rather than left to its 1.1rem default.
         icon = spec.creator and spec.creator.html_icon(size=ABOUT_META_ICON_SIZE)
         return icon or icons.sparkles, spec.label
-
-    def _render_about_meta_card(self, *, icon: str, label: str, pane: ConfigPane):
-        with gui.model_component(
-            RecipeWorkspaceTriggerProps(
-                layout=SingleLayout(surface=SurfaceId.editor),
-                editor_pane=pane.value,
-                className="v2-about-meta-card",
-            )
-        ):
-            # icon over label, and no chevron: the whole card is the link, so an affordance
-            # arrow only competed with the icon for the eye
-            gui.html(
-                f'<span class="v2-about-meta-icon">{icon}</span>'
-                f'<span class="v2-about-meta-label">{html.escape(label)}</span>'
-            )
 
     def _render_input_col(self):
         """The working column, shared by Edit and Split. Overridden here rather than per

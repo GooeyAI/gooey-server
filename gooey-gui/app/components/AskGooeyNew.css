@@ -2,7 +2,7 @@
   width: 100%;
   min-height: 100dvh;
   padding: 48px 24px;
-  background: #fbfaf8;
+  background: #fffefd;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -32,9 +32,8 @@
   text-align: center;
   font-size: 2rem;
   font-weight: 400;
-  font-family: Georgia, serif;
-  color: #111;
-  letter-spacing: -0.02em;
+  /* Family comes from `--gooey-font-heading` in app.css, with the display headings. */
+  color: var(--gooey-ink);
 }
 
 .ask-gooey-title-highlight {
