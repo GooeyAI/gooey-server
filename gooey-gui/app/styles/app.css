@@ -524,6 +524,24 @@ button .gui-html-container,
   font-family: var(--gooey-font-ui);
 }
 
+/* Weights the heavy face never had to name. Avenir 85 Heavy is a single weight, so
+   custom.css leaves headings and `.streamlit-like-btn` at 400 and they still read bold; on
+   Inter, 400 is Regular. 600 matches what RecipeTopBar and the bulk card already chose.
+   `:where()` keeps this at one class: it outranks custom.css's bare `h1` but loses to any
+   component that names its own weight (`.v2-about .v2-about-section-title` at 500).
+   `.gui-input` is excluded because gooey-gui renders control labels as heading tags. */
+:is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
+  :where(h1, h2, h3, h4, h5, h6):not(:where(.gui-input *)) {
+  font-weight: 600;
+}
+
+/* Two classes, because custom.css's own `.streamlit-like-btn { font-weight: 400 }` loads
+   after this file and would win a tie. */
+:is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
+  .streamlit-like-btn {
+  font-weight: 600;
+}
+
 /* The two headings the design actually draws in the display face. Everything else in v2 uses
    heading tags for structure. Must stay below the rule above, which it ties. */
 .v2-app-shell .v2-about h1,
