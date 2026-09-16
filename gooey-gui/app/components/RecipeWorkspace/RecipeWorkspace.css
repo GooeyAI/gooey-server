@@ -37,19 +37,14 @@
     flex-basis 180ms var(--pane-ease),
     max-width 180ms var(--pane-ease),
     margin 180ms var(--pane-ease),
-    opacity 120ms ease;
+    opacity 120ms ease,
+    transform 180ms var(--pane-ease);
 }
 
 /* The slide is the part About sits out - it is the surface being read when a run starts,
    and the one place a pane arriving from the side was most noticeable. */
 .recipe-workspace-pane:not(.recipe-workspace-about) {
   transform: translateX(0.375rem);
-  transition:
-    flex-basis 180ms var(--pane-ease),
-    max-width 180ms var(--pane-ease),
-    margin 180ms var(--pane-ease),
-    opacity 120ms ease,
-    transform 180ms var(--pane-ease);
 }
 
 .recipe-workspace-pane--closed {
@@ -426,11 +421,11 @@
   /* Debug is a dump - called functions, the step trace, the run timeline - read rather than
      filled in, and at body size it wraps to a wall on a phone. `em` so anything that already
      sizes itself relative to its text keeps its proportion. */
-  #editor-pane-debug {
+  .v2-debug {
     font-size: 0.75rem;
   }
 
-  #editor-pane-debug :where(h1, h2, h3, h4, h5, h6) {
+  .v2-debug :where(h1, h2, h3, h4, h5, h6) {
     font-size: 1.15em;
   }
 

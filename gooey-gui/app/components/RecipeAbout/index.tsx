@@ -1,7 +1,6 @@
 import "./RecipeAbout.css";
 
 import clsx from "clsx";
-import { useState } from "react";
 
 import type {
   AboutAuthor,
@@ -10,12 +9,14 @@ import type {
   RecipeAboutProps,
 } from "@gooey-types/about_props";
 import { useWorkspaceLayout } from "~/appShellContext";
+import { useCopyToClipboard } from "~/useCopyToClipboard";
 import type { CustomComponentProps } from "~/components";
 import { RenderedHTML } from "~/renderedHTML";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 
 import { useRecipeWorkspaceContext } from "../RecipeWorkspace";
 import { layoutForEditorPane } from "../RecipeWorkspace/paneState";
+import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 
 /** Cards per row before a group takes a second line. */
 const MAX_COLS = 6;
@@ -35,6 +36,10 @@ export function RecipeAbout({
   notes_line_clamp,
   groups,
 }: CustomComponentProps & RecipeAboutProps) {
+  const { config } = useRecipeWorkspaceContext();
+  // One subscription for the surface. Called per card it was a media listener and a
+  // hydration effect each, for the one callback a card actually uses.
+  const { selectLayout, isNarrow } = useWorkspaceLayout(config);
   const hasPanel = !!tags.length || !!notes || !!groups.length;
   return (
     <div className="v2-about">
@@ -90,6 +95,8 @@ export function RecipeAbout({
                   key={group.title}
                   group={group}
                   submitIntentKey={submit_intent_key}
+                  selectLayout={selectLayout}
+                  isNarrow={isNarrow}
                 />
               ))}
             </div>
@@ -144,9 +151,13 @@ function AuthorBlock({
     <div className="v2-about-author-row">
       <img className="v2-about-author-photo" src={author.photo_url} alt="" />
       <div className="v2-about-author-text">
-        <span className="v2-about-author-name">{author.name}</span>
+        <span className="v2-about-author-name text-truncate">
+          {author.name}
+        </span>
         {!!author.subtitle && (
-          <span className="v2-about-author-meta">{author.subtitle}</span>
+          <span className="v2-about-author-meta text-truncate">
+            {author.subtitle}
+          </span>
         )}
       </div>
     </div>
@@ -186,7 +197,7 @@ function AuthorBlock({
 /** The browser's share sheet, falling back to the clipboard where there is none - Firefox
  *  on the desktop has no `navigator.share`, and nor does any insecure context. */
 function useNativeShare(url?: string | null) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copyUrl } = useCopyToClipboard();
   const shareNatively = () => {
     if (!url) return;
     // A sheet the user dismisses rejects with AbortError; that is not a failure.
@@ -194,17 +205,7 @@ function useNativeShare(url?: string | null) {
       navigator.share({ title: document.title, url }).catch(() => {});
       return;
     }
-    if (!navigator.clipboard) {
-      window.prompt("Copy this link", url);
-      return;
-    }
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => window.prompt("Copy this link", url));
+    copyUrl(url);
   };
   return { copied, shareNatively };
 }
@@ -212,9 +213,13 @@ function useNativeShare(url?: string | null) {
 function GroupBlock({
   group,
   submitIntentKey,
+  selectLayout,
+  isNarrow,
 }: {
   group: AboutGroup;
   submitIntentKey: string;
+  selectLayout: (next: WorkspaceLayout) => void;
+  isNarrow: boolean;
 }) {
   return (
     <div className="v2-about-group">
@@ -234,6 +239,8 @@ function GroupBlock({
             key={card.label}
             card={card}
             submitIntentKey={submitIntentKey}
+            selectLayout={selectLayout}
+            isNarrow={isNarrow}
           />
         ))}
       </div>
@@ -245,12 +252,15 @@ function GroupBlock({
 function MetaCard({
   card,
   submitIntentKey,
+  selectLayout,
+  isNarrow,
 }: {
   card: AboutCard;
   submitIntentKey: string;
+  selectLayout: (next: WorkspaceLayout) => void;
+  isNarrow: boolean;
 }) {
   const { config, setActiveEditorPane } = useRecipeWorkspaceContext();
-  const { selectLayout, isNarrow } = useWorkspaceLayout(config);
   const body = (
     <>
       <span className="v2-about-meta-head">

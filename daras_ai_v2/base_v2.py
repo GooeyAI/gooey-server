@@ -281,9 +281,8 @@ class BasePage(BasePageV1):
         Availability, not presence: every tab offers the way in, because a tab that cannot
         hold the panel navigates to the workspace and opens it there.
         """
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return can_launch_gooey_builder(self.request, workspace)
 
@@ -575,9 +574,8 @@ class BasePage(BasePageV1):
         """
         if not self.request.user:
             return False
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return WorkflowAccessLevel.can_user_edit_published_run(
             workspace=workspace, user=self.request.user, pr=self.current_pr
@@ -671,10 +669,8 @@ class BasePage(BasePageV1):
             return False
         if user.is_admin():
             return True
-        try:
-            return self.current_workspace.id == pr.workspace_id
-        except Workspace.DoesNotExist:
-            return False
+        workspace = self._current_workspace_or_none()
+        return bool(workspace and workspace.id == pr.workspace_id)
 
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars."""
@@ -724,6 +720,7 @@ class BasePage(BasePageV1):
             )
 
         usage_active = self.tab == RecipeTabs.usage
+        can_launch_builder = self._can_launch_builder()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -758,14 +755,14 @@ class BasePage(BasePageV1):
                 ),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
-                    GOOEY_BUILDER_EVENT_KEY if self._can_launch_builder() else None
+                    GOOEY_BUILDER_EVENT_KEY if can_launch_builder else None
                 ),
                 builder_storage_key=(
-                    GOOEY_BUILDER_STORAGE_KEY if self._can_launch_builder() else None
+                    GOOEY_BUILDER_STORAGE_KEY if can_launch_builder else None
                 ),
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
-                    if self._can_launch_builder() and not builder_thread_is_empty(self)
+                    if can_launch_builder and not builder_thread_is_empty(self)
                     else None
                 ),
                 # a route rather than a pane, and empty for anyone who cannot read the
@@ -1000,11 +997,8 @@ class BasePage(BasePageV1):
         from daras_ai_v2.fastapi_tricks import get_route_path
         from routers.account import saved_route
 
-        try:
-            if workspace == self.current_workspace:
-                return get_route_path(saved_route)
-        except Workspace.DoesNotExist:
-            pass
+        if workspace == self._current_workspace_or_none():
+            return get_route_path(saved_route)
         if workspace.handle_id:
             return workspace.handle.get_app_url()
         return None
@@ -1172,6 +1166,14 @@ class BasePage(BasePageV1):
             return False
         return self._usage_workspace() in user.cached_workspaces
 
+    def _current_workspace_or_none(self) -> Workspace | None:
+        """`current_workspace` for somewhere that can do without one: it raises for a logged
+        out visitor, who now reaches surfaces that only members used to."""
+        try:
+            return self.current_workspace
+        except Workspace.DoesNotExist:
+            return None
+
     def _usage_workspace(self) -> Workspace:
         """Whose runs the tab lists: the app's workspace, or the viewer's on a root recipe."""
         published_run = self.current_pr
@@ -1181,16 +1183,12 @@ class BasePage(BasePageV1):
 
     def render_debug_pane(self):
         with gui.div(className="v2-debug"):
-            # a logged-out viewer has no workspace of their own; the link falls back
-            try:
-                current_workspace = self.current_workspace
-            except Workspace.DoesNotExist:
-                current_workspace = None
             gui.model_component(
                 run_debug_info_props(
                     self.current_sr,
                     run_by=self.current_sr_user,
-                    current_workspace=current_workspace,
+                    # a logged-out viewer has no workspace of their own; the link falls back
+                    current_workspace=self._current_workspace_or_none(),
                 )
             )
             with gui.div(className="v2-debug-section"):
@@ -1433,6 +1431,3 @@ VARIABLES_DIALOG_CSS = """
 # Matches `--v2-about-icon-size` below. Icon html that carries its own inline size - a model
 # creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
 ABOUT_META_ICON_SIZE = "22px"
-
-# Cards per row before a group takes a second line.
-ABOUT_META_MAX_COLS = 6

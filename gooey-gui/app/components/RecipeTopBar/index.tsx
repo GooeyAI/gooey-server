@@ -16,6 +16,7 @@ import {
   useWorkspaceLayout,
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
+import { useCopyToClipboard } from "~/useCopyToClipboard";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import {
   activeViewForLayouts,
@@ -108,22 +109,12 @@ export function RecipeTopBar({
   usage_active,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
-  const [shareCopied, setShareCopied] = useState(false);
+  const { copied: shareCopied, copyUrl } = useCopyToClipboard();
   const copyShareUrl = () => {
     if (share.kind !== "copy") {
       return;
     }
-    if (!navigator.clipboard) {
-      window.prompt("Copy this link", share.url);
-      return;
-    }
-    navigator.clipboard
-      .writeText(share.url)
-      .then(() => {
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 2000);
-      })
-      .catch(() => window.prompt("Copy this link", share.url));
+    copyUrl(share.url);
   };
 
   const [sheetOpen, setSheetOpen] = useState(false);

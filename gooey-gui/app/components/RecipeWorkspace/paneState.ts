@@ -111,14 +111,6 @@ export function clearWorkspaceLayoutNavigationState() {
   window.history.replaceState({ ...historyState, usr: nextUserState }, "");
 }
 
-/** Whether starting a run should swap this layout for the one that shows the output.
- *
- * Only from the editor on its own. That is the view a run would start out of sight from, so
- * it gives way to the split. Every other view was chosen to show something in particular -
- * About to read about the workflow, Preview to watch it - and a run is no reason to take it
- * away. Preview is already the output, and About keeps the preview beside it on a wide
- * screen, so nothing is hidden by staying put either.
- */
 /** Move to the run layout when a run starts, from the views where that is wanted.
  *
  *  Deferred one macrotask. The timer does not *order* anything against the submit - it
@@ -171,6 +163,14 @@ function carriedLayoutFor(config: PageShellConfig): WorkspaceLayout | null {
   return layout;
 }
 
+/** Whether starting a run should swap this layout for the one that shows the output.
+ *
+ * Only from the editor on its own. That is the view a run would start out of sight from, so
+ * it gives way to the split. Every other view was chosen to show something in particular -
+ * About to read about the workflow, Preview to watch it - and a run is no reason to take it
+ * away. Preview is already the output, and About keeps the preview beside it on a wide
+ * screen, so nothing is hidden by staying put either.
+ */
 export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {
   return layout.kind === "single" && layout.surface === "editor";
 }

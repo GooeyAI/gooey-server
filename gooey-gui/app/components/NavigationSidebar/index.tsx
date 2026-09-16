@@ -22,9 +22,6 @@ import { GooeyBuilderButton } from "./GooeyBuilderButton";
 import { NavigationHeader, NavigationHeaderMobile } from "./NavigationHeader";
 import { PrimaryNavItems } from "./PrimaryNavItems";
 
-// Below this width the rail becomes an off-canvas drawer (matches the CSS
-// breakpoint in NavigationSidebar.css).
-
 export function NavigationSidebar({
   logo_image_url,
   logo_href,

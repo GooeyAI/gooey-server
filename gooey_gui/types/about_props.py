@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 import pydantic
 
@@ -69,11 +69,11 @@ class AboutGroup(StrictComponentModel):
     cards: list[AboutCard] = []
 
 
-class RecipeAboutProps(pydantic.BaseModel):
+class RecipeAboutProps(StrictComponentModel):
     """Everything the About surface draws. Structured rather than pre-rendered html, so the
     component owns the markup and the payload carries only what varies."""
 
-    _component: str = "RecipeAbout"
+    _component: ClassVar[Literal["RecipeAbout"]] = "RecipeAbout"
 
     photo_url: str | None = None
     circle_photo: bool = False

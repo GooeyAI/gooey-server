@@ -198,7 +198,7 @@ function App() {
     // A component persisting its own chrome state. Straight to the post, ahead of the
     // debounce branches below: there is no input being typed into to debounce, and the
     // marker is what keeps the progress bar out of it.
-    if (event && "silent" in event && event.silent) {
+    if (event?.silent) {
       onSubmit(undefined, { [silentSubmitKey]: true });
       return;
     }
