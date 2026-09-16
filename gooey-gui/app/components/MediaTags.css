@@ -21,6 +21,58 @@
   margin-bottom: 0.9rem;
 }
 
+/* Shown while GooeyVideo's poster (previewImg, a low-res thumbnail) is
+   standing in for a not-yet-loaded video - blurred rather than shown as-is,
+   so it reads as a loading placeholder instead of the actual generated
+   result, and the swap to the real frame reads as content resolving into
+   focus rather than a visible jump from low to high resolution. Removed
+   (via a class toggle, not this rule) once the video's onLoadedData fires,
+   which happens right around when the browser would swap poster to live
+   frame anyway. */
+.gui-video-loading-placeholder {
+  filter: blur(4px);
+  transition: filter 300ms ease;
+}
+
+/* Layered on top of the video/placeholder while loading, in both cases (a
+   previewImg to blur, or nothing at all) - blur alone doesn't read clearly
+   as "loading" on its own, and there's otherwise no loading indication at
+   all when there's no previewImg to show as a placeholder. Positioned
+   absolute within .gui-media-preview-wrap (position-relative); pointer-
+   events:none so it doesn't block the tap-to-reveal-controls interaction
+   or the expand button sitting above it. */
+.gui-video-shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0) 90%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: gui-video-shimmer 3s ease-in-out infinite;
+}
+
+/* No previewImg to sweep over - a solid base so the sweep has something to
+   move across instead of a bare streak over whatever the video itself
+   renders before it has a frame. */
+.gui-video-shimmer-overlay-solid {
+  background-color: rgba(0, 0, 0, 0.35);
+}
+
+@keyframes gui-video-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 /* Match the rounded corners used in the fullscreen dialog (.gui-media-
    dialog-content) so the inline preview doesn't look sharp-cornered by
    comparison. Clipping only rounds an edge that's actually flush with the
