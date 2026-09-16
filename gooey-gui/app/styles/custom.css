@@ -869,7 +869,9 @@ button {
 
 /* Checked state */
 .gooey-switch:checked + label:before {
-  background-color: #02c4c8;
+  background-color: var(
+    --gooey-accent
+  ); /* the same cyan, now named in app.css */
 }
 
 /* Large Variant */
