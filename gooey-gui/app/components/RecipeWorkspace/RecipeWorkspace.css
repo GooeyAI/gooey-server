@@ -520,46 +520,6 @@
   font-size: 0.875rem;
 }
 
-/* Run metadata: a label column sized to its longest word, values fill the rest. */
-.v2-debug-meta {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: center;
-  column-gap: var(--gooey-space-4);
-  row-gap: var(--gooey-space-2);
-  padding-bottom: var(--gooey-space-4);
-}
-.v2-debug-source {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--gooey-space-2);
-}
-.v2-debug-platform {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border-radius: var(--gooey-radius-pill);
-  background: var(--gooey-surface-100);
-  border: 1px solid var(--gooey-line-soft);
-  font-weight: 500;
-}
-.v2-debug-value {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.v2-debug-value a {
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--gooey-line-strong);
-  text-underline-offset: 0.15em;
-}
-.v2-debug-value a:hover {
-  text-decoration-color: currentColor;
-}
-
 /* Timeline and prompt details are separated by rules instead of headings; the
    timeline's own labels and the step widgets already say what they are. */
 .v2-debug-section {
