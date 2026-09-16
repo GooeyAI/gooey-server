@@ -38,11 +38,19 @@ export function initialWorkspaceState(
   }
 
   const navigationLayout = workspaceLayoutFromNavigationState(navigationState);
+  if (navigationLayout) {
+    // A view someone picked to arrive on is not the run's to override. Without the run
+    // marked handled, `revealRunLayout` reads Edit - a lone editor - as somewhere the
+    // output cannot be seen and swaps in the work view, so leaving Usage for Edit on a
+    // run landed on Split. That is the rule `revealRunLayout` already applies to a view
+    // picked after the run arrived; this is the same view, picked a moment earlier.
+    return {
+      layout: navigationLayout,
+      handled_run_id: config.active_run_id ?? null,
+    };
+  }
   return revealRunLayout(
-    {
-      layout: navigationLayout ?? carried ?? config.initial_layout,
-      handled_run_id: null,
-    },
+    { layout: carried ?? config.initial_layout, handled_run_id: null },
     config
   );
 }

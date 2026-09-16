@@ -392,6 +392,24 @@ describe("leaving a document tab for a view", () => {
     expect(initialWorkspaceState(baseConfig, null).layout).toEqual(about);
   });
 
+  it("survives the run reveal, which reads Edit as nowhere to see output", () => {
+    // Leaving Usage keeps the run in the url, so the workspace arrives with an
+    // `active_run_id`. Edit is a lone editor, which `shouldRevealRunOutput` treats as
+    // grounds to swap in the work view - and that turned the pick into Split.
+    const leavingUsage = { ...baseConfig, active_run_id: "run-1" };
+    const nav = workspaceLayoutNavigationState(edit);
+
+    expect(shouldRevealRunOutput(edit)).toBe(true);
+    expect(initialWorkspaceState(leavingUsage, nav).layout).toEqual(edit);
+    // and the run counts as handled, so a later render cannot swap it either
+    expect(initialWorkspaceState(leavingUsage, nav).handled_run_id).toBe("run-1");
+  });
+
+  it("still reveals the output for a run nobody picked a view for", () => {
+    const starting = { ...baseConfig, initial_layout: edit, active_run_id: "run-2" };
+    expect(initialWorkspaceState(starting, null).layout).toEqual(split);
+  });
+
   it("is actually passed by the top bar's view picker", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("app/components/RecipeTopBar/index.tsx", "utf8");
