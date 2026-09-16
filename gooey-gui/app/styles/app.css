@@ -3,21 +3,8 @@ img {
   height: auto;
 }
 
-.gui-img {
-  width: 100%;
-  max-width: 450px;
-  height: auto;
-  margin-bottom: 0.9rem;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.gui-video {
-  width: 100%;
-  max-width: 450px;
-  height: auto;
-  margin-bottom: 0.9rem;
-}
+/* GooeyImg/GooeyVideo/MediaPreviewDialog-specific styling lives in
+   MediaTags.css instead - this file is for global tokens/resets. */
 
 .gui-audio {
   width: 100%;

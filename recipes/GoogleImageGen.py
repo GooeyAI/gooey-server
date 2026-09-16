@@ -195,7 +195,10 @@ class GoogleImageGenPage(BasePage):
         if out_imgs:
             for img in out_imgs:
                 gui.image(
-                    img, caption="#### Generated Image", show_download_button=True
+                    img,
+                    caption="#### Generated Image",
+                    show_download_button=True,
+                    enable_preview_dialog=True,
                 )
         else:
             gui.div()

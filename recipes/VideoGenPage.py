@@ -213,6 +213,7 @@ class VideoGenPage(BasePage):
                 autoplay=True,
                 show_download_button=not preview,
                 previewImg=media_preview_img(video_url) if preview else None,
+                enable_preview_dialog=not preview,
             )
             gui.caption(label)
 

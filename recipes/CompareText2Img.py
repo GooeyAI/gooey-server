@@ -269,6 +269,7 @@ class CompareText2ImgPage(BasePage):
                     caption=Text2ImgModels[key].value,
                     show_download_button=True,
                     previewImg=media_preview_img(img) if preview else None,
+                    enable_preview_dialog=not preview,
                 )
 
     def get_raw_price(self, state: dict) -> int:

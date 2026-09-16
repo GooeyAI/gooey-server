@@ -268,6 +268,7 @@ def image(
     href: str = None,
     show_download_button: bool = False,
     previewImg: str | None = None,
+    enable_preview_dialog: bool = False,
     **props,
 ):
     try:
@@ -294,6 +295,7 @@ def image(
             alt=alt or caption,
             href=href,
             previewImg=previewImg,
+            enablePreviewDialog=enable_preview_dialog,
             **props,
         ),
     ).mount()
@@ -323,6 +325,7 @@ def video(
     autoplay: bool = False,
     show_download_button: bool = False,
     previewImg: str | None = None,
+    enable_preview_dialog: bool = False,
     **props,
 ):
     if not src:
@@ -341,6 +344,7 @@ def video(
             src=src,
             caption=dedent(caption),
             previewImg=previewImg,
+            enablePreviewDialog=enable_preview_dialog,
             **props,
         ),
     ).mount()
