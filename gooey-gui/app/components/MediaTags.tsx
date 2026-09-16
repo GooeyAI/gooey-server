@@ -167,12 +167,23 @@ export function GooeyVideo({
   const [isIntersecting, setIsIntersecting] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  // Shimmer applies in both cases (with or without a previewImg to blur) -
+  // blur alone doesn't read clearly as "loading" on its own, and a video
+  // with no previewImg at all still needs *some* loading indication rather
+  // than a bare blank/black box.
+  const showShimmer = expandable && !videoReady;
 
   // A recipe rerun can swap src on this same component instance - reset so
   // the new video's own loading placeholder (if any) shows again, rather
-  // than staying revealed from the previous one.
+  // than staying revealed from the previous one. Then check readyState
+  // directly rather than relying solely on the onLoadedData listener below:
+  // autoPlay starts the browser loading the video from the server-rendered
+  // HTML alone, before React hydrates, so loadeddata can fire - and be
+  // missed - before the listener is even attached (the same SSR hydration
+  // race useImageValid above already works around for images).
   useEffect(() => {
-    setVideoReady(false);
+    const el = videoRef.current;
+    setVideoReady(!!el && el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA);
   }, [src]);
 
   const shouldPlay = isPlayable && !userPaused && isIntersecting;
@@ -275,7 +286,7 @@ export function GooeyVideo({
         // live frame on its own; onLoadedData just clears the blur, right
         // around the same moment.
         poster={showLoadingPlaceholder ? previewImg : undefined}
-        onLoadedData={showLoadingPlaceholder ? () => setVideoReady(true) : undefined}
+        onLoadedData={expandable ? () => setVideoReady(true) : undefined}
         src={src}
       ></video>
     );
@@ -304,6 +315,18 @@ export function GooeyVideo({
           }}
         >
           {media}
+          {showShimmer && (
+            <div
+              className={clsx(
+                "gui-video-shimmer-overlay",
+                // No previewImg to show at all - give the sweep a solid
+                // base to move across, rather than a bare streak over
+                // whatever the video itself renders before it has a frame.
+                !hasPreviewImg && "gui-video-shimmer-overlay-solid",
+              )}
+              aria-hidden="true"
+            />
+          )}
           <button
             type="button"
             aria-label="Expand video"
