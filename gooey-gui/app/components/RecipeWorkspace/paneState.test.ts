@@ -376,3 +376,29 @@ describe("what counts as arriving somewhere new", () => {
     );
   });
 });
+
+describe("leaving a document tab for a view", () => {
+  // Usage, API and Deploy are routes, not panes, so picking a view on one navigates. The
+  // pick has to ride along: the workspace opens on the view its own url asks for, which
+  // threw the pick away and landed on About however you chose to leave.
+  it("hands the chosen view to the navigation, and it wins on arrival", () => {
+    const chosen = singleLayout("editor");
+    const nav = workspaceLayoutNavigationState(chosen);
+
+    expect(workspaceLayoutFromNavigationState(nav)).toEqual(chosen);
+    expect(initialWorkspaceState(baseConfig, nav).layout).toEqual(chosen);
+
+    // and without it you get the url's own view, which is the bug
+    expect(initialWorkspaceState(baseConfig, null).layout).toEqual(about);
+  });
+
+  it("is actually passed by the top bar's view picker", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/components/RecipeTopBar/index.tsx", "utf8");
+    const chooseView = src.slice(
+      src.indexOf("const chooseView"),
+      src.indexOf("const handleRun")
+    );
+    expect(chooseView).toContain("workspaceLayoutNavigationState(view.layout)");
+  });
+});

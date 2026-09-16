@@ -23,6 +23,7 @@ import {
   layoutsEqual,
   revealRunOutput,
   workspaceHrefToNavigate,
+  workspaceLayoutNavigationState,
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
 import { isIntegrationLabelled } from "./integrationChips";
@@ -161,7 +162,10 @@ export function RecipeTopBar({
       config.workspace_href
     );
     if (target) {
-      navigate(target);
+      // Carry the pick. A document tab is a route, so leaving one is a real navigation, and
+      // the workspace opens on the view its url asks for - which threw the `selectLayout`
+      // above away and landed on About whichever view you had picked to leave by.
+      navigate(target, { state: workspaceLayoutNavigationState(view.layout) });
     }
   };
   const handleRun = () => {
