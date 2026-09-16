@@ -535,10 +535,13 @@ button .gui-html-container,
   font-weight: 600;
 }
 
-/* Two classes, because custom.css's own `.streamlit-like-btn { font-weight: 400 }` loads
-   after this file and would win a tie. */
+/* Buttons to the same 600 as the Run button, headings and labels. custom.css gives
+   `.btn.btn-theme` `bold`, which on Avenir Heavy changed nothing and on Inter is a step
+   heavier than the label beside it; `.streamlit-like-btn` there is 400. Both load after this
+   file, so the selectors carry one class more than theirs to win. Pane pills and top bar
+   tabs are not `.btn` and keep their own 500. */
 :is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
-  .streamlit-like-btn {
+  :is(.btn, .btn.btn-theme, .streamlit-like-btn) {
   font-weight: 600;
 }
 

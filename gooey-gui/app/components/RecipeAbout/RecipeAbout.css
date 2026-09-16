@@ -80,7 +80,7 @@
   background: var(--gooey-bg-page);
   color: var(--gooey-ink);
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 600; /* the button weight app.css gives the rest of the shell */
   line-height: 1.2;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition:
