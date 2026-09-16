@@ -539,10 +539,14 @@ button .gui-html-container,
    `.btn.btn-theme` `bold`, which on Avenir Heavy changed nothing and on Inter is a step
    heavier than the label beside it; `.streamlit-like-btn` there is 400. Both load after this
    file, so the selectors carry one class more than theirs to win. Pane pills and top bar
-   tabs are not `.btn` and keep their own 500. */
+   tabs are not `.btn` and keep their own 500.
+
+   14px too: Bootstrap's `.btn` is 1rem, the size of body text, so a 600 label in a button
+   read bulkier than the Run button and pane pills it sits among, which are 14px. */
 :is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
   :is(.btn, .btn.btn-theme, .streamlit-like-btn) {
   font-weight: 600;
+  font-size: 0.875rem;
 }
 
 /* The two headings the design actually draws in the display face. Everything else in v2 uses
