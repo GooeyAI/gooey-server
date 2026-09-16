@@ -479,6 +479,26 @@ def test_the_about_meta_heading_names_only_what_the_row_holds(monkeypatch):
     assert page._about_meta_groups() == []
 
 
+def test_the_about_meta_cards_open_their_pane_in_the_work_view(monkeypatch):
+    """The editor alone would hide the preview these cards exist to change - so they target
+    the same split the Split tab does, not a solo editor."""
+    page = object.__new__(VideoBotsPageV2)
+    monkeypatch.setattr(
+        VideoBotsPageV2,
+        "_about_model_summary",
+        lambda self: (icons.sparkles, "GPT-5"),
+        raising=False,
+    )
+    gui.session_state.clear()
+    gui.session_state.update(documents=["a"], functions=["f"])
+
+    cards = [card for group in page._about_meta_groups() for card in group.cards]
+    assert len(cards) == 3
+    for card in cards:
+        assert card.target.layout == page.work_layout(), card.label
+        assert card.target.editor_pane
+
+
 def test_every_about_card_is_one_kind_of_object(monkeypatch):
     """A deployment card and a config card were two copies of the same markup. They are one
     `AboutCard` now, so the component draws both and a change of shape cannot reach one and

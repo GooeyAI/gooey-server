@@ -221,6 +221,21 @@ export function foldForNarrowViewport(
   return singleLayout(layout.primary);
 }
 
+/* A card that names a config pane has to land somewhere that pane is on screen. On a phone a
+   split folds to the half the recipe keeps - the chat, for an owner - which is not that pane. */
+export function layoutForEditorPane(
+  layout: WorkspaceLayout,
+  editorPane: string | null | undefined,
+  narrowSurface: SurfaceId,
+  isNarrow: boolean
+): WorkspaceLayout {
+  if (!editorPane) {
+    return layout;
+  }
+  const shown = foldForNarrowViewport(layout, narrowSurface, isNarrow);
+  return layoutHasSurface(shown, "editor") ? layout : singleLayout("editor");
+}
+
 export function paneRolesForLayout(layout: WorkspaceLayout): PaneRoles {
   const roles: PaneRoles = {
     about: "closed",

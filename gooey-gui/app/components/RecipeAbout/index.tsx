@@ -15,6 +15,7 @@ import { RenderedHTML } from "~/renderedHTML";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 
 import { useRecipeWorkspaceContext } from "../RecipeWorkspace";
+import { layoutForEditorPane } from "../RecipeWorkspace/paneState";
 
 /** Cards per row before a group takes a second line. */
 const MAX_COLS = 6;
@@ -249,7 +250,7 @@ function MetaCard({
   submitIntentKey: string;
 }) {
   const { config, setActiveEditorPane } = useRecipeWorkspaceContext();
-  const { selectLayout } = useWorkspaceLayout(config);
+  const { selectLayout, isNarrow } = useWorkspaceLayout(config);
   const body = (
     <>
       <span className="v2-about-meta-head">
@@ -289,7 +290,14 @@ function MetaCard({
           type="button"
           className="v2-about-meta-card"
           onClick={() => {
-            selectLayout(target.layout);
+            selectLayout(
+              layoutForEditorPane(
+                target.layout,
+                target.editor_pane,
+                config.narrow_surface,
+                isNarrow
+              )
+            );
             if (target.editor_pane) setActiveEditorPane(target.editor_pane);
           }}
         >

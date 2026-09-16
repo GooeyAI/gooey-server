@@ -8,6 +8,7 @@ import {
   foldForNarrowViewport,
   initialWorkspaceState,
   isRootLayout,
+  layoutForEditorPane,
   layoutsEqual,
   paneRolesForLayout,
   revealRunLayout,
@@ -86,7 +87,6 @@ describe("workspace layout", () => {
     expect(layoutsEqual(split, about)).toBe(false);
     expect(layoutsEqual(edit, preview)).toBe(false);
   });
-
 });
 
 describe("initialWorkspaceState", () => {
@@ -188,6 +188,29 @@ describe("responsive layout", () => {
     expect(foldForNarrowViewport(edit, "preview", true)).toEqual(edit);
   });
 
+  it("keeps a config pane reachable when the split folds away from it", () => {
+    // An About card naming a pane, tapped on a phone by someone whose narrow surface is the
+    // chat: the split would fold to the chat, so the editor alone stands in for it.
+    expect(layoutForEditorPane(split, "knowledge", "preview", true)).toEqual(
+      edit
+    );
+    expect(layoutForEditorPane(split, "knowledge", "editor", true)).toEqual(
+      split
+    );
+    expect(layoutForEditorPane(split, "knowledge", "preview", false)).toEqual(
+      split
+    );
+  });
+
+  it("leaves a target that names no pane alone", () => {
+    expect(layoutForEditorPane(preview, null, "preview", true)).toEqual(
+      preview
+    );
+    expect(layoutForEditorPane(about, undefined, "preview", true)).toEqual(
+      about
+    );
+  });
+
   it("calls the root what the fold shows, not what is stored", () => {
     // The work split folds to Preview, so Preview chosen on its own is the same screen and
     // has to count as the root too - otherwise Back sits there offering to swap one for the
@@ -285,7 +308,6 @@ describe("workspace navigation", () => {
     // already a path: left exactly as it is
     expect(appRelativeHref("/agent/?run_id=32i1")).toBe("/agent/?run_id=32i1");
   });
-
 });
 
 describe("carrying the view through a run", () => {
@@ -402,11 +424,17 @@ describe("leaving a document tab for a view", () => {
     expect(shouldRevealRunOutput(edit)).toBe(true);
     expect(initialWorkspaceState(leavingUsage, nav).layout).toEqual(edit);
     // and the run counts as handled, so a later render cannot swap it either
-    expect(initialWorkspaceState(leavingUsage, nav).handled_run_id).toBe("run-1");
+    expect(initialWorkspaceState(leavingUsage, nav).handled_run_id).toBe(
+      "run-1"
+    );
   });
 
   it("still reveals the output for a run nobody picked a view for", () => {
-    const starting = { ...baseConfig, initial_layout: edit, active_run_id: "run-2" };
+    const starting = {
+      ...baseConfig,
+      initial_layout: edit,
+      active_run_id: "run-2",
+    };
     expect(initialWorkspaceState(starting, null).layout).toEqual(split);
   });
 
