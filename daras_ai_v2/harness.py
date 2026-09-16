@@ -220,7 +220,9 @@ def output_translation_step(
 
     # remove html tags from the output text for tts
     raw_tts_text = [parse_bot_html(text)[1].strip() for text in tts_source]
-    if raw_tts_text != output_text:
+    if raw_tts_text == output_text:
+        response.raw_tts_text = None
+    else:
         response.raw_tts_text = raw_tts_text
 
     return output_text
