@@ -21,6 +21,19 @@
   margin-bottom: 0.9rem;
 }
 
+/* Shown while GooeyVideo's poster (previewImg, a low-res thumbnail) is
+   standing in for a not-yet-loaded video - blurred rather than shown as-is,
+   so it reads as a loading placeholder instead of the actual generated
+   result, and the swap to the real frame reads as content resolving into
+   focus rather than a visible jump from low to high resolution. Removed
+   (via a class toggle, not this rule) once the video's onLoadedData fires,
+   which happens right around when the browser would swap poster to live
+   frame anyway. */
+.gui-video-loading-placeholder {
+  filter: blur(20px);
+  transition: filter 300ms ease;
+}
+
 /* Match the rounded corners used in the fullscreen dialog (.gui-media-
    dialog-content) so the inline preview doesn't look sharp-cornered by
    comparison. Clipping only rounds an edge that's actually flush with the

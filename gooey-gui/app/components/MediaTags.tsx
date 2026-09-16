@@ -123,10 +123,21 @@ export function GooeyVideo({
 
   const expandable = enablePreviewDialog && !href;
   const mediaTransitionName = useMediaTransitionName(src, expandable);
-  const showingVideoElement = !(previewImg && previewIsValid);
+  const hasPreviewImg = !!(previewImg && previewIsValid);
+  // Non-expandable (e.g. small list/grid cards): previewImg, when given, is
+  // a permanent static replacement for the video - never mounted at all,
+  // by design (a page can render dozens of these; autoplaying video for
+  // each would be wasteful). Expandable: always show the real video -
+  // previewImg there, if present, becomes a transitional loading
+  // placeholder instead (see showLoadingPlaceholder below), not a
+  // replacement.
+  const showingVideoElement = expandable || !hasPreviewImg;
   // The play/pause/mute overlay only makes sense against a real <video> -
   // the previewImg fallback is a static <img>, nothing to play or mute.
   const isPlayable = expandable && showingVideoElement;
+  // Whether to show previewImg as a poster + blur until the real video has
+  // a frame ready, rather than just autoplaying from a blank/black box.
+  const showLoadingPlaceholder = expandable && hasPreviewImg;
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -155,6 +166,14 @@ export function GooeyVideo({
   const [userPaused, setUserPaused] = useState(false);
   const [isIntersecting, setIsIntersecting] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+
+  // A recipe rerun can swap src on this same component instance - reset so
+  // the new video's own loading placeholder (if any) shows again, rather
+  // than staying revealed from the previous one.
+  useEffect(() => {
+    setVideoReady(false);
+  }, [src]);
 
   const shouldPlay = isPlayable && !userPaused && isIntersecting;
 
@@ -229,7 +248,10 @@ export function GooeyVideo({
     media = (
       <video
         ref={videoRef}
-        className="gui-video"
+        className={clsx(
+          "gui-video",
+          showLoadingPlaceholder && !videoReady && "gui-video-loading-placeholder",
+        )}
         {...props}
         // The dialog already offers a full native player, and native
         // controls on the inline thumbnail is what caused the AirPlay-icon/
@@ -245,6 +267,15 @@ export function GooeyVideo({
         playsInline={expandable ? true : props.playsInline}
         disablePictureInPicture={expandable || undefined}
         disableRemotePlayback={expandable || undefined}
+        // Native poster + the video's own decoded frame are the same
+        // element's content, so there's no separate box to keep in sync
+        // (unlike an overlaid <img>, which could mismatch the video's
+        // aspect ratio before its metadata loads - the exact bug fixed for
+        // the dialog's open transition above). The browser swaps poster to
+        // live frame on its own; onLoadedData just clears the blur, right
+        // around the same moment.
+        poster={showLoadingPlaceholder ? previewImg : undefined}
+        onLoadedData={showLoadingPlaceholder ? () => setVideoReady(true) : undefined}
         src={src}
       ></video>
     );
@@ -319,7 +350,12 @@ export function GooeyVideo({
               aria-hidden="true"
             ></i>
           </button>
-          {isPlayable && (
+          {/* While a loading placeholder is still showing, hold off on
+              mute/play-pause - showing controls over a blurred poster that
+              isn't the real content yet doesn't make sense. Expand (above)
+              stays available regardless - it opens its own independent
+              video in the dialog. */}
+          {isPlayable && (!showLoadingPlaceholder || videoReady) && (
             <>
               <button
                 type="button"
