@@ -64,7 +64,7 @@ def bulk_documents_uploader(
                 "whiteSpace": "pre",
                 "overflowWrap": "normal",
                 "overflowX": "scroll",
-                "fontFamily": "monospace",
+                "fontFamily": "var(--gooey-font-mono)",
                 "fontSize": "0.9rem",
             },
             **kwargs,

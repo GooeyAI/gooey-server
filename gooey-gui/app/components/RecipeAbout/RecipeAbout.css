@@ -237,10 +237,9 @@
 
 .v2-about .v2-about-section-title {
   /* h2/h3 for the outline, so the app's heading scale comes back off it here. `h3` also
-       carries `inline-block` and letter-spacing, which is what these two undo. */
+       carries `inline-block`, which `display` undoes. */
   font-family: inherit;
   display: block;
-  letter-spacing: normal;
   margin-top: 0;
   font-size: 0.875rem;
   font-weight: 500;

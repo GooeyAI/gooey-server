@@ -478,23 +478,49 @@ button .gui-html-container,
      the old picture rather than to Helvetica. */
   --gooey-font-ui: "Inter", basiercircle, sans-serif;
   --gooey-font-heading: "Domine", basiercircle, Georgia, serif;
+  /* Bootstrap's own stack, named so code, the editor and the bulk card's ids agree. */
+  --gooey-font-mono: var(
+    --bs-font-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace
+  );
 }
 
 /* The surfaces built on the design system; v1 stays on basiercircle. `.gooey-ds-page` is
-   the marker a converted React page adds, so the next one needs no change here. */
+   the marker a converted React page adds, so the next one needs no change here.
+   `.v2-topbar-container` is the bar base_v2.py renders as a sibling of the shell, not a
+   child - without it the recipe title inherits basiercircle from `body`. */
 .v2-app-shell,
+.v2-topbar-container,
 .nav-sidebar,
 .gooey-ds-page,
 .ask-gooey-page {
   font-family: var(--gooey-font-ui);
 }
 
-/* Mirrors the selector list custom.css hands the heavy face - headings, `strong`, and the
-   `.bold`/`.semibold` utilities - each of which declares its own family, so inheriting from
-   the page cannot reach them. Two `:is()`s keep this at two classes, which outranks both
-   `.bold` and `.gui-md-container strong`. */
-:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
-  :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold) {
+/* Mirrors the selector list custom.css hands the heavy face - headings, table headers,
+   `strong`, `.streamlit-like-btn` and the `.bold`/`.semibold` utilities - each of which
+   declares its own family, so inheriting from the page cannot reach them. Two `:is()`s keep
+   this at two classes, which outranks both `.bold` and `.gui-md-container strong`. */
+:is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
+  :is(
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    strong,
+    .bold,
+    .semibold,
+    .streamlit-like-btn,
+    .table > thead > tr > th
+  ) {
   font-family: var(--gooey-font-ui);
 }
 

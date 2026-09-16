@@ -146,7 +146,7 @@ def edit_secret_button_with_dialog(
 
         name = gui.text_input(
             label="###### Name",
-            style=dict(textTransform="uppercase", fontFamily="monospace"),
+            style=dict(textTransform="uppercase", fontFamily="var(--gooey-font-mono)"),
             # language=javascript
             onKeyUp="setValue(value.replace(/ /g, '_').replace(/[^a-zA-Z0-9_\$]/g, ''))",
             key="secret:name",
