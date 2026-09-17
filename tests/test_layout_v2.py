@@ -1354,15 +1354,6 @@ def test_about_names_what_else_the_owner_has_published(monkeypatch):
     assert counted == []
 
 
-def _tool_url(tool_slug: str) -> str:
-    from daras_ai_v2.fastapi_tricks import get_app_route_url
-    from routers.root import tool_page
-
-    return get_app_route_url(
-        tool_page, path_params=dict(toolkit_slug="GMAIL", tool_slug=tool_slug)
-    )
-
-
 def test_tool_slugs_are_excluded_before_the_tools_pane_has_rendered():
     """v2 reads the exclusions from the first pane, before `functions_input` runs, so the
     slug has to be derived from the url - the `slug` key is only ever written as a side
@@ -1376,6 +1367,15 @@ def test_tool_slugs_are_excluded_before_the_tools_pane_has_rendered():
     )
 
     assert "GMAIL_SEND_EMAIL" in page._variable_exclusions()
+
+
+def _tool_url(tool_slug: str) -> str:
+    from daras_ai_v2.fastapi_tricks import get_app_route_url
+    from routers.root import tool_page
+
+    return get_app_route_url(
+        tool_page, path_params=dict(toolkit_slug="GMAIL", tool_slug=tool_slug)
+    )
 
 
 def test_a_workflow_function_contributes_no_slug():
@@ -1393,7 +1393,9 @@ def test_a_workflow_function_contributes_no_slug():
 @pytest.mark.parametrize(
     "functions",
     [
-        pytest.param(["https://gooey.ai/tools/GMAIL/GMAIL_SEND_EMAIL/"], id="list-of-str"),
+        pytest.param(
+            ["https://gooey.ai/tools/GMAIL/GMAIL_SEND_EMAIL/"], id="list-of-str"
+        ),
         pytest.param("not-a-list", id="bare-str"),
         pytest.param([None], id="list-of-none"),
         pytest.param([dict(url=123)], id="non-str-url"),
@@ -1446,7 +1448,9 @@ def test_the_tools_pane_survives_what_the_boundary_let_through():
 
     page = object.__new__(VideoBotsPageV2)
     gui.session_state.clear()
-    gui.session_state.update(functions=["https://gooey.ai/tools/GMAIL/X/", {"url": "a"}])
+    gui.session_state.update(
+        functions=["https://gooey.ai/tools/GMAIL/X/", {"url": "a"}]
+    )
     page._drop_malformed_functions()
 
     with NestingCtx(RenderTreeNode("root")):
