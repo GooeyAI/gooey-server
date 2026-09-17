@@ -1400,11 +1400,71 @@ def test_a_workflow_function_contributes_no_slug():
         pytest.param(None, id="null"),
     ],
 )
-def test_malformed_functions_state_does_not_500_the_page(functions):
+def test_malformed_functions_state_does_not_break_the_exclusions(functions):
     """`functions` arrives as posted json and is never validated, so a malformed entry has
-    to be skipped rather than take the whole render down."""
+    to be skipped here. Note the render as a whole is not safe yet: `functions_input` hits
+    the same state later, and `list_view_editor` still throws on a non-dict entry."""
     page = object.__new__(VideoBotsPageV2)
     gui.session_state.clear()
     gui.session_state.update(functions=functions)
 
     assert page._variable_exclusions() == page.fields_to_save()
+
+
+@pytest.mark.parametrize(
+    "posted, expected",
+    [
+        pytest.param(["https://gooey.ai/tools/GMAIL/X/"], [], id="list-of-str"),
+        pytest.param("not-a-list", None, id="bare-str"),
+        pytest.param([None], [], id="list-of-none"),
+        pytest.param(None, None, id="null"),
+        pytest.param(
+            [dict(url="a"), "junk", dict(url="b")],
+            [dict(url="a"), dict(url="b")],
+            id="keeps-the-good-ones",
+        ),
+        pytest.param([dict(url="a")], [dict(url="a")], id="well-formed-is-untouched"),
+    ],
+)
+def test_load_state_drops_malformed_function_entries(posted, expected):
+    """State reaches the page as unvalidated posted json. Every reader downstream indexes
+    into these entries, so the shape is settled once at the boundary instead."""
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+    gui.session_state.update(functions=posted)
+
+    page._drop_malformed_functions()
+
+    assert gui.session_state.get("functions") == expected
+
+
+def test_the_tools_pane_survives_what_the_boundary_let_through():
+    """The regression this closes: `_variable_exclusions` was made safe on its own, but
+    `list_view_editor` reads the same state later in the very same render."""
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+    from recipes.BulkRunner import list_view_editor
+
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+    gui.session_state.update(functions=["https://gooey.ai/tools/GMAIL/X/", {"url": "a"}])
+    page._drop_malformed_functions()
+
+    with NestingCtx(RenderTreeNode("root")):
+        kept = list_view_editor(key="functions", render_inputs=lambda *a: None)
+
+    assert [fn["url"] for fn in kept] == ["a"]
+
+
+def test_load_state_normalises_whatever_it_loaded(monkeypatch):
+    """Wiring check: `_load_state` has an early return and two paths that replace the state
+    wholesale, so the normalisation hangs off the wrapper, not off one of those branches."""
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+
+    def fake_load_state(self):
+        gui.session_state.update(functions=["junk", {"url": "a"}])
+
+    monkeypatch.setattr(VideoBotsPageV2, "_load_state", fake_load_state, raising=False)
+    page.load_state()
+
+    assert gui.session_state["functions"] == [{"url": "a"}]

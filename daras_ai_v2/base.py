@@ -378,6 +378,24 @@ class BasePage:
         return event
 
     def load_state(self):
+        self._load_state()
+        # a wrapper, so no branch of `_load_state` can return past the normalisation
+        self._drop_malformed_functions()
+
+    def _drop_malformed_functions(self):
+        """`functions` arrives as posted json or as whatever the db holds, and every reader
+        treats it as a list of dicts. Normalised once here rather than at each call site."""
+        functions = gui.session_state.get("functions")
+        if functions is None:
+            return
+        if not isinstance(functions, list):
+            gui.session_state.pop("functions", None)
+            return
+        clean = [fn for fn in functions if isinstance(fn, dict)]
+        if len(clean) != len(functions):
+            gui.session_state["functions"] = clean
+
+    def _load_state(self):
         from recipes.VideoBots import VideoBotsPage
 
         if not gui.session_state:
