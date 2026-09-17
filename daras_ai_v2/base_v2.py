@@ -39,7 +39,11 @@ from daras_ai_v2.tab_spec import (
 )
 from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
-from functions.base_llm_tool import functions_input, render_called_functions
+from functions.base_llm_tool import (
+    functions_input,
+    get_external_tool_slug_from_url,
+    render_called_functions,
+)
 from functions.models import FunctionTrigger
 from gooey_gui.types.about_props import (
     AboutAuthor,
@@ -1210,11 +1214,18 @@ class BasePage(BasePageV1):
 
     def _variable_exclusions(self) -> list[str]:
         """Names the variables editor must not offer: request/response fields and function
-        slugs, which have inputs of their own. Shared with `variable_names()`."""
+        slugs, which have inputs of their own. Shared with `variable_names()`.
+
+        The slug is derived from the url rather than read off the entry: an entry's `slug`
+        is only ever written by `functions_input`, which renders after this on every v2
+        surface. Entries arrive as posted json, so nothing about their shape is guaranteed.
+        """
         function_slugs = [
             slug
-            for fn in gui.session_state.get("functions", [])
-            if (slug := fn.get("slug"))
+            for fn in gui.session_state.get("functions") or []
+            if isinstance(fn, dict)
+            and isinstance(url := fn.get("url"), str)
+            and (slug := get_external_tool_slug_from_url(url))
         ]
         return self.fields_to_save() + function_slugs
 

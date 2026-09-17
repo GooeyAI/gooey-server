@@ -1352,3 +1352,59 @@ def test_about_names_what_else_the_owner_has_published(monkeypatch):
     fake_count.value = 12
     assert page._about_author_subtitle(SimpleNamespace(workspace_id=None)) == ""
     assert counted == []
+
+
+def _tool_url(tool_slug: str) -> str:
+    from daras_ai_v2.fastapi_tricks import get_app_route_url
+    from routers.root import tool_page
+
+    return get_app_route_url(
+        tool_page, path_params=dict(toolkit_slug="GMAIL", tool_slug=tool_slug)
+    )
+
+
+def test_tool_slugs_are_excluded_before_the_tools_pane_has_rendered():
+    """v2 reads the exclusions from the first pane, before `functions_input` runs, so the
+    slug has to be derived from the url - the `slug` key is only ever written as a side
+    effect of that later render, and is never persisted.
+    """
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+    # the shape saved runs actually hold: url + trigger, no "slug"
+    gui.session_state.update(
+        functions=[dict(url=_tool_url("GMAIL_SEND_EMAIL"), trigger="prompt")]
+    )
+
+    assert "GMAIL_SEND_EMAIL" in page._variable_exclusions()
+
+
+def test_a_workflow_function_contributes_no_slug():
+    """Only integrations get a slug-shaped input of their own; a plain workflow url has
+    nothing to exclude, and must not be mistaken for one."""
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+    gui.session_state.update(
+        functions=[dict(url="https://gooey.ai/functions/?run_id=x", trigger="pre")]
+    )
+
+    assert page._variable_exclusions() == page.fields_to_save()
+
+
+@pytest.mark.parametrize(
+    "functions",
+    [
+        pytest.param(["https://gooey.ai/tools/GMAIL/GMAIL_SEND_EMAIL/"], id="list-of-str"),
+        pytest.param("not-a-list", id="bare-str"),
+        pytest.param([None], id="list-of-none"),
+        pytest.param([dict(url=123)], id="non-str-url"),
+        pytest.param(None, id="null"),
+    ],
+)
+def test_malformed_functions_state_does_not_500_the_page(functions):
+    """`functions` arrives as posted json and is never validated, so a malformed entry has
+    to be skipped rather than take the whole render down."""
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+    gui.session_state.update(functions=functions)
+
+    assert page._variable_exclusions() == page.fields_to_save()
