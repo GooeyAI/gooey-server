@@ -269,38 +269,6 @@ def can_launch_gooey_builder(
 router = CustomAPIRouter()
 
 
-def validated_workflow_state(page_cls: "typing.Type[BasePage]", state: dict) -> dict:
-    """The builder posts its client's state and it lands in a saved run untouched, so a
-    malformed field here is persisted for every later reader to trip over.
-
-    A field that validates is stored exactly as sent - this is a gate, not a rewrite. One
-    the client double-encoded is decoded and kept if that decodes to something valid, which
-    is how a stringified `functions` list was reaching the db. Anything else is dropped.
-    """
-    validated = {}
-    for name, value in state.items():
-        field = page_cls.RequestModel.model_fields.get(name)
-        if field is None:
-            continue
-        adapter = pydantic.TypeAdapter(field.annotation)
-        try:
-            adapter.validate_python(value)
-        except pydantic.ValidationError:
-            pass
-        else:
-            validated[name] = value
-            continue
-        if not isinstance(value, str):
-            continue
-        try:
-            decoded = json.loads(value)
-            adapter.validate_python(decoded)
-        except (ValueError, pydantic.ValidationError):
-            continue
-        validated[name] = decoded
-    return validated
-
-
 class GooeyBuilderSendMessage(pydantic.BaseModel):
     workflow_url: str | None = None
     builder_run_url: str | None = None
@@ -384,6 +352,38 @@ def gooey_builder_send_message(request: fastapi.Request, body: GooeyBuilderSendM
         # no workflow attached - navigate to the standalone builder page,
         # which redirects to the child workflow once the builder creates one
         return get_gooey_builder_run_url(builder_prompt_sr)
+
+
+def validated_workflow_state(page_cls: typing.Type[BasePage], state: dict) -> dict:
+    """The builder posts its client's state and it lands in a saved run untouched, so a
+    malformed field here is persisted for every later reader to trip over.
+
+    A field that validates is stored exactly as sent - this is a gate, not a rewrite. One
+    the client double-encoded is decoded and kept if that decodes to something valid, which
+    is how a stringified `functions` list was reaching the db. Anything else is dropped.
+    """
+    validated = {}
+    for name, value in state.items():
+        field = page_cls.RequestModel.model_fields.get(name)
+        if field is None:
+            continue
+        adapter = pydantic.TypeAdapter(field.annotation)
+        try:
+            adapter.validate_python(value)
+        except pydantic.ValidationError:
+            pass
+        else:
+            validated[name] = value
+            continue
+        if not isinstance(value, str):
+            continue
+        try:
+            decoded = json.loads(value)
+            adapter.validate_python(decoded)
+        except (ValueError, pydantic.ValidationError):
+            continue
+        validated[name] = decoded
+    return validated
 
 
 def get_default_builder_pr() -> PublishedRun:
