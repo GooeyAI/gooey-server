@@ -212,7 +212,11 @@ class VideoGenPage(BasePage):
                 video_url,
                 autoplay=True,
                 show_download_button=not preview,
-                previewImg=media_preview_img(video_url) if preview else None,
+                # On the full (non-preview) output this is used as a
+                # transitional loading placeholder rather than a permanent
+                # static swap - see GooeyVideo's handling of previewImg when
+                # enable_preview_dialog is set.
+                previewImg=media_preview_img(video_url),
                 enable_preview_dialog=not preview,
             )
             gui.caption(label)
