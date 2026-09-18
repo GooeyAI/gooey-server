@@ -235,7 +235,7 @@ def register_blob(
 
     with transaction.atomic():
         metadata = FileMetadata.objects.create(
-            name=filename or Path(blob.name).name,
+            name=truncate_filename(filename or Path(blob.name).name, maxlen=255),
             etag=blob.etag,
             mime_type=content_type,
             total_bytes=total_bytes,
