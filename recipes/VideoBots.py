@@ -125,6 +125,10 @@ SAFETY_BUFFER = 100
 class ReplyButton(typing_extensions.TypedDict):
     id: str
     title: str
+    description: typing_extensions.NotRequired[str]
+    section: typing_extensions.NotRequired[str]
+    # render in an options menu (list msg) instead of as a reply button
+    menu: typing_extensions.NotRequired[bool]
 
 
 class VideoBotsPage(BasePage):

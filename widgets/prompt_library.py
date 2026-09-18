@@ -45,13 +45,20 @@ First display the questions to the user as plain text (with an appropriate emoji
 {emoji1} {question1}
 {emoji2} {question2}
 {emoji3} {question3}
-Then render quick buttons as HTML elements like so: 
+Then render an options menu as an HTML select element like so, where the label (under 24 characters) is shown as the menu's section title, the option text is a short label (under 24 characters, including the emoji) shown as the menu row title, gui-description is the full question (under 72 characters) shown below the label, and value is the exact message sent when the user picks that option:
+<label>Follow up questions
+<select gui-target="input_prompt">
+  <option gui-description="{question1}" value="{question1}">{emoji1} {short_label1}</option>
+  <option gui-description="{question2}" value="{question2}">{emoji2} {short_label2}</option>
+  <option gui-description="{question3}" value="{question3}">{emoji3} {short_label3}</option>
+</select>
+</label>
 {% else %}
 Display the questions to the user as HTML elements like so: 
-{% endif %}
 <button gui-target="input_prompt">{emoji1} {question1}</button>
 <button gui-target="input_prompt">{emoji2} {question2}</button> 
 <button gui-target="input_prompt">{emoji3} {question3}</button>
+{% endif %}
         """.strip(),
     ),
     Prompt(
