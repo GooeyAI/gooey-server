@@ -1418,6 +1418,10 @@ def test_malformed_functions_state_does_not_break_the_exclusions(functions):
     [
         pytest.param(["https://gooey.ai/tools/GMAIL/X/"], [], id="list-of-str"),
         pytest.param("not-a-list", None, id="bare-str"),
+        pytest.param(
+            '[{"url": "a"}]', [dict(url="a")], id="double-encoded-is-recovered"
+        ),
+        pytest.param('"a string"', None, id="decodes-but-not-a-list"),
         pytest.param([None], [], id="list-of-none"),
         pytest.param(None, None, id="null"),
         pytest.param(
@@ -1472,3 +1476,43 @@ def test_load_state_normalises_whatever_it_loaded(monkeypatch):
     page.load_state()
 
     assert gui.session_state["functions"] == [{"url": "a"}]
+
+
+PROD_DOUBLE_ENCODED = (
+    '[{"scope": "workspace_member", "title": "Google Search", "trigger": "prompt",'
+    ' "url": "https://gooey.ai/google-gpt/google-search-j99eg32xtdoy/"}]'
+)
+
+
+def test_a_double_encoded_functions_list_keeps_its_tools():
+    """Verbatim from the saved run that produced the reported 500. The builder wrote the
+    list back as a json string, so dropping it outright would cost the run its tools."""
+    page = object.__new__(VideoBotsPageV2)
+    gui.session_state.clear()
+    gui.session_state.update(functions=PROD_DOUBLE_ENCODED)
+
+    page._drop_malformed_functions()
+
+    (fn,) = gui.session_state["functions"]
+    assert fn["url"] == "https://gooey.ai/google-gpt/google-search-j99eg32xtdoy/"
+
+
+def test_the_builder_does_not_persist_an_unvalidatable_field():
+    """`workflow_state` is posted by the builder's client and written straight onto a saved
+    run, which is how the double-encoded list got into the db in the first place."""
+    from daras_ai_v2.gooey_builder import validated_workflow_state
+
+    out = validated_workflow_state(
+        VideoBotsPageV2,
+        dict(
+            bot_script="hi",
+            functions=PROD_DOUBLE_ENCODED,
+            input_prompt=["not a string"],
+            not_a_field="ignored",
+        ),
+    )
+
+    assert out["bot_script"] == "hi"  # valid, stored exactly as sent
+    assert out["functions"][0]["title"] == "Google Search"  # decoded, not rewritten
+    assert "input_prompt" not in out  # unvalidatable, dropped
+    assert "not_a_field" not in out  # not in the schema at all
