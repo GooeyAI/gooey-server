@@ -1,0 +1,44 @@
+.run-debug-meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--gooey-space-4);
+  row-gap: var(--gooey-space-2);
+  padding-bottom: var(--gooey-space-4);
+}
+
+.run-debug-source {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gooey-space-2);
+}
+
+.run-debug-platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--gooey-surface-100);
+  border: 1px solid var(--gooey-line-soft);
+  font-weight: 500;
+}
+
+.run-debug-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.run-debug-avatar {
+  width: 22px;
+  height: 22px;
+}
+
+.run-debug-timeline {
+  border-top: 1px solid var(--gooey-line-soft);
+  padding-top: var(--gooey-space-4);
+  margin-top: var(--gooey-space-2);
+  font-size: 0.8125rem;
+}

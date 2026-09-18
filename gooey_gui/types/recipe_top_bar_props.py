@@ -140,6 +140,9 @@ class RecipeTopBarProps(StrictComponentModel):
     view_only: bool = False
     crumb_label: str | None = None
     builder_panel_key: str | None = None
+    # Where the panel's open state is kept. Sent rather than derived here: the rail addresses
+    # the same panel, and two callers guessing at one key is how it ends up fighting itself.
+    builder_storage_key: str | None = None
     builder_new_event: str | None = None
     # Usage is a route rather than a client-side pane, but it shares the bar's view
     # selector. None hides it for viewers who cannot inspect the workflow's run data.

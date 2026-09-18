@@ -38,13 +38,38 @@ export function initialWorkspaceState(
   }
 
   const navigationLayout = workspaceLayoutFromNavigationState(navigationState);
+  if (navigationLayout) {
+    // A view someone picked to arrive on is not the run's to override. Without the run
+    // marked handled, `revealRunLayout` reads Edit - a lone editor - as somewhere the
+    // output cannot be seen and swaps in the work view, so leaving Usage for Edit on a
+    // run landed on Split. That is the rule `revealRunLayout` already applies to a view
+    // picked after the run arrived; this is the same view, picked a moment earlier.
+    return {
+      layout: navigationLayout,
+      handled_run_id: config.active_run_id ?? null,
+    };
+  }
   return revealRunLayout(
-    {
-      layout: navigationLayout ?? carried ?? config.initial_layout,
-      handled_run_id: null,
-    },
+    { layout: carried ?? config.initial_layout, handled_run_id: null },
     config
   );
+}
+
+/* What counts as arriving somewhere new, and so as grounds for putting the view back to the
+   one the url asks for. Deliberately not `location.key`: a form post is a navigation with a
+   fresh key and the same url, and the rail posts one to remember its width while a run posts
+   one per chunk - each of which used to throw away whichever view had been picked. */
+export function workspaceHydrationToken(
+  config: PageShellConfig,
+  location: { pathname: string; search: string; state?: unknown }
+): string {
+  const navLayout = workspaceLayoutFromNavigationState(location.state);
+  return [
+    location.pathname + location.search,
+    config.active_run_id ?? "",
+    config.route_layout ? JSON.stringify(config.route_layout) : "",
+    navLayout ? JSON.stringify(navLayout) : "",
+  ].join("|");
 }
 
 export function workspaceLayoutNavigationState(layout: WorkspaceLayout): {
@@ -86,14 +111,6 @@ export function clearWorkspaceLayoutNavigationState() {
   window.history.replaceState({ ...historyState, usr: nextUserState }, "");
 }
 
-/** Whether starting a run should swap this layout for the one that shows the output.
- *
- * Only from the editor on its own. That is the view a run would start out of sight from, so
- * it gives way to the split. Every other view was chosen to show something in particular -
- * About to read about the workflow, Preview to watch it - and a run is no reason to take it
- * away. Preview is already the output, and About keeps the preview beside it on a wide
- * screen, so nothing is hidden by staying put either.
- */
 /** Move to the run layout when a run starts, from the views where that is wanted.
  *
  *  Deferred one macrotask. The timer does not *order* anything against the submit - it
@@ -146,6 +163,14 @@ function carriedLayoutFor(config: PageShellConfig): WorkspaceLayout | null {
   return layout;
 }
 
+/** Whether starting a run should swap this layout for the one that shows the output.
+ *
+ * Only from the editor on its own. That is the view a run would start out of sight from, so
+ * it gives way to the split. Every other view was chosen to show something in particular -
+ * About to read about the workflow, Preview to watch it - and a run is no reason to take it
+ * away. Preview is already the output, and About keeps the preview beside it on a wide
+ * screen, so nothing is hidden by staying put either.
+ */
 export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {
   return layout.kind === "single" && layout.surface === "editor";
 }
@@ -194,6 +219,21 @@ export function foldForNarrowViewport(
     return singleLayout(narrowSurface);
   }
   return singleLayout(layout.primary);
+}
+
+/* A card that names a config pane has to land somewhere that pane is on screen. On a phone a
+   split folds to the half the recipe keeps - the chat, for an owner - which is not that pane. */
+export function layoutForEditorPane(
+  layout: WorkspaceLayout,
+  editorPane: string | null | undefined,
+  narrowSurface: SurfaceId,
+  isNarrow: boolean
+): WorkspaceLayout {
+  if (!editorPane) {
+    return layout;
+  }
+  const shown = foldForNarrowViewport(layout, narrowSurface, isNarrow);
+  return layoutHasSurface(shown, "editor") ? layout : singleLayout("editor");
 }
 
 export function paneRolesForLayout(layout: WorkspaceLayout): PaneRoles {

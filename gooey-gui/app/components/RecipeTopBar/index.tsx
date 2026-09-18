@@ -16,6 +16,7 @@ import {
   useWorkspaceLayout,
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
+import { useCopyToClipboard } from "~/useCopyToClipboard";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import {
   activeViewForLayouts,
@@ -23,6 +24,7 @@ import {
   layoutsEqual,
   revealRunOutput,
   workspaceHrefToNavigate,
+  workspaceLayoutNavigationState,
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
 import { isIntegrationLabelled } from "./integrationChips";
@@ -102,27 +104,18 @@ export function RecipeTopBar({
   crumb_label,
   deploy_href,
   builder_panel_key,
+  builder_storage_key,
   builder_new_event,
   usage_href,
   usage_active,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
-  const [shareCopied, setShareCopied] = useState(false);
+  const { copied: shareCopied, copyUrl } = useCopyToClipboard();
   const copyShareUrl = () => {
     if (share.kind !== "copy") {
       return;
     }
-    if (!navigator.clipboard) {
-      window.prompt("Copy this link", share.url);
-      return;
-    }
-    navigator.clipboard
-      .writeText(share.url)
-      .then(() => {
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 2000);
-      })
-      .catch(() => window.prompt("Copy this link", share.url));
+    copyUrl(share.url);
   };
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -132,7 +125,10 @@ export function RecipeTopBar({
   const builder = useAppShellPanel(
     builder_panel_key,
     Boolean(builder_panel_key && state[builder_panel_key]),
-    builder_panel_key ? `${config.storage_key}:builder` : null
+    // The server's key, not one built from the workspace's: the rail addresses this same
+    // panel with the server's, and a key off `config.storage_key` moves with the published
+    // run - so saving a workflow closed the panel that had asked for the save.
+    builder_storage_key
   );
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -159,7 +155,10 @@ export function RecipeTopBar({
       config.workspace_href
     );
     if (target) {
-      navigate(target);
+      // Carry the pick. A document tab is a route, so leaving one is a real navigation, and
+      // the workspace opens on the view its url asks for - which threw the `selectLayout`
+      // above away and landed on About whichever view you had picked to leave by.
+      navigate(target, { state: workspaceLayoutNavigationState(view.layout) });
     }
   };
   const handleRun = () => {
@@ -560,30 +559,33 @@ export function RecipeTopBar({
           ref={titleMenuRef}
         >
           <div className="gooey-topbar-titlerow">
-            {/* A heading that names another page is a link to it - a run points at the
-                workflow it came from. Where it names this page the server sends no href and
-                it stays the menu's trigger, as it is on the workflow's own url. */}
-            {title_href ? (
-              <Link
-                to={title_href}
-                className="gooey-topbar-title gooey-topbar-title-link"
-                title={title}
-              >
-                {titleContent}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className="gooey-topbar-title"
-                onClick={() => setTitleMenuOpen((v) => !v)}
-                disabled={!title_menu_items.length || isNarrow}
-              >
-                {titleContent}
-                {!!title_menu_items.length && !isNarrow && (
-                  <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
-                )}
-              </button>
-            )}
+            {/* The page's h1, around the control only: `h1` takes phrasing content, which
+                `a` and `button` are and the row's `div` is not. */}
+            <h1 className="gooey-topbar-heading">
+              {/* A heading naming another page is a link to it; on its own url it stays
+                  the menu's trigger, which is why the server sends no href there. */}
+              {title_href ? (
+                <Link
+                  to={title_href}
+                  className="gooey-topbar-title gooey-topbar-title-link"
+                  title={title}
+                >
+                  {titleContent}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="gooey-topbar-title"
+                  onClick={() => setTitleMenuOpen((v) => !v)}
+                  disabled={!title_menu_items.length || isNarrow}
+                >
+                  {titleContent}
+                  {!!title_menu_items.length && !isNarrow && (
+                    <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+                  )}
+                </button>
+              )}
+            </h1>
             {/* Above lg the chevron is the only way to Versions, Duplicate and Delete, so
                 once the title itself navigates the menu needs a trigger of its own. */}
             {!!title_href && !!title_menu_items.length && !isNarrow && (

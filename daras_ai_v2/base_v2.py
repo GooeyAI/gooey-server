@@ -23,6 +23,7 @@ from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
+    GOOEY_BUILDER_STORAGE_KEY,
     GOOEY_BUILDER_TITLE,
     builder_thread_is_empty,
     can_launch_gooey_builder,
@@ -38,7 +39,17 @@ from daras_ai_v2.tab_spec import (
 )
 from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
-from functions.base_llm_tool import functions_input
+from functions.base_llm_tool import functions_input, render_called_functions
+from functions.models import FunctionTrigger
+from gooey_gui.types.about_props import (
+    AboutAuthor,
+    AboutCard,
+    AboutGroup,
+    AboutLinkTarget,
+    AboutSubmitTarget,
+    AboutTag,
+    RecipeAboutProps,
+)
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -59,15 +70,6 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarMenuItem,
     TopBarParent,
 )
-from gooey_gui.types.about_props import (
-    AboutAuthor,
-    AboutCard,
-    AboutGroup,
-    AboutLinkTarget,
-    AboutSubmitTarget,
-    AboutTag,
-    RecipeAboutProps,
-)
 from gooey_gui.types.recipe_workspace_props import (
     EventControlTarget,
     FontAwesomeIcon,
@@ -82,6 +84,7 @@ from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
 from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
+from widgets.run_debug_info import run_debug_info_props
 from widgets.sidebar import sidebar_layout
 from widgets.workflow_cards import author_from_user, history_card
 from widgets.workflow_share import render_share_modal
@@ -278,9 +281,8 @@ class BasePage(BasePageV1):
         Availability, not presence: every tab offers the way in, because a tab that cannot
         hold the panel navigates to the workspace and opens it there.
         """
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return can_launch_gooey_builder(self.request, workspace)
 
@@ -303,38 +305,40 @@ class BasePage(BasePageV1):
             session=self.request.session,
             disabled=False,
             client_only=True,
-            storage_key=f"{self._workspace_storage_key()}:builder",
+            # Not the workspace's key: the client resets a panel to its default whenever
+            # the key changes, so saving a workflow - a new published run, and a new key -
+            # closed the panel that asked for the save.
+            storage_key=GOOEY_BUILDER_STORAGE_KEY,
         )
 
     def _render_gooey_builder(self):
-        # The panel's collapse control, positioned against `.gooey-sidebar` at every
-        # breakpoint so there is no app-header offset to hardcode.
-        gui.model_component(
-            WorkspacePaneControlProps(
-                label="Close Ask gooey",
-                icon=FontAwesomeIcon(class_name=icons.cls.cancel),
-                target=PanelControlTarget(
-                    panel_key=GOOEY_BUILDER_EVENT_KEY,
-                    open=False,
-                ),
-                className="v2-builder-close",
-            )
-        )
-        # The panel's title, and its "new conversation" control - v2 hides the widget's own
-        # header. Skipped on an empty thread, where the widget draws its own splash.
-        if not builder_thread_is_empty(self):
+        with gui.div(className="v2-builder-header"):
+            # v2 hides the widget's own header. Skip the title on an empty thread, where the
+            # widget draws its own splash.
+            if not builder_thread_is_empty(self):
+                gui.model_component(
+                    WorkspacePaneControlProps(
+                        label=GOOEY_BUILDER_TITLE,
+                        # the label names the panel; the tooltip says what clicking it does
+                        tooltip="New Chat",
+                        icon=PhotoIcon(url=get_gooey_builder_photo_url()),
+                        target=EventControlTarget(
+                            event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new"
+                        ),
+                        show_label=True,
+                        # padding is owned by `.v2-pane-control-labelled`, not a utility class
+                        className="v2-builder-new",
+                    )
+                )
             gui.model_component(
                 WorkspacePaneControlProps(
-                    label=GOOEY_BUILDER_TITLE,
-                    # the label names the panel; the tooltip says what clicking it does
-                    tooltip="New Chat",
-                    icon=PhotoIcon(url=get_gooey_builder_photo_url()),
-                    target=EventControlTarget(
-                        event_name=f"{GOOEY_BUILDER_EVENT_KEY}:new"
+                    label="Close Ask gooey",
+                    icon=FontAwesomeIcon(class_name=icons.cls.cancel),
+                    target=PanelControlTarget(
+                        panel_key=GOOEY_BUILDER_EVENT_KEY,
+                        open=False,
                     ),
-                    show_label=True,
-                    # padding is owned by `.v2-pane-control-labelled`, not a utility class
-                    className="v2-builder-new",
+                    className="v2-builder-close",
                 )
             )
         render_gooey_builder(
@@ -346,6 +350,7 @@ class BasePage(BasePageV1):
             # nothing on this tab submits, and a stale key from the workspace would fire
             # against a run the reader is not looking at
             gui.session_state.pop(self.SUBMIT_INTENT_KEY, None)
+            gui.session_state.pop("-submit-workflow", None)
             return
 
         intent = self._pop_submit_intent()
@@ -383,6 +388,9 @@ class BasePage(BasePageV1):
 
     def _pop_submit_intent(self) -> RecipeSubmitIntent | None:
         raw_intent = gui.session_state.pop(self.SUBMIT_INTENT_KEY, None)
+        legacy_submit = gui.session_state.pop("-submit-workflow", None)
+        if not raw_intent and legacy_submit:
+            raw_intent = RunIntent()
         if not raw_intent:
             return None
 
@@ -413,6 +421,12 @@ class BasePage(BasePageV1):
             ):
                 self._render_version_history()
 
+        report_ref = gui.use_alert_dialog(key="report-modal")
+        if picked == self.MENU_REPORT:
+            report_ref.set_open(True)
+        if report_ref.is_open:
+            self._render_report_dialog(ref=report_ref)
+
         delete_ref = gui.use_confirm_dialog(key="--delete-run-modal")
         if picked == self.MENU_DELETE:
             delete_ref.set_open(True)
@@ -433,6 +447,62 @@ class BasePage(BasePageV1):
 
         if picked == self.MENU_DUPLICATE:
             self._duplicate_and_redirect()
+
+    REPORT_INAPPROPRIATE = "Inappropriate content"
+    REPORT_TYPES = ("Buggy Output", REPORT_INAPPROPRIATE, "Other")
+
+    def _render_report_dialog(self, *, ref):
+        """v1's report form, as a dialog. The run's output is not repeated inside it - in v2
+        it is already on screen in the pane behind."""
+        from daras_ai_v2.send_email import send_reported_run_email
+
+        with gui.alert_dialog(
+            ref=ref,
+            modal_title=f"#### {icons.flag} Report a Workflow",
+            unsafe_allow_html=True,
+        ):
+            gui.caption(
+                "These models are unmoderated, so a workflow's output can be wrong, broken, "
+                "or inappropriate. Tell us what went wrong and we will look into it."
+            )
+            gui.text_input("Workflow", disabled=True, value=self.title)
+            gui.text_input("Run URL", disabled=True, value=self.current_app_url())
+            report_type = gui.radio(
+                "Report Type", self.REPORT_TYPES, key="--report-type"
+            )
+            reason = gui.text_area(
+                "Reason for report",
+                key="--report-reason",
+                placeholder=(
+                    "Tell us why you are reporting this workflow - an error, poor output, "
+                    "inappropriate content - and what you expected instead."
+                ),
+            )
+            if not gui.button(
+                f"{icons.flag} Submit Report", type="primary", key="--report-submit"
+            ):
+                return
+            if not reason:
+                gui.error("Reason for report cannot be empty")
+                return
+
+            sr_user = self.current_sr_user
+            send_reported_run_email(
+                user=self.request.user,
+                run_uid=str(sr_user and sr_user.uid or ""),
+                url=self.current_app_url(),
+                recipe_name=self.title,
+                report_type=report_type,
+                reason_for_report=reason,
+                error_msg=gui.session_state.get(StateKeys.error_msg),
+            )
+            if report_type == self.REPORT_INAPPROPRIATE:
+                self.update_flag_for_run(is_flagged=True)
+
+            for key in ("--report-type", "--report-reason"):
+                gui.session_state.pop(key, None)
+            ref.set_open(False)
+            gui.rerun()
 
     def _duplicate_and_redirect(self) -> typing.NoReturn:
         """Copy this workflow into the current workspace and open the copy.
@@ -504,9 +574,8 @@ class BasePage(BasePageV1):
         """
         if not self.request.user:
             return False
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return WorkflowAccessLevel.can_user_edit_published_run(
             workspace=workspace, user=self.request.user, pr=self.current_pr
@@ -528,6 +597,7 @@ class BasePage(BasePageV1):
     SUBMIT_INTENT_KEY = "--recipe-submit-intent"
 
     # Stable item keys carried by MenuIntent.
+    MENU_REPORT = "--menu-report"
     MENU_VERSION_HISTORY = "--menu-version-history"
     MENU_DUPLICATE = "--menu-duplicate"
     MENU_DELETE = "--menu-delete"
@@ -599,10 +669,8 @@ class BasePage(BasePageV1):
             return False
         if user.is_admin():
             return True
-        try:
-            return self.current_workspace.id == pr.workspace_id
-        except Workspace.DoesNotExist:
-            return False
+        workspace = self._current_workspace_or_none()
+        return bool(workspace and workspace.id == pr.workspace_id)
 
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars."""
@@ -633,8 +701,15 @@ class BasePage(BasePageV1):
         identity = self._workflow_identity()
         cost_label, cost_title = self._top_bar_cost()
         can_manage_sharing = self.can_manage_sharing()
+
+        # A view-only page has nothing to publish, and the five go together: the client
+        # renders its Publish control for any entry left, so one stray href or a Share row
+        # leaves a button still labelled Publish. A run is never view-only.
+        view_only = self.is_view_only()
+        publish_label = None if view_only else self._top_bar_publish_label()
+
         # a root recipe has no published run behind it, so there is no published url to share
-        can_share = not pr.is_root()
+        can_share = not pr.is_root() and not view_only
         share = NoShare()
         if can_share and can_manage_sharing:
             share = ManageShare(icon_html=icons.share)
@@ -644,12 +719,8 @@ class BasePage(BasePageV1):
                 icon_html=icons.share,
             )
 
-        # A view-only page has nothing to publish. All four go together, or the client
-        # keeps its Publish button for whatever entry is left. A run is never view-only.
-        view_only = self.is_view_only()
-        publish_label = None if view_only else self._top_bar_publish_label()
-
         usage_active = self.tab == RecipeTabs.usage
+        can_launch_builder = self._can_launch_builder()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -685,11 +756,14 @@ class BasePage(BasePageV1):
                 ),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
-                    GOOEY_BUILDER_EVENT_KEY if self._can_launch_builder() else None
+                    GOOEY_BUILDER_EVENT_KEY if can_launch_builder else None
+                ),
+                builder_storage_key=(
+                    GOOEY_BUILDER_STORAGE_KEY if can_launch_builder else None
                 ),
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
-                    if self._can_launch_builder() and not builder_thread_is_empty(self)
+                    if can_launch_builder and not builder_thread_is_empty(self)
                     else None
                 ),
                 # a route rather than a pane, and empty for anyone who cannot read the
@@ -844,6 +918,8 @@ class BasePage(BasePageV1):
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._about_author(pr),
                 share_value=self._about_share_value(),
+                share_url=self._about_share_url(),
+                report_value=self._about_report_value(),
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
                 tags=self._about_tags(pr),
                 notes=pr.notes or None,
@@ -887,9 +963,10 @@ class BasePage(BasePageV1):
         It qualifies the *name* it sits under, not the workflow. Read through
         `public_workflow_count` so this and the workspace's profile cannot drift.
         """
+        from django.utils.translation import ngettext
+
         from daras_ai.text_format import format_number_with_suffix
         from daras_ai_v2.profiles import public_workflow_count
-        from django.utils.translation import ngettext
 
         if not pr.workspace_id:
             return ""
@@ -899,16 +976,35 @@ class BasePage(BasePageV1):
         noun = ngettext(singular="workflow", plural="workflows", number=count)
         return f"{format_number_with_suffix(count)} Published {noun}"
 
+    def _about_report_value(self) -> str | None:
+        """The encoded pick that opens the report dialog, or None with nobody to attribute
+        it to. v1 also hid this on a published run; About is where it is asked for."""
+        if not self.is_logged_in():
+            return None
+        return MenuIntent(item_key=self.MENU_REPORT).model_dump_json()
+
     def _about_share_value(self) -> str | None:
-        """The encoded `ShareIntent`, or None when there is nothing to share.
+        """The encoded `ShareIntent`, or None with no dialog to open.
 
         The same intent the bar's button posts, so `_handle_top_bar_actions` opens the one
-        share dialog either way. A root recipe has no published url, which is the bar's rule.
+        share dialog either way. That dialog manages a published run's visibility, so it
+        takes one to manage and somebody to manage it for.
         """
         pr = self.current_pr
         if not self.is_logged_in() or not pr.workspace_id or pr.is_root():
             return None
         return ShareIntent().model_dump_json()
+
+    def _about_share_url(self) -> str | None:
+        """The url for the browser's own share sheet, wherever there is no dialog.
+
+        Not the dialog's conditions over again: those are about managing a published run,
+        and the sheet asks for nothing but a url. A page a visitor can read is a page they
+        can pass on - the recipe's own `/agent/` most of all.
+        """
+        if self._about_share_value():
+            return None
+        return self.current_app_url(self.tab)
 
     def _about_author_href(self, workspace: Workspace) -> str | None:
         """Where the author block points. The same three answers
@@ -916,11 +1012,8 @@ class BasePage(BasePageV1):
         from daras_ai_v2.fastapi_tricks import get_route_path
         from routers.account import saved_route
 
-        try:
-            if workspace == self.current_workspace:
-                return get_route_path(saved_route)
-        except Workspace.DoesNotExist:
-            pass
+        if workspace == self._current_workspace_or_none():
+            return get_route_path(saved_route)
         if workspace.handle_id:
             return workspace.handle.get_app_url()
         return None
@@ -1097,12 +1190,39 @@ class BasePage(BasePageV1):
             return False
         return self._usage_workspace() in user.cached_workspaces
 
+    def _current_workspace_or_none(self) -> Workspace | None:
+        """`current_workspace` for somewhere that can do without one: it raises for a logged
+        out visitor, who now reaches surfaces that only members used to."""
+        try:
+            return self.current_workspace
+        except Workspace.DoesNotExist:
+            return None
+
     def _usage_workspace(self) -> Workspace:
         """Whose runs the tab lists: the app's workspace, or the viewer's on a root recipe."""
         published_run = self.current_pr
         if not published_run.is_root() and published_run.workspace_id:
             return published_run.workspace
         return self.current_workspace
+
+    def render_debug_pane(self):
+        with gui.div(className="v2-debug"):
+            gui.model_component(
+                run_debug_info_props(
+                    self.current_sr,
+                    run_by=self.current_sr_user,
+                    # a logged-out viewer has no workspace of their own; the link falls back
+                    current_workspace=self._current_workspace_or_none(),
+                )
+            )
+            with gui.div(className="v2-debug-section"):
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.pre
+                )
+                self.render_steps()
+                render_called_functions(
+                    saved_run=self.current_sr, trigger=FunctionTrigger.post
+                )
 
     def _render_functions(self):
         if not self.functions_in_settings:
@@ -1179,7 +1299,7 @@ class BasePage(BasePageV1):
             if not is_deleted:
                 self.render_is_cancelled()
                 with gui.div(
-                    className="flex-grow-1 d-flex flex-column",
+                    className="flex-grow-1 d-flex flex-column v2-run-output",
                     style=dict(minHeight=0),
                 ):
                     self.render_output()
@@ -1335,6 +1455,3 @@ VARIABLES_DIALOG_CSS = """
 # Matches `--v2-about-icon-size` below. Icon html that carries its own inline size - a model
 # creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
 ABOUT_META_ICON_SIZE = "22px"
-
-# Cards per row before a group takes a second line.
-ABOUT_META_MAX_COLS = 6

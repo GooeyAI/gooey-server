@@ -200,7 +200,8 @@ def output_translation_step(
     from daras_ai_v2.bots import parse_bot_html
 
     # translate response text
-    if should_translate_lang(request.user_language):
+    translated = should_translate_lang(request.user_language)
+    if translated:
         yield f"Translating response to {request.user_language}..."
         output_text = run_translate(
             texts=output_text,
@@ -220,7 +221,10 @@ def output_translation_step(
 
     # remove html tags from the output text for tts
     raw_tts_text = [parse_bot_html(text)[1].strip() for text in tts_source]
-    if raw_tts_text != output_text:
+    if translated or raw_tts_text != output_text:
+        # always keep the translated text: raw_output_text is untranslated
         response.raw_tts_text = raw_tts_text
+    else:
+        response.raw_tts_text = None
 
     return output_text

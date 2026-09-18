@@ -130,7 +130,7 @@ class Img2ImgPage(BasePage):
             return
         gui.write("#### Output Image")
         for img in output_images:
-            gui.image(img, show_download_button=True)
+            gui.image(img, show_download_button=True, enable_preview_dialog=True)
 
     def render_run_preview_output(self, state: dict):
         col1, col2 = gui.columns(2)

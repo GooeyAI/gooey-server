@@ -185,8 +185,8 @@ class BotInterface:
                     f"phone number {self.bot_id} is not configured for {self.platform.label}"
                 ) from e
 
-        input_text = self.get_input_text() or ""
-        input_text = input_text.strip().lower()
+        raw_input_text = self.get_input_text() or ""
+        input_text = raw_input_text.strip().lower()
 
         if input_text.startswith("/disconnect"):
             SharedPhoneNumberBotUser.objects.filter(
@@ -228,8 +228,9 @@ class BotInterface:
                 **user_lookup,
                 defaults=dict(bot_integration=bi),
             )[0]
-            # replace the ext number with a prompt for the bot to start
-            self.get_input_text = lambda: "Hello"
+            # send any text after the ext number to the bot, else a default greeting
+            trailing_text = raw_input_text.split(str(extension_number), 1)[-1].strip()
+            self.get_input_text = lambda: trailing_text or "Hello"
 
         return bi_user.bot_integration
 

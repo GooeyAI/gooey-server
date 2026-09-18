@@ -21,7 +21,6 @@ from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
-from daras_ai_v2.tab_spec import SingleLayout, SurfaceId
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
@@ -41,7 +40,6 @@ from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspacePanesProps,
     WorkspaceEditorPane,
 )
-
 from recipes.VideoBots import VideoBotsPage
 from widgets.switch_with_section import switch_with_section
 from widgets.workflow_bulk_runs_list import render_workflow_bulk_runs_list
@@ -147,7 +145,9 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             gui.session_state["final_search_query"] = ""
             gui.rerun()
 
-        messages = get_chat_widget_messages(gui.session_state)
+        messages = get_chat_widget_messages(
+            gui.session_state, web_url=self.current_app_url()
+        )
 
         # fill branding with bot integration data if available
         bot_integration = (
@@ -177,6 +177,8 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             enablePhotoUpload=True,
             enableConversations=True,
             showToolCalls=True,
+            showRunLink=True,
+            showRunTime=True,
             branding=bot_branding,
             fillParent=True,
             enableSourcePreview=False,
@@ -285,13 +287,16 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             return []
         return [AboutGroup(title=get_text_list(kinds, "&"), cards=cards)]
 
-    @staticmethod
-    def _about_pane_card(icon_html: str, label: str, pane: ConfigPane) -> AboutCard:
+    def _about_pane_card(
+        self, icon_html: str, label: str, pane: ConfigPane
+    ) -> AboutCard:
         return AboutCard(
             icon_html=icon_html,
             label=label,
             target=AboutPaneTarget(
-                layout=SingleLayout(surface=SurfaceId.editor),
+                # The work view, not the editor alone: these open a pane to change something,
+                # and the preview beside it is how you see what the change did.
+                layout=self.work_layout(),
                 editor_pane=pane.value,
             ),
         )

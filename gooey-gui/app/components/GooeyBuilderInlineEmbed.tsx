@@ -14,7 +14,7 @@ export function GooeyBuilderInlineEmbed(
   props: CustomComponentProps & {
     config: Record<string, any>;
     event_key: string;
-    messages?: Record<string, any> | null;
+    messages?: Record<string, any>[] | null;
     builder_run_url: string;
     workflow_state: Record<string, any>;
     builder_only?: boolean;
@@ -69,6 +69,15 @@ export function GooeyBuilderInlineEmbed(
           let url = new URL(redirectUrl);
           ctx.current.navigate(url.pathname + url.search);
         },
+        onEditQuery: (_messageId: string, input_data: any, webUrl?: string) => {
+          // webUrl identifies the run that produced the edited turn, so the
+          // server re-runs that turn rather than always the latest one
+          if (!webUrl) return;
+          controllerRef.current?.onSendMessage({
+            ...input_data,
+            edit_run_url: webUrl,
+          });
+        },
         onNewConversation: async () => {
           ctx.current.update_session_state({ builderOnNewConversation: true });
         },
@@ -101,11 +110,16 @@ export function GooeyBuilderInlineEmbed(
     const newConversationEvent = `${propsRef.current.event_key}:new`;
     const onNewConversation = () =>
       controllerRef.current?.onNewConversation?.();
+    const rerunEvent = `${propsRef.current.event_key}:rerun`;
+    const onRerun = () =>
+      controllerRef.current?.rerun?.(propsRef.current.builder_run_url);
     window.addEventListener(newConversationEvent, onNewConversation);
+    window.addEventListener(rerunEvent, onRerun);
 
     return () => {
       script?.removeEventListener("load", loadEmbed);
       window.removeEventListener(newConversationEvent, onNewConversation);
+      window.removeEventListener(rerunEvent, onRerun);
     };
   }, []);
 
@@ -113,7 +127,5 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
 
-  // No `w-100`: Bootstrap's width utilities are `!important` and would beat the settled-width
-  // rule in app.css. Width is owned there.
-  return <div className="h-100" id="gooey-builder-embed" />;
+  return <div id="gooey-builder-embed" />;
 }

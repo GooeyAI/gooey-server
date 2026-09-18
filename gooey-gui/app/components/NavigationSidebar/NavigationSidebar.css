@@ -94,8 +94,6 @@ a.nav-brand {
   overflow-x: hidden;
   /* Stop scroll chaining: at the list's top/bottom, don't scroll the page. */
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
 /* Keyboard focus: the browser paints its focus ring *outside* an element's box
@@ -105,19 +103,6 @@ a.nav-brand {
    instead of loosening the clipping, which the sticky rail depends on. */
 .nav-scroll-region :focus-visible {
   outline-offset: -3px;
-}
-
-.nav-scroll-region::-webkit-scrollbar {
-  width: 4px;
-}
-
-.nav-scroll-region::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.nav-scroll-region::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
 }
 
 .nav-sidebar--collapsed .nav-item-link {

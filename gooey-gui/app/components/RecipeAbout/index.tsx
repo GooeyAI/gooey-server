@@ -9,12 +9,14 @@ import type {
   RecipeAboutProps,
 } from "@gooey-types/about_props";
 import { useWorkspaceLayout } from "~/appShellContext";
+import { useCopyToClipboard } from "~/useCopyToClipboard";
 import type { CustomComponentProps } from "~/components";
 import { RenderedHTML } from "~/renderedHTML";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 
-import { layoutsEqual } from "../RecipeWorkspace/paneState";
 import { useRecipeWorkspaceContext } from "../RecipeWorkspace";
+import { layoutForEditorPane, layoutsEqual } from "../RecipeWorkspace/paneState";
+import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 
 /** Cards per row before a group takes a second line. */
 const MAX_COLS = 6;
@@ -28,12 +30,18 @@ export function RecipeAbout({
   circle_photo,
   author,
   share_value,
+  share_url,
+  report_value,
   submit_intent_key,
   tags,
   notes,
   notes_line_clamp,
   groups,
 }: CustomComponentProps & RecipeAboutProps) {
+  const { config } = useRecipeWorkspaceContext();
+  // One subscription for the surface. Called per card it was a media listener and a
+  // hydration effect each, for the one callback a card actually uses.
+  const { selectLayout, isNarrow } = useWorkspaceLayout(config);
   const hasPanel = !!tags.length || !!notes || !!groups.length;
   return (
     <div className="v2-about">
@@ -48,13 +56,15 @@ export function RecipeAbout({
           alt=""
         />
       )}
-      {/* Below lg the top bar shows the logo at the scroll top, so the name lives here. */}
-      <h1 className="v2-about-heading">{heading}</h1>
+      {/* Below lg the bar leads with the logo, so the name is shown here instead. A `p`,
+          not a heading: the page's one h1 is the bar's. */}
+      <p className="v2-about-heading">{heading}</p>
       {!!heading_meta && <p className="v2-about-heading-meta">{heading_meta}</p>}
       {!!author && (
         <AuthorBlock
           author={author}
           shareValue={share_value}
+          shareUrl={share_url}
           submitIntentKey={submit_intent_key}
         />
       )}
@@ -62,13 +72,17 @@ export function RecipeAbout({
         <div className="v2-about-panel">
           {!!tags.length && (
             <div className="v2-about-tags">
+              {/* Names what the pills are for. Hidden: the pills read as tags already. */}
+              <h3 className="visually-hidden">Related AI Workflows</h3>
               {tags.map((tag) => (
                 <a
                   key={tag.href + tag.label_html}
                   className="v2-about-tag"
                   href={tag.href}
                 >
-                  <RenderedHTML body={tag.label_html} />
+                  <h4 className="v2-about-tag-label">
+                    <RenderedHTML body={tag.label_html} />
+                  </h4>
                 </a>
               ))}
             </div>
@@ -88,12 +102,40 @@ export function RecipeAbout({
                   key={group.title}
                   group={group}
                   submitIntentKey={submit_intent_key}
+                  selectLayout={selectLayout}
+                  isNarrow={isNarrow}
                 />
               ))}
             </div>
           )}
         </div>
       )}
+      {/* Closes the surface. Report is only offered to someone it can be attributed to,
+          so logged out this row is the two policy links. */}
+      <div className="v2-about-footer">
+        <a className="v2-about-footer-link" href="https://gooey.ai/privacy">
+          <i className="fa-regular fa-shield" />
+          <span>Privacy</span>
+        </a>
+        <a className="v2-about-footer-link" href="https://gooey.ai/terms">
+          <i className="fa-regular fa-file-pen" />
+          <span>Terms</span>
+        </a>
+        {!!report_value && (
+          // The submit-intent path Share uses: the form posts its submitter's name and
+          // value, which reaches `_handle_menu_pick` and opens the dialog.
+          <button
+            type="submit"
+            className="v2-about-footer-link"
+            name={submit_intent_key}
+            value={report_value}
+            title="Report this workflow"
+          >
+            <i className="fa-regular fa-flag" />
+            <span>Report</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -101,10 +143,10 @@ export function RecipeAbout({
 /** The view switcher, above About's content and below lg only.
  *
  *  Here rather than in the top bar: it belongs to the page, scrolls with it, and sticks to
- *  the top of the surface as you go. The bar's pill is the drawer's trigger, not this.
+ *  the top of the surface. The bar's pill is the drawer's trigger, not this.
  */
 function AboutViewSwitcher() {
-  const { config, setActiveEditorPane } = useRecipeWorkspaceContext();
+  const { config } = useRecipeWorkspaceContext();
   const { layout, selectLayout } = useWorkspaceLayout(config);
   const views = config.views.filter((view) => !view.desktop_only);
   if (views.length < 2) return null;
@@ -118,14 +160,8 @@ function AboutViewSwitcher() {
             type="button"
             role="tab"
             aria-selected={active}
-            className={clsx(
-              "v2-about-view",
-              active && "v2-about-view--active"
-            )}
-            onClick={() => {
-              selectLayout(view.layout);
-              setActiveEditorPane("");
-            }}
+            className={clsx("v2-about-view", active && "v2-about-view--active")}
+            onClick={() => selectLayout(view.layout)}
           >
             {!!view.icon_html && (
               <span
@@ -146,19 +182,26 @@ function AboutViewSwitcher() {
 function AuthorBlock({
   author,
   shareValue,
+  shareUrl,
   submitIntentKey,
 }: {
   author: AboutAuthor;
   shareValue?: string | null;
+  shareUrl?: string | null;
   submitIntentKey: string;
 }) {
+  const { copied, shareNatively } = useNativeShare(shareUrl);
   const row = (
     <div className="v2-about-author-row">
       <img className="v2-about-author-photo" src={author.photo_url} alt="" />
       <div className="v2-about-author-text">
-        <span className="v2-about-author-name">{author.name}</span>
+        <span className="v2-about-author-name text-truncate">
+          {author.name}
+        </span>
         {!!author.subtitle && (
-          <span className="v2-about-author-meta">{author.subtitle}</span>
+          <span className="v2-about-author-meta text-truncate">
+            {author.subtitle}
+          </span>
         )}
       </div>
     </div>
@@ -178,20 +221,53 @@ function AuthorBlock({
           <span>Share</span>
         </button>
       )}
+      {!shareValue && !!shareUrl && (
+        // Nobody to open the share dialog for, so the browser's own sheet takes the url.
+        // `type="button"`: this must not submit the form it sits in.
+        <button
+          type="button"
+          className="v2-about-share"
+          onClick={shareNatively}
+          title="Share this workflow"
+        >
+          <i className="fa-regular fa-share-nodes" />
+          <span>{copied ? "Link copied" : "Share"}</span>
+        </button>
+      )}
     </div>
   );
+}
+
+/** The browser's share sheet, falling back to the clipboard where there is none - Firefox
+ *  on the desktop has no `navigator.share`, and nor does any insecure context. */
+function useNativeShare(url?: string | null) {
+  const { copied, copyUrl } = useCopyToClipboard();
+  const shareNatively = () => {
+    if (!url) return;
+    // A sheet the user dismisses rejects with AbortError; that is not a failure.
+    if (navigator.share) {
+      navigator.share({ title: document.title, url }).catch(() => {});
+      return;
+    }
+    copyUrl(url);
+  };
+  return { copied, shareNatively };
 }
 
 function GroupBlock({
   group,
   submitIntentKey,
+  selectLayout,
+  isNarrow,
 }: {
   group: AboutGroup;
   submitIntentKey: string;
+  selectLayout: (next: WorkspaceLayout) => void;
+  isNarrow: boolean;
 }) {
   return (
     <div className={clsx("v2-about-group", `v2-about-group--${group.variant}`)}>
-      <h2 className="v2-about-section-title">{group.title}</h2>
+      <h3 className="v2-about-section-title">{group.title}</h3>
       {/* The column count follows the cards rather than `auto-fill`, which materialises
           every track that fits and made a two-card group as wide as a six-card one. */}
       <div
@@ -207,6 +283,8 @@ function GroupBlock({
             key={card.label}
             card={card}
             submitIntentKey={submitIntentKey}
+            selectLayout={selectLayout}
+            isNarrow={isNarrow}
           />
         ))}
       </div>
@@ -218,12 +296,15 @@ function GroupBlock({
 function MetaCard({
   card,
   submitIntentKey,
+  selectLayout,
+  isNarrow,
 }: {
   card: AboutCard;
   submitIntentKey: string;
+  selectLayout: (next: WorkspaceLayout) => void;
+  isNarrow: boolean;
 }) {
   const { config, setActiveEditorPane } = useRecipeWorkspaceContext();
-  const { selectLayout } = useWorkspaceLayout(config);
   // The platform's own colour, used only by the full-width deployment buttons below lg.
   const accent = card.accent
     ? ({ "--v2-about-accent": card.accent } as React.CSSProperties)
@@ -236,7 +317,7 @@ function MetaCard({
         </span>
         <i className="fa-regular fa-chevron-right v2-about-meta-chevron" />
       </span>
-      <span className="v2-about-meta-label">{card.label}</span>
+      <h4 className="v2-about-meta-label">{card.label}</h4>
     </>
   );
 
@@ -268,7 +349,14 @@ function MetaCard({
           type="button"
           className="v2-about-meta-card"
           onClick={() => {
-            selectLayout(target.layout);
+            selectLayout(
+              layoutForEditorPane(
+                target.layout,
+                target.editor_pane,
+                config.narrow_surface,
+                isNarrow
+              )
+            );
             if (target.editor_pane) setActiveEditorPane(target.editor_pane);
           }}
         >

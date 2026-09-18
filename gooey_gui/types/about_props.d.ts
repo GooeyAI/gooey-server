@@ -61,7 +61,7 @@ export interface AboutCard {
  * A heading and the grid of cards under it.
  *
  * `variant` is what lets the deployments read as full-width buttons below lg, where the
- * design puts them right under the description rather than in the card grid.
+ * design puts them under the description rather than in the card grid.
  */
 export interface AboutGroup {
   title: string;
@@ -78,7 +78,9 @@ export interface RecipeAboutProps {
   photo_url: string | null;
   circle_photo: boolean;
   author: AboutAuthor | null;
+  report_value: string | null;
   share_value: string | null;
+  share_url: string | null;
   submit_intent_key: string;
   tags: AboutTag[];
   notes: string | null;

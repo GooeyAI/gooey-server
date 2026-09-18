@@ -37,19 +37,14 @@
     flex-basis 180ms var(--pane-ease),
     max-width 180ms var(--pane-ease),
     margin 180ms var(--pane-ease),
-    opacity 120ms ease;
+    opacity 120ms ease,
+    transform 180ms var(--pane-ease);
 }
 
 /* The slide is the part About sits out - it is the surface being read when a run starts,
    and the one place a pane arriving from the side was most noticeable. */
 .recipe-workspace-pane:not(.recipe-workspace-about) {
   transform: translateX(0.375rem);
-  transition:
-    flex-basis 180ms var(--pane-ease),
-    max-width 180ms var(--pane-ease),
-    margin 180ms var(--pane-ease),
-    opacity 120ms ease,
-    transform 180ms var(--pane-ease);
 }
 
 .recipe-workspace-pane--closed {
@@ -189,6 +184,9 @@
   min-height: 0;
   max-height: 45%;
   overflow-y: auto;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
 }
 
 .recipe-workspace-controls {
@@ -420,6 +418,17 @@
     margin-top: 0 !important;
   }
 
+  /* Debug is a dump - called functions, the step trace, the run timeline - read rather than
+     filled in, and at body size it wraps to a wall on a phone. `em` so anything that already
+     sizes itself relative to its text keeps its proportion. */
+  .v2-debug {
+    font-size: 0.75rem;
+  }
+
+  .v2-debug :where(h1, h2, h3, h4, h5, h6) {
+    font-size: 1.15em;
+  }
+
   /* Both work views start at the header's rule, so the page's top gutter showed as a strip of
      background between the two. `!important` to beat `pt-2`. About keeps its gutter - it is a
      card, and sits off the rule. */
@@ -496,6 +505,35 @@
    an inline style, so the top bar's `<noscript>` can take it back without `!important`. */
 .gooey-until-hydrated {
   visibility: hidden;
+}
+
+/* ------------------------------------------------------------ debug pane
+
+   Markup comes from `BasePage.render_debug_pane` in base_v2.py. */
+/* ------------------------------------------------------------ debug pane
+
+   `BasePage.render_debug_pane` in base_v2.py: the RunDebugInfo component, then the
+   step widgets. */
+
+.v2-debug {
+  font-size: 0.875rem;
+}
+
+/* The step widgets follow the timeline under a rule rather than a heading. */
+.v2-debug-section {
+  border-top: 1px solid var(--gooey-line-soft);
+  padding-top: var(--gooey-space-4);
+  margin-top: var(--gooey-space-2);
+}
+
+/* The JSON viewer sizes its text in rem via its own emotion classes, so the pane's
+   font-size doesn't reach it; pin it to the timeline's size instead. */
+.v2-debug .data-key-pair,
+.v2-debug .data-key-pair span {
+  font-size: 0.8125rem !important;
+}
+.v2-debug .data-type-label {
+  font-size: 0.6875rem !important;
 }
 
 /* Publish, beside Run at the foot of the editor below lg. The bar above gave it up when the

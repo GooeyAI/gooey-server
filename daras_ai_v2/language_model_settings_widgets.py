@@ -79,15 +79,8 @@ def language_model_settings(selected_models: str | list[str] | None = None) -> N
 
     llms = list(AIModelSpec.objects.filter(name__in=selected_models))
 
-    col1, col2 = gui.columns(2)
+    col1, _ = gui.columns(2)
     with col1:
-        gui.checkbox(
-            label="**" + field_title(LanguageModelSettings, "avoid_repetition") + "**",
-            help=field_desc(LanguageModelSettings, "avoid_repetition"),
-            key="avoid_repetition",
-        )
-
-    with col2:
         gui.selectbox(
             label=(
                 "###### " + field_title(LanguageModelSettings, "response_format_type")

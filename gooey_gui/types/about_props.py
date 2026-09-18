@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 import pydantic
 
@@ -60,7 +60,7 @@ class AboutCard(StrictComponentModel):
     icon_html: str
     label: str
     target: AboutCardTarget
-    # A platform's own colour, for the deployment buttons below lg. None keeps the card neutral.
+    # A platform's own colour, for the deployment buttons below lg. None keeps it neutral.
     accent: str | None = None
 
 
@@ -68,7 +68,7 @@ class AboutGroup(StrictComponentModel):
     """A heading and the grid of cards under it.
 
     `variant` is what lets the deployments read as full-width buttons below lg, where the
-    design puts them right under the description rather than in the card grid.
+    design puts them under the description rather than in the card grid.
     """
 
     title: str
@@ -76,24 +76,28 @@ class AboutGroup(StrictComponentModel):
     variant: Literal["cards", "deployments"] = "cards"
 
 
-class RecipeAboutProps(pydantic.BaseModel):
+class RecipeAboutProps(StrictComponentModel):
     """Everything the About surface draws. Structured rather than pre-rendered html, so the
     component owns the markup and the payload carries only what varies."""
 
-    _component: str = "RecipeAbout"
+    _component: ClassVar[Literal["RecipeAbout"]] = "RecipeAbout"
 
-    # The page's one h1, visually hidden: the top bar already shows the name, but that bar
-    # is chrome on every tab, so it cannot be the heading.
+    # The workflow's name and run count, shown below lg where the bar leads with the logo
+    # instead. Not the page's h1 - that is the top bar's, and there is only one.
     heading: str
-    # What the name sits on below lg, where About shows it rather than the top bar
     heading_meta: str | None = None
 
     photo_url: str | None = None
     circle_photo: bool = False
 
     author: AboutAuthor | None = None
-    # the encoded ShareIntent, or None when there is nothing shareable
+    # the encoded pick that opens the report dialog, or None with nobody to attribute it to
+    report_value: str | None = None
+    # the encoded ShareIntent, or None with no share dialog to open
     share_value: str | None = None
+    # the url for the browser's own share sheet, set instead of `share_value` for a visitor
+    # who has no dialog - the two are never both present
+    share_url: str | None = None
     submit_intent_key: str
 
     tags: list[AboutTag] = []

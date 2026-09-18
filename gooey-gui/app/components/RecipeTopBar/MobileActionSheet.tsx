@@ -89,7 +89,7 @@ export function MobileActionSheet({
               </span>
               {/* An element of its own so it can be truncated - a bare text node is not
                   something CSS can put an ellipsis on. */}
-              <span className="gooey-sheet-label">{entry.label}</span>
+              <span className="text-truncate min-w-0">{entry.label}</span>
             </>
           );
           return entry.href ? (
