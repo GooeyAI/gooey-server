@@ -6,6 +6,7 @@ from functools import partial
 
 import numpy as np
 from aifail import (
+    http_should_retry,
     retry_if,
     try_all,
 )
@@ -13,6 +14,8 @@ from jinja2.lexer import whitespace_re
 from loguru import logger
 
 from daras_ai_v2 import settings
+from daras_ai_v2.asr import get_google_auth_session
+from daras_ai_v2.exceptions import raise_for_status
 from daras_ai_v2.gpu_server import call_celery_task
 from daras_ai_v2.language_model import get_openai_client, openai_should_retry
 from daras_ai_v2.redis_cache import (
@@ -37,6 +40,11 @@ class EmbeddingModels(Enum):
     openai_ada_2 = EmbeddingModel(
         model_id=("openai-text-embedding-ada-002-prod-ca-1", "text-embedding-ada-002"),
         label="Text Embedding Ada 2 (OpenAI)",
+    )
+
+    gemini_embedding_2 = EmbeddingModel(
+        model_id="gemini-embedding-2",
+        label="Gemini Embedding 2 (Google)",
     )
 
     mistral_embed = EmbeddingModel(
@@ -125,6 +133,8 @@ def create_embeddings(texts: list[str], model: EmbeddingModels) -> np.ndarray:
             base_url="https://api.mistral.ai/v1",
             api_key=settings.MISTRAL_API_KEY,
         )
+    elif "gemini" in model.name:
+        ret = _run_vertex_embedding(texts=texts, model_id=model.model_id)
     else:
         ret = _run_gpu_embedding(texts=texts, model_id=model.model_id)
 
@@ -188,3 +198,54 @@ def _run_openai_embedding(
         ],
     )
     return [data.embedding for data in res.data]
+
+
+# gemini-embedding-2 emits 128..3072 dims (Matryoshka, auto-renormalized). 3072 is the max
+# and exactly matches vector_search.EMBEDDING_SIZE, so it needs no zero padding to be fed
+# into the Vespa `tensor<float>(x[3072])` field.
+GEMINI_EMBEDDING_DIMENSIONS = 3072
+
+# Max `requests` per batchEmbedContents call. Deliberately conservative -- confirm against
+# the current Vertex quota before raising it.
+VERTEX_EMBEDDING_BATCH_SIZE = 100
+
+
+def _run_vertex_embedding(*, texts: list[str], model_id: str) -> list[list[float]]:
+    logger.info(f"{model_id=}, {len(texts)=}")
+    session, project = get_google_auth_session()
+    # every request item must name the model by its fully qualified resource path
+    model_uri = (
+        f"projects/{project}/locations/{settings.GCP_REGION}"
+        f"/publishers/google/models/{model_id}"
+    )
+    ret = []
+    for i in range(0, len(texts), VERTEX_EMBEDDING_BATCH_SIZE):
+        ret += _vertex_batch_embed_contents(
+            session=session,
+            model_uri=model_uri,
+            texts=texts[i : i + VERTEX_EMBEDDING_BATCH_SIZE],
+        )
+    return ret
+
+
+@retry_if(http_should_retry)
+def _vertex_batch_embed_contents(
+    *, session, model_uri: str, texts: list[str]
+) -> list[list[float]]:
+    # note: gemini-embedding-2 dropped the legacy :predict endpoint that the older
+    # text embedding models use, so this must go through :batchEmbedContents
+    r = session.post(
+        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/{model_uri}:batchEmbedContents",
+        json={
+            "requests": [
+                {
+                    "model": model_uri,
+                    "content": {"parts": [{"text": text}]},
+                    "outputDimensionality": GEMINI_EMBEDDING_DIMENSIONS,
+                }
+                for text in texts
+            ]
+        },
+    )
+    raise_for_status(r)
+    return [item["values"] for item in r.json()["embeddings"]]
