@@ -28,8 +28,6 @@ import {
 } from "../RecipeWorkspace/paneState";
 import { MobileActionSheet, type SheetEntry } from "./MobileActionSheet";
 import { isIntegrationLabelled } from "./integrationChips";
-import type { SheetSlot } from "./sheetSlots";
-import { sheetAudience, sheetSlots } from "./sheetSlots";
 import { encodeSubmitIntent } from "./submitIntent";
 
 type TopBarTarget = LinkTarget | SubmitTarget;
@@ -46,20 +44,44 @@ type MenuEntry = {
 
 // The bot itself as a destination, for tab sets that do not name it as a view of their own.
 // A visitor's does not: About and How it works each pair with the preview on a wide screen,
-// so it never needed a pill. Below lg both fold to a single pane, and then the header's eye
-// is the only route to the bot - hence a view here rather than a missing one.
+// so it never needed a tab there. Below lg both fold to a single pane, and then the strip is
+// the only route to the bot - hence a view here rather than a missing one.
 const PREVIEW_VIEW: WorkspaceView = {
   key: "preview",
   label: "Preview",
-  // Play, same as `icons.play` on the Preview tab an owner is given and same as the compact
-  // button below lg - one destination should not be drawn two ways.
+  // Play, same as `icons.play` on the Preview tab an owner is given - one destination
+  // should not be drawn two ways.
   icon_html: '<i class="fa-regular fa-play"></i>',
   layout: { kind: "single", surface: "preview" },
   desktop_only: false,
 };
 
-// `BasePage.MENU_*` - the keys Python stamps on the title-menu items, so the sheet can put
-// them in its own order rather than taking the list as it comes.
+/** A tab that is a route rather than a client-side pane: Usage, Deploy, API. */
+type DocumentTab = {
+  key: NonNullable<RecipeTopBarProps["active_document_tab"]>;
+  label: string;
+  iconClass: string;
+  href: string;
+  /** Deploy and API: reachable from the switcher, never a tab of their own. */
+  switcherOnly?: boolean;
+};
+
+/** Which widths a tab is drawn at, as bootstrap display utilities.
+ *
+ * The strip is one element at every width, but the two ends of it differ by one tab each:
+ * Split has nowhere to fold below lg, and the supplied Preview is only a destination there.
+ * CSS rather than a viewport branch, so the markup is the same before and after hydration.
+ */
+function tabVisibility(
+  view: WorkspaceView,
+  declared: WorkspaceView[]
+): string | undefined {
+  if (view.desktop_only) return "d-none d-lg-inline-flex";
+  if (!declared.some((it) => it.key === view.key)) return "d-lg-none";
+  return undefined;
+}
+
+// `BasePage.MENU_*` - the keys Python stamps on the title-menu items.
 const MENU_VERSION_HISTORY_KEY = "--menu-version-history";
 const MENU_DUPLICATE_KEY = "--menu-duplicate";
 const MENU_DELETE_KEY = "--menu-delete";
@@ -101,13 +123,13 @@ export function RecipeTopBar({
   cost_href,
   cost_title,
   view_only,
-  crumb_label,
   deploy_href,
   builder_panel_key,
   builder_storage_key,
   builder_new_event,
+  builder_photo_url,
   usage_href,
-  usage_active,
+  active_document_tab,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
   const { copied: shareCopied, copyUrl } = useCopyToClipboard();
@@ -118,10 +140,6 @@ export function RecipeTopBar({
     copyUrl(share.url);
   };
 
-  const [sheetOpen, setSheetOpen] = useState(false);
-  // Below lg About leads with the logo and hands the name over once you scroll - see
-  // `useScrolledPastTop`. The bar animates between the two rather than cutting.
-  const scrolled = useScrolledPastTop();
   const builder = useAppShellPanel(
     builder_panel_key,
     Boolean(builder_panel_key && state[builder_panel_key]),
@@ -130,18 +148,46 @@ export function RecipeTopBar({
     // run - so saving a workflow closed the panel that had asked for the save.
     builder_storage_key
   );
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { layout, storedLayout, hydrated, isNarrow, selectLayout } =
     useWorkspaceLayout(config);
-  // Used wherever a layout has to be named. Not `config.views`, which is what the desktop
-  // pill strip draws - the supplied Preview is reachable from the header and the sheet, both
-  // of which are the narrow layout's, and a pill for it would be redundant beside them.
+  // Every layout the bar can name, which is what the strip draws below lg. Wider than
+  // `config.views` by the supplied Preview, which only the folded layout needs a tab for -
+  // `tabVisibility` is what keeps it off the desktop strip.
   const views = config.views.some((view) => view.key === "preview")
     ? config.views
-    : [...config.views, PREVIEW_VIEW];
+    : // Second, where an editor's own Preview tab sits - the design's order is About,
+      // Preview, then the tab that edits, and a visitor's set should read the same.
+      [config.views[0], PREVIEW_VIEW, ...config.views.slice(1)];
+  // Routes rather than panes, so they navigate instead of selecting a layout and the server
+  // says which is current. Only Usage is a tab; the other two are destinations the switcher
+  // offers, and the pill names whichever of the three you are on.
+  const documentTabs: DocumentTab[] = [
+    usage_href && {
+      key: "usage",
+      label: "Usage",
+      iconClass: "fa-regular fa-chart-line",
+      href: usage_href,
+    },
+    deploy_href && {
+      key: "deploy",
+      label: "Deploy",
+      iconClass: "fa-regular fa-rocket",
+      href: deploy_href,
+      switcherOnly: true,
+    },
+    api_href && {
+      key: "api",
+      label: "API",
+      iconClass: "fa-regular fa-code",
+      href: api_href,
+      switcherOnly: true,
+    },
+  ].filter((tab): tab is DocumentTab => !!tab);
   const activeViewSpec = activeViewForLayouts(
     views,
     layout,
@@ -190,18 +236,24 @@ export function RecipeTopBar({
         config.narrow_surface,
         isNarrow
       ));
-  // Ask Gooey carries its own title pill, so the bar neither repeats it nor goes on naming
-  // the view underneath the panel.
-  const crumb = builderOpen ? "" : crumb_label || activeViewSpec?.label || "";
-  // About carries its own switcher, which sticks to the top of the surface - so the bar's
-  // pill would be a second copy of it at every scroll position, not just at the top.
-  const isAbout = !builderOpen && activeViewSpec?.key === "about";
-  // What the bar's pill says. The crumb below lg gives way to it rather than repeating it -
-  // a document tab (API, Deploy) has no view of its own, so its crumb still earns its place.
-  const pillLabel = activeViewSpec?.label ?? "More";
-  const showsPill = !isAbout;
-  // The logo leads About until it is scrolled; every other view keeps naming the workflow.
-  const showsLogo = isAbout && !scrolled;
+  // About is the one surface with the strip, and the only one whose body names the workflow
+  // itself - so it leads with the wordmark and keeps the strip below. Every other surface
+  // collapses to a single row that names the workflow and carries the pill.
+  const onAbout =
+    !builderOpen && !active_document_tab && activeViewSpec?.key === "about";
+  // What the pill says: the panel wins over the surface behind it, then a route names
+  // itself, then the pane you are on.
+  const surface: { label: string; iconClass?: string; iconHtml?: string } | null =
+    builderOpen
+      ? { label: "Ask", iconClass: "fa-regular fa-sparkles" }
+      : active_document_tab
+        ? documentTabs.find((tab) => tab.key === active_document_tab) ?? null
+        : activeViewSpec
+          ? {
+              label: activeViewSpec.label,
+              iconHtml: activeViewSpec.icon_html ?? undefined,
+            }
+          : null;
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
   // Absent on a tab that carries no run control, where nothing is running as far as the
   // bar is concerned.
@@ -281,21 +333,13 @@ export function RecipeTopBar({
       onPick: share.kind === "copy" ? copyShareUrl : undefined,
     });
   }
-  if (api_href) {
+  for (const tab of documentTabs) {
+    if (tab.key === "usage") continue;
     publishEntries.push({
-      key: API_ITEM_KEY,
-      label: "API",
-      iconHtml: '<i class="fa-regular fa-code"></i>',
-      target: { kind: "link", href: api_href },
-    });
-  }
-
-  if (deploy_href) {
-    publishEntries.push({
-      key: DEPLOY_ITEM_KEY,
-      label: "Deploy",
-      iconHtml: '<i class="fa-regular fa-rocket"></i>',
-      target: { kind: "link", href: deploy_href },
+      key: `--topbar-item-${tab.key}`,
+      label: tab.label,
+      iconHtml: `<i class="${tab.iconClass}"></i>`,
+      target: { kind: "link", href: tab.href },
     });
   }
 
@@ -320,173 +364,55 @@ export function RecipeTopBar({
       mobileOnly: true,
     })),
   ];
-  const viewEntry = (key: string, label?: string): SheetEntry[] => {
-    const view = views.find((candidate) => candidate.key === key);
-    // The sheet only exists below lg, so a view that asks to be desktop-only has no
-    // business in it - Split is one, and it is why this guard is here rather than assumed.
-    if (!view || view.desktop_only) {
-      return [];
-    }
-    return [
-      {
-        key: `--sheet-view-${view.key}`,
-        // The sheet names a couple of the surfaces differently from the desktop pills, which
-        // have the room to be terser - so the label is overridable here.
-        label: label ?? view.label,
-        iconHtml: view.icon_html ?? undefined,
-        onPick: () => showView(view),
-      },
-    ];
-  };
 
-  // Usage is a page, not a pane, so it is a link rather than a view - but it belongs in the
-  // same list the panes do. Hidden while you are already looking at it.
-  const usageEntry: SheetEntry[] =
-    usage_href && !usage_active
+
+  /* What the pill opens: the surfaces, in the order the strip draws them, plus the two
+     routes that never earn a tab. Destinations only - the actions live on the surfaces
+     themselves, and a menu that mixes "go here" with "do this" is what this replaced. */
+  const switcherEntries: SheetEntry[] = [
+    ...views
+      .filter((view) => !view.desktop_only)
+      .flatMap((view) =>
+        view.key === activeViewSpec?.key && !builderOpen && !active_document_tab
+          ? []
+          : [
+              {
+                key: `--switch-${view.key}`,
+                label: view.label,
+                iconHtml: view.icon_html ?? undefined,
+                onPick: () => showView(view),
+              },
+            ]
+      ),
+    ...(builder_panel_key && !builderOpen
       ? [
           {
-            key: "--sheet-usage",
-            label: "Usage",
-            iconClass: "fa-regular fa-chart-line",
-            href: usage_href,
-            onPick: () => setBuilder(false),
-          },
-        ]
-      : [];
-
-  // The way into Ask Gooey. Not while the panel is already up, where the sheet offers New
-  // Chat instead. What it offers to do depends on whose published run it is: your own is
-  // edited, someone else's is remixed into a copy, and a saved run is just worked on.
-  const builderEntry = (label: string): SheetEntry[] =>
-    !builderOpen && !!builder_panel_key
-      ? [
-          {
-            key: "--sheet-builder",
-            label,
+            key: "--switch-builder",
+            label: "Ask",
             iconClass: "fa-regular fa-sparkles",
             onPick: showBuilder,
           },
         ]
-      : [];
-
-  // A control on the Ask Gooey panel, so it is only offered while that panel is up.
-  const newChatEntry: SheetEntry[] =
-    builder_new_event && builderOpen
-      ? [
-          {
-            key: "--sheet-new-chat",
-            label: "New Chat",
-            iconClass: "fa-regular fa-pen-to-square",
-            onPick: () =>
-              window.dispatchEvent(new CustomEvent(builder_new_event)),
-          },
-        ]
-      : [];
-
-  // The channels this published run is deployed to, as rows of their own. No group heading:
-  // the menu is one flat list, and with a channel or two at the top of it a heading is more
-  // furniture than help.
-  const integrationEntries: SheetEntry[] = integrations.map((it) => ({
-    key: it.key,
-    label: it.label,
-    iconHtml: it.icon_html,
-    href: it.target.kind === "link" ? it.target.href : undefined,
-    submitIntent: it.target.kind === "submit" ? it.target.intent : undefined,
-    onPick: () => setBuilder(false),
-  }));
-
-  const sheetEntry = (entries: MenuEntry[], key: string): SheetEntry[] =>
-    entries
-      .filter((item) => item.key === key)
-      .map((item) => ({
-        key: item.key,
-        label: item.label,
-        iconHtml: item.iconHtml ?? undefined,
-        href: item.target?.kind === "link" ? item.target.href : undefined,
-        submitIntent:
-          item.target?.kind === "submit" ? item.target.intent : undefined,
-        onPick: item.onPick ?? (() => setBuilder(false)),
-      }));
-
-  // Named so the three menus below read as the orders they are, rather than as index
-  // arithmetic over `publishEntries` and `title_menu_items`.
-  const saveEntry = sheetEntry(publishEntries, PUBLISH_ITEM_KEY);
-  const shareEntry = sheetEntry(publishEntries, SHARE_ITEM_KEY);
-  const apiEntry = sheetEntry(publishEntries, API_ITEM_KEY);
-  const deployEntry = sheetEntry(publishEntries, DEPLOY_ITEM_KEY);
-  const versionsEntry = sheetEntry(titleEntries, MENU_VERSION_HISTORY_KEY);
-  const duplicateEntry = sheetEntry(titleEntries, MENU_DUPLICATE_KEY);
-  const deleteEntry = sheetEntry(titleEntries, MENU_DELETE_KEY);
-
-  // Where a saved run's menu leads: back to the published run it belongs to, opening on
-  // About. The layout rides along in the navigation state, read while the next page
-  // hydrates.
-  const parentEntry: SheetEntry[] = parent
-    ? [
-        {
-          key: "--sheet-parent",
-          label: `Run of ${parent.label}`,
-          iconClass: "fa-regular fa-circle-info",
-          href: parent.href,
-          navigationLayout: ABOUT_LAYOUT,
-          onPick: () => setBuilder(false),
-        },
-      ]
-    : [];
-
-  const audience = sheetAudience({ onSavedRun: !!parent, viewOnly: view_only });
-
-  /* Every row the sheet can hold. `sheetSlots` picks which of them appear and in what order;
-     the labels are here because they are the one thing that varies with who is looking - a
-     visitor configures nothing, so their row explains rather than edits, and Ask Gooey
-     edits your own published run, remixes someone else's and just works on a saved run. */
-  const slotEntries: Record<SheetSlot, SheetEntry[]> = {
-    parent: parentEntry,
-    integrations: integrationEntries,
-    about: viewEntry("about"),
-    preview: viewEntry("preview"),
-    edit:
-      audience === "visitor"
-        ? viewEntry("how-it-works", "How it Works")
-        : viewEntry("edit"),
-    newChat: newChatEntry,
-    builder: builderEntry(
-      {
-        savedRun: "Ask Gooey",
-        visitor: "Ask Gooey to Remix",
-        editor: "Ask Gooey to Edit",
-      }[audience]
+      : []),
+    ...documentTabs.flatMap((tab) =>
+      tab.key === active_document_tab
+        ? []
+        : [
+            {
+              key: `--switch-${tab.key}`,
+              label: tab.label,
+              iconClass: tab.iconClass,
+              href: tab.href,
+              onPick: () => setBuilder(false),
+            },
+          ]
     ),
-    usage: usageEntry,
-    save: saveEntry,
-    deploy: deployEntry,
-    share: shareEntry,
-    api: apiEntry,
-    versions: versionsEntry,
-    duplicate: duplicateEntry,
-    delete: deleteEntry,
-  };
+  ];
 
-  const sheetEntries: SheetEntry[] = sheetSlots(audience).flatMap(
-    (slot) => slotEntries[slot]
-  );
-
-  // Shared by the two forms the heading takes. The crumb sits inside it so a long name
-  // ellipsises against it rather than pushing it off the row.
+  // Shared by the two forms the heading takes.
   const titleContent = (
     <>
       <span className="gooey-topbar-title-text">{title}</span>
-      {/* Which level of the stack is on screen; above lg the active pill says so, and below
-          lg the view pill does - so this only renders when it says something they do not. */}
-      {!atRoot && !!crumb && !(showsPill && crumb === pillLabel) && (
-        <span className="gooey-topbar-crumb d-lg-none">
-          <i
-            className="fa-regular fa-chevron-right gooey-topbar-crumb-sep"
-            aria-hidden="true"
-          />
-          {crumb}
-        </span>
-      )}
     </>
   );
 
@@ -500,7 +426,7 @@ export function RecipeTopBar({
     <div
       className={clsx(
         "gooey-topbar",
-        // a level down the mobile stack, which the design gives a shorter bar and a softer rule
+        // a level down the mobile stack, which the design rules with the softer line
         !atRoot && "gooey-topbar-stacked"
       )}
     >
@@ -528,17 +454,6 @@ export function RecipeTopBar({
           />
         </button>
 
-        {/* On About, before the surface is scrolled, the bar says whose app this is rather
-            than which workflow - the name is in the surface itself there. Both are rendered
-            and cross-faded, so the swap animates and the pill slides rather than jumping. */}
-        {showsLogo && !!logo_image_url && (
-          <img
-            src={logo_image_url}
-            alt="Gooey.AI"
-            className="gooey-topbar-logo d-lg-none"
-          />
-        )}
-
         {photo_url && (
           <img
             src={photo_url}
@@ -546,7 +461,7 @@ export function RecipeTopBar({
             className={clsx(
               "gooey-topbar-avatar",
               circle_photo && "gooey-topbar-avatar-circle",
-              showsLogo && "gooey-topbar-identity-hidden"
+              onAbout && "gooey-topbar-identity-hidden"
             )}
           />
         )}
@@ -554,7 +469,7 @@ export function RecipeTopBar({
         <div
           className={clsx(
             "gooey-topbar-titleblock",
-            showsLogo && "gooey-topbar-identity-hidden"
+            onAbout && "gooey-topbar-identity-hidden"
           )}
           ref={titleMenuRef}
         >
@@ -614,21 +529,36 @@ export function RecipeTopBar({
         </div>
       </div>
 
-      {/* A single-view recipe does not need a selector unless Usage is available. */}
-      {(config.views.length > 1 || !!usage_href) && (
+      {/* On About the bar leads with the wordmark rather than the workflow, whose name the
+          surface below carries. A grid item of its own, so the bar's three tracks centre it
+          in the row instead of it riding along after the drawer button. */}
+      {onAbout && !!logo_image_url && (
+        <img
+          src={logo_image_url}
+          alt="Gooey.AI"
+          className="gooey-topbar-logo d-lg-none"
+        />
+      )}
+
+      {/* A single-view recipe does not need a selector unless a route tab joins it. Above lg
+          the strip is the bar's own navigation on every surface; below lg it is About's, and
+          the pill stands in for it everywhere else. */}
+      {(config.views.length > 1 || !!documentTabs.length) && (
         <div
           className={clsx(
             "gooey-topbar-tabs",
+            !onAbout && "d-none d-lg-flex",
             !hydrated && "gooey-until-hydrated"
           )}
         >
-          {config.views.map((view) => (
+          {views.map((view) => (
             <button
               type="button"
               key={view.key}
               className={clsx(
                 "gooey-topbar-tab",
-                view.key === activeViewSpec?.key && "gooey-topbar-tab-active"
+                view.key === activeViewSpec?.key && "gooey-topbar-tab-active",
+                tabVisibility(view, config.views)
               )}
               onClick={() => chooseView(view)}
               aria-pressed={view.key === activeViewSpec?.key}
@@ -640,48 +570,80 @@ export function RecipeTopBar({
               {view.label}
             </button>
           ))}
-          {usage_href && (
-            <Link
-              to={usage_href}
-              className={clsx(
-                "gooey-topbar-tab",
-                usage_active && "gooey-topbar-tab-active"
-              )}
-              onClick={() => setBuilder(false)}
-              aria-current={usage_active ? "page" : undefined}
-            >
-              <i className="fa-regular fa-chart-line gooey-topbar-tab-icon" />
-              Usage
-            </Link>
-          )}
+          {documentTabs
+            .filter((tab) => !tab.switcherOnly)
+            .map((tab) => (
+              <Link
+                key={tab.key}
+                to={tab.href}
+                className={clsx(
+                  "gooey-topbar-tab",
+                  tab.key === active_document_tab && "gooey-topbar-tab-active"
+                )}
+                onClick={() => setBuilder(false)}
+                aria-current={
+                  tab.key === active_document_tab ? "page" : undefined
+                }
+              >
+                <i className={clsx(tab.iconClass, "gooey-topbar-tab-icon")} />
+                {tab.label}
+              </Link>
+            ))}
         </div>
       )}
 
       <div className="gooey-topbar-right">
-        {/* Below lg only these two render; the desktop cluster is hidden by CSS, and cost
-            and Run return as the editor's own bottom bar. */}
-        {!!sheetEntries.length && showsPill && (
-          <button
-            type="button"
-            className="gooey-topbar-viewpill d-lg-none"
-            onClick={() => setSheetOpen(true)}
-            title="Switch view"
-            aria-label={`Switch view (currently ${pillLabel})`}
-            aria-haspopup="menu"
-            aria-expanded={sheetOpen}
-          >
-            {!!activeViewSpec?.icon_html && (
-              <span
-                className="gooey-topbar-viewpill-icon"
-                dangerouslySetInnerHTML={{ __html: activeViewSpec.icon_html }}
-              />
+        {/* The only control here below lg; the desktop cluster is hidden by CSS, and cost
+            and Run return as the editor's own bottom bar.
+
+            The way into Ask Gooey, which below lg is a level of the stack rather than a
+            rail. Not while it is already up: Back is what closes it, and the panel's own
+            header carries New Chat. */}
+        {onAbout
+          ? !!builder_panel_key && (
+              <button
+                type="button"
+                className="gooey-topbar-askgooey d-lg-none"
+                onClick={showBuilder}
+                title="Ask Gooey"
+                aria-label="Ask Gooey"
+              >
+                {builder_photo_url ? (
+                  <img src={builder_photo_url} alt="" />
+                ) : (
+                  <i className="fa-regular fa-sparkles" />
+                )}
+              </button>
+            )
+          : !!surface && (
+              <button
+                type="button"
+                className="gooey-topbar-viewpill d-lg-none"
+                onClick={() => setSwitcherOpen(true)}
+                title="Switch view"
+                aria-label={`Switch view (currently ${surface.label})`}
+                aria-haspopup="menu"
+                aria-expanded={switcherOpen}
+              >
+                {surface.iconHtml ? (
+                  <span
+                    className="gooey-topbar-viewpill-icon"
+                    dangerouslySetInnerHTML={{ __html: surface.iconHtml }}
+                  />
+                ) : (
+                  <i
+                    className={clsx(
+                      surface.iconClass,
+                      "gooey-topbar-viewpill-icon"
+                    )}
+                  />
+                )}
+                <span className="gooey-topbar-viewpill-label">
+                  {surface.label}
+                </span>
+                <i className="fa-regular fa-chevron-down" />
+              </button>
             )}
-            <span className="gooey-topbar-viewpill-label">
-              {pillLabel}
-            </span>
-            <i className="fa-regular fa-chevron-down" />
-          </button>
-        )}
 
         {/* Preview from About and from Ask Gooey, Update from the work views.
 
@@ -872,11 +834,11 @@ export function RecipeTopBar({
         )}
       </div>
 
-      {sheetOpen && (
+      {switcherOpen && (
         <MobileActionSheet
-          entries={sheetEntries}
+          entries={switcherEntries}
           submitIntentKey={submit_intent_key}
-          onDismiss={() => setSheetOpen(false)}
+          onDismiss={() => setSwitcherOpen(false)}
         />
       )}
     </div>
@@ -1017,25 +979,3 @@ function menuEntryFromTopBarItem(item: TopBarMenuItem): MenuEntry {
   };
 }
 
-/** Whether the About surface has been scrolled away from its top.
- *
- * The pane's own content box is what scrolls - the workspace and the tab body around it are
- * both `overflow: hidden`, so binding to either watched an element whose `scrollTop` never
- * moved. Listens in the capture phase on `document` because `scroll` does not bubble, and
- * because the pane may not have mounted when this runs.
- */
-function useScrolledPastTop(threshold = 24) {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const read = () => {
-      const pane = document.querySelector(
-        ".recipe-workspace-about .recipe-workspace-pane-content"
-      );
-      setScrolled(!!pane && pane.scrollTop > threshold);
-    };
-    read();
-    document.addEventListener("scroll", read, true);
-    return () => document.removeEventListener("scroll", read, true);
-  }, [threshold]);
-  return scrolled;
-}

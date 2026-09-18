@@ -562,6 +562,21 @@ def test_usage_is_kept_out_of_a_view_only_bar(monkeypatch):
     assert page._usage_href() is None
 
 
+def test_the_route_tabs_name_themselves_rather_than_the_bar_guessing(monkeypatch):
+    """Usage, Deploy and API are routes, so no client-side layout can be matched against
+    them - the page says which of its own tabs is current, and the strip marks that one."""
+    page = object.__new__(VideoBotsPageV2)
+    for tab, expected in [
+        (RecipeTabs.usage, "usage"),
+        (RecipeTabs.integrations, "deploy"),
+        (RecipeTabs.run_as_api, "api"),
+        (RecipeTabs.run, None),
+        (RecipeTabs.preview, None),
+    ]:
+        page.tab = tab
+        assert page._active_document_tab() == expected
+
+
 def test_title_menu_offers_v1s_options(monkeypatch):
     """The chevron menu is v1's Options dialog, gated the same way."""
     from bots.models import WorkflowAccessLevel
@@ -724,13 +739,13 @@ def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
     assert calls == [("agent", RecipeTabs.examples)]
 
 
-def test_the_menu_keys_python_stamps_are_the_ones_the_sheet_looks_for():
+def test_the_menu_keys_python_stamps_are_the_ones_the_bar_looks_for():
     """These three strings are declared twice - once here, once as literals in
-    `RecipeTopBar/index.tsx` - because the mobile sheet reorders the title menu by key.
+    `RecipeTopBar/index.tsx` - because the bar picks rows out of the title menu by key.
 
     The generated prop *types* are checked by CI, but nothing checks a value. Rename one in
-    Python and the row silently vanishes from the phone menu: no type error, no failure,
-    no log line. This is that missing check.
+    Python and the row silently vanishes from the menu: no type error, no failure, no log
+    line. This is that missing check.
     """
     from pathlib import Path
 
@@ -750,8 +765,8 @@ def test_the_menu_keys_python_stamps_are_the_ones_the_sheet_looks_for():
 
 def test_a_recipe_gets_the_base_tab_set_unless_it_says_otherwise(monkeypatch):
     """The base spec is the one every fork inherits, so Split has to be desktop-only *here*.
-    It folds to a single pane below lg and the mobile sheet drops a desktop-only view -
-    without the flag the next recipe to migrate gets a Split row in its phone menu.
+    It folds to a single pane below lg and `tabVisibility` keeps a desktop-only view off the
+    strip there - without the flag the next recipe to migrate gets a Split tab on a phone.
 
     Also pins that VideoBots takes the base set rather than restating it: the two had
     already drifted on this very flag.

@@ -436,62 +436,15 @@
 
 /* ------------------------------------------------------- the mobile surface
 
-   The name, the view switcher and the deployment buttons: everything About carries below lg
-   that the bar used to. A second `@media` block rather than edits inside the one above, so
-   what the mobile screens added stays legible as one piece. */
+   The name and the deployment buttons: what About carries below lg that the bar used to.
+   A second `@media` block rather than edits inside the one above, so what the mobile screens
+   added stays legible as one piece. */
 
 /* The workflow's name. The top bar carries it above lg - and owns the page's one h1 either
    way, which is why this is a `p`. */
 .v2-about .v2-about-heading,
 .v2-about .v2-about-heading-meta {
   display: none;
-}
-
-/* Above About's content, sticky to the top of the surface. */
-.v2-about .v2-about-views {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gooey-space-2);
-  margin-bottom: var(--gooey-space-3);
-  padding: var(--gooey-space-2) 0;
-  background: var(--gooey-bg-page);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.v2-about .v2-about-views::-webkit-scrollbar {
-  display: none;
-}
-
-.v2-about .v2-about-view {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  gap: var(--gooey-space-2);
-  padding: 6px var(--gooey-space-3);
-  border: 1px solid var(--gooey-line-default);
-  border-radius: var(--gooey-radius-pill);
-  background: var(--gooey-bg-page);
-  color: var(--gooey-ink-muted);
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.v2-about .v2-about-view--active {
-  border-color: var(--gooey-line-strong);
-  background: var(--gooey-surface-100);
-  color: var(--gooey-ink);
-}
-
-.v2-about .v2-about-view-icon {
-  display: inline-flex;
-  align-items: center;
 }
 
 @media (max-width: 991.98px) {

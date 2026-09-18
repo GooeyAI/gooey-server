@@ -15,7 +15,7 @@ import { RenderedHTML } from "~/renderedHTML";
 import { RenderedMarkdown } from "~/renderedMarkdown";
 
 import { useRecipeWorkspaceContext } from "../RecipeWorkspace";
-import { layoutForEditorPane, layoutsEqual } from "../RecipeWorkspace/paneState";
+import { layoutForEditorPane } from "../RecipeWorkspace/paneState";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 
 /** Cards per row before a group takes a second line. */
@@ -45,7 +45,6 @@ export function RecipeAbout({
   const hasPanel = !!tags.length || !!notes || !!groups.length;
   return (
     <div className="v2-about">
-      <AboutViewSwitcher />
       {!!photo_url && (
         <img
           className={clsx(
@@ -56,8 +55,8 @@ export function RecipeAbout({
           alt=""
         />
       )}
-      {/* Below lg the bar leads with the logo, so the name is shown here instead. A `p`,
-          not a heading: the page's one h1 is the bar's. */}
+      {/* Below lg the bar leads with the wordmark, so the name is shown here instead. A
+          `p`, not a heading: the page's one h1 is the bar's. */}
       <p className="v2-about-heading">{heading}</p>
       {!!heading_meta && <p className="v2-about-heading-meta">{heading_meta}</p>}
       {!!author && (
@@ -136,43 +135,6 @@ export function RecipeAbout({
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-/** The view switcher, above About's content and below lg only.
- *
- *  Here rather than in the top bar: it belongs to the page, scrolls with it, and sticks to
- *  the top of the surface. The bar's pill is the drawer's trigger, not this.
- */
-function AboutViewSwitcher() {
-  const { config } = useRecipeWorkspaceContext();
-  const { layout, selectLayout } = useWorkspaceLayout(config);
-  const views = config.views.filter((view) => !view.desktop_only);
-  if (views.length < 2) return null;
-  return (
-    <div className="v2-about-views d-lg-none" role="tablist">
-      {views.map((view) => {
-        const active = layoutsEqual(view.layout, layout);
-        return (
-          <button
-            key={view.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            className={clsx("v2-about-view", active && "v2-about-view--active")}
-            onClick={() => selectLayout(view.layout)}
-          >
-            {!!view.icon_html && (
-              <span
-                className="v2-about-view-icon"
-                dangerouslySetInnerHTML={{ __html: view.icon_html }}
-              />
-            )}
-            {view.label}
-          </button>
-        );
-      })}
     </div>
   );
 }

@@ -729,7 +729,6 @@ class BasePage(BasePageV1):
                 title=identity.title if config.workspace_active else identity.name,
                 title_href=identity.href,
                 logo_image_url=settings.GOOEY_LOGO_IMG,
-                crumb_label=None if config.workspace_active else self.tab.label,
                 view_only=view_only,
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
@@ -766,12 +765,31 @@ class BasePage(BasePageV1):
                     if can_launch_builder and not builder_thread_is_empty(self)
                     else None
                 ),
+                builder_photo_url=(
+                    get_gooey_builder_photo_url() if can_launch_builder else None
+                ),
                 # a route rather than a pane, and empty for anyone who cannot read the
                 # workflow's run data
                 usage_href=self._usage_href(),
-                usage_active=usage_active,
+                active_document_tab=self._active_document_tab(),
             )
         )
+
+    def _active_document_tab(self) -> typing.Literal["usage", "deploy", "api"] | None:
+        """Which route the bar's strip marks as current, or None on the workspace itself.
+
+        A route cannot be matched against a client-side layout the way a pane's tab can, so
+        the page names its own rather than leaving the bar to guess from the url.
+        """
+        match self.tab:
+            case RecipeTabs.usage:
+                return "usage"
+            case RecipeTabs.integrations:
+                return "deploy"
+            case RecipeTabs.run_as_api:
+                return "api"
+            case _:
+                return None
 
     def _usage_href(self) -> str | None:
         """The Usage tab's url, or None to leave it out of the bar.
@@ -856,16 +874,16 @@ class BasePage(BasePageV1):
                 ),
             ),
             TabSpec(
-                key="edit",
-                label="Edit",
-                icon_html=icons.edit,
-                layout=SingleLayout(surface=SurfaceId.editor),
-            ),
-            TabSpec(
                 key="preview",
                 label="Preview",
                 icon_html=icons.play,
                 layout=SingleLayout(surface=SurfaceId.preview),
+            ),
+            TabSpec(
+                key="edit",
+                label="Edit",
+                icon_html=icons.edit,
+                layout=SingleLayout(surface=SurfaceId.editor),
             ),
             TabSpec(
                 key="split",

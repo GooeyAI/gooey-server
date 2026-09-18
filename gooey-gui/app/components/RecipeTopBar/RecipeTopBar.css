@@ -153,7 +153,8 @@
 .gooey-topbar-tab {
   display: inline-flex;
   align-items: center;
-  gap: var(--gooey-space-2);
+  /* 4px between glyph and label, as drawn - the 8px is between whole tabs. */
+  gap: var(--gooey-space-1);
   border: 0;
   border-radius: 8px;
   background: none;
@@ -444,29 +445,55 @@ a.gooey-topbar-cost:hover {
 /* -------------------------------------------------------------- mobile */
 
 @media (max-width: 991.98px) {
-  /* The pills are gone, so the grid collapses to one row of nav + title + actions. The
-     bar owns its padding and its rule here, since the two header states differ and only
-     the bar knows which applies. */
+  /* The bar owns its padding and its rule here, since the two header states differ and
+     only the bar knows which applies. */
   .v2-topbar-container {
     padding: 0 !important;
     border-bottom: 0 !important;
   }
 
+  /* Two rows: the identity row, then the tab strip across the full width. The three tracks
+     are the desktop bar's, kept so the wordmark sits in the true centre of the row rather
+     than wherever the drawer button and the right cluster happen to leave it. */
   .gooey-topbar {
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: var(--gooey-space-2);
-    padding: var(--gooey-space-3);
-    /* a hairline at device pixel ratio 3; rounds up to 1px on a 1x display */
-    border-bottom: 0.33px solid var(--gooey-line-default);
+    padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
+      var(--gooey-space-2);
+    /* a hairline at device pixel ratio 3; rounds up to 1px on a 1x display. The literal is
+       the design's `line/strong` on this screen; `--gooey-line-strong` is #b9b9b9 from an
+       earlier node, and the two disagree - reconcile before either moves. */
+    border-bottom: 0.33px solid #949494;
   }
 
-  /* A level down the stack: 4px shorter, ruled with the softer line. The horizontal inset
-     is deliberately unchanged, so the left control does not shift on entering a view. */
+  /* Off About there is no wordmark and no strip, so the identity spans the first two
+     tracks and the name takes every pixel the pill leaves it. */
+  .gooey-topbar-left {
+    grid-area: 1 / 1 / 2 / 3;
+  }
+
+  .gooey-topbar:has(.gooey-topbar-logo) .gooey-topbar-left {
+    grid-area: 1 / 1 / 2 / 2;
+  }
+
+  /* The name is the only thing here with somewhere to go, so it is what truncates. */
+  .gooey-topbar-titleblock {
+    flex: 1 1 auto;
+  }
+
+  .gooey-topbar-logo {
+    grid-area: 1 / 2 / 2 / 3;
+  }
+
+  .gooey-topbar-right {
+    grid-area: 1 / 3 / 2 / 4;
+  }
+
+  /* A level down the stack: ruled with the softer line. The insets are deliberately
+     unchanged, so the left control does not shift on entering a view. */
   .gooey-topbar-stacked {
-    padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
-      var(--gooey-space-3);
     border-bottom-color: var(--gooey-line-soft);
   }
 
@@ -496,10 +523,11 @@ a.gooey-topbar-cost:hover {
   }
 
   /* Always round at this size; the square treatment and `circle_photo` are desktop-only. */
+  /* 24px beside the name, as drawn - the desktop bar's 36 is its own row's height. */
   .gooey-topbar-avatar,
   .gooey-topbar-avatar-circle {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     border-radius: var(--gooey-radius-full);
   }
 
@@ -565,10 +593,21 @@ a.gooey-topbar-cost:hover {
     display: none !important;
   }
 
-  /* Replaced at this width by the action sheet, which is a list and so carries entries a
-     strip of pills could not. */
+  /* The bar's second row, spanning all three tracks - About's only, which is why the row
+     is `auto` and collapses everywhere else. The track hugs its tabs and centres in the row
+     (`justify-self` from the base rule): stretched to the full width instead, a short tab
+     set left a stretch of empty track beside it. Tabs packed at the design's 8px, so a full
+     set overflows the row and scrolls rather than spreading.
+     2px of track around a 32px pill makes the design's 36px. */
   .gooey-topbar-tabs {
-    display: none;
+    grid-area: 2 / 1 / 3 / 4;
+    gap: var(--gooey-space-2);
+    padding: 2px;
+    border-radius: var(--gooey-radius-full);
+  }
+
+  .gooey-topbar-tab {
+    border-radius: var(--gooey-radius-full);
   }
 
   /* Icon-only actions below lg - the labels are what crowd the title out. Square, so they
@@ -703,10 +742,11 @@ a.gooey-topbar-cost:hover {
   }
 }
 
-/* ------------------------------------------------------- mobile action sheet
+/* ------------------------------------------------------- the view switcher
 
-   Hidden above lg regardless of how it was opened, so crossing the breakpoint while it is up
-   cannot strand it. */
+   What the pill opens: the surfaces this workflow has, as a bottom sheet. Hidden above lg
+   regardless of how it was opened, so crossing the breakpoint while it is up cannot strand
+   it - the strip is the switcher there. */
 .gooey-sheet-scrim {
   position: fixed;
   inset: 0;
@@ -824,23 +864,29 @@ a.gooey-topbar-cost:hover {
   font: inherit;
 }
 
-/* ------------------------------------------------- mobile view pill + logo swap
+/* --------------------------------------------- the mobile right cluster + wordmark
 
-   Below lg the bar names the view you are on and opens the sheet, where it used to be an
-   unlabelled ellipsis - the sheet is the view switcher, so its trigger should say so. */
+   One control, and on About the wordmark between it and the drawer: the Ask button there,
+   the view pill everywhere else. */
+
+/* Names the surface you are on and opens the switcher, which below lg is the only way
+   between them once the strip is behind you on About. */
 .gooey-topbar-viewpill {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: var(--gooey-space-2);
-  padding: 6px var(--gooey-space-3);
+  /* 33 tall and 4px between glyph and label, which is what makes the design's 53px row. */
+  box-sizing: border-box;
+  height: 33px;
+  gap: var(--gooey-space-1);
+  padding: 0 var(--gooey-space-3);
   border: 1px solid var(--gooey-line-default);
-  border-radius: var(--gooey-radius-pill);
+  border-radius: var(--gooey-radius-full);
   background: var(--gooey-bg-page);
   color: var(--gooey-ink);
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 500;
-  line-height: 1.2;
+  line-height: 16px;
   white-space: nowrap;
 }
 
@@ -850,38 +896,52 @@ a.gooey-topbar-cost:hover {
   color: var(--gooey-ink-muted);
 }
 
-/* The wordmark About leads with. Sized to the bar's own row rather than to the image. */
+.gooey-topbar-askgooey {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 24px of glyph, 4px of padding and the border, which is what makes the design's 34 -
+     and with it the row's own height, since these are the tallest thing in it. */
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  padding: var(--gooey-space-1);
+  border-radius: var(--gooey-radius-xs);
+  color: var(--gooey-ink);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Outlined in the mark's own green - it is the one control in the bar that opens something
+   rather than going somewhere, and the border is what says so. */
+.gooey-topbar-askgooey {
+  border: 1px solid var(--gooey-brand);
+  background: var(--gooey-bg-page);
+}
+
+/* The mark fills the button's 24px box whatever aspect the deployment's branding sends. */
+.gooey-topbar-askgooey > img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* The wordmark About leads with. 14px of ink, which is the design's 84x32 slot once its
+   asset's transparent padding is taken off - ours is cropped to the glyphs, so the height
+   is the glyphs' own. */
 .gooey-topbar-logo {
   flex: 0 0 auto;
-  height: 20px;
+  height: 14px;
   width: auto;
   object-fit: contain;
 }
 
-/* The two halves of the identity cross-fade: the name and its mark slide in from the left
-   as the logo goes, so the pill beside them settles rather than snapping to a new width.
-   `max-width` is what the row animates on - a flex item cannot transition `display`. */
-.gooey-topbar-avatar,
-.gooey-topbar-titleblock {
-  transition:
-    opacity 180ms ease,
-    max-width 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.gooey-topbar-identity-hidden {
-  /* Instant on the way out, animated on the way back: a transition declared here applies
-     while the class is on, so removing it falls back to the rule above and eases in. */
-  transition: none;
-  max-width: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gooey-topbar-avatar,
-  .gooey-topbar-titleblock {
-    transition: none;
+@media (max-width: 991.98px) {
+  /* Only below lg, where the wordmark takes the row's centre. Above it the bar always names
+     the workflow, and an unscoped rule hid the title on the desktop About as well. */
+  .gooey-topbar-identity-hidden {
+    display: none;
   }
 }
 

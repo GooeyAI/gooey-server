@@ -63,9 +63,7 @@ class TopBarAuthor(StrictComponentModel):
 class TopBarParent(StrictComponentModel):
     """The published run a saved run belongs to.
 
-    Present only while the url points at a saved run, so it doubles as that signal: the
-    mobile sheet leads with the way back to the published run rather than repeating the
-    actions that belong to it.
+    Present only while the url points at a saved run, so it doubles as that signal.
     """
 
     label: str
@@ -118,7 +116,7 @@ class RecipeTopBarProps(StrictComponentModel):
     # Where the heading points, from `get_title_breadcrumbs` - the workflow this run belongs
     # to. None when the title already names the page you are on.
     title_href: str | None = None
-    # Shown instead of the name below lg, on About, until the surface is scrolled.
+    # Shown instead of the name below lg, on About, whose surface names the workflow itself.
     logo_image_url: str | None = None
     photo_url: str | None = None
     circle_photo: bool = False
@@ -138,16 +136,21 @@ class RecipeTopBarProps(StrictComponentModel):
     share: ShareControl = pydantic.Field(default_factory=NoShare)
 
     view_only: bool = False
-    crumb_label: str | None = None
     builder_panel_key: str | None = None
     # Where the panel's open state is kept. Sent rather than derived here: the rail addresses
     # the same panel, and two callers guessing at one key is how it ends up fighting itself.
     builder_storage_key: str | None = None
     builder_new_event: str | None = None
-    # Usage is a route rather than a client-side pane, but it shares the bar's view
-    # selector. None hides it for viewers who cannot inspect the workflow's run data.
+    # The panel's own mark, on the button that opens it below lg. From the deployment's
+    # branding, so the button wears whatever avatar the panel itself greets you with.
+    builder_photo_url: str | None = None
+    # Usage is a route rather than a client-side pane, but it shares the bar's tab strip -
+    # as, below lg, do Deploy and API. None hides it for viewers who cannot inspect the
+    # workflow's run data; the other two ride on `deploy_href` and `api_href` above.
     usage_href: str | None = None
-    usage_active: bool = False
+    # Which of those three the bar marks as current, since a route cannot be matched against
+    # a client-side layout the way a pane's tab can.
+    active_document_tab: Literal["usage", "deploy", "api"] | None = None
 
     # None where the bar carries no run control at all: Usage lists the saved runs already
     # made, so it offers neither Run nor the cost of one.
