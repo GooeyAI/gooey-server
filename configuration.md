@@ -231,11 +231,21 @@ See [README.md § Functions runtime](README.md#%EF%B8%8F-functions-runtime-cloud
 
 ## Modal (serverless GPU)
 
-| Variable             | Description                   |
-| -------------------- | ----------------------------- |
-| `MODAL_TOKEN_ID`     | Modal token ID                |
-| `MODAL_TOKEN_SECRET` | Modal token secret            |
-| `MODAL_VLLM_API_KEY` | API key for Modal-hosted vLLM |
+| Variable                | Description                                                                                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MODAL_TOKEN_ID`        | Modal token ID                                                                                                                                                                                           |
+| `MODAL_TOKEN_SECRET`    | Modal token secret                                                                                                                                                                                       |
+| `MODAL_VLLM_API_KEY`    | API key for Modal-hosted vLLM                                                                                                                                                                            |
+| `MODAL_RUN_LOCALLY`     | Set to `1` to run every Modal workload (`modal_functions/*`) in-process on this machine instead of on Modal's cloud, using the local GPU if available. No Modal account needed. See `daras_ai_v2/modal_utils.py` |
+| `MODAL_LOCAL_WEB_URL`   | With `MODAL_RUN_LOCALLY` on, Modal web endpoints (the agri_llm vLLM server) resolve to this URL (default `http://localhost:8000`) — run the equivalent server yourself, e.g. `vllm serve ... --port 8000` |
+| `MODAL_LOCAL_CACHE_DIR` | With `MODAL_RUN_LOCALLY` on, where locally-run model weights are cached (default `/cache`, the Modal volume path — point it at e.g. `~/.cache/gooey-models` on a dev machine)                             |
+
+Notes on `MODAL_RUN_LOCALLY`: model weights are downloaded to this machine on
+first use, and models that hard-require CUDA (e.g. Omnilingual ASR) need a
+local NVIDIA GPU. `modal.Sandbox` usage (functions code-execution, ComfyUI
+cloud) is intentionally *not* switched — sandboxes isolate untrusted code and
+must not silently run on the host. The ComfyUI gateway instead defaults to its
+own `COMFY_BACKEND=local` mode when this flag is set (see `comfy/README.md`).
 
 ---
 

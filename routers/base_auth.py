@@ -53,4 +53,5 @@ SAFE_URLS = (
     settings.APP_BASE_URL,
     settings.API_BASE_URL,
     settings.ADMIN_BASE_URL,
+    settings.COMFY_BASE_URL,
 )
