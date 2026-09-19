@@ -556,6 +556,8 @@ export function RecipeTopBar({
     <div
       className={clsx(
         "gooey-topbar",
+        // the strip is on a row of its own here, which moves the bar's rule up above it
+        onAbout && "gooey-topbar-with-strip",
         // a level down the mobile stack, which the design rules with the softer line
         !atRoot && "gooey-topbar-stacked"
       )}
