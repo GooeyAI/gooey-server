@@ -224,13 +224,14 @@
   white-space: nowrap;
 }
 
-/* Only the first chip is labelled; the rest stay square and carry their name in the tooltip
-   and the ... menu.
+/* Only the first chip is labelled; the rest stay square and carry their name in the tooltip.
 
    A @container query, not @media: the bar narrows when the Builder opens or the rail expands,
    neither of which changes the viewport, so a viewport breakpoint let the label appear on a
    bar that had no room for it. `.v2-topbar-container` (the wrapper base_v2 renders the bar
-   into) is the query container. */
+   into) is the query container. 1200 is the bar's one "roomy" width, shared with the rule
+   below that collapses every other label - the two have to agree, or the cluster regains
+   one label at the width it loses another. */
 .gooey-topbar-integration-label {
   display: none;
   /* matches Publish, which sits beside it */
@@ -238,7 +239,7 @@
   font-weight: 500;
 }
 
-@container topbar (min-width: 1150px) {
+@container topbar (min-width: 1200px) {
   .gooey-topbar-integration--labelled {
     width: auto;
     /* the same 12px Publish uses */
@@ -248,6 +249,52 @@
   .gooey-topbar-integration--labelled .gooey-topbar-integration-label {
     display: inline;
   }
+}
+
+/* Below that, every control in the bar but the title collapses to its icon. The title is
+   the one thing that cannot: an icon does not say which workflow you are on, and it has
+   somewhere to go anyway - it truncates.
+
+   Hidden to the eye and not to the accessibility tree, so an icon-only tab keeps the name
+   it had. `display: none` would have left the tabs unnamed; Publish and Run carry an
+   `aria-label` of their own and would not have, but one rule for all three is a rule a
+   reader does not have to check twice.
+
+   Inside a media query as well, because the container is the bar at every width: below lg
+   it is ~390 and matched this on its own, collapsing the mobile strip - which is labelled
+   by design and has a whole row to itself. */
+@media (min-width: 992px) {
+  @container topbar (max-width: 1199.98px) {
+    .gooey-topbar-tab-label,
+    .gooey-topbar-btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* Square, rather than a stretched rectangle left holding the label's padding. */
+    .gooey-topbar-publish,
+    .gooey-topbar-run {
+      width: var(--topbar-control-h);
+      padding: 0;
+      justify-content: center;
+    }
+  }
+}
+
+/* The unpublished marker in the Publish menu, where it says the same of the Update row as
+   the badge says of the button that opened it. Inline at the row's end rather than a corner
+   badge - a menu row has no corner to sit on. */
+.gooey-topbar-menu-dot {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gooey-warn);
 }
 
 .gooey-topbar-integration:hover {

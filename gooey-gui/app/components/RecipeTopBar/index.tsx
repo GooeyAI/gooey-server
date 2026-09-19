@@ -40,6 +40,8 @@ type MenuEntry = {
   target?: TopBarTarget;
   isDanger?: boolean;
   mobileOnly?: boolean;
+  /** Carries the unpublished-changes marker, so the row says what its button says. */
+  dot?: boolean;
   heading?: boolean;
   onPick?: () => void;
 };
@@ -373,6 +375,7 @@ export function RecipeTopBar({
       label: publish_label,
       iconHtml: '<i class="fa-regular fa-floppy-disk"></i>',
       target: { kind: "submit", intent: publish_intent },
+      dot: has_unpublished_changes,
     });
   }
   if (share.kind !== "none") {
@@ -699,7 +702,7 @@ export function RecipeTopBar({
                 html={view.icon_html ?? undefined}
                 className="gooey-topbar-tab-icon"
               />
-              {view.label}
+              <span className="gooey-topbar-tab-label">{view.label}</span>
             </button>
           ))}
           {documentTabs
@@ -718,7 +721,7 @@ export function RecipeTopBar({
                 }
               >
                 <i className={clsx(tab.iconClass, "gooey-topbar-tab-icon")} />
-                {tab.label}
+                <span className="gooey-topbar-tab-label">{tab.label}</span>
               </Link>
             ))}
         </div>
@@ -1005,6 +1008,7 @@ function Menu({
               className="gooey-topbar-menu-icon"
             />
             {item.label}
+            {item.dot && <span className="gooey-topbar-menu-dot" />}
           </Link>
         ) : (
           <button
@@ -1034,6 +1038,7 @@ function Menu({
               className="gooey-topbar-menu-icon"
             />
             {item.label}
+            {item.dot && <span className="gooey-topbar-menu-dot" />}
           </button>
         )
       )}
