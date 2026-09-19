@@ -52,7 +52,7 @@ export function RecipeWorkspace({
     useWorkspaceLayout(config);
   const surfaces = namedSurfaceSlots(children);
   const roles = paneRolesForLayout(layout);
-  const controls = workspaceControlsForLayout(layout);
+  const controls = workspaceControlsForLayout(layout, config.views);
 
   return (
     <RecipeWorkspaceProvider key={config.storage_key} config={config}>

@@ -238,26 +238,37 @@ describe("pane roles and controls", () => {
   });
 
   it("offers only valid editor/preview pairing controls", () => {
-    expect(workspaceControlsForLayout(edit)).toEqual({
+    expect(workspaceControlsForLayout(edit, baseConfig.views)).toEqual({
       addEditor: false,
       addPreview: true,
       closePreview: false,
     });
-    expect(workspaceControlsForLayout(preview)).toEqual({
+    expect(workspaceControlsForLayout(preview, baseConfig.views)).toEqual({
       addEditor: true,
       addPreview: false,
       closePreview: false,
     });
-    expect(workspaceControlsForLayout(split)).toEqual({
+    expect(workspaceControlsForLayout(split, baseConfig.views)).toEqual({
       addEditor: false,
       addPreview: false,
       closePreview: true,
     });
-    expect(workspaceControlsForLayout(about)).toEqual({
+    expect(workspaceControlsForLayout(about, baseConfig.views)).toEqual({
       addEditor: false,
       addPreview: false,
       closePreview: false,
     });
+  });
+
+  it("withholds Close Preview when nothing would be left selected", () => {
+    // A visitor's set: About and How it works, both of them the preview paired with
+    // something. Closing it lands on a bare editor they have no tab for, so the strip
+    // would show nothing selected - the control is not offered.
+    const visitorViews = baseConfig.views.filter((view) => view.key !== "edit");
+    expect(workspaceControlsForLayout(split, visitorViews).closePreview).toBe(
+      false
+    );
+    expect(workspaceControlsForLayout(split, baseConfig.views).closePreview).toBe(true);
   });
 });
 
