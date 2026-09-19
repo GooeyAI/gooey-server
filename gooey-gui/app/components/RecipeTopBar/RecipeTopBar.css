@@ -447,10 +447,8 @@ a.gooey-topbar-cost:hover {
     gap: var(--gooey-space-2);
     padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
       var(--gooey-space-2);
-    /* a hairline at device pixel ratio 3; rounds up to 1px on a 1x display. The literal is
-       the design's `line/strong` on this screen; `--gooey-line-strong` is #b9b9b9 from an
-       earlier node, and the two disagree - reconcile before either moves. */
-    border-bottom: 0.33px solid #949494;
+    /* a hairline at device pixel ratio 3; rounds up to 1px on a 1x display */
+    border-bottom: 0.33px solid var(--gooey-line-default);
   }
 
   /* The rule belongs under the header, not under the whole bar: where the strip has a row
@@ -463,6 +461,10 @@ a.gooey-topbar-cost:hover {
      bled out of the strip, which hugs its tabs and so is narrower than the bar. */
   .gooey-topbar-with-strip {
     position: relative;
+    /* Double the row gap so the line lands in the middle of it - at 8px it sat hard against
+       the row above and read as underlining the Ask button. The offset below is unchanged:
+       half of this gap is what it already cleared. */
+    row-gap: var(--gooey-space-4);
     border-bottom: 0;
   }
 
@@ -472,7 +474,7 @@ a.gooey-topbar-cost:hover {
     left: 0;
     right: 0;
     bottom: calc(var(--topbar-strip-h) + var(--gooey-space-2) * 2);
-    border-top: 0.33px solid #949494;
+    border-top: 0.33px solid var(--gooey-line-default);
   }
 
   .gooey-topbar-left {
