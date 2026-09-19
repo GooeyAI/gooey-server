@@ -229,9 +229,11 @@
    A @container query, not @media: the bar narrows when the Builder opens or the rail expands,
    neither of which changes the viewport, so a viewport breakpoint let the label appear on a
    bar that had no room for it. `.v2-topbar-container` (the wrapper base_v2 renders the bar
-   into) is the query container. 1200 is the bar's one "roomy" width, shared with the rule
+   into) is the query container. 1128 is the bar's one "roomy" width, shared with the rule
    below that collapses every other label - the two have to agree, or the cluster regains
-   one label at the width it loses another. */
+   one label at the width it loses another. It is a container width, not a viewport one:
+   it lands the gate on a 1440px viewport with the rail out, and moves with the rail and
+   the Builder rather than letting a wide window hide a bar that has no room. */
 .gooey-topbar-integration-label {
   display: none;
   /* matches Publish, which sits beside it */
@@ -239,7 +241,7 @@
   font-weight: 500;
 }
 
-@container topbar (min-width: 1200px) {
+@container topbar (min-width: 1128px) {
   .gooey-topbar-integration--labelled {
     width: auto;
     /* the same 12px Publish uses */
@@ -395,7 +397,7 @@ a.gooey-topbar-cost:hover {
    Placed after the controls it overrides: a container query carries no specificity of its
    own, so source order is all that decides it against their own `.gooey-topbar-publish`. */
 @media (min-width: 992px) {
-  @container topbar (max-width: 1199.98px) {
+  @container topbar (max-width: 1127.98px) {
     .gooey-topbar-tab-label,
     .gooey-topbar-btn-label {
       position: absolute;
@@ -992,4 +994,3 @@ a.gooey-topbar-cost:hover {
     display: none;
   }
 }
-

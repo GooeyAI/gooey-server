@@ -304,17 +304,16 @@ export function RecipeTopBar({
     : { iconClass: "fa-regular fa-sparkles" };
   // What the pill says: the panel wins over the surface behind it, then a route names
   // itself, then the pane you are on.
-  const surface: ({ label: string } & SurfaceIcon) | null =
-    builderOpen
-      ? { label: "Ask", ...builderIcon }
-      : active_document_tab
-        ? documentTabs.find((tab) => tab.key === active_document_tab) ?? null
-        : activeViewSpec
-          ? {
-              label: activeViewSpec.label,
-              iconHtml: activeViewSpec.icon_html ?? undefined,
-            }
-          : null;
+  const surface: ({ label: string } & SurfaceIcon) | null = builderOpen
+    ? { label: "Ask", ...builderIcon }
+    : active_document_tab
+      ? (documentTabs.find((tab) => tab.key === active_document_tab) ?? null)
+      : activeViewSpec
+        ? {
+            label: activeViewSpec.label,
+            iconHtml: activeViewSpec.icon_html ?? undefined,
+          }
+        : null;
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
   // Absent on a tab that carries no run control, where nothing is running as far as the
   // bar is concerned.
@@ -402,7 +401,6 @@ export function RecipeTopBar({
   }
 
   const titleEntries = title_menu_items.map(menuEntryFromTopBarItem);
-
 
   const viewEntry = (key: string, label?: string): SheetEntry[] => {
     const view = views.find((candidate) => candidate.key === key);
@@ -694,23 +692,23 @@ export function RecipeTopBar({
               placement="bottom"
               fitContent
             >
-            <button
-              type="button"
-              className={clsx(
-                "gooey-topbar-tab",
-                view.key === activeViewSpec?.key && "gooey-topbar-tab-active",
-                tabVisibility(view, config.views)
-              )}
-              onClick={() => chooseView(view)}
-              aria-pressed={view.key === activeViewSpec?.key}
-              aria-label={view.label}
-            >
-              <Icon
-                html={view.icon_html ?? undefined}
-                className="gooey-topbar-tab-icon"
-              />
-              <span className="gooey-topbar-tab-label">{view.label}</span>
-            </button>
+              <button
+                type="button"
+                className={clsx(
+                  "gooey-topbar-tab",
+                  view.key === activeViewSpec?.key && "gooey-topbar-tab-active",
+                  tabVisibility(view, config.views)
+                )}
+                onClick={() => chooseView(view)}
+                aria-pressed={view.key === activeViewSpec?.key}
+                aria-label={view.label}
+              >
+                <Icon
+                  html={view.icon_html ?? undefined}
+                  className="gooey-topbar-tab-icon"
+                />
+                <span className="gooey-topbar-tab-label">{view.label}</span>
+              </button>
             </GooeyTooltip>
           ))}
           {documentTabs
@@ -722,21 +720,21 @@ export function RecipeTopBar({
                 placement="bottom"
                 fitContent
               >
-              <Link
-                to={tab.href}
-                className={clsx(
-                  "gooey-topbar-tab",
-                  tab.key === active_document_tab && "gooey-topbar-tab-active"
-                )}
-                onClick={() => setBuilder(false)}
-                aria-current={
-                  tab.key === active_document_tab ? "page" : undefined
-                }
-                aria-label={tab.label}
-              >
-                <i className={clsx(tab.iconClass, "gooey-topbar-tab-icon")} />
-                <span className="gooey-topbar-tab-label">{tab.label}</span>
-              </Link>
+                <Link
+                  to={tab.href}
+                  className={clsx(
+                    "gooey-topbar-tab",
+                    tab.key === active_document_tab && "gooey-topbar-tab-active"
+                  )}
+                  onClick={() => setBuilder(false)}
+                  aria-current={
+                    tab.key === active_document_tab ? "page" : undefined
+                  }
+                  aria-label={tab.label}
+                >
+                  <i className={clsx(tab.iconClass, "gooey-topbar-tab-icon")} />
+                  <span className="gooey-topbar-tab-label">{tab.label}</span>
+                </Link>
               </GooeyTooltip>
             ))}
         </div>
@@ -809,7 +807,6 @@ export function RecipeTopBar({
             behaviour, and the form posted the publish intent. The save dialog opened on top
             of the preview. The keys keep the nodes apart; `preventDefault` stays as the
             direct guard on a control that must never submit. */}
-
 
         {/* Labels only in the view-only bar, and at most one there: the centred pill group
             leaves the right cluster half the bar's slack, and an editor's bar spends that on
@@ -890,19 +887,21 @@ export function RecipeTopBar({
               placement="bottom"
               fitContent
             >
-            <button
-              type="button"
-              className="gooey-topbar-publish"
-              onClick={() => setPublishMenuOpen((v) => !v)}
-              aria-label="Publish"
-              aria-haspopup="menu"
-              aria-expanded={publishMenuOpen}
-            >
-              <i className="fa-regular fa-floppy-disk" />
-              <span className="gooey-topbar-btn-label">Publish</span>
-              <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
-              {has_unpublished_changes && <span className="gooey-topbar-dot" />}
-            </button>
+              <button
+                type="button"
+                className="gooey-topbar-publish"
+                onClick={() => setPublishMenuOpen((v) => !v)}
+                aria-label="Publish"
+                aria-haspopup="menu"
+                aria-expanded={publishMenuOpen}
+              >
+                <i className="fa-regular fa-floppy-disk" />
+                <span className="gooey-topbar-btn-label">Publish</span>
+                <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+                {has_unpublished_changes && (
+                  <span className="gooey-topbar-dot" />
+                )}
+              </button>
             </GooeyTooltip>
             <Menu
               items={publishEntries}
@@ -955,26 +954,26 @@ export function RecipeTopBar({
             placement="bottom"
             fitContent
           >
-          <button
-            type="submit"
-            name={submit_intent_key}
-            value={encodeSubmitIntent(run_intent)}
-            className={clsx(
-              "gooey-topbar-run",
-              isRunning && "gooey-topbar-run-stop"
-            )}
-            onClick={handleRun}
-            aria-label={isRunning ? "Stop this run" : "Run"}
-          >
-            {isRunning ? (
-              <i className="fa-regular fa-xmark-large" />
-            ) : (
-              <i className="fa-solid fa-play" />
-            )}
-            <span className="gooey-topbar-btn-label">
-              {isRunning ? "Stop" : "Run"}
-            </span>
-          </button>
+            <button
+              type="submit"
+              name={submit_intent_key}
+              value={encodeSubmitIntent(run_intent)}
+              className={clsx(
+                "gooey-topbar-run",
+                isRunning && "gooey-topbar-run-stop"
+              )}
+              onClick={handleRun}
+              aria-label={isRunning ? "Stop this run" : "Run"}
+            >
+              {isRunning ? (
+                <i className="fa-regular fa-xmark-large" />
+              ) : (
+                <i className="fa-solid fa-play" />
+              )}
+              <span className="gooey-topbar-btn-label">
+                {isRunning ? "Stop" : "Run"}
+              </span>
+            </button>
           </GooeyTooltip>
         )}
       </div>
@@ -1125,4 +1124,3 @@ function menuEntryFromTopBarItem(item: TopBarMenuItem): MenuEntry {
     isDanger: item.is_danger,
   };
 }
-
