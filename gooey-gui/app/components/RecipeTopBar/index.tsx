@@ -16,6 +16,7 @@ import {
   useWorkspaceLayout,
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
+import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import { useCopyToClipboard } from "~/useCopyToClipboard";
 import {
   activeViewForLayouts,
@@ -92,6 +93,15 @@ function useScrolledPastAboutTitle(active: boolean): boolean {
   }, [active]);
   return past;
 }
+
+// Where a "Run of <name>" row lands: the published run's own About. There is no per-surface
+// url to link to, so the layout rides along as navigation state, which the next page reads
+// while it hydrates.
+const ABOUT_LAYOUT: WorkspaceLayout = {
+  kind: "split",
+  primary: "about",
+  secondary: "preview",
+};
 
 /** The three ways a surface draws its icon: a bare class, server-supplied html, or a
  *  branded mark. At most one is set. */
@@ -404,9 +414,24 @@ export function RecipeTopBar({
 
 
   /* What the pill opens: the surfaces, in the order the strip draws them, plus the two
-     routes that never earn a tab. Destinations only - the actions live on the surfaces
-     themselves, and a menu that mixes "go here" with "do this" is what this replaced. */
+     routes that never earn a tab. Destinations, and the two controls that are a destination
+     in all but name - a saved run's way back to what it is a run of, and the fresh thread
+     that replaces Ask Gooey's row once its panel is already up. */
   const switcherEntries: SheetEntry[] = [
+    // A saved run leads with what it is a run of, because that is where everything acting
+    // on the published run lives.
+    ...(parent
+      ? [
+          {
+            key: "--switch-parent",
+            label: `Run of ${parent.label}`,
+            iconClass: "fa-regular fa-circle-info",
+            href: parent.href,
+            navigationLayout: ABOUT_LAYOUT,
+            onPick: () => setBuilder(false),
+          },
+        ]
+      : []),
     ...views
       .filter((view) => !view.desktop_only)
       .flatMap((view) =>
@@ -421,16 +446,30 @@ export function RecipeTopBar({
               },
             ]
       ),
-    ...(builder_panel_key && !builderOpen
-      ? [
-          {
-            key: "--switch-builder",
-            label: "Ask",
-            ...builderIcon,
-            onPick: showBuilder,
-          },
-        ]
-      : []),
+    // One row for the panel, saying whichever of the two things it can do here: open it, or
+    // - once it is open and holding a thread - start that thread again.
+    ...(!builder_panel_key
+      ? []
+      : builderOpen
+        ? builder_new_event
+          ? [
+              {
+                key: "--switch-new-chat",
+                label: "New Chat",
+                iconClass: "fa-regular fa-pen-to-square",
+                onPick: () =>
+                  window.dispatchEvent(new CustomEvent(builder_new_event)),
+              },
+            ]
+          : []
+        : [
+            {
+              key: "--switch-builder",
+              label: "Ask",
+              ...builderIcon,
+              onPick: showBuilder,
+            },
+          ]),
     ...documentTabs.flatMap((tab) =>
       tab.key === active_document_tab
         ? []
