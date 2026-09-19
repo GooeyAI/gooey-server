@@ -624,13 +624,15 @@ class BasePage(BasePageV1):
                 )
             )
 
-        # "Duplicate" off the latest version, "Save as New" off an older one.
+        # Always "Duplicate", because it is the one that does not ask: it names the copy
+        # "<title> (Copy)" and goes there. Off an older version this used to read "Save as
+        # New", which is what `_top_bar_publish_label` calls the publish dialog in exactly
+        # that case - two rows of the same menu, same words, one of them asking for a name
+        # and the other not.
         items.append(
             TopBarMenuItem(
                 key=self.MENU_DUPLICATE,
-                label=(
-                    "Duplicate" if pr.saved_run == self.current_sr else "Save as New"
-                ),
+                label="Duplicate",
                 icon_html=icons.fork,
                 target=SubmitTarget(intent=MenuIntent(item_key=self.MENU_DUPLICATE)),
             )
@@ -728,7 +730,7 @@ class BasePage(BasePageV1):
                 # Prefixed on the workspace; elsewhere the tab's label is the crumb.
                 title=identity.title if config.workspace_active else identity.name,
                 title_href=identity.href,
-                crumb_label=None if config.workspace_active else self.tab.label,
+                logo_image_url=settings.GOOEY_LOGO_IMG,
                 view_only=view_only,
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
@@ -765,12 +767,31 @@ class BasePage(BasePageV1):
                     if can_launch_builder and not builder_thread_is_empty(self)
                     else None
                 ),
+                builder_photo_url=(
+                    get_gooey_builder_photo_url() if can_launch_builder else None
+                ),
                 # a route rather than a pane, and empty for anyone who cannot read the
                 # workflow's run data
                 usage_href=self._usage_href(),
-                usage_active=usage_active,
+                active_document_tab=self._active_document_tab(),
             )
         )
+
+    def _active_document_tab(self) -> typing.Literal["usage", "deploy", "api"] | None:
+        """Which route the bar's strip marks as current, or None on the workspace itself.
+
+        A route cannot be matched against a client-side layout the way a pane's tab can, so
+        the page names its own rather than leaving the bar to guess from the url.
+        """
+        match self.tab:
+            case RecipeTabs.usage:
+                return "usage"
+            case RecipeTabs.integrations:
+                return "deploy"
+            case RecipeTabs.run_as_api:
+                return "api"
+            case _:
+                return None
 
     def _usage_href(self) -> str | None:
         """The Usage tab's url, or None to leave it out of the bar.
@@ -855,16 +876,16 @@ class BasePage(BasePageV1):
                 ),
             ),
             TabSpec(
-                key="edit",
-                label="Edit",
-                icon_html=icons.edit,
-                layout=SingleLayout(surface=SurfaceId.editor),
-            ),
-            TabSpec(
                 key="preview",
                 label="Preview",
                 icon_html=icons.play,
                 layout=SingleLayout(surface=SurfaceId.preview),
+            ),
+            TabSpec(
+                key="edit",
+                label="Edit",
+                icon_html=icons.edit,
+                layout=SingleLayout(surface=SurfaceId.editor),
             ),
             TabSpec(
                 key="split",
@@ -911,6 +932,8 @@ class BasePage(BasePageV1):
 
         gui.model_component(
             RecipeAboutProps(
+                heading=self._workflow_identity().name,
+                heading_meta=self._about_heading_meta(pr),
                 photo_url=pr.photo_url or None,
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._about_author(pr),
@@ -924,6 +947,18 @@ class BasePage(BasePageV1):
                 groups=self._about_groups(),
             )
         )
+
+    def _about_heading_meta(self, pr: PublishedRun) -> str | None:
+        """How much this workflow has been run, under its name. Below lg only, where About
+        carries the name the top bar shows at the scroll top."""
+        from daras_ai.text_format import format_number_with_suffix
+        from django.utils.translation import ngettext
+
+        run_count = pr.run_count or 0
+        if not run_count:
+            return None
+        noun = ngettext(singular="run", plural="runs", number=run_count)
+        return f"{format_number_with_suffix(run_count)} {noun}"
 
     def _about_author(self, pr: PublishedRun) -> AboutAuthor | None:
         """Who published this: their mark, their name, and what else they have published.
@@ -1038,10 +1073,12 @@ class BasePage(BasePageV1):
             return None
         return AboutGroup(
             title="Deployments",
+            variant="deployments",
             cards=[
                 AboutCard(
                     icon_html=it.icon_html,
                     label=it.label,
+                    accent=it.color,
                     target=(
                         AboutLinkTarget(href=it.target.href)
                         if isinstance(it.target, LinkTarget)
@@ -1078,6 +1115,9 @@ class BasePage(BasePageV1):
         the bar above hides its own Run and cost; the component decides that.
         """
         cost_label, cost_title = self._top_bar_cost()
+        sr, pr = self.current_sr_pr
+        # A view-only page has nothing to publish, which is the bar above's rule too.
+        publish_label = None if self.is_view_only() else self._top_bar_publish_label()
         # after `_render_input_col`, so a run this very request started already reads as
         # running and the button offers Stop - the point in the cycle the bar reads it at too
         is_running = self._is_run_in_progress()
@@ -1085,6 +1125,10 @@ class BasePage(BasePageV1):
             EditorRunBarProps(
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
                 run_intent=StopIntent() if is_running else RunIntent(),
+                publish_label=publish_label,
+                publish_intent=PublishIntent() if publish_label else None,
+                has_unpublished_changes=self._has_request_changed()
+                or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 cost_label=cost_label or None,
                 cost_href=self.get_credits_click_url() or None,
                 cost_title=cost_title or None,

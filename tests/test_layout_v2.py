@@ -562,6 +562,21 @@ def test_usage_is_kept_out_of_a_view_only_bar(monkeypatch):
     assert page._usage_href() is None
 
 
+def test_the_route_tabs_name_themselves_rather_than_the_bar_guessing(monkeypatch):
+    """Usage, Deploy and API are routes, so no client-side layout can be matched against
+    them - the page says which of its own tabs is current, and the strip marks that one."""
+    page = object.__new__(VideoBotsPageV2)
+    for tab, expected in [
+        (RecipeTabs.usage, "usage"),
+        (RecipeTabs.integrations, "deploy"),
+        (RecipeTabs.run_as_api, "api"),
+        (RecipeTabs.run, None),
+        (RecipeTabs.preview, None),
+    ]:
+        page.tab = tab
+        assert page._active_document_tab() == expected
+
+
 def test_title_menu_offers_v1s_options(monkeypatch):
     """The chevron menu is v1's Options dialog, gated the same way."""
     from bots.models import WorkflowAccessLevel
@@ -584,9 +599,40 @@ def test_title_menu_offers_v1s_options(monkeypatch):
     labels = [item.label for item in page._title_menu_items()]
     assert labels == ["Versions", "Duplicate", "Delete"]
 
-    # off an older version, duplicating means promoting that version to a new workflow
+    # Off an older version too. It used to read "Save as New" there, which is what the
+    # publish control calls itself in that same state - and both are rows of the mobile
+    # menu, so the pair read identically while doing different things.
     monkeypatch.setattr(VideoBotsPageV2, "current_sr", property(lambda self: "older"))
-    assert [i.label for i in page._title_menu_items()][1] == "Save as New"
+    assert [i.label for i in page._title_menu_items()][1] == "Duplicate"
+
+
+def test_duplicate_and_publish_do_not_arrive_at_one_label(monkeypatch):
+    """Both make a new published run off the current one, and the mobile menu offers them
+    side by side - so the words have to say which one asks you for a name."""
+    from bots.models import WorkflowAccessLevel
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(
+        is_root=lambda: False, saved_run="sr", tags=SimpleNamespace(all=list)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "current_pr", property(lambda self: pr))
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_workspace", property(lambda self: None)
+    )
+    monkeypatch.setattr(
+        WorkflowAccessLevel, "can_user_delete_published_run", lambda **kw: True
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_edit_current_pr", property(lambda self: False)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "_has_request_changed", lambda self: False)
+    page.request = SimpleNamespace(user=object())
+
+    # a saved run, which is where the publish control says "Save as New"
+    monkeypatch.setattr(VideoBotsPageV2, "current_sr", property(lambda self: "older"))
+    assert page._top_bar_publish_label() == "Save as New"
+    assert "Save as New" not in [i.label for i in page._title_menu_items()]
 
 
 def test_the_root_recipes_version_history_is_an_admins_to_see(monkeypatch):
@@ -750,8 +796,8 @@ def test_the_menu_keys_python_stamps_are_the_ones_the_sheet_looks_for():
 
 def test_a_recipe_gets_the_base_tab_set_unless_it_says_otherwise(monkeypatch):
     """The base spec is the one every fork inherits, so Split has to be desktop-only *here*.
-    It folds to a single pane below lg and the mobile sheet drops a desktop-only view -
-    without the flag the next recipe to migrate gets a Split row in its phone menu.
+    It folds to a single pane below lg and `tabVisibility` keeps a desktop-only view off the
+    strip there - without the flag the next recipe to migrate gets a Split tab on a phone.
 
     Also pins that VideoBots takes the base set rather than restating it: the two had
     already drifted on this very flag.
@@ -803,6 +849,7 @@ def test_the_top_bar_is_sent_the_name_that_becomes_the_pages_h1(monkeypatch):
                 notes="",
                 tags=SimpleNamespace(all=list),
                 photo_url=None,
+                run_count=0,
             )
         ),
         raising=False,
@@ -832,8 +879,12 @@ def test_the_top_bar_is_sent_the_name_that_becomes_the_pages_h1(monkeypatch):
 
     props = json.dumps(root.to_dict())
     assert "RecipeAbout" in props
-    # About no longer draws a heading of its own; the name reaches the bar instead
-    assert "heading" not in json.loads(props)["children"][0]["props"]
+    # The bar draws the page's one h1. About is sent the name as well, because below lg the
+    # bar leads with the Gooey wordmark instead - so the surface is where the name appears
+    # there. It renders as text, not a second heading.
+    assert json.loads(props)["children"][0]["props"]["heading"] == (
+        "Farmer.CHAT Ag Advisory Agent"
+    )
 
 
 def test_the_about_report_button_round_trips_to_the_pick_that_opens_the_dialog(
@@ -855,6 +906,7 @@ def test_the_about_report_button_round_trips_to_the_pick_that_opens_the_dialog(
                 workspace_id=None,
                 notes="",
                 tags=SimpleNamespace(all=list),
+                run_count=0,
                 photo_url=None,
             )
         ),
