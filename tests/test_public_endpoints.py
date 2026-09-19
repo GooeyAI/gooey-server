@@ -14,6 +14,7 @@ from bots.models import (
 )
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.fastapi_tricks import get_route_path
+from daras_ai_v2.layout_v2 import can_use_layout_v2
 from routers import facebook_api
 from routers.root import RecipeTabs, integrations_stats_route
 from routers.slack_api import slack_connect_redirect, slack_connect_redirect_shortcuts
@@ -104,6 +105,9 @@ def test_all_post(db_fixtures, force_authentication, threadpool_subtest):
     for pr in PublishedRun.objects.all():
         for tab in RecipeTabs:
             slug = random_slug(Workflow(pr.workflow).page_cls)
+            # the Usage tab only exists on recipes forked to layout v2; every other recipe 404s it
+            if tab == RecipeTabs.usage and not can_use_layout_v2(slug):
+                continue
             url_path = tab.url_path(slug, "test-run-slug", pr.published_run_id)
             if RecipeTabs in [RecipeTabs.run, RecipeTabs.run_as_api]:
                 test_content = [pr.title]

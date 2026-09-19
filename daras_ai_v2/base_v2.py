@@ -1,5 +1,3 @@
-import contextlib
-import html
 import inspect
 import typing
 from functools import cached_property
@@ -8,8 +6,6 @@ import pydantic
 
 import gooey_gui as gui
 from bots.models import (
-    MessageThread,
-    Platform,
     PublishedRun,
     RetentionPolicy,
     SavedRun,
@@ -22,7 +18,6 @@ from daras_ai_v2.base import (
 from daras_ai_v2.base import (
     RecipeRunState,
     StateKeys,
-    render_run_timeline,
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
@@ -46,6 +41,15 @@ from daras_ai_v2.urls import paginate_queryset
 from daras_ai_v2.variables_widget import variables_input
 from functions.base_llm_tool import functions_input, render_called_functions
 from functions.models import FunctionTrigger
+from gooey_gui.types.about_props import (
+    AboutAuthor,
+    AboutCard,
+    AboutGroup,
+    AboutLinkTarget,
+    AboutSubmitTarget,
+    AboutTag,
+    RecipeAboutProps,
+)
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -66,15 +70,6 @@ from gooey_gui.types.recipe_top_bar_props import (
     TopBarMenuItem,
     TopBarParent,
 )
-from gooey_gui.types.about_props import (
-    AboutAuthor,
-    AboutCard,
-    AboutGroup,
-    AboutLinkTarget,
-    AboutSubmitTarget,
-    AboutTag,
-    RecipeAboutProps,
-)
 from gooey_gui.types.recipe_workspace_props import (
     EventControlTarget,
     FontAwesomeIcon,
@@ -87,11 +82,11 @@ from gooey_gui.types.recipe_workspace_props import (
 )
 from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
-from widgets.author import render_author_from_user, render_author_from_workspace
 from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
+from widgets.run_debug_info import run_debug_info_props
 from widgets.sidebar import sidebar_layout
-from widgets.workflow_cards import author_from_user, history_card, mask_user_id
+from widgets.workflow_cards import author_from_user, history_card
 from widgets.workflow_share import render_share_modal
 from workspaces.models import Workspace
 
@@ -286,9 +281,8 @@ class BasePage(BasePageV1):
         Availability, not presence: every tab offers the way in, because a tab that cannot
         hold the panel navigates to the workspace and opens it there.
         """
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return can_launch_gooey_builder(self.request, workspace)
 
@@ -463,7 +457,9 @@ class BasePage(BasePageV1):
         from daras_ai_v2.send_email import send_reported_run_email
 
         with gui.alert_dialog(
-            ref=ref, modal_title=f"#### {icons.flag} Report a Workflow"
+            ref=ref,
+            modal_title=f"#### {icons.flag} Report a Workflow",
+            unsafe_allow_html=True,
         ):
             gui.caption(
                 "These models are unmoderated, so a workflow's output can be wrong, broken, "
@@ -578,9 +574,8 @@ class BasePage(BasePageV1):
         """
         if not self.request.user:
             return False
-        try:
-            workspace = self.current_workspace
-        except Workspace.DoesNotExist:
+        workspace = self._current_workspace_or_none()
+        if not workspace:
             return False
         return WorkflowAccessLevel.can_user_edit_published_run(
             workspace=workspace, user=self.request.user, pr=self.current_pr
@@ -629,13 +624,15 @@ class BasePage(BasePageV1):
                 )
             )
 
-        # "Duplicate" off the latest version, "Save as New" off an older one.
+        # Always "Duplicate", because it is the one that does not ask: it names the copy
+        # "<title> (Copy)" and goes there. Off an older version this used to read "Save as
+        # New", which is what `_top_bar_publish_label` calls the publish dialog in exactly
+        # that case - two rows of the same menu, same words, one of them asking for a name
+        # and the other not.
         items.append(
             TopBarMenuItem(
                 key=self.MENU_DUPLICATE,
-                label=(
-                    "Duplicate" if pr.saved_run == self.current_sr else "Save as New"
-                ),
+                label="Duplicate",
                 icon_html=icons.fork,
                 target=SubmitTarget(intent=MenuIntent(item_key=self.MENU_DUPLICATE)),
             )
@@ -674,10 +671,8 @@ class BasePage(BasePageV1):
             return False
         if user.is_admin():
             return True
-        try:
-            return self.current_workspace.id == pr.workspace_id
-        except Workspace.DoesNotExist:
-            return False
+        workspace = self._current_workspace_or_none()
+        return bool(workspace and workspace.id == pr.workspace_id)
 
     def _top_bar_cost(self) -> tuple[str, str]:
         """(label, hover note) for the bar's cost readout, in dollars."""
@@ -727,6 +722,7 @@ class BasePage(BasePageV1):
             )
 
         usage_active = self.tab == RecipeTabs.usage
+        can_launch_builder = self._can_launch_builder()
 
         gui.model_component(
             RecipeTopBarProps(
@@ -734,7 +730,7 @@ class BasePage(BasePageV1):
                 # Prefixed on the workspace; elsewhere the tab's label is the crumb.
                 title=identity.title if config.workspace_active else identity.name,
                 title_href=identity.href,
-                crumb_label=None if config.workspace_active else self.tab.label,
+                logo_image_url=settings.GOOEY_LOGO_IMG,
                 view_only=view_only,
                 photo_url=identity.photo_url,
                 circle_photo=identity.circle_photo,
@@ -761,22 +757,41 @@ class BasePage(BasePageV1):
                 ),
                 cost_title=None if usage_active else (cost_title or None),
                 builder_panel_key=(
-                    GOOEY_BUILDER_EVENT_KEY if self._can_launch_builder() else None
+                    GOOEY_BUILDER_EVENT_KEY if can_launch_builder else None
                 ),
                 builder_storage_key=(
-                    GOOEY_BUILDER_STORAGE_KEY if self._can_launch_builder() else None
+                    GOOEY_BUILDER_STORAGE_KEY if can_launch_builder else None
                 ),
                 builder_new_event=(
                     f"{GOOEY_BUILDER_EVENT_KEY}:new"
-                    if self._can_launch_builder() and not builder_thread_is_empty(self)
+                    if can_launch_builder and not builder_thread_is_empty(self)
                     else None
+                ),
+                builder_photo_url=(
+                    get_gooey_builder_photo_url() if can_launch_builder else None
                 ),
                 # a route rather than a pane, and empty for anyone who cannot read the
                 # workflow's run data
                 usage_href=self._usage_href(),
-                usage_active=usage_active,
+                active_document_tab=self._active_document_tab(),
             )
         )
+
+    def _active_document_tab(self) -> typing.Literal["usage", "deploy", "api"] | None:
+        """Which route the bar's strip marks as current, or None on the workspace itself.
+
+        A route cannot be matched against a client-side layout the way a pane's tab can, so
+        the page names its own rather than leaving the bar to guess from the url.
+        """
+        match self.tab:
+            case RecipeTabs.usage:
+                return "usage"
+            case RecipeTabs.integrations:
+                return "deploy"
+            case RecipeTabs.run_as_api:
+                return "api"
+            case _:
+                return None
 
     def _usage_href(self) -> str | None:
         """The Usage tab's url, or None to leave it out of the bar.
@@ -861,16 +876,16 @@ class BasePage(BasePageV1):
                 ),
             ),
             TabSpec(
-                key="edit",
-                label="Edit",
-                icon_html=icons.edit,
-                layout=SingleLayout(surface=SurfaceId.editor),
-            ),
-            TabSpec(
                 key="preview",
                 label="Preview",
                 icon_html=icons.play,
                 layout=SingleLayout(surface=SurfaceId.preview),
+            ),
+            TabSpec(
+                key="edit",
+                label="Edit",
+                icon_html=icons.edit,
+                layout=SingleLayout(surface=SurfaceId.editor),
             ),
             TabSpec(
                 key="split",
@@ -917,6 +932,8 @@ class BasePage(BasePageV1):
 
         gui.model_component(
             RecipeAboutProps(
+                heading=self._workflow_identity().name,
+                heading_meta=self._about_heading_meta(pr),
                 photo_url=pr.photo_url or None,
                 circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
                 author=self._about_author(pr),
@@ -930,6 +947,18 @@ class BasePage(BasePageV1):
                 groups=self._about_groups(),
             )
         )
+
+    def _about_heading_meta(self, pr: PublishedRun) -> str | None:
+        """How much this workflow has been run, under its name. Below lg only, where About
+        carries the name the top bar shows at the scroll top."""
+        from daras_ai.text_format import format_number_with_suffix
+        from django.utils.translation import ngettext
+
+        run_count = pr.run_count or 0
+        if not run_count:
+            return None
+        noun = ngettext(singular="run", plural="runs", number=run_count)
+        return f"{format_number_with_suffix(run_count)} {noun}"
 
     def _about_author(self, pr: PublishedRun) -> AboutAuthor | None:
         """Who published this: their mark, their name, and what else they have published.
@@ -954,9 +983,10 @@ class BasePage(BasePageV1):
         It qualifies the *name* it sits under, not the workflow. Read through
         `public_workflow_count` so this and the workspace's profile cannot drift.
         """
+        from django.utils.translation import ngettext
+
         from daras_ai.text_format import format_number_with_suffix
         from daras_ai_v2.profiles import public_workflow_count
-        from django.utils.translation import ngettext
 
         if not pr.workspace_id:
             return ""
@@ -1002,11 +1032,8 @@ class BasePage(BasePageV1):
         from daras_ai_v2.fastapi_tricks import get_route_path
         from routers.account import saved_route
 
-        try:
-            if workspace == self.current_workspace:
-                return get_route_path(saved_route)
-        except Workspace.DoesNotExist:
-            pass
+        if workspace == self._current_workspace_or_none():
+            return get_route_path(saved_route)
         if workspace.handle_id:
             return workspace.handle.get_app_url()
         return None
@@ -1046,10 +1073,12 @@ class BasePage(BasePageV1):
             return None
         return AboutGroup(
             title="Deployments",
+            variant="deployments",
             cards=[
                 AboutCard(
                     icon_html=it.icon_html,
                     label=it.label,
+                    accent=it.color,
                     target=(
                         AboutLinkTarget(href=it.target.href)
                         if isinstance(it.target, LinkTarget)
@@ -1086,6 +1115,9 @@ class BasePage(BasePageV1):
         the bar above hides its own Run and cost; the component decides that.
         """
         cost_label, cost_title = self._top_bar_cost()
+        sr, pr = self.current_sr_pr
+        # A view-only page has nothing to publish, which is the bar above's rule too.
+        publish_label = None if self.is_view_only() else self._top_bar_publish_label()
         # after `_render_input_col`, so a run this very request started already reads as
         # running and the button offers Stop - the point in the cycle the bar reads it at too
         is_running = self._is_run_in_progress()
@@ -1093,6 +1125,10 @@ class BasePage(BasePageV1):
             EditorRunBarProps(
                 submit_intent_key=self.SUBMIT_INTENT_KEY,
                 run_intent=StopIntent() if is_running else RunIntent(),
+                publish_label=publish_label,
+                publish_intent=PublishIntent() if publish_label else None,
+                has_unpublished_changes=self._has_request_changed()
+                or (self.can_user_save_run(sr, pr) and pr.saved_run != sr),
                 cost_label=cost_label or None,
                 cost_href=self.get_credits_click_url() or None,
                 cost_title=cost_title or None,
@@ -1191,9 +1227,14 @@ class BasePage(BasePageV1):
 
     def render_debug_pane(self):
         with gui.div(className="v2-debug"):
-            self._render_debug_run_details()
-            with gui.div(className="v2-debug-section v2-debug-timeline"):
-                render_run_timeline(self.current_sr)
+            gui.model_component(
+                run_debug_info_props(
+                    self.current_sr,
+                    run_by=self.current_sr_user,
+                    # a logged-out viewer has no workspace of their own; the link falls back
+                    current_workspace=self._current_workspace_or_none(),
+                )
+            )
             with gui.div(className="v2-debug-section"):
                 render_called_functions(
                     saved_run=self.current_sr, trigger=FunctionTrigger.pre
@@ -1202,73 +1243,6 @@ class BasePage(BasePageV1):
                 render_called_functions(
                     saved_run=self.current_sr, trigger=FunctionTrigger.post
                 )
-
-    def _render_debug_run_details(self):
-        sr = self.current_sr
-        thread = sr.message_thread
-        with gui.div(className="v2-debug-meta"):
-            if sr.platform is not None:
-                self._render_debug_source(Platform(sr.platform), thread)
-
-            if thread:
-                with self._debug_meta_row("Conversation"):
-                    # the last run is SET_NULL on delete, so the title may have no target
-                    link = (
-                        gui.link(to=thread.last_run.get_app_url())
-                        if thread.last_run_id
-                        else gui.dummy()
-                    )
-                    with link:
-                        gui.html(html.escape(thread.title or "Untitled conversation"))
-
-            with self._debug_meta_row("Run by"):
-                if user := self.current_sr_user:
-                    render_author_from_user(user, responsive=False, image_size="22px")
-                else:
-                    with gui.tag("span", className="text-muted"):
-                        gui.html("Unknown user")
-
-            with self._debug_meta_row("Charged to"):
-                if sr.workspace:
-                    render_author_from_workspace(
-                        sr.workspace,
-                        responsive=False,
-                        image_size="22px",
-                        # Only decides whether the name links to your own saved runs. A
-                        # logged out visitor has no workspace to compare against, and
-                        # asking for one raises rather than answering None.
-                        current_workspace=self._current_workspace_or_none(),
-                    )
-                else:
-                    with gui.tag("span", className="text-muted"):
-                        gui.html("No workspace")
-
-            if sr.parent:
-                with self._debug_meta_row("Parent run"):
-                    with gui.link(to=sr.parent.get_app_url()):
-                        gui.html(f"View run {icons.external_link}")
-
-    @staticmethod
-    def _render_debug_source(platform: Platform, thread: MessageThread | None):
-        """The platform badge, plus the masked end-user id for bot conversations."""
-        with gui.div(className="v2-debug-source"):
-            with gui.tag("span", className="v2-debug-platform"):
-                gui.html(platform.get_icon())
-                gui.html(html.escape(platform.get_title()))
-            conversation = thread and thread.bot_conversation
-            if conversation:
-                user = mask_user_id(conversation.get_display_name() or "")
-                with gui.tag("span", className="text-muted"):
-                    gui.html(html.escape(user))
-
-    @staticmethod
-    @contextlib.contextmanager
-    def _debug_meta_row(label: str):
-        """One grid row: the label cell, then the value cell as the context body."""
-        with gui.tag("span", className="text-muted"):
-            gui.html(label)
-        with gui.div(className="v2-debug-value"):
-            yield
 
     def _render_functions(self):
         if not self.functions_in_settings:
@@ -1501,6 +1475,3 @@ VARIABLES_DIALOG_CSS = """
 # Matches `--v2-about-icon-size` below. Icon html that carries its own inline size - a model
 # creator's logo, say - has to be asked for this one, since inline beats the stylesheet.
 ABOUT_META_ICON_SIZE = "22px"
-
-# Cards per row before a group takes a second line.
-ABOUT_META_MAX_COLS = 6

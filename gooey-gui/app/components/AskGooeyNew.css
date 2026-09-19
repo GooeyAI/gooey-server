@@ -33,8 +33,7 @@
   font-size: 2rem;
   font-weight: 400;
   /* Family comes from `--gooey-font-heading` in app.css, with the display headings. */
-  color: #111;
-  letter-spacing: -0.02em;
+  color: var(--gooey-ink);
 }
 
 .ask-gooey-title-highlight {

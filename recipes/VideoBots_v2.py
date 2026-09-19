@@ -21,7 +21,6 @@ from daras_ai_v2.integrations_tab import render_integrations_tab
 from daras_ai_v2.language_model_settings_widgets import (
     language_model_selector,
 )
-from daras_ai_v2.tab_spec import SingleLayout, SurfaceId
 from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
@@ -288,13 +287,16 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             return []
         return [AboutGroup(title=get_text_list(kinds, "&"), cards=cards)]
 
-    @staticmethod
-    def _about_pane_card(icon_html: str, label: str, pane: ConfigPane) -> AboutCard:
+    def _about_pane_card(
+        self, icon_html: str, label: str, pane: ConfigPane
+    ) -> AboutCard:
         return AboutCard(
             icon_html=icon_html,
             label=label,
             target=AboutPaneTarget(
-                layout=SingleLayout(surface=SurfaceId.editor),
+                # The work view, not the editor alone: these open a pane to change something,
+                # and the preview beside it is how you see what the change did.
+                layout=self.work_layout(),
                 editor_pane=pane.value,
             ),
         )

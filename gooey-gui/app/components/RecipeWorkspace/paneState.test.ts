@@ -8,6 +8,7 @@ import {
   foldForNarrowViewport,
   initialWorkspaceState,
   isRootLayout,
+  layoutForEditorPane,
   layoutsEqual,
   paneRolesForLayout,
   revealRunLayout,
@@ -86,7 +87,6 @@ describe("workspace layout", () => {
     expect(layoutsEqual(split, about)).toBe(false);
     expect(layoutsEqual(edit, preview)).toBe(false);
   });
-
 });
 
 describe("initialWorkspaceState", () => {
@@ -188,6 +188,29 @@ describe("responsive layout", () => {
     expect(foldForNarrowViewport(edit, "preview", true)).toEqual(edit);
   });
 
+  it("keeps a config pane reachable when the split folds away from it", () => {
+    // An About card naming a pane, tapped on a phone by someone whose narrow surface is the
+    // chat: the split would fold to the chat, so the editor alone stands in for it.
+    expect(layoutForEditorPane(split, "knowledge", "preview", true)).toEqual(
+      edit
+    );
+    expect(layoutForEditorPane(split, "knowledge", "editor", true)).toEqual(
+      split
+    );
+    expect(layoutForEditorPane(split, "knowledge", "preview", false)).toEqual(
+      split
+    );
+  });
+
+  it("leaves a target that names no pane alone", () => {
+    expect(layoutForEditorPane(preview, null, "preview", true)).toEqual(
+      preview
+    );
+    expect(layoutForEditorPane(about, undefined, "preview", true)).toEqual(
+      about
+    );
+  });
+
   it("calls the root what the fold shows, not what is stored", () => {
     // The work split folds to Preview, so Preview chosen on its own is the same screen and
     // has to count as the root too - otherwise Back sits there offering to swap one for the
@@ -215,26 +238,37 @@ describe("pane roles and controls", () => {
   });
 
   it("offers only valid editor/preview pairing controls", () => {
-    expect(workspaceControlsForLayout(edit)).toEqual({
+    expect(workspaceControlsForLayout(edit, baseConfig.views)).toEqual({
       addEditor: false,
       addPreview: true,
       closePreview: false,
     });
-    expect(workspaceControlsForLayout(preview)).toEqual({
+    expect(workspaceControlsForLayout(preview, baseConfig.views)).toEqual({
       addEditor: true,
       addPreview: false,
       closePreview: false,
     });
-    expect(workspaceControlsForLayout(split)).toEqual({
+    expect(workspaceControlsForLayout(split, baseConfig.views)).toEqual({
       addEditor: false,
       addPreview: false,
       closePreview: true,
     });
-    expect(workspaceControlsForLayout(about)).toEqual({
+    expect(workspaceControlsForLayout(about, baseConfig.views)).toEqual({
       addEditor: false,
       addPreview: false,
       closePreview: false,
     });
+  });
+
+  it("withholds Close Preview when nothing would be left selected", () => {
+    // A visitor's set: About and How it works, both of them the preview paired with
+    // something. Closing it lands on a bare editor they have no tab for, so the strip
+    // would show nothing selected - the control is not offered.
+    const visitorViews = baseConfig.views.filter((view) => view.key !== "edit");
+    expect(workspaceControlsForLayout(split, visitorViews).closePreview).toBe(
+      false
+    );
+    expect(workspaceControlsForLayout(split, baseConfig.views).closePreview).toBe(true);
   });
 });
 
@@ -285,7 +319,6 @@ describe("workspace navigation", () => {
     // already a path: left exactly as it is
     expect(appRelativeHref("/agent/?run_id=32i1")).toBe("/agent/?run_id=32i1");
   });
-
 });
 
 describe("carrying the view through a run", () => {
@@ -374,5 +407,55 @@ describe("what counts as arriving somewhere new", () => {
     expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
       workspaceHydrationToken(baseConfig, at("/agent/", "", nav))
     );
+  });
+});
+
+describe("leaving a document tab for a view", () => {
+  // Usage, API and Deploy are routes, not panes, so picking a view on one navigates. The
+  // pick has to ride along: the workspace opens on the view its own url asks for, which
+  // threw the pick away and landed on About however you chose to leave.
+  it("hands the chosen view to the navigation, and it wins on arrival", () => {
+    const chosen = singleLayout("editor");
+    const nav = workspaceLayoutNavigationState(chosen);
+
+    expect(workspaceLayoutFromNavigationState(nav)).toEqual(chosen);
+    expect(initialWorkspaceState(baseConfig, nav).layout).toEqual(chosen);
+
+    // and without it you get the url's own view, which is the bug
+    expect(initialWorkspaceState(baseConfig, null).layout).toEqual(about);
+  });
+
+  it("survives the run reveal, which reads Edit as nowhere to see output", () => {
+    // Leaving Usage keeps the run in the url, so the workspace arrives with an
+    // `active_run_id`. Edit is a lone editor, which `shouldRevealRunOutput` treats as
+    // grounds to swap in the work view - and that turned the pick into Split.
+    const leavingUsage = { ...baseConfig, active_run_id: "run-1" };
+    const nav = workspaceLayoutNavigationState(edit);
+
+    expect(shouldRevealRunOutput(edit)).toBe(true);
+    expect(initialWorkspaceState(leavingUsage, nav).layout).toEqual(edit);
+    // and the run counts as handled, so a later render cannot swap it either
+    expect(initialWorkspaceState(leavingUsage, nav).handled_run_id).toBe(
+      "run-1"
+    );
+  });
+
+  it("still reveals the output for a run nobody picked a view for", () => {
+    const starting = {
+      ...baseConfig,
+      initial_layout: edit,
+      active_run_id: "run-2",
+    };
+    expect(initialWorkspaceState(starting, null).layout).toEqual(split);
+  });
+
+  it("is actually passed by the top bar's view picker", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/components/RecipeTopBar/index.tsx", "utf8");
+    const chooseView = src.slice(
+      src.indexOf("const chooseView"),
+      src.indexOf("const handleRun")
+    );
+    expect(chooseView).toContain("workspaceLayoutNavigationState(view.layout)");
   });
 });

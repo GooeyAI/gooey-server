@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 import pydantic
 
@@ -60,20 +60,32 @@ class AboutCard(StrictComponentModel):
     icon_html: str
     label: str
     target: AboutCardTarget
+    # A platform's own colour, for the deployment buttons below lg. None keeps it neutral.
+    accent: str | None = None
 
 
 class AboutGroup(StrictComponentModel):
-    """A heading and the grid of cards under it."""
+    """A heading and the grid of cards under it.
+
+    `variant` is what lets the deployments read as full-width buttons below lg, where the
+    design puts them under the description rather than in the card grid.
+    """
 
     title: str
     cards: list[AboutCard] = []
+    variant: Literal["cards", "deployments"] = "cards"
 
 
-class RecipeAboutProps(pydantic.BaseModel):
+class RecipeAboutProps(StrictComponentModel):
     """Everything the About surface draws. Structured rather than pre-rendered html, so the
     component owns the markup and the payload carries only what varies."""
 
-    _component: str = "RecipeAbout"
+    _component: ClassVar[Literal["RecipeAbout"]] = "RecipeAbout"
+
+    # The workflow's name and run count, shown below lg where the bar leads with the logo
+    # instead. Not the page's h1 - that is the top bar's, and there is only one.
+    heading: str
+    heading_meta: str | None = None
 
     photo_url: str | None = None
     circle_photo: bool = False

@@ -4,6 +4,8 @@
 .gooey-topbar {
   /* One height for every control in the right cluster - see the shared rule below. */
   --topbar-control-h: 36px;
+  /* 2px of track around a 32px pill. The mobile rule sits this far above the bar's foot. */
+  --topbar-strip-h: 36px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -153,7 +155,8 @@
 .gooey-topbar-tab {
   display: inline-flex;
   align-items: center;
-  gap: var(--gooey-space-2);
+  /* 4px between glyph and label, as drawn - the 8px is between whole tabs. */
+  gap: var(--gooey-space-1);
   border: 0;
   border-radius: 8px;
   background: none;
@@ -199,7 +202,6 @@
 /* One height and one box model for the right cluster. Height is set here and the vertical
    padding left off each control, so a border cannot change how tall a control is. */
 .gooey-topbar-integration,
-.gooey-topbar-overflow-btn,
 .gooey-topbar-publish,
 .gooey-topbar-run {
   box-sizing: border-box;
@@ -222,13 +224,16 @@
   white-space: nowrap;
 }
 
-/* Only the first chip is labelled; the rest stay square and carry their name in the tooltip
-   and the ... menu.
+/* Only the first chip is labelled; the rest stay square and carry their name in the tooltip.
 
    A @container query, not @media: the bar narrows when the Builder opens or the rail expands,
    neither of which changes the viewport, so a viewport breakpoint let the label appear on a
    bar that had no room for it. `.v2-topbar-container` (the wrapper base_v2 renders the bar
-   into) is the query container. */
+   into) is the query container. 1128 is the bar's one "roomy" width, shared with the rule
+   below that collapses every other label - the two have to agree, or the cluster regains
+   one label at the width it loses another. It is a container width, not a viewport one:
+   it lands the gate on a 1440px viewport with the rail out, and moves with the rail and
+   the Builder rather than letting a wide window hide a bar that has no room. */
 .gooey-topbar-integration-label {
   display: none;
   /* matches Publish, which sits beside it */
@@ -236,7 +241,7 @@
   font-weight: 500;
 }
 
-@container topbar (min-width: 1150px) {
+@container topbar (min-width: 1128px) {
   .gooey-topbar-integration--labelled {
     width: auto;
     /* the same 12px Publish uses */
@@ -246,6 +251,18 @@
   .gooey-topbar-integration--labelled .gooey-topbar-integration-label {
     display: inline;
   }
+}
+
+/* The unpublished marker in the Publish menu, where it says the same of the Update row as
+   the badge says of the button that opened it. Inline at the row's end rather than a corner
+   badge - a menu row has no corner to sit on. */
+.gooey-topbar-menu-dot {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gooey-warn);
 }
 
 .gooey-topbar-integration:hover {
@@ -270,25 +287,7 @@
   flex: 0 0 auto;
 }
 
-.gooey-topbar-overflow-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--topbar-control-h);
-  border: 1px solid var(--gooey-line-default);
-  border-radius: 9px;
-  background: var(--gooey-bg-page);
-  color: var(--gooey-ink);
-  font-size: 0.95rem;
-}
-
-.gooey-topbar-overflow-btn:hover {
-  background: var(--gooey-surface-50);
-  border-color: var(--gooey-line-strong);
-  color: var(--gooey-ink);
-}
-
-/* the cluster sits at the right edge, so its menu opens leftwards */
+/* the cluster sits at the right edge, so the Publish menu opens leftwards */
 .gooey-topbar-overflow-wrap .gooey-topbar-menu {
   left: auto;
   right: 0;
@@ -382,6 +381,52 @@ a.gooey-topbar-cost:hover {
   background: var(--gooey-danger);
 }
 
+/* Below that, every control in the bar but the title collapses to its icon. The title is
+   the one thing that cannot: an icon does not say which workflow you are on, and it has
+   somewhere to go anyway - it truncates.
+
+   Hidden to the eye and not to the accessibility tree, so an icon-only tab keeps the name
+   it had. `display: none` would have left the tabs unnamed; Publish and Run carry an
+   `aria-label` of their own and would not have, but one rule for all three is a rule a
+   reader does not have to check twice.
+
+   Inside a media query as well, because the container is the bar at every width: below lg
+   it is ~390 and matched this on its own, collapsing the mobile strip - which is labelled
+   by design and has a whole row to itself.
+
+   Placed after the controls it overrides: a container query carries no specificity of its
+   own, so source order is all that decides it against their own `.gooey-topbar-publish`. */
+@media (min-width: 992px) {
+  @container topbar (max-width: 1127.98px) {
+    .gooey-topbar-tab-label,
+    .gooey-topbar-btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* Run holds one glyph, so it squares off. Publish holds two - it keeps its chevron,
+       because that is what says it opens a menu rather than doing something - so it sizes
+       to them with even padding instead. Forcing both to a square left Publish with 30px
+       of glyph in a 12px content box, which is the lopsided padding it looked like. */
+    .gooey-topbar-run {
+      width: var(--topbar-control-h);
+      padding: 0;
+      justify-content: center;
+    }
+
+    .gooey-topbar-publish {
+      width: auto;
+      gap: var(--gooey-space-1);
+      padding: 0 var(--gooey-space-2);
+      justify-content: center;
+    }
+  }
+}
+
 /* --------------------------------------------------------------- menus */
 
 .gooey-topbar-menu {
@@ -444,29 +489,71 @@ a.gooey-topbar-cost:hover {
 /* -------------------------------------------------------------- mobile */
 
 @media (max-width: 991.98px) {
-  /* The pills are gone, so the grid collapses to one row of nav + title + actions. The
-     bar owns its padding and its rule here, since the two header states differ and only
-     the bar knows which applies. */
+  /* The bar owns its padding and its rule here, since the two header states differ and
+     only the bar knows which applies. */
   .v2-topbar-container {
     padding: 0 !important;
     border-bottom: 0 !important;
   }
 
+  /* Two rows: the identity row, then the tab strip below it. The identity takes the row and
+     the right cluster is sized to its own control, so whichever of the wordmark and the
+     workflow name is showing gets every pixel the button or pill leaves. Two `1fr` tracks
+     split the row in half whatever sits in them, which is what left the name truncating
+     against 90px of nothing. The middle track stays for the strip to span. */
   .gooey-topbar {
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: var(--gooey-space-2);
-    padding: var(--gooey-space-3);
+    padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
+      var(--gooey-space-2);
     /* a hairline at device pixel ratio 3; rounds up to 1px on a 1x display */
     border-bottom: 0.33px solid var(--gooey-line-default);
   }
 
-  /* A level down the stack: 4px shorter, ruled with the softer line. The horizontal inset
-     is deliberately unchanged, so the left control does not shift on entering a view. */
+  /* The rule belongs under the header, not under the whole bar: where the strip has a row
+     of its own it sits below the line, on the page rather than in the header.
+
+     A pseudo-element on the bar, because the two rows are grid items and there is no row-1
+     element to hang a border on. Offset from the *bottom*: row 1 grows and shrinks with
+     what the right cluster holds, while everything below the line is fixed - the strip's
+     row, the gap above it, and the bar's bottom padding. Anchored to the bar rather than
+     bled out of the strip, which hugs its tabs and so is narrower than the bar. */
+  .gooey-topbar-with-strip {
+    position: relative;
+    /* Double the row gap so the line lands in the middle of it - at 8px it sat hard against
+       the row above and read as underlining the Ask button. The offset below is unchanged:
+       half of this gap is what it already cleared. */
+    row-gap: var(--gooey-space-4);
+    border-bottom: 0;
+  }
+
+  .gooey-topbar-with-strip::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--topbar-strip-h) + var(--gooey-space-2) * 2);
+    border-top: 0.33px solid var(--gooey-line-default);
+  }
+
+  .gooey-topbar-left {
+    grid-area: 1 / 1 / 2 / 3;
+  }
+
+  /* The name is the only thing here with somewhere to go, so it is what truncates. */
+  .gooey-topbar-titleblock {
+    flex: 1 1 auto;
+  }
+
+  .gooey-topbar-right {
+    grid-area: 1 / 3 / 2 / 4;
+  }
+
+  /* A level down the stack: ruled with the softer line. The insets are deliberately
+     unchanged, so the left control does not shift on entering a view. */
   .gooey-topbar-stacked {
-    padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
-      var(--gooey-space-3);
     border-bottom-color: var(--gooey-line-soft);
   }
 
@@ -496,10 +583,11 @@ a.gooey-topbar-cost:hover {
   }
 
   /* Always round at this size; the square treatment and `circle_photo` are desktop-only. */
+  /* 24px beside the name, as drawn - the desktop bar's 36 is its own row's height. */
   .gooey-topbar-avatar,
   .gooey-topbar-avatar-circle {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     border-radius: var(--gooey-radius-full);
   }
 
@@ -509,23 +597,6 @@ a.gooey-topbar-cost:hover {
     font-weight: 600;
     line-height: 1.2;
     color: var(--gooey-ink);
-  }
-
-  /* The trailing crumb holds its width and the workflow name gives way, because the name is
-     the part with somewhere to go - it ellipsises. Reversed, a long name would push the level
-     you are actually on off the row. */
-  .gooey-topbar-crumb {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--gooey-space-1);
-    color: var(--gooey-ink);
-  }
-
-  /* Only the separator is dimmed; both text segments stay full ink, as drawn. */
-  .gooey-topbar-crumb-sep {
-    font-size: 0.7em;
-    opacity: 0.45;
   }
 
   /* Ghost and Outline from the design system's Button set, at SM. */
@@ -565,10 +636,23 @@ a.gooey-topbar-cost:hover {
     display: none !important;
   }
 
-  /* Replaced at this width by the action sheet, which is a list and so carries entries a
-     strip of pills could not. */
+  /* The bar's second row, spanning all three tracks - About's only, which is why the row
+     is `auto` and collapses everywhere else. The track hugs its tabs and centres in the row
+     (`justify-self` from the base rule): stretched to the full width instead, a short tab
+     set left a stretch of empty track beside it. Tabs packed at the design's 8px, so a full
+     set overflows the row and scrolls rather than spreading.
+     2px of track around a 32px pill makes the design's 36px. */
   .gooey-topbar-tabs {
-    display: none;
+    grid-area: 2 / 1 / 3 / 4;
+    box-sizing: border-box;
+    height: var(--topbar-strip-h);
+    gap: var(--gooey-space-2);
+    padding: 2px;
+    border-radius: var(--gooey-radius-full);
+  }
+
+  .gooey-topbar-tab {
+    border-radius: var(--gooey-radius-full);
   }
 
   /* Icon-only actions below lg - the labels are what crowd the title out. Square, so they
@@ -580,7 +664,6 @@ a.gooey-topbar-cost:hover {
 
   .gooey-topbar-publish,
   .gooey-topbar-run,
-  .gooey-topbar-overflow-btn,
   .gooey-topbar-integration {
     width: auto;
     height: auto;
@@ -692,21 +775,18 @@ a.gooey-topbar-cost:hover {
     display: none !important;
   }
 
-  /* At the root of the mobile stack there is no view to close back to. */
-  .v2-builder-close {
+  /* The panel draws no header of its own here. The bar's pill names it, Back closes it,
+     and the title chip was a second name for the surface you are already looking at. */
+  .v2-builder-header {
     display: none !important;
-  }
-
-  /* Do not leave an empty header above a new conversation. */
-  .v2-builder-header:not(:has(.v2-builder-new)) {
-    display: none;
   }
 }
 
-/* ------------------------------------------------------- mobile action sheet
+/* ------------------------------------------------------- the view switcher
 
-   Hidden above lg regardless of how it was opened, so crossing the breakpoint while it is up
-   cannot strand it. */
+   What the pill opens: the surfaces this workflow has, as a bottom sheet. Hidden above lg
+   regardless of how it was opened, so crossing the breakpoint while it is up cannot strand
+   it - the strip is the switcher there. */
 .gooey-sheet-scrim {
   position: fixed;
   inset: 0;
@@ -794,17 +874,6 @@ a.gooey-topbar-cost:hover {
   font-size: 1rem;
 }
 
-/* One line each, however long the name. A published run can be titled a whole sentence, and
-   a row that wraps to two lines pushes every row under it further down a screen that is
-   already short. `min-width: 0` because a flex item will not shrink below its own content
-   width without it, which is what leaves the text to overflow instead of ellipsising. */
-.gooey-sheet-label {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 /* ------------------------------------------------- no motion below lg
 
    The layout animations are desktop affordances - one surface making room for another beside
@@ -833,4 +902,95 @@ a.gooey-topbar-cost:hover {
   /* `display: contents` drops the box, not the inheritance - without this the heading
      scale's heavy face would still reach the title text inside. */
   font: inherit;
+}
+
+/* --------------------------------------------- the mobile right cluster + wordmark
+
+   One control, and on About the wordmark between it and the drawer: the Ask button there,
+   the view pill everywhere else. */
+
+/* Names the surface you are on and opens the switcher, which below lg is the only way
+   between them once the strip is behind you on About. */
+.gooey-topbar-viewpill {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  /* 33 tall and 4px between glyph and label, which is what makes the design's 53px row. */
+  box-sizing: border-box;
+  height: 33px;
+  gap: var(--gooey-space-1);
+  padding: 0 var(--gooey-space-3);
+  border: 1px solid var(--gooey-line-default);
+  border-radius: var(--gooey-radius-full);
+  background: var(--gooey-bg-page);
+  color: var(--gooey-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.gooey-topbar-viewpill-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--gooey-ink-muted);
+}
+
+/* Ask Gooey names itself with its deployment's avatar rather than a glyph, at the size the
+   glyphs beside it occupy so the pill does not change height with the surface. */
+.gooey-topbar-viewpill-mark,
+.gooey-sheet-icon > img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.gooey-topbar-askgooey {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 24px of glyph, 4px of padding and the border, which is what makes the design's 34 -
+     and with it the row's own height, since these are the tallest thing in it. */
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  padding: var(--gooey-space-1);
+  border-radius: var(--gooey-radius-xs);
+  color: var(--gooey-ink);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Outlined in the mark's own green - it is the one control in the bar that opens something
+   rather than going somewhere, and the border is what says so. */
+.gooey-topbar-askgooey {
+  border: 1px solid var(--gooey-brand);
+  background: var(--gooey-bg-page);
+}
+
+/* The mark fills the button's 24px box whatever aspect the deployment's branding sends. */
+.gooey-topbar-askgooey > img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* The wordmark About leads with. 14px of ink, which is the design's 84x32 slot once its
+   asset's transparent padding is taken off - ours is cropped to the glyphs, so the height
+   is the glyphs' own. */
+.gooey-topbar-logo {
+  flex: 0 0 auto;
+  height: 14px;
+  width: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 991.98px) {
+  /* Only below lg, where the wordmark takes the row's centre. Above it the bar always names
+     the workflow, and an unscoped rule hid the title on the desktop About as well. */
+  .gooey-topbar-identity-hidden {
+    display: none;
+  }
 }
