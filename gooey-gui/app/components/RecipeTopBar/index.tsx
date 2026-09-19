@@ -56,6 +56,52 @@ const PREVIEW_VIEW: WorkspaceView = {
   desktop_only: false,
 };
 
+/** Whether About's own title has scrolled up behind the bar.
+ *
+ * Measured against the heading rather than a pixel threshold, so the bar takes the name over
+ * exactly when the surface stops showing it. `scroll` does not bubble and the pane that
+ * scrolls is not an ancestor of the bar, so this listens in the capture phase on `document`.
+ * Inert unless `active`, which is what keeps it off the desktop.
+ */
+function useScrolledPastAboutTitle(active: boolean): boolean {
+  const [past, setPast] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setPast(false);
+      return;
+    }
+    const read = () => {
+      const heading = document.querySelector(".v2-about-heading");
+      const bar = document.querySelector(".gooey-topbar");
+      const box = heading?.getBoundingClientRect();
+      if (!box || !bar) {
+        setPast(false);
+        return;
+      }
+      setPast(box.bottom <= bar.getBoundingClientRect().bottom);
+    };
+    // Read on the event rather than on a frame: rAF is throttled while the tab is not
+    // painting, which left the bar naming the wrong thing on return - and two rects per
+    // scroll event measured as no cost worth that.
+    read();
+    document.addEventListener("scroll", read, true);
+    window.addEventListener("resize", read);
+    return () => {
+      document.removeEventListener("scroll", read, true);
+      window.removeEventListener("resize", read);
+    };
+  }, [active]);
+  return past;
+}
+
+/** The three ways a surface draws its icon: a bare class, server-supplied html, or a
+ *  branded mark. At most one is set. */
+type SurfaceIcon = {
+  iconClass?: string;
+  iconHtml?: string;
+  iconUrl?: string;
+};
+
 /** A tab that is a route rather than a client-side pane: Usage, Deploy, API. */
 type DocumentTab = {
   key: NonNullable<RecipeTopBarProps["active_document_tab"]>;
@@ -241,11 +287,22 @@ export function RecipeTopBar({
   // collapses to a single row that names the workflow and carries the pill.
   const onAbout =
     !builderOpen && !active_document_tab && activeViewSpec?.key === "about";
+  // About leads with the wordmark only while its own surface is still showing the name.
+  // Scroll the name off and the bar takes it over, so the workflow is named exactly once.
+  // Narrow only: above lg the bar names the workflow whatever the surface is doing. The
+  // hook is called on every render - a `&&` in front of it would change the hook order.
+  const scrolledPastAboutTitle = useScrolledPastAboutTitle(onAbout && isNarrow);
+  // The panel's own mark wherever it names itself, falling back to a glyph when the
+  // deployment carries no branding.
+  const builderIcon: SurfaceIcon = builder_photo_url
+    ? { iconUrl: builder_photo_url }
+    : { iconClass: "fa-regular fa-sparkles" };
+  const showsWordmark = onAbout && !scrolledPastAboutTitle;
   // What the pill says: the panel wins over the surface behind it, then a route names
   // itself, then the pane you are on.
-  const surface: { label: string; iconClass?: string; iconHtml?: string } | null =
+  const surface: ({ label: string } & SurfaceIcon) | null =
     builderOpen
-      ? { label: "Ask", iconClass: "fa-regular fa-sparkles" }
+      ? { label: "Ask", ...builderIcon }
       : active_document_tab
         ? documentTabs.find((tab) => tab.key === active_document_tab) ?? null
         : activeViewSpec
@@ -389,7 +446,7 @@ export function RecipeTopBar({
           {
             key: "--switch-builder",
             label: "Ask",
-            iconClass: "fa-regular fa-sparkles",
+            ...builderIcon,
             onPick: showBuilder,
           },
         ]
@@ -454,6 +511,17 @@ export function RecipeTopBar({
           />
         </button>
 
+        {/* On About the bar says whose app this is rather than which workflow - the surface
+            below names it - and hands the name over once that name scrolls away. Beside the
+            drawer button rather than centred in the row, as drawn. */}
+        {showsWordmark && !!logo_image_url && (
+          <img
+            src={logo_image_url}
+            alt="Gooey.AI"
+            className="gooey-topbar-logo d-lg-none"
+          />
+        )}
+
         {photo_url && (
           <img
             src={photo_url}
@@ -461,7 +529,7 @@ export function RecipeTopBar({
             className={clsx(
               "gooey-topbar-avatar",
               circle_photo && "gooey-topbar-avatar-circle",
-              onAbout && "gooey-topbar-identity-hidden"
+              showsWordmark && "gooey-topbar-identity-hidden"
             )}
           />
         )}
@@ -469,7 +537,7 @@ export function RecipeTopBar({
         <div
           className={clsx(
             "gooey-topbar-titleblock",
-            onAbout && "gooey-topbar-identity-hidden"
+            showsWordmark && "gooey-topbar-identity-hidden"
           )}
           ref={titleMenuRef}
         >
@@ -528,17 +596,6 @@ export function RecipeTopBar({
           />
         </div>
       </div>
-
-      {/* On About the bar leads with the wordmark rather than the workflow, whose name the
-          surface below carries. A grid item of its own, so the bar's three tracks centre it
-          in the row instead of it riding along after the drawer button. */}
-      {onAbout && !!logo_image_url && (
-        <img
-          src={logo_image_url}
-          alt="Gooey.AI"
-          className="gooey-topbar-logo d-lg-none"
-        />
-      )}
 
       {/* A single-view recipe does not need a selector unless a route tab joins it. Above lg
           the strip is the bar's own navigation on every surface; below lg it is About's, and
@@ -625,7 +682,13 @@ export function RecipeTopBar({
                 aria-haspopup="menu"
                 aria-expanded={switcherOpen}
               >
-                {surface.iconHtml ? (
+                {surface.iconUrl ? (
+                  <img
+                    className="gooey-topbar-viewpill-mark"
+                    src={surface.iconUrl}
+                    alt=""
+                  />
+                ) : surface.iconHtml ? (
                   <span
                     className="gooey-topbar-viewpill-icon"
                     dangerouslySetInnerHTML={{ __html: surface.iconHtml }}

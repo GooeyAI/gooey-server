@@ -452,12 +452,14 @@ a.gooey-topbar-cost:hover {
     border-bottom: 0 !important;
   }
 
-  /* Two rows: the identity row, then the tab strip across the full width. The three tracks
-     are the desktop bar's, kept so the wordmark sits in the true centre of the row rather
-     than wherever the drawer button and the right cluster happen to leave it. */
+  /* Two rows: the identity row, then the tab strip below it. The identity takes the row and
+     the right cluster is sized to its own control, so whichever of the wordmark and the
+     workflow name is showing gets every pixel the button or pill leaves. Two `1fr` tracks
+     split the row in half whatever sits in them, which is what left the name truncating
+     against 90px of nothing. The middle track stays for the strip to span. */
   .gooey-topbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: var(--gooey-space-2);
     padding: var(--gooey-space-3) var(--gooey-space-3) var(--gooey-space-2)
@@ -468,23 +470,13 @@ a.gooey-topbar-cost:hover {
     border-bottom: 0.33px solid #949494;
   }
 
-  /* Off About there is no wordmark and no strip, so the identity spans the first two
-     tracks and the name takes every pixel the pill leaves it. */
   .gooey-topbar-left {
     grid-area: 1 / 1 / 2 / 3;
-  }
-
-  .gooey-topbar:has(.gooey-topbar-logo) .gooey-topbar-left {
-    grid-area: 1 / 1 / 2 / 2;
   }
 
   /* The name is the only thing here with somewhere to go, so it is what truncates. */
   .gooey-topbar-titleblock {
     flex: 1 1 auto;
-  }
-
-  .gooey-topbar-logo {
-    grid-area: 1 / 2 / 2 / 3;
   }
 
   .gooey-topbar-right {
@@ -731,14 +723,10 @@ a.gooey-topbar-cost:hover {
     display: none !important;
   }
 
-  /* At the root of the mobile stack there is no view to close back to. */
-  .v2-builder-close {
+  /* The panel draws no header of its own here. The bar's pill names it, Back closes it,
+     and the title chip was a second name for the surface you are already looking at. */
+  .v2-builder-header {
     display: none !important;
-  }
-
-  /* Do not leave an empty header above a new conversation. */
-  .v2-builder-header:not(:has(.v2-builder-new)) {
-    display: none;
   }
 }
 
@@ -894,6 +882,16 @@ a.gooey-topbar-cost:hover {
   display: inline-flex;
   align-items: center;
   color: var(--gooey-ink-muted);
+}
+
+/* Ask Gooey names itself with its deployment's avatar rather than a glyph, at the size the
+   glyphs beside it occupy so the pill does not change height with the surface. */
+.gooey-topbar-viewpill-mark,
+.gooey-sheet-icon > img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .gooey-topbar-askgooey {
