@@ -251,40 +251,6 @@
   }
 }
 
-/* Below that, every control in the bar but the title collapses to its icon. The title is
-   the one thing that cannot: an icon does not say which workflow you are on, and it has
-   somewhere to go anyway - it truncates.
-
-   Hidden to the eye and not to the accessibility tree, so an icon-only tab keeps the name
-   it had. `display: none` would have left the tabs unnamed; Publish and Run carry an
-   `aria-label` of their own and would not have, but one rule for all three is a rule a
-   reader does not have to check twice.
-
-   Inside a media query as well, because the container is the bar at every width: below lg
-   it is ~390 and matched this on its own, collapsing the mobile strip - which is labelled
-   by design and has a whole row to itself. */
-@media (min-width: 992px) {
-  @container topbar (max-width: 1199.98px) {
-    .gooey-topbar-tab-label,
-    .gooey-topbar-btn-label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-
-    /* Square, rather than a stretched rectangle left holding the label's padding. */
-    .gooey-topbar-publish,
-    .gooey-topbar-run {
-      width: var(--topbar-control-h);
-      padding: 0;
-      justify-content: center;
-    }
-  }
-}
-
 /* The unpublished marker in the Publish menu, where it says the same of the Update row as
    the badge says of the button that opened it. Inline at the row's end rather than a corner
    badge - a menu row has no corner to sit on. */
@@ -411,6 +377,52 @@ a.gooey-topbar-cost:hover {
 
 .gooey-topbar-run-stop:hover {
   background: var(--gooey-danger);
+}
+
+/* Below that, every control in the bar but the title collapses to its icon. The title is
+   the one thing that cannot: an icon does not say which workflow you are on, and it has
+   somewhere to go anyway - it truncates.
+
+   Hidden to the eye and not to the accessibility tree, so an icon-only tab keeps the name
+   it had. `display: none` would have left the tabs unnamed; Publish and Run carry an
+   `aria-label` of their own and would not have, but one rule for all three is a rule a
+   reader does not have to check twice.
+
+   Inside a media query as well, because the container is the bar at every width: below lg
+   it is ~390 and matched this on its own, collapsing the mobile strip - which is labelled
+   by design and has a whole row to itself.
+
+   Placed after the controls it overrides: a container query carries no specificity of its
+   own, so source order is all that decides it against their own `.gooey-topbar-publish`. */
+@media (min-width: 992px) {
+  @container topbar (max-width: 1199.98px) {
+    .gooey-topbar-tab-label,
+    .gooey-topbar-btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* Run holds one glyph, so it squares off. Publish holds two - it keeps its chevron,
+       because that is what says it opens a menu rather than doing something - so it sizes
+       to them with even padding instead. Forcing both to a square left Publish with 30px
+       of glyph in a 12px content box, which is the lopsided padding it looked like. */
+    .gooey-topbar-run {
+      width: var(--topbar-control-h);
+      padding: 0;
+      justify-content: center;
+    }
+
+    .gooey-topbar-publish {
+      width: auto;
+      gap: var(--gooey-space-1);
+      padding: 0 var(--gooey-space-2);
+      justify-content: center;
+    }
+  }
 }
 
 /* --------------------------------------------------------------- menus */

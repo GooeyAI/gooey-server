@@ -18,6 +18,7 @@ import {
 import type { CustomComponentProps } from "~/components";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import { useCopyToClipboard } from "~/useCopyToClipboard";
+import { GooeyTooltip } from "../GooeyTooltip";
 import {
   activeViewForLayouts,
   isRootLayout,
@@ -687,9 +688,14 @@ export function RecipeTopBar({
           )}
         >
           {views.map((view) => (
+            <GooeyTooltip
+              key={view.key}
+              content={view.label}
+              placement="bottom"
+              fitContent
+            >
             <button
               type="button"
-              key={view.key}
               className={clsx(
                 "gooey-topbar-tab",
                 view.key === activeViewSpec?.key && "gooey-topbar-tab-active",
@@ -697,6 +703,7 @@ export function RecipeTopBar({
               )}
               onClick={() => chooseView(view)}
               aria-pressed={view.key === activeViewSpec?.key}
+              aria-label={view.label}
             >
               <Icon
                 html={view.icon_html ?? undefined}
@@ -704,12 +711,18 @@ export function RecipeTopBar({
               />
               <span className="gooey-topbar-tab-label">{view.label}</span>
             </button>
+            </GooeyTooltip>
           ))}
           {documentTabs
             .filter((tab) => !tab.switcherOnly)
             .map((tab) => (
-              <Link
+              <GooeyTooltip
                 key={tab.key}
+                content={tab.label}
+                placement="bottom"
+                fitContent
+              >
+              <Link
                 to={tab.href}
                 className={clsx(
                   "gooey-topbar-tab",
@@ -719,10 +732,12 @@ export function RecipeTopBar({
                 aria-current={
                   tab.key === active_document_tab ? "page" : undefined
                 }
+                aria-label={tab.label}
               >
                 <i className={clsx(tab.iconClass, "gooey-topbar-tab-icon")} />
                 <span className="gooey-topbar-tab-label">{tab.label}</span>
               </Link>
+              </GooeyTooltip>
             ))}
         </div>
       )}
@@ -799,7 +814,7 @@ export function RecipeTopBar({
         {/* Labels only in the view-only bar, and at most one there: the centred pill group
             leaves the right cluster half the bar's slack, and an editor's bar spends that on
             the tabs and Update. Unlabelled chips keep their name in the tooltip and in the
-            ... menu. */}
+            tooltip. */}
         {integrations.map((integration, i) => {
           const labelled = isIntegrationLabelled({
             index: i,
@@ -827,30 +842,35 @@ export function RecipeTopBar({
           // aria-label as well as title: every chip past the first renders no text at all, so
           // the tooltip is the only thing naming it and `title` alone is not a reliable
           // accessible name
-          return integration.target.kind === "link" ? (
-            <a
+          return (
+            <GooeyTooltip
               key={integration.key}
-              href={integration.target.href}
-              className={className}
-              style={style}
-              title={integration.label}
-              aria-label={integration.label}
+              content={integration.label}
+              placement="bottom"
+              fitContent
             >
-              {content}
-            </a>
-          ) : (
-            <button
-              key={integration.key}
-              type="submit"
-              name={submit_intent_key}
-              value={encodeSubmitIntent(integration.target.intent)}
-              className={className}
-              style={style}
-              title={integration.label}
-              aria-label={integration.label}
-            >
-              {content}
-            </button>
+              {integration.target.kind === "link" ? (
+                <a
+                  href={integration.target.href}
+                  className={className}
+                  style={style}
+                  aria-label={integration.label}
+                >
+                  {content}
+                </a>
+              ) : (
+                <button
+                  type="submit"
+                  name={submit_intent_key}
+                  value={encodeSubmitIntent(integration.target.intent)}
+                  className={className}
+                  style={style}
+                  aria-label={integration.label}
+                >
+                  {content}
+                </button>
+              )}
+            </GooeyTooltip>
           );
         })}
 
@@ -861,15 +881,19 @@ export function RecipeTopBar({
             className="gooey-topbar-overflow-wrap d-none d-lg-block"
             ref={publishMenuRef}
           >
-            <button
-              type="button"
-              className="gooey-topbar-publish"
-              onClick={() => setPublishMenuOpen((v) => !v)}
-              title={
+            <GooeyTooltip
+              content={
                 has_unpublished_changes
                   ? "Publish (unpublished changes)"
                   : "Publish"
               }
+              placement="bottom"
+              fitContent
+            >
+            <button
+              type="button"
+              className="gooey-topbar-publish"
+              onClick={() => setPublishMenuOpen((v) => !v)}
               aria-label="Publish"
               aria-haspopup="menu"
               aria-expanded={publishMenuOpen}
@@ -877,13 +901,9 @@ export function RecipeTopBar({
               <i className="fa-regular fa-floppy-disk" />
               <span className="gooey-topbar-btn-label">Publish</span>
               <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
-              {has_unpublished_changes && (
-                <span
-                  className="gooey-topbar-dot"
-                  title="Unpublished changes"
-                />
-              )}
+              {has_unpublished_changes && <span className="gooey-topbar-dot" />}
             </button>
+            </GooeyTooltip>
             <Menu
               items={publishEntries}
               open={publishMenuOpen}
@@ -930,6 +950,11 @@ export function RecipeTopBar({
         {/* Omitted, not disabled, where the server sends no run intent: Usage lists the
             saved runs already made, so a Run control has nothing to do there. */}
         {!!run_intent && (
+          <GooeyTooltip
+            content={isRunning ? "Stop this run" : "Run"}
+            placement="bottom"
+            fitContent
+          >
           <button
             type="submit"
             name={submit_intent_key}
@@ -939,7 +964,6 @@ export function RecipeTopBar({
               isRunning && "gooey-topbar-run-stop"
             )}
             onClick={handleRun}
-            title={isRunning ? "Stop this run" : "Run"}
             aria-label={isRunning ? "Stop this run" : "Run"}
           >
             {isRunning ? (
@@ -951,6 +975,7 @@ export function RecipeTopBar({
               {isRunning ? "Stop" : "Run"}
             </span>
           </button>
+          </GooeyTooltip>
         )}
       </div>
 
