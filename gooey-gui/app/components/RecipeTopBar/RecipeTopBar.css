@@ -200,7 +200,6 @@
 /* One height and one box model for the right cluster. Height is set here and the vertical
    padding left off each control, so a border cannot change how tall a control is. */
 .gooey-topbar-integration,
-.gooey-topbar-overflow-btn,
 .gooey-topbar-publish,
 .gooey-topbar-run {
   box-sizing: border-box;
@@ -271,25 +270,7 @@
   flex: 0 0 auto;
 }
 
-.gooey-topbar-overflow-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--topbar-control-h);
-  border: 1px solid var(--gooey-line-default);
-  border-radius: 9px;
-  background: var(--gooey-bg-page);
-  color: var(--gooey-ink);
-  font-size: 0.95rem;
-}
-
-.gooey-topbar-overflow-btn:hover {
-  background: var(--gooey-surface-50);
-  border-color: var(--gooey-line-strong);
-  color: var(--gooey-ink);
-}
-
-/* the cluster sits at the right edge, so its menu opens leftwards */
+/* the cluster sits at the right edge, so the Publish menu opens leftwards */
 .gooey-topbar-overflow-wrap .gooey-topbar-menu {
   left: auto;
   right: 0;
@@ -594,7 +575,6 @@ a.gooey-topbar-cost:hover {
 
   .gooey-topbar-publish,
   .gooey-topbar-run,
-  .gooey-topbar-overflow-btn,
   .gooey-topbar-integration {
     width: auto;
     height: auto;

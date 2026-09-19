@@ -739,6 +739,30 @@ def test_examples_route_keeps_the_tab_wherever_the_page_is_v1(monkeypatch):
     assert calls == [("agent", RecipeTabs.examples)]
 
 
+def test_the_menu_keys_python_stamps_are_the_ones_the_sheet_looks_for():
+    """These three strings are declared twice - once here, once as literals in
+    `RecipeTopBar/index.tsx` - because the mobile sheet reorders the title menu by key.
+
+    The generated prop *types* are checked by CI, but nothing checks a value. Rename one in
+    Python and the row silently vanishes from the phone menu: no type error, no failure,
+    no log line. This is that missing check.
+    """
+    from pathlib import Path
+
+    from daras_ai_v2.base_v2 import BasePage as BasePageV2
+
+    source = Path("gooey-gui/app/components/RecipeTopBar/index.tsx").read_text()
+    found = dict(re.findall(r'const (MENU_\w+?)_KEY = "([^"]+)";', source))
+    assert found, "no menu key constants found - has the top bar been restructured?"
+
+    expected = {
+        "MENU_VERSION_HISTORY": BasePageV2.MENU_VERSION_HISTORY,
+        "MENU_DUPLICATE": BasePageV2.MENU_DUPLICATE,
+        "MENU_DELETE": BasePageV2.MENU_DELETE,
+    }
+    assert found == expected
+
+
 def test_a_recipe_gets_the_base_tab_set_unless_it_says_otherwise(monkeypatch):
     """The base spec is the one every fork inherits, so Split has to be desktop-only *here*.
     It folds to a single pane below lg and `tabVisibility` keeps a desktop-only view off the
