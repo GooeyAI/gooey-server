@@ -17,7 +17,6 @@ import {
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
 import { useCopyToClipboard } from "~/useCopyToClipboard";
-import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import {
   activeViewForLayouts,
   isRootLayout,
@@ -126,26 +125,6 @@ function tabVisibility(
   if (!declared.some((it) => it.key === view.key)) return "d-lg-none";
   return undefined;
 }
-
-// `BasePage.MENU_*` - the keys Python stamps on the title-menu items.
-const MENU_VERSION_HISTORY_KEY = "--menu-version-history";
-const MENU_DUPLICATE_KEY = "--menu-duplicate";
-const MENU_DELETE_KEY = "--menu-delete";
-
-// Where a "Run of <name>" row lands: the published run's own About. There is no
-// per-surface url to link to, so the layout rides along as navigation state, which the next
-// page reads while it hydrates.
-const ABOUT_LAYOUT: WorkspaceLayout = {
-  kind: "split",
-  primary: "about",
-  secondary: "preview",
-};
-
-// the Publish menu's own entries, distinguishable from anything the server declares
-const PUBLISH_ITEM_KEY = "--topbar-item-publish";
-const SHARE_ITEM_KEY = "--topbar-item-share";
-const API_ITEM_KEY = "--topbar-item-api";
-const DEPLOY_ITEM_KEY = "--topbar-item-deploy";
 
 export function RecipeTopBar({
   config,
@@ -292,12 +271,13 @@ export function RecipeTopBar({
   // Narrow only: above lg the bar names the workflow whatever the surface is doing. The
   // hook is called on every render - a `&&` in front of it would change the hook order.
   const scrolledPastAboutTitle = useScrolledPastAboutTitle(onAbout && isNarrow);
+  const showsWordmark = onAbout && !scrolledPastAboutTitle;
+
   // The panel's own mark wherever it names itself, falling back to a glyph when the
   // deployment carries no branding.
   const builderIcon: SurfaceIcon = builder_photo_url
     ? { iconUrl: builder_photo_url }
     : { iconClass: "fa-regular fa-sparkles" };
-  const showsWordmark = onAbout && !scrolledPastAboutTitle;
   // What the pill says: the panel wins over the surface behind it, then a route names
   // itself, then the pane you are on.
   const surface: ({ label: string } & SurfaceIcon) | null =
@@ -372,7 +352,7 @@ export function RecipeTopBar({
   const publishEntries: MenuEntry[] = [];
   if (publish_label && publish_intent) {
     publishEntries.push({
-      key: PUBLISH_ITEM_KEY,
+      key: "--topbar-item-publish",
       label: publish_label,
       iconHtml: '<i class="fa-regular fa-floppy-disk"></i>',
       target: { kind: "submit", intent: publish_intent },
@@ -380,7 +360,7 @@ export function RecipeTopBar({
   }
   if (share.kind !== "none") {
     publishEntries.push({
-      key: SHARE_ITEM_KEY,
+      key: "--topbar-item-share",
       label: shareCopied ? "Link copied" : "Share",
       iconHtml: share.icon_html,
       target:

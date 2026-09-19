@@ -531,23 +531,6 @@ a.gooey-topbar-cost:hover {
     color: var(--gooey-ink);
   }
 
-  /* The trailing crumb holds its width and the workflow name gives way, because the name is
-     the part with somewhere to go - it ellipsises. Reversed, a long name would push the level
-     you are actually on off the row. */
-  .gooey-topbar-crumb {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--gooey-space-1);
-    color: var(--gooey-ink);
-  }
-
-  /* Only the separator is dimmed; both text segments stay full ink, as drawn. */
-  .gooey-topbar-crumb-sep {
-    font-size: 0.7em;
-    opacity: 0.45;
-  }
-
   /* Ghost and Outline from the design system's Button set, at SM. */
   .gooey-topbar-menu-btn {
     flex: 0 0 auto;
