@@ -599,9 +599,40 @@ def test_title_menu_offers_v1s_options(monkeypatch):
     labels = [item.label for item in page._title_menu_items()]
     assert labels == ["Versions", "Duplicate", "Delete"]
 
-    # off an older version, duplicating means promoting that version to a new workflow
+    # Off an older version too. It used to read "Save as New" there, which is what the
+    # publish control calls itself in that same state - and both are rows of the mobile
+    # menu, so the pair read identically while doing different things.
     monkeypatch.setattr(VideoBotsPageV2, "current_sr", property(lambda self: "older"))
-    assert [i.label for i in page._title_menu_items()][1] == "Save as New"
+    assert [i.label for i in page._title_menu_items()][1] == "Duplicate"
+
+
+def test_duplicate_and_publish_do_not_arrive_at_one_label(monkeypatch):
+    """Both make a new published run off the current one, and the mobile menu offers them
+    side by side - so the words have to say which one asks you for a name."""
+    from bots.models import WorkflowAccessLevel
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = SimpleNamespace(
+        is_root=lambda: False, saved_run="sr", tags=SimpleNamespace(all=list)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "is_logged_in", lambda self: True)
+    monkeypatch.setattr(VideoBotsPageV2, "current_pr", property(lambda self: pr))
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_workspace", property(lambda self: None)
+    )
+    monkeypatch.setattr(
+        WorkflowAccessLevel, "can_user_delete_published_run", lambda **kw: True
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "can_edit_current_pr", property(lambda self: False)
+    )
+    monkeypatch.setattr(VideoBotsPageV2, "_has_request_changed", lambda self: False)
+    page.request = SimpleNamespace(user=object())
+
+    # a saved run, which is where the publish control says "Save as New"
+    monkeypatch.setattr(VideoBotsPageV2, "current_sr", property(lambda self: "older"))
+    assert page._top_bar_publish_label() == "Save as New"
+    assert "Save as New" not in [i.label for i in page._title_menu_items()]
 
 
 def test_the_root_recipes_version_history_is_an_admins_to_see(monkeypatch):

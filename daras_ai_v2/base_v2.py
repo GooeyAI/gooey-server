@@ -624,13 +624,15 @@ class BasePage(BasePageV1):
                 )
             )
 
-        # "Duplicate" off the latest version, "Save as New" off an older one.
+        # Always "Duplicate", because it is the one that does not ask: it names the copy
+        # "<title> (Copy)" and goes there. Off an older version this used to read "Save as
+        # New", which is what `_top_bar_publish_label` calls the publish dialog in exactly
+        # that case - two rows of the same menu, same words, one of them asking for a name
+        # and the other not.
         items.append(
             TopBarMenuItem(
                 key=self.MENU_DUPLICATE,
-                label=(
-                    "Duplicate" if pr.saved_run == self.current_sr else "Save as New"
-                ),
+                label="Duplicate",
                 icon_html=icons.fork,
                 target=SubmitTarget(intent=MenuIntent(item_key=self.MENU_DUPLICATE)),
             )
