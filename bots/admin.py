@@ -28,6 +28,7 @@ from bots.models import (
     MessageAttachment,
     Platform,
     PublishedRun,
+    PublishedRunStat,
     PublishedRunVersion,
     SavedRun,
     Tag,
@@ -35,6 +36,7 @@ from bots.models import (
     WorkflowMetadata,
 )
 from bots.models.message_thread import MessageThread
+from bots.sdg import SDG
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
@@ -403,8 +405,31 @@ class PublishedRunVersionAdmin(GooeyModelAdmin):
         return change_obj_url(published_run_version.saved_run)
 
 
+class PublishedRunAdminForm(forms.ModelForm):
+    """Renders `sdgs` as checkboxes. The raw ArrayField widget is a comma-separated text
+    box, which is unusable for a fixed set of 17 options."""
+
+    sdgs = forms.TypedMultipleChoiceField(
+        choices=SDG.choices,
+        coerce=int,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = PublishedRun
+        fields = "__all__"
+
+
+class PublishedRunStatInline(admin.TabularInline):
+    model = PublishedRunStat
+    extra = 0
+
+
 @admin.register(PublishedRun)
 class PublishedRunAdmin(GooeyModelAdmin):
+    form = PublishedRunAdminForm
+    inlines = [PublishedRunStatInline]
     list_display = [
         "__str__",
         "public_access",
