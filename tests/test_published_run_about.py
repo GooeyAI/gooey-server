@@ -121,3 +121,62 @@ def test_builder_prompt_url_keeps_existing_query_params():
     q = parse_qs(urlparse(url).query)
     assert q["example_id"] == ["abc"]
     assert q[BUILDER_PROMPT_Q] == ["Hi"]
+
+
+def test_a_fully_dressed_about_page_serialises(monkeypatch):
+    """Every marketing field set, rendered through the real component call - catches prop
+    shape and pydantic validation that the per-method tests cannot."""
+    import gooey_gui as gui
+    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = make_pr(
+        headline="Transforming Smallholder Farming",
+        banner_url="https://cdn/banner.jpg",
+        more_info_url="https://example.org/case-study",
+        more_info_text="View case study",
+        sdgs=[1, 13],
+        show_stats_publicly=True,
+        stats_title="",
+    )
+    pr.workspace_id = None
+    pr.notes = "An agri-advisor chatbot."
+    pr.tags = SimpleNamespace(all=list)
+    pr.stats = SimpleNamespace(
+        all=lambda: [
+            SimpleNamespace(value="1800+", label="Farmers supported"),
+            SimpleNamespace(value="17,000", label="User messages"),
+        ]
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_pr", property(lambda self: pr), raising=False
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "_about_meta_groups", lambda self: [], raising=False
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "current_app_url", lambda self, tab=None: "/agent/"
+    )
+    monkeypatch.setattr(
+        VideoBotsPageV2, "is_logged_in", lambda self: False, raising=False
+    )
+    page._top_bar_integrations = lambda: []
+    page.tab = None
+    page.request = SimpleNamespace(user=None)
+    gui.session_state.clear()
+
+    root = RenderTreeNode("root")
+    with NestingCtx(root):
+        page._render_about_content()
+    props = root.to_dict()["children"][0]["props"]
+
+    assert props["headline"] == "Transforming Smallholder Farming"
+    assert props["media"] == {"kind": "banner", "url": "https://cdn/banner.jpg"}
+    assert props["more_info"] == {
+        "text": "View case study",
+        "href": "https://example.org/case-study",
+    }
+    assert [s["number"] for s in props["sdgs"]] == [1, 13]
+    # blank stats_title falls back rather than rendering an empty heading
+    assert props["stats"]["title"] == DEFAULT_STATS_TITLE
+    assert [c["value"] for c in props["stats"]["cards"]] == ["1800+", "17,000"]
