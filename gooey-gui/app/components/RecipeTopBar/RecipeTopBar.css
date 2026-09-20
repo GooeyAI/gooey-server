@@ -823,3 +823,29 @@ a.gooey-topbar-cost:hover {
      scale's heavy face would still reach the title text inside. */
   font: inherit;
 }
+
+/* The published run's prompts, above the builder's own input. A link when logged out - the
+   send endpoint needs a session - and a button once there is one. */
+.v2-builder-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gooey-space-2);
+  margin-bottom: var(--gooey-space-2);
+}
+
+.v2-builder-suggestion {
+  padding: var(--gooey-space-1) var(--gooey-space-3);
+  border: 1px solid var(--gooey-line-default);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  color: var(--gooey-ink);
+  text-align: left;
+  text-decoration: none;
+}
+
+.v2-builder-suggestion:hover {
+  background: var(--gooey-surface-100);
+  color: var(--gooey-ink);
+}

@@ -18,6 +18,10 @@ export function GooeyBuilderInlineEmbed(
     builder_run_url: string;
     workflow_state: Record<string, any>;
     builder_only?: boolean;
+    /** Each prompt carries where an anonymous click goes; `login_url` is null when signed in. */
+    suggestions?: { text: string; login_url?: string | null }[];
+    /** Set only for a logged-out visitor: the send endpoint is login-required. */
+    login_url?: string | null;
   }
 ) {
   const { config, messages } = props;
@@ -53,6 +57,11 @@ export function GooeyBuilderInlineEmbed(
       controllerRef.current = {
         messages,
         onSendMessage: async (input_data: any) => {
+          // Anonymous: the endpoint is login-required, so sign in rather than 401.
+          if (propsRef.current.login_url) {
+            window.location.href = propsRef.current.login_url;
+            return;
+          }
           let redirectUrl = await fetchServerAPI<string | null>(
             "/__/gooey-builder/send-message",
             {
@@ -82,6 +91,10 @@ export function GooeyBuilderInlineEmbed(
           ctx.current.update_session_state({ builderOnNewConversation: true });
         },
         rerun: async (run_url: string) => {
+          if (propsRef.current.login_url) {
+            window.location.href = propsRef.current.login_url;
+            return;
+          }
           let redirectUrl = await fetchServerAPI<string | null>(
             "/__/gooey-builder/send-message",
             {
@@ -127,5 +140,49 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
 
-  return <div id="gooey-builder-embed" />;
+  useEffect(() => {
+    // A prompt carried back from login. Cleared first so a reload cannot re-send it.
+    if (propsRef.current.login_url) return;
+    const params = new URLSearchParams(window.location.search);
+    const prompt = params.get("builderprompt");
+    if (!prompt) return;
+    params.delete("builderprompt");
+    const search = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (search ? `?${search}` : "")
+    );
+    controllerRef.current?.onSendMessage?.({ input_prompt: prompt });
+  }, []);
+
+  const suggestions = props.suggestions ?? [];
+  return (
+    <>
+      {!!suggestions.length && (
+        <div className="v2-builder-suggestions">
+          {suggestions.map((s) =>
+            s.login_url ? (
+              // Logged out: the prompt rides inside login's `next` and replays on return.
+              <a key={s.text} className="v2-builder-suggestion" href={s.login_url}>
+                {s.text}
+              </a>
+            ) : (
+              <button
+                key={s.text}
+                type="button"
+                className="v2-builder-suggestion"
+                onClick={() =>
+                  controllerRef.current?.onSendMessage?.({ input_prompt: s.text })
+                }
+              >
+                {s.text}
+              </button>
+            )
+          )}
+        </div>
+      )}
+      <div id="gooey-builder-embed" />
+    </>
+  );
 }
