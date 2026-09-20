@@ -19,6 +19,48 @@ export interface AboutTag {
   label_html: string;
   href: string;
 }
+export interface AboutVideoMedia {
+  kind: "video";
+  url: string;
+}
+export interface AboutBannerMedia {
+  kind: "banner";
+  url: string;
+}
+/**
+ * The square portrait About has always drawn. Now the last of three media states
+ * rather than a field of its own, so the surface has one slot.
+ */
+export interface AboutPhotoMedia {
+  kind: "photo";
+  url: string;
+  circle: boolean;
+}
+/**
+ * The outbound link beside Share, e.g. "View case study".
+ */
+export interface AboutMoreInfo {
+  text: string;
+  href: string;
+}
+/**
+ * One UN goal tile. The icon carries the goal's number, title and colour, so the tile
+ * draws the image alone.
+ */
+export interface AboutSDG {
+  number: number;
+  title: string;
+  icon_url: string;
+  href: string;
+}
+export interface AboutStat {
+  value: string;
+  label: string;
+}
+export interface AboutStats {
+  title: string;
+  cards: AboutStat[];
+}
 /**
  * Opens a config pane in the workspace beside About.
  */
@@ -68,8 +110,8 @@ export interface AboutGroup {
  * component owns the markup and the payload carries only what varies.
  */
 export interface RecipeAboutProps {
-  photo_url: string | null;
-  circle_photo: boolean;
+  media: (AboutVideoMedia | AboutBannerMedia | AboutPhotoMedia) | null;
+  headline: string | null;
   author: AboutAuthor | null;
   report_value: string | null;
   share_value: string | null;
@@ -79,4 +121,7 @@ export interface RecipeAboutProps {
   notes: string | null;
   notes_line_clamp: number;
   groups: AboutGroup[];
+  more_info: AboutMoreInfo | null;
+  sdgs: AboutSDG[];
+  stats: AboutStats | null;
 }

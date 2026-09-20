@@ -27,6 +27,58 @@ class AboutTag(StrictComponentModel):
     href: str
 
 
+class AboutVideoMedia(StrictComponentModel):
+    kind: Literal["video"] = "video"
+    url: str
+
+
+class AboutBannerMedia(StrictComponentModel):
+    kind: Literal["banner"] = "banner"
+    url: str
+
+
+class AboutPhotoMedia(StrictComponentModel):
+    """The square portrait About has always drawn. Now the last of three media states
+    rather than a field of its own, so the surface has one slot."""
+
+    kind: Literal["photo"] = "photo"
+    url: str
+    circle: bool = False
+
+
+AboutMedia = Annotated[
+    AboutVideoMedia | AboutBannerMedia | AboutPhotoMedia,
+    pydantic.Field(discriminator="kind"),
+]
+
+
+class AboutMoreInfo(StrictComponentModel):
+    """The outbound link beside Share, e.g. "View case study"."""
+
+    text: str
+    href: str
+
+
+class AboutSDG(StrictComponentModel):
+    """One UN goal tile. The icon carries the goal's number, title and colour, so the tile
+    draws the image alone."""
+
+    number: int
+    title: str
+    icon_url: str
+    href: str
+
+
+class AboutStat(StrictComponentModel):
+    value: str
+    label: str
+
+
+class AboutStats(StrictComponentModel):
+    title: str
+    cards: list[AboutStat] = []
+
+
 class AboutPaneTarget(StrictComponentModel):
     """Opens a config pane in the workspace beside About."""
 
@@ -75,8 +127,8 @@ class RecipeAboutProps(StrictComponentModel):
 
     _component: ClassVar[Literal["RecipeAbout"]] = "RecipeAbout"
 
-    photo_url: str | None = None
-    circle_photo: bool = False
+    media: AboutMedia | None = None
+    headline: str | None = None
 
     author: AboutAuthor | None = None
     # the encoded pick that opens the report dialog, or None with nobody to attribute it to
@@ -94,3 +146,6 @@ class RecipeAboutProps(StrictComponentModel):
     notes_line_clamp: int = 6
 
     groups: list[AboutGroup] = []
+    more_info: AboutMoreInfo | None = None
+    sdgs: list[AboutSDG] = []
+    stats: AboutStats | None = None

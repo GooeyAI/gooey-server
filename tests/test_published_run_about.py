@@ -13,3 +13,111 @@ def test_sdg_urls_are_derived_from_the_number():
     assert SDG(17).icon_url.endswith("E_SDG_Icons-17.jpg")
     assert SDG(1).un_url == "https://sdgs.un.org/goals/goal1"
     assert SDG(17).un_url == "https://sdgs.un.org/goals/goal17"
+
+
+from types import SimpleNamespace
+
+import pytest
+
+from daras_ai_v2.base_v2 import DEFAULT_STATS_TITLE
+from recipes.VideoBots_v2 import VideoBotsPageV2
+
+
+def make_pr(**kwargs):
+    """A published run with every marketing field empty, overridden per test."""
+    defaults = dict(
+        photo_url="",
+        banner_url="",
+        video_url="",
+        headline="",
+        more_info_url="",
+        more_info_text="",
+        sdgs=[],
+        show_stats_publicly=False,
+        stats_title="",
+    )
+    return SimpleNamespace(**(defaults | kwargs))
+
+
+@pytest.mark.parametrize(
+    "fields, expected_kind, expected_url",
+    [
+        (dict(video_url="v", banner_url="b", photo_url="p"), "video", "v"),
+        (dict(banner_url="b", photo_url="p"), "banner", "b"),
+        (dict(photo_url="p"), "photo", "p"),
+    ],
+)
+def test_media_precedence(fields, expected_kind, expected_url):
+    page = object.__new__(VideoBotsPageV2)
+    page.workflow = 0
+    media = page._about_media(make_pr(**fields))
+    assert (media.kind, media.url) == (expected_kind, expected_url)
+
+
+def test_no_media_at_all_leaves_the_slot_empty():
+    page = object.__new__(VideoBotsPageV2)
+    page.workflow = 0
+    assert page._about_media(make_pr()) is None
+
+
+def test_sdg_tiles_carry_the_un_icon_and_link():
+    page = object.__new__(VideoBotsPageV2)
+    tiles = page._about_sdgs(make_pr(sdgs=[1, 13]))
+    assert [t.number for t in tiles] == [1, 13]
+    assert tiles[0].title == "No Poverty"
+    assert tiles[1].href == "https://sdgs.un.org/goals/goal13"
+    assert tiles[1].icon_url.endswith("E_SDG_Icons-13.jpg")
+
+
+def test_stats_stay_hidden_until_published():
+    """Rows can be drafted in the admin; the bool is what reveals them."""
+    page = object.__new__(VideoBotsPageV2)
+    rows = [SimpleNamespace(value="1800+", label="Farmers supported")]
+    pr = make_pr(show_stats_publicly=False)
+    pr.stats = SimpleNamespace(all=lambda: rows)
+    assert page._about_stats(pr) is None
+
+    pr.show_stats_publicly = True
+    stats = page._about_stats(pr)
+    assert stats.title == DEFAULT_STATS_TITLE
+    assert [(c.value, c.label) for c in stats.cards] == [("1800+", "Farmers supported")]
+
+
+def test_published_stats_with_no_rows_draw_no_group():
+    page = object.__new__(VideoBotsPageV2)
+    pr = make_pr(show_stats_publicly=True)
+    pr.stats = SimpleNamespace(all=lambda: [])
+    assert page._about_stats(pr) is None
+
+
+def test_more_info_needs_both_a_url_and_a_label():
+    page = object.__new__(VideoBotsPageV2)
+    assert page._about_more_info(make_pr(more_info_url="/x")) is None
+    assert page._about_more_info(make_pr(more_info_text="View case study")) is None
+    link = page._about_more_info(
+        make_pr(more_info_url="/x", more_info_text="View case study")
+    )
+    assert (link.href, link.text) == ("/x", "View case study")
+
+
+from daras_ai_v2.gooey_builder import BUILDER_PROMPT_Q, builder_prompt_next_url
+
+
+def test_the_prompt_rides_inside_the_url_login_returns_to():
+    """Appending to the login url itself would strand the prompt outside `next`, so it is
+    added to the page url before that becomes `next`."""
+    url = builder_prompt_next_url("https://gooey.ai/agent/", "Add a Hindi step")
+    assert url.startswith("https://gooey.ai/agent/?")
+    assert BUILDER_PROMPT_Q in url
+    from urllib.parse import parse_qs, urlparse
+
+    assert parse_qs(urlparse(url).query)[BUILDER_PROMPT_Q] == ["Add a Hindi step"]
+
+
+def test_builder_prompt_url_keeps_existing_query_params():
+    url = builder_prompt_next_url("https://gooey.ai/agent/?example_id=abc", "Hi")
+    from urllib.parse import parse_qs, urlparse
+
+    q = parse_qs(urlparse(url).query)
+    assert q["example_id"] == ["abc"]
+    assert q[BUILDER_PROMPT_Q] == ["Hi"]
