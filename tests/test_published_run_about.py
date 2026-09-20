@@ -180,3 +180,50 @@ def test_a_fully_dressed_about_page_serialises(monkeypatch):
     # blank stats_title falls back rather than rendering an empty heading
     assert props["stats"]["title"] == DEFAULT_STATS_TITLE
     assert [c["value"] for c in props["stats"]["cards"]] == ["1800+", "17,000"]
+
+
+def test_anonymous_chips_carry_a_login_url_that_replays_the_prompt():
+    """Logged out each chip is a link to login; the prompt rides inside `next` so it comes
+    back and replays."""
+    from urllib.parse import parse_qs, unquote, urlparse
+
+    from daras_ai_v2.gooey_builder import _builder_suggestions
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = make_pr()
+    pr.suggested_questions = ["Add a Hindi step", "Make replies shorter"]
+    page.current_pr = pr
+    page.tab = None
+    page.current_app_url = lambda tab=None: "https://gooey.ai/agent/"
+    page.get_auth_url = lambda next_url=None: f"https://gooey.ai/login?next={next_url}"
+
+    anon = _builder_suggestions(page, is_anonymous=True)
+    assert [s["text"] for s in anon] == ["Add a Hindi step", "Make replies shorter"]
+    inner = unquote(parse_qs(urlparse(anon[0]["login_url"]).query)["next"][0])
+    assert parse_qs(urlparse(inner).query)["builderprompt"] == ["Add a Hindi step"]
+
+    # signed in there is nowhere to send them - the chip posts straight to the builder
+    assert all(s["login_url"] is None for s in _builder_suggestions(page, is_anonymous=False))
+
+
+def test_only_four_chips_are_ever_offered():
+    from daras_ai_v2.gooey_builder import _builder_suggestions
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = make_pr()
+    pr.suggested_questions = [f"q{i}" for i in range(9)]
+    page.current_pr = pr
+    page.tab = None
+    page.current_app_url = lambda tab=None: "https://gooey.ai/agent/"
+    page.get_auth_url = lambda next_url=None: "https://gooey.ai/login"
+    assert len(_builder_suggestions(page, is_anonymous=False)) == 4
+
+
+def test_a_run_with_no_questions_offers_no_chips():
+    from daras_ai_v2.gooey_builder import _builder_suggestions
+
+    page = object.__new__(VideoBotsPageV2)
+    pr = make_pr()
+    pr.suggested_questions = []
+    page.current_pr = pr
+    assert _builder_suggestions(page, is_anonymous=False) == []
