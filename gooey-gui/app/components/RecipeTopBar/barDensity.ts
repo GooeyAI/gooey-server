@@ -18,18 +18,36 @@ export const BAR_DENSITIES: readonly BarDensity[] = [0, 1, 2, 3];
  *  workflows apart; past this it ellipsises, which it may do at any density. */
 export const TITLE_FLOOR = 200;
 
+/** Headroom the fully-labelled row has to clear, over and above fitting.
+ *
+ * One deployment chip and the gap before it. A workflow gains and loses those, and a row
+ * that fits to the pixel today is a cramped one tomorrow - so the roomiest density is the
+ * one asked to prove it has somewhere to put the next chip. The tighter steps are not:
+ * by then the row is shedding because it must, and slack would only cost it another label.
+ */
+export const FULL_LABEL_SLACK = 48;
+
 /** The roomiest density that fits, or the tightest one if none do.
  *
  * `needed[d]` is what the row measures at density `d`. A hole means it was never measured,
- * which is what happens once a roomier one has already fitted.
+ * which is what happens once a roomier one has already fitted - so the caller has to stop
+ * measuring on `fitsAt` too, or it will leave holes under a density this would have taken.
  */
+export function fitsAt(
+  density: BarDensity,
+  need: number,
+  available: number
+): boolean {
+  return need + (density === 0 ? FULL_LABEL_SLACK : 0) <= available;
+}
+
 export function pickDensity(
   available: number,
   needed: readonly (number | undefined)[]
 ): BarDensity {
   for (const density of BAR_DENSITIES) {
     const need = needed[density];
-    if (need !== undefined && need <= available) return density;
+    if (need !== undefined && fitsAt(density, need, available)) return density;
   }
   return 3;
 }
