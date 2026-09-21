@@ -198,39 +198,46 @@ function AuthorBlock({
       </div>
     </div>
   );
+  const hasActions = !!shareValue || !!shareUrl || !!moreInfo;
   return (
     <div className="v2-about-author">
       {author.href ? <a href={author.href}>{row}</a> : row}
-      {!!shareValue && (
-        // The same ShareIntent the bar's button posts, so one dialog opens either way.
-        <button
-          type="submit"
-          className="v2-about-share"
-          name={submitIntentKey}
-          value={shareValue}
-        >
-          <i className="fa-regular fa-share-nodes" />
-          <span>Share</span>
-        </button>
-      )}
-      {!shareValue && !!shareUrl && (
-        // Nobody to open the share dialog for, so the browser's own sheet takes the url.
-        // `type="button"`: this must not submit the form it sits in.
-        <button
-          type="button"
-          className="v2-about-share"
-          onClick={shareNatively}
-          title="Share this workflow"
-        >
-          <i className="fa-regular fa-share-nodes" />
-          <span>{copied ? "Link copied" : "Share"}</span>
-        </button>
-      )}
-      {!!moreInfo && (
-        <a className="v2-about-share" href={moreInfo.href}>
-          <i className="fa-regular fa-arrow-up-right-from-square" />
-          <span>{moreInfo.text}</span>
-        </a>
+      {hasActions && (
+        // Grouped, so `space-between` separates the attribution from the buttons rather
+        // than the buttons from each other.
+        <div className="v2-about-author-actions">
+          {!!shareValue && (
+            // The same ShareIntent the bar's button posts, so one dialog opens either way.
+            <button
+              type="submit"
+              className="v2-about-share"
+              name={submitIntentKey}
+              value={shareValue}
+            >
+              <i className="fa-regular fa-share-nodes" />
+              <span>Share</span>
+            </button>
+          )}
+          {!shareValue && !!shareUrl && (
+            // Nobody to open the share dialog for, so the browser's own sheet takes the
+            // url. `type="button"`: this must not submit the form it sits in.
+            <button
+              type="button"
+              className="v2-about-share"
+              onClick={shareNatively}
+              title="Share this workflow"
+            >
+              <i className="fa-regular fa-share-nodes" />
+              <span>{copied ? "Link copied" : "Share"}</span>
+            </button>
+          )}
+          {!!moreInfo && (
+            <a className="v2-about-share" href={moreInfo.href}>
+              <i className="fa-regular fa-arrow-up-right-from-square" />
+              <span>{moreInfo.text}</span>
+            </a>
+          )}
+        </div>
       )}
     </div>
   );

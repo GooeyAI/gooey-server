@@ -67,6 +67,16 @@
   min-width: 0;
 }
 
+/* Share and the optional outbound link, side by side. They sit in their own box so the
+   row's `space-between` pushes the pair away from the attribution, not one button away
+   from the other. `flex: 0 0 auto` opts out of the `> *` shrink rule above. */
+.v2-about .v2-about-author-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gooey-space-3);
+  flex: 0 0 auto;
+}
+
 /* The design's Button style. `flex: 0 0 auto` keeps it at its natural width while
    everything to its left gives way. */
 .v2-about .v2-about-share {
