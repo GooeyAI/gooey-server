@@ -3,6 +3,7 @@ import type {
   SingleLayout,
   SplitLayout,
   SurfaceId,
+  WorkspaceEditorPane,
   WorkspaceView,
 } from "@gooey-types/recipe_workspace_props";
 
@@ -190,6 +191,21 @@ export function revealRunLayout(
       : state.layout,
     handled_run_id: config.active_run_id,
   };
+}
+
+/** The key to write into the form state to ask for a deferred pane's body, or null if there
+ *  is nothing to ask for. State-guarded, so each response offering it deferred gets one ask. */
+export function deferredPaneLoadKey(
+  panes: readonly WorkspaceEditorPane[],
+  selectedPane: string | null,
+  state: Record<string, unknown>
+): string | null {
+  if (!selectedPane) return null;
+  const pane = panes.find((it) => it.id === selectedPane);
+  if (!pane?.load_key) return null;
+  // already asked against this response, so the answer is in flight
+  if (state[pane.load_key]) return null;
+  return pane.load_key;
 }
 
 export function isRootLayout(

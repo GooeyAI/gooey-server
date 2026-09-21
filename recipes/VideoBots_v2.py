@@ -12,6 +12,7 @@ from daras_ai_v2.base_v2 import (
     VARIABLES_DIALOG_CSS,
     BasePage,
     RecipeTabs,
+    deferred_pane,
 )
 from daras_ai_v2.bot_integration_widgets import integrations_welcome_screen
 from daras_ai_v2.doc_search_settings_widgets import bulk_documents_uploader
@@ -318,6 +319,9 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
     def _render_input_col(self):
         """The working column, shared by Edit and Split. Overridden here rather than per
         tab, so both get the pane strip without duplicating the layout."""
+        # Debug is the strip's most expensive pane - FK hops, called functions, and the
+        # `references`/`final_prompt` payload - and is never the pane shown on load.
+        debug_pane, debug_loaded = deferred_pane(ConfigPane.debug.value, "Debug")
         panes = [
             WorkspaceEditorPane(
                 id=ConfigPane.llm_instructions, label="LLM Instructions"
@@ -325,7 +329,7 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
             WorkspaceEditorPane(id=ConfigPane.knowledge, label="Knowledge"),
             WorkspaceEditorPane(id=ConfigPane.tools, label="Tools"),
             WorkspaceEditorPane(id=ConfigPane.settings, label="Settings"),
-            WorkspaceEditorPane(id=ConfigPane.debug, label="Debug"),
+            debug_pane,
         ]
         with gui.model_component(RecipeWorkspacePanesProps(panes=panes)):
             with gui.div():
@@ -337,8 +341,10 @@ class VideoBotsPageV2(BasePage, VideoBotsPage):
                 self._render_functions()
             with gui.div():
                 self._render_settings_pane()
+            # The div is emitted either way: RecipeWorkspacePanes wants one child per pane.
             with gui.div():
-                self.render_debug_pane()
+                if debug_loaded:
+                    self.render_debug_pane()
 
         # nothing in this column submits any more; the top bar owns Run
         return False

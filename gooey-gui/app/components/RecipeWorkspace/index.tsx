@@ -28,6 +28,7 @@ import { encodeSubmitIntent } from "../RecipeTopBar/submitIntent";
 import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
   collapsePane,
+  deferredPaneLoadKey,
   paneRolesForLayout,
   revealRunOutput,
   workspaceControlsForLayout,
@@ -155,6 +156,16 @@ export function RecipeWorkspacePanes({
   const selectedPane = panes.some((pane) => pane.id === activeEditorPane)
     ? activeEditorPane
     : panes[0]?.id;
+
+  // A deferred pane's body arrives on a second pass: writing its key into the form state and
+  // posting silently is what asks for it, and the skeleton below stands in until it lands.
+  useEffect(() => {
+    const loadKey = deferredPaneLoadKey(panes, selectedPane ?? null, state);
+    if (!loadKey) return;
+    state[loadKey] = true;
+    onChange({ target: null, silent: true });
+  }, [panes, selectedPane, state, onChange]);
+
   if (panes.length !== children.length) {
     throw new Error("RecipeWorkspacePanes requires one child per pane");
   }
@@ -193,15 +204,31 @@ export function RecipeWorkspacePanes({
             role="tabpanel"
             aria-labelledby={`editor-pane-tab-${pane.id}`}
             hidden={pane.id !== selectedPane}
+            aria-busy={pane.load_key ? true : undefined}
           >
-            <RenderedChildren
-              children={[children[index]]}
-              onChange={onChange}
-              state={state}
-            />
+            {pane.load_key ? (
+              <DeferredPaneSkeleton />
+            ) : (
+              <RenderedChildren
+                children={[children[index]]}
+                onChange={onChange}
+                state={state}
+              />
+            )}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* Shaped rather than a spinner: the pane would otherwise collapse to nothing and jolt when
+   the body lands. Two blocks, standing in for the run metadata strip and the steps below it. */
+function DeferredPaneSkeleton() {
+  return (
+    <div className="recipe-workspace-pane-skeleton" aria-hidden="true">
+      <div className="recipe-workspace-pane-skeleton-strip" />
+      <div className="recipe-workspace-pane-skeleton-block" />
     </div>
   );
 }
