@@ -32,11 +32,7 @@ export function GooeyImg({
 
   const clickable =
     enablePreviewDialog && !href && !currentSrc.startsWith("data:");
-  // gui.image emits data: URIs for numpy-array inputs (tens of KB, bounded
-  // by a 128px resize) - src is only sanitized into a name when actually
-  // needed, gated on `clickable`, so a non-clickable data: URI image
-  // doesn't run a regex over that whole string just to throw it away.
-  const mediaTransitionName = useMediaTransitionName(src, clickable);
+  const { mediaTransitionName, withViewTransition } = useMediaTransitionName();
 
   const openDialog = () => withViewTransition(() => setDialogOpen(true));
 
@@ -122,7 +118,7 @@ export function GooeyVideo({
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const expandable = enablePreviewDialog && !href;
-  const mediaTransitionName = useMediaTransitionName(src, expandable);
+  const { mediaTransitionName, withViewTransition } = useMediaTransitionName();
   const hasPreviewImg = !!(previewImg && previewIsValid);
   // Non-expandable (e.g. small list/grid cards): previewImg, when given, is
   // a permanent static replacement for the video - never mounted at all,
@@ -663,12 +659,24 @@ declare global {
   }
 }
 
+// A single constant works because it's only ever assigned to the one
+// instance actively opening/closing (see useMediaTransitionName below) -
+// every other thumbnail on the page sits idle with no transition name at
+// all, so there's nothing for it to collide with.
+const MEDIA_TRANSITION_NAME = "gooey-media-preview";
+
 // Morphs the media card's position/size/radius between the thumbnail and the
 // dialog (matched by view-transition-name on each side) - browser support
 // only (Chromium, Safari 18+), no dependency. Where it's unsupported, or the
 // user has asked for reduced motion, this just runs the update plainly, same
 // as the dialog opening/closing today.
-function withViewTransition(update: () => void) {
+//
+// Bound to one GooeyImg/GooeyVideo instance via useMediaTransitionName
+// below, which is also what supplies `active` - see there for why.
+function withViewTransition(
+  update: () => void,
+  setActive: (active: boolean) => void,
+) {
   const start = typeof document !== "undefined" && document.startViewTransition;
   const prefersReducedMotion =
     typeof window !== "undefined" &&
@@ -677,33 +685,41 @@ function withViewTransition(update: () => void) {
     update();
     return;
   }
+  // The name has to already be in the DOM before start() takes its
+  // "before" snapshot, so flip this instance's flag on synchronously first
+  // - flushSync forces that commit instead of batching it in with the
+  // state change below.
+  flushSync(() => setActive(true));
   // .call, not a bare start(...) - it's unbound from `document` once
   // destructured into this local.
-  start.call(document, () => flushSync(update));
+  const { finished } = start.call(document, () => flushSync(update));
+  // Cleared once the transition actually settles, not right away - turning
+  // it off immediately would let a second open/close on the same instance
+  // (or another instance entirely) yank the name out from under a
+  // still-running transition.
+  finished.finally(() => setActive(false));
 }
 
-// A src-based name alone collides whenever two expandable instances share a
-// source (e.g. Img2Img renders one expandable image per output in a loop) -
-// the browser sees a duplicate view-transition-name in the "before"
-// snapshot and aborts the transition for both. React 17 has no useId, so
-// the per-instance part comes from a plain module-level counter instead,
-// assigned once per instance via a lazily-initialized ref. Render order is
-// deterministic between the server and hydration, so this stays consistent
-// across both rather than needing anything client-only like Math.random().
-let mediaTransitionInstanceCounter = 0;
-
-function useMediaTransitionName(src: string, active: boolean | undefined) {
-  const instanceId = useRef<number>();
-  if (instanceId.current === undefined) {
-    instanceId.current = mediaTransitionInstanceCounter++;
-  }
-  if (!active) return "";
-  return (
-    "gooey-media-" +
-    src.replace(/[^a-zA-Z0-9_-]/g, "") +
-    "-" +
-    instanceId.current
-  );
+// The name only needs to be unique among elements that currently have one,
+// and view transitions are a whole-document, one-at-a-time affair - so
+// rather than track a name per instance (which, absent React 17's useId,
+// devolves into a module-level counter, and one whose starting value
+// disagrees between the server and a freshly hydrating client - the exact
+// bug this used to have: the very first Expand click paired the SSR'd
+// thumbnail's counter value against hydration's, which restart at 0 on
+// every client but keep climbing across requests on the long-lived server
+// process, so they never matched until some later re-render overwrote the
+// server's value), every instance shares one constant name and only wears
+// it for the moment it's actually transitioning. Idle thumbnails carry no
+// view-transition-name at all - nor does anything during SSR, since
+// `active` starts false identically on both sides - so there's never a
+// duplicate to collide with, and no hydration mismatch to race.
+function useMediaTransitionName() {
+  const [active, setActive] = useState(false);
+  return {
+    mediaTransitionName: active ? MEDIA_TRANSITION_NAME : "",
+    withViewTransition: (update: () => void) => withViewTransition(update, setActive),
+  };
 }
 
 /**
