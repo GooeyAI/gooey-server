@@ -33,7 +33,6 @@ def make_pr(**kwargs):
         more_info_url="",
         more_info_text="",
         sdgs=[],
-        show_stats_publicly=False,
         stats_title="",
     )
     return SimpleNamespace(**(defaults | kwargs))
@@ -69,25 +68,19 @@ def test_sdg_tiles_carry_the_un_icon_and_link():
     assert tiles[1].icon_url.endswith("E_SDG_Icons-13.jpg")
 
 
-def test_stats_stay_hidden_until_published():
-    """Rows can be drafted in the admin; the bool is what reveals them."""
+def test_the_stat_rows_are_the_switch():
+    """No separate toggle: adding a row shows the group, removing the last one hides it."""
     page = object.__new__(VideoBotsPageV2)
-    rows = [SimpleNamespace(value="1800+", label="Farmers supported")]
-    pr = make_pr(show_stats_publicly=False)
-    pr.stats = SimpleNamespace(all=lambda: rows)
+    pr = make_pr()
+    pr.stats = SimpleNamespace(all=lambda: [])
     assert page._about_stats(pr) is None
 
-    pr.show_stats_publicly = True
+    pr.stats = SimpleNamespace(
+        all=lambda: [SimpleNamespace(value="1800+", label="Farmers supported")]
+    )
     stats = page._about_stats(pr)
     assert stats.title == DEFAULT_STATS_TITLE
     assert [(c.value, c.label) for c in stats.cards] == [("1800+", "Farmers supported")]
-
-
-def test_published_stats_with_no_rows_draw_no_group():
-    page = object.__new__(VideoBotsPageV2)
-    pr = make_pr(show_stats_publicly=True)
-    pr.stats = SimpleNamespace(all=lambda: [])
-    assert page._about_stats(pr) is None
 
 
 def test_more_info_needs_both_a_url_and_a_label():
@@ -136,7 +129,6 @@ def test_a_fully_dressed_about_page_serialises(monkeypatch):
         more_info_url="https://example.org/case-study",
         more_info_text="View case study",
         sdgs=[1, 13],
-        show_stats_publicly=True,
         stats_title="",
     )
     pr.workspace_id = None
@@ -187,45 +179,45 @@ def test_anonymous_chips_carry_a_login_url_that_replays_the_prompt():
     back and replays."""
     from urllib.parse import parse_qs, unquote, urlparse
 
-    from daras_ai_v2.gooey_builder import _builder_suggestions
+    from daras_ai_v2.gooey_builder import _builder_prompts
 
     page = object.__new__(VideoBotsPageV2)
     pr = make_pr()
-    pr.suggested_questions = ["Add a Hindi step", "Make replies shorter"]
+    pr.builder_prompts = ["Add a Hindi step", "Make replies shorter"]
     page.current_pr = pr
     page.tab = None
     page.current_app_url = lambda tab=None: "https://gooey.ai/agent/"
     page.get_auth_url = lambda next_url=None: f"https://gooey.ai/login?next={next_url}"
 
-    anon = _builder_suggestions(page, is_anonymous=True)
+    anon = _builder_prompts(page, is_anonymous=True)
     assert [s["text"] for s in anon] == ["Add a Hindi step", "Make replies shorter"]
     inner = unquote(parse_qs(urlparse(anon[0]["login_url"]).query)["next"][0])
     assert parse_qs(urlparse(inner).query)["builderprompt"] == ["Add a Hindi step"]
 
     # signed in there is nowhere to send them - the chip posts straight to the builder
     assert all(
-        s["login_url"] is None for s in _builder_suggestions(page, is_anonymous=False)
+        s["login_url"] is None for s in _builder_prompts(page, is_anonymous=False)
     )
 
 
-def test_only_four_chips_are_ever_offered():
-    from daras_ai_v2.gooey_builder import _builder_suggestions
+def test_only_four_prompts_are_ever_offered():
+    from daras_ai_v2.gooey_builder import _builder_prompts
 
     page = object.__new__(VideoBotsPageV2)
     pr = make_pr()
-    pr.suggested_questions = [f"q{i}" for i in range(9)]
+    pr.builder_prompts = [f"q{i}" for i in range(9)]
     page.current_pr = pr
     page.tab = None
     page.current_app_url = lambda tab=None: "https://gooey.ai/agent/"
     page.get_auth_url = lambda next_url=None: "https://gooey.ai/login"
-    assert len(_builder_suggestions(page, is_anonymous=False)) == 4
+    assert len(_builder_prompts(page, is_anonymous=False)) == 4
 
 
-def test_a_run_with_no_questions_offers_no_chips():
-    from daras_ai_v2.gooey_builder import _builder_suggestions
+def test_a_run_with_no_prompts_offers_no_chips():
+    from daras_ai_v2.gooey_builder import _builder_prompts
 
     page = object.__new__(VideoBotsPageV2)
     pr = make_pr()
-    pr.suggested_questions = []
+    pr.builder_prompts = []
     page.current_pr = pr
-    assert _builder_suggestions(page, is_anonymous=False) == []
+    assert _builder_prompts(page, is_anonymous=False) == []

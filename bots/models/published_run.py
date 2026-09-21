@@ -183,17 +183,13 @@ class PublishedRun(models.Model):
         blank=True,
         help_text="UN Sustainable Development Goals this workflow contributes to.",
     )
-    show_stats_publicly = models.BooleanField(
-        default=False,
-        help_text="If checked, the stats below are shown on the public About page.",
-    )
     stats_title = models.CharField(
         max_length=64,
         blank=True,
         default="",
         help_text='Heading above the stat cards. Defaults to "Community Engagement".',
     )
-    suggested_questions = models.JSONField(
+    builder_prompts = models.JSONField(
         default=list,
         blank=True,
         help_text="Up to 4 prompts offered above the Gooey Builder input.",

@@ -19,7 +19,7 @@ export function GooeyBuilderInlineEmbed(
     workflow_state: Record<string, any>;
     builder_only?: boolean;
     /** Each prompt carries where an anonymous click goes; `login_url` is null when signed in. */
-    suggestions?: { text: string; login_url?: string | null }[];
+    prompts?: { text: string; login_url?: string | null }[];
     /** Set only for a logged-out visitor: the send endpoint is login-required. */
     login_url?: string | null;
   }
@@ -156,22 +156,22 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.onSendMessage?.({ input_prompt: prompt });
   }, []);
 
-  const suggestions = props.suggestions ?? [];
+  const prompts = props.prompts ?? [];
   return (
     <>
-      {!!suggestions.length && (
-        <div className="v2-builder-suggestions">
-          {suggestions.map((s) =>
+      {!!prompts.length && (
+        <div className="v2-builder-prompts">
+          {prompts.map((s) =>
             s.login_url ? (
               // Logged out: the prompt rides inside login's `next` and replays on return.
-              <a key={s.text} className="v2-builder-suggestion" href={s.login_url}>
+              <a key={s.text} className="v2-builder-prompt" href={s.login_url}>
                 {s.text}
               </a>
             ) : (
               <button
                 key={s.text}
                 type="button"
-                className="v2-builder-suggestion"
+                className="v2-builder-prompt"
                 onClick={() =>
                   controllerRef.current?.onSendMessage?.({ input_prompt: s.text })
                 }

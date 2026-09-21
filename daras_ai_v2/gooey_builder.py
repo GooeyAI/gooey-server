@@ -98,7 +98,7 @@ def render_gooey_builder(
         builder_run_url=builder_run_url,
         messages=messages,
         workflow_state=workflow_state,
-        suggestions=_builder_suggestions(page, is_anonymous=is_anonymous),
+        prompts=_builder_prompts(page, is_anonymous=is_anonymous),
         login_url=(
             page.get_auth_url(next_url=page.current_app_url(page.tab))
             if is_anonymous
@@ -107,12 +107,12 @@ def render_gooey_builder(
     )
 
 
-def _builder_suggestions(page: BasePage, *, is_anonymous: bool) -> list[dict]:
+def _builder_prompts(page: BasePage, *, is_anonymous: bool) -> list[dict]:
     """The published run's prompts, each carrying where an anonymous click should go. The
     url is built per chip because the prompt has to ride inside login's `next`."""
     pr = page.current_pr
-    questions = (pr and pr.suggested_questions or [])[:4]
-    if not questions:
+    prompts = (pr and pr.builder_prompts or [])[:4]
+    if not prompts:
         return []
     about_url = page.current_app_url(page.tab)
     return [
@@ -124,7 +124,7 @@ def _builder_suggestions(page: BasePage, *, is_anonymous: bool) -> list[dict]:
                 else None
             ),
         )
-        for q in questions
+        for q in prompts
     ]
 
 
@@ -198,7 +198,7 @@ def render_gooey_builder_embed(
     workflow_state: dict,
     builder_only: bool = False,
     page: BasePage | None = None,
-    suggestions: list[dict] | None = None,
+    prompts: list[dict] | None = None,
     login_url: str | None = None,
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
@@ -241,7 +241,7 @@ def render_gooey_builder_embed(
         builder_run_url=builder_run_url or bi.published_run.get_app_url(),
         workflow_state=workflow_state,
         builder_only=builder_only,
-        suggestions=suggestions or [],
+        prompts=prompts or [],
         login_url=login_url,
     )
 

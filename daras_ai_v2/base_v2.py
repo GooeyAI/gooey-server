@@ -974,10 +974,8 @@ class BasePage(BasePageV1):
         ]
 
     def _about_stats(self, pr: PublishedRun) -> AboutStats | None:
-        """Hand-authored impact numbers, revealed by `show_stats_publicly` so rows can be
-        drafted in the admin before they are shown."""
-        if not pr.show_stats_publicly:
-            return None
+        """Hand-authored impact numbers. The rows are the switch: add them and the group
+        appears, delete them and it goes."""
         cards = [AboutStat(value=s.value, label=s.label) for s in pr.stats.all()]
         if not cards:
             return None
