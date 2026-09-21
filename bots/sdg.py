@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from django.db import models
 
+# How many builder prompts a published run may offer.
+MAX_BUILDER_PROMPTS = 4
+
 
 class SDG(models.IntegerChoices):
     """The 17 UN Sustainable Development Goals. Fixed global constants, so they live in code

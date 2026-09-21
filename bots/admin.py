@@ -36,7 +36,7 @@ from bots.models import (
     WorkflowMetadata,
 )
 from bots.models.message_thread import MessageThread
-from bots.sdg import SDG
+from bots.sdg import MAX_BUILDER_PROMPTS, SDG
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
@@ -419,6 +419,21 @@ class PublishedRunAdminForm(forms.ModelForm):
     class Meta:
         model = PublishedRun
         fields = "__all__"
+
+    def clean_builder_prompts(self):
+        """A JSON textarea accepts any shape, and a bad one reaches the renderer as a
+        sliced dict. Checked here like `fa_icon` and `color` are."""
+        value = self.cleaned_data.get("builder_prompts") or []
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
+            raise ValidationError(
+                'Must be a list of strings, e.g. ["Add a Hindi translation step"]'
+            )
+        value = [item.strip() for item in value if item.strip()]
+        if len(value) > MAX_BUILDER_PROMPTS:
+            raise ValidationError(f"At most {MAX_BUILDER_PROMPTS} prompts.")
+        return value
 
 
 class PublishedRunStatInline(admin.TabularInline):

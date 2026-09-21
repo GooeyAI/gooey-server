@@ -7,6 +7,7 @@ from django.db.models import F
 import pydantic
 
 from bots.models.workflow import Workflow
+from bots.sdg import MAX_BUILDER_PROMPTS
 import gooey_gui as gui
 import fastapi
 
@@ -107,16 +108,24 @@ def render_gooey_builder(
     )
 
 
-def _builder_prompts(page: BasePage, *, is_anonymous: bool) -> list[dict]:
+class BuilderPrompt(typing.TypedDict):
+    """One chip above the builder input. `login_url` is None for a signed-in visitor,
+    who posts straight to the builder instead of going through login."""
+
+    text: str
+    login_url: str | None
+
+
+def _builder_prompts(page: BasePage, *, is_anonymous: bool) -> list[BuilderPrompt]:
     """The published run's prompts, each carrying where an anonymous click should go. The
     url is built per chip because the prompt has to ride inside login's `next`."""
     pr = page.current_pr
-    prompts = (pr and pr.builder_prompts or [])[:4]
+    prompts = (pr and pr.builder_prompts or [])[:MAX_BUILDER_PROMPTS]
     if not prompts:
         return []
     about_url = page.current_app_url(page.tab)
     return [
-        dict(
+        BuilderPrompt(
             text=q,
             login_url=(
                 page.get_auth_url(next_url=builder_prompt_next_url(about_url, q))
@@ -198,7 +207,7 @@ def render_gooey_builder_embed(
     workflow_state: dict,
     builder_only: bool = False,
     page: BasePage | None = None,
-    prompts: list[dict] | None = None,
+    prompts: list[BuilderPrompt] | None = None,
     login_url: str | None = None,
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
