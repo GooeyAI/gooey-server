@@ -17,7 +17,7 @@ def run_prompt_safety_checker(inputs: dict) -> typing.Iterator[str | None]:
         text = inputs.get(key)
         if not text:
             continue
-        inputs[key] = render_prompt_vars(text, gui.session_state)
+        text = inputs[key] = render_prompt_vars(text, gui.session_state)
         yield "Running safety checker..."
         safety_checker(text=text)
 
