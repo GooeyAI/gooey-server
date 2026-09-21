@@ -283,8 +283,13 @@ export function collapsePane(
   return singleLayout(layout.primary);
 }
 
+/** `views` decides whether closing the preview is offered: it may only leave a layout one
+ *  of them names, or the strip would end up with nothing selected. A visitor's How it works
+ *  is the editor beside the preview, and closing it left them on an Edit they have no tab
+ *  for. An editor has that tab, which is why this only ever bit view-only. */
 export function workspaceControlsForLayout(
-  layout: WorkspaceLayout
+  layout: WorkspaceLayout,
+  views: readonly WorkspaceView[] = []
 ): WorkspaceControls {
   const noControls: WorkspaceControls = {
     addEditor: false,
@@ -297,7 +302,9 @@ export function workspaceControlsForLayout(
   if (layout.kind === "split") {
     return {
       ...noControls,
-      closePreview: layoutHasSurface(layout, "preview"),
+      closePreview:
+        layoutHasSurface(layout, "preview") &&
+        !!viewForLayout(views, collapsePane(layout, "preview")),
     };
   }
   if (layout.surface === "editor") {

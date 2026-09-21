@@ -450,6 +450,7 @@ button .gui-html-container,
 
   /* Not in the Figma set - added because the v2 surfaces need them and had been carrying
      one-off hexes instead. Replace with the design's own once it defines them. */
+  --gooey-brand: #027d70; /* the Ask Gooey mark's green - drawn as a raw hex in Figma */
   --gooey-danger: #c0392b; /* destructive action */
   --gooey-warn: #f0a020; /* the unpublished-changes dot */
   --gooey-ok-wash: #eaf6ee; /* the run bar's cost tint */
@@ -481,8 +482,11 @@ button .gui-html-container,
 }
 
 /* The surfaces built on the design system; v1 stays on basiercircle. `.gooey-ds-page` is
-   the marker a converted React page adds, so the next one needs no change here. */
+   the marker a converted React page adds, so the next one needs no change here.
+   `.v2-topbar-container` is named separately because the bar is a sibling of `.v2-app-shell`
+   rather than inside it - the shell wraps the tab body below the bar, not the page. */
 .v2-app-shell,
+.v2-topbar-container,
 .nav-sidebar,
 .gooey-ds-page,
 .ask-gooey-page {
@@ -493,7 +497,7 @@ button .gui-html-container,
    `.bold`/`.semibold` utilities - each of which declares its own family, so inheriting from
    the page cannot reach them. Two `:is()`s keep this at two classes, which outranks both
    `.bold` and `.gui-md-container strong`. */
-:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+:is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
   :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold) {
   font-family: var(--gooey-font-ui);
 }

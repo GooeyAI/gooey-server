@@ -271,7 +271,8 @@
   padding: var(--gooey-space-4) var(--gooey-space-3) var(--gooey-space-3);
   border: 1px solid var(--gooey-line-default);
   border-radius: var(--gooey-radius-md);
-  background: transparent;
+  /* A fill of its own: the card stands on the panel's tint rather than lying in it. */
+  background: var(--gooey-bg-page);
   color: var(--gooey-ink);
   text-align: left;
   text-decoration: none;
@@ -431,4 +432,95 @@
 /* Sized off the label rather than its own value, so the pair stays in proportion. */
 .v2-about .v2-about-footer-link > i {
   font-size: 1em;
+}
+
+/* ------------------------------------------------------- the mobile surface
+
+   The name and the deployment buttons: what About carries below lg that the bar used to.
+   A second `@media` block rather than edits inside the one above, so what the mobile screens
+   added stays legible as one piece. */
+
+/* The workflow's name. The top bar carries it above lg - and owns the page's one h1 either
+   way, which is why this is a `p`. */
+.v2-about .v2-about-heading,
+.v2-about .v2-about-heading-meta {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  /* A portrait sized for the desktop column takes most of a phone's width. */
+  .v2-about .v2-about-photo {
+    width: 8rem;
+    height: 8rem;
+    margin-bottom: var(--gooey-space-4);
+  }
+
+  .v2-about .v2-about-heading {
+    display: block;
+    margin: 0 0 var(--gooey-space-1);
+    font-size: 1.125rem;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--gooey-ink);
+  }
+
+  .v2-about .v2-about-heading-meta {
+    display: block;
+    margin: 0 0 var(--gooey-space-4);
+    font-size: 0.875rem;
+    color: var(--gooey-ink-muted);
+  }
+
+  /* Deployments come before the config cards and read as buttons, not tiles - a channel is
+     somewhere you go, and at this width there is room to say so. */
+  .v2-about .v2-about-groups {
+    flex-direction: column;
+  }
+
+  .v2-about .v2-about-group--deployments {
+    order: -1;
+  }
+
+  .v2-about .v2-about-group--deployments .v2-about-section-title {
+    display: none;
+  }
+
+  .v2-about .v2-about-group--deployments .v2-about-meta {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .v2-about .v2-about-group--deployments .v2-about-meta-card {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gooey-space-2);
+    width: 100%;
+    min-height: 0;
+    padding: var(--gooey-space-3);
+    border-radius: var(--gooey-radius-xs);
+    /* the platform's own colour; without one it still has to read as a button, so the
+       fallback is the page against the panel's tint rather than the tint itself */
+    background: var(--v2-about-accent, var(--gooey-bg-page));
+    border-color: var(--gooey-line-default);
+    color: var(--gooey-ink);
+    font-weight: 600;
+  }
+
+  .v2-about .v2-about-group--deployments .v2-about-meta-head {
+    width: auto;
+  }
+
+  .v2-about .v2-about-group--deployments .v2-about-meta-chevron {
+    display: none;
+  }
+
+  .v2-about .v2-about-group--deployments .v2-about-meta-label {
+    display: block;
+    width: auto;
+    min-height: 0;
+    -webkit-line-clamp: none;
+    font-size: 0.9375rem;
+  }
 }

@@ -1,7 +1,7 @@
 import "./RecipeTopBar.css";
 
 import clsx from "clsx";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   LinkTarget,
   RecipeTopBarProps,
@@ -16,8 +16,10 @@ import {
   useWorkspaceLayout,
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
-import { useCopyToClipboard } from "~/useCopyToClipboard";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
+import { useCopyToClipboard } from "~/useCopyToClipboard";
+import { GooeyTooltip } from "../GooeyTooltip";
+import { BAR_DENSITIES, fitsAt, neededWidth, pickDensity } from "./barDensity";
 import {
   activeViewForLayouts,
   isRootLayout,
@@ -40,23 +42,63 @@ type MenuEntry = {
   target?: TopBarTarget;
   isDanger?: boolean;
   mobileOnly?: boolean;
+  /** Carries the unpublished-changes marker, so the row says what its button says. */
+  dot?: boolean;
   heading?: boolean;
   onPick?: () => void;
 };
 
 // The bot itself as a destination, for tab sets that do not name it as a view of their own.
 // A visitor's does not: About and How it works each pair with the preview on a wide screen,
-// so it never needed a pill. Below lg both fold to a single pane, and then the header's eye
-// is the only route to the bot - hence a view here rather than a missing one.
+// so it never needed a tab there. Below lg both fold to a single pane, and then the strip is
+// the only route to the bot - hence a view here rather than a missing one.
 const PREVIEW_VIEW: WorkspaceView = {
   key: "preview",
   label: "Preview",
-  // Play, same as `icons.play` on the Preview tab an owner is given and same as the compact
-  // button below lg - one destination should not be drawn two ways.
+  // Play, same as `icons.play` on the Preview tab an owner is given - one destination
+  // should not be drawn two ways.
   icon_html: '<i class="fa-regular fa-play"></i>',
   layout: { kind: "single", surface: "preview" },
   desktop_only: false,
 };
+
+/** Whether About's own title has scrolled up behind the bar.
+ *
+ * Measured against the heading rather than a pixel threshold, so the bar takes the name over
+ * exactly when the surface stops showing it. `scroll` does not bubble and the pane that
+ * scrolls is not an ancestor of the bar, so this listens in the capture phase on `document`.
+ * Inert unless `active`, which is what keeps it off the desktop.
+ */
+function useScrolledPastAboutTitle(active: boolean): boolean {
+  const [past, setPast] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setPast(false);
+      return;
+    }
+    const read = () => {
+      const heading = document.querySelector(".v2-about-heading");
+      const bar = document.querySelector(".gooey-topbar");
+      const box = heading?.getBoundingClientRect();
+      if (!box || !bar) {
+        setPast(false);
+        return;
+      }
+      setPast(box.bottom <= bar.getBoundingClientRect().bottom);
+    };
+    // Read on the event rather than on a frame: rAF is throttled while the tab is not
+    // painting, which left the bar naming the wrong thing on return - and two rects per
+    // scroll event measured as no cost worth that.
+    read();
+    document.addEventListener("scroll", read, true);
+    window.addEventListener("resize", read);
+    return () => {
+      document.removeEventListener("scroll", read, true);
+      window.removeEventListener("resize", read);
+    };
+  }, [active]);
+  return past;
+}
 
 // `BasePage.MENU_*` - the keys Python stamps on the title-menu items, so the sheet can put
 // them in its own order rather than taking the list as it comes.
@@ -64,25 +106,117 @@ const MENU_VERSION_HISTORY_KEY = "--menu-version-history";
 const MENU_DUPLICATE_KEY = "--menu-duplicate";
 const MENU_DELETE_KEY = "--menu-delete";
 
-// Where a "Run of <name>" row lands: the published run's own About. There is no
-// per-surface url to link to, so the layout rides along as navigation state, which the next
-// page reads while it hydrates.
+// the Publish menu's own entries, distinguishable from anything the server declares
+const PUBLISH_ITEM_KEY = "--topbar-item-publish";
+const SHARE_ITEM_KEY = "--topbar-item-share";
+
+// Where a "Run of <name>" row lands: the published run's own About. There is no per-surface
+// url to link to, so the layout rides along as navigation state, which the next page reads
+// while it hydrates.
 const ABOUT_LAYOUT: WorkspaceLayout = {
   kind: "split",
   primary: "about",
   secondary: "preview",
 };
 
-// the Publish menu's own entries, distinguishable from anything the server declares
-const PUBLISH_ITEM_KEY = "--topbar-item-publish";
-const SHARE_ITEM_KEY = "--topbar-item-share";
-const API_ITEM_KEY = "--topbar-item-api";
-const DEPLOY_ITEM_KEY = "--topbar-item-deploy";
+/** The three ways a surface draws its icon: a bare class, server-supplied html, or a
+ *  branded mark. At most one is set. */
+type SurfaceIcon = {
+  iconClass?: string;
+  iconHtml?: string;
+  iconUrl?: string;
+};
+
+/** Sheds the bar's labels, roomiest density first, until the row fits.
+ *
+ * Writes `data-density` straight onto the node rather than through state: the CSS is what
+ * reads it, and a re-render per step would be four of them per resize. Nothing is applied
+ * until this runs, so the server sends - and a browser without JS keeps - the full row.
+ *
+ * `signature` is what the caller knows changed the row's contents. A resize alone will not
+ * say that the active tab's label went from "Edit" to "How it works".
+ */
+function useBarDensity(
+  ref: React.RefObject<HTMLDivElement>,
+  enabled: boolean,
+  signature: string
+) {
+  useLayoutEffect(() => {
+    const bar = ref.current;
+    if (!bar) return;
+    if (!enabled) {
+      // Below lg the bar is two rows and none of these rules apply; a stale attribute left
+      // behind would describe a row that is not laid out this way.
+      delete bar.dataset.density;
+      return;
+    }
+
+    // Guards the observer against the relayout our own write causes. The bar spans the
+    // header at every density, so a step never changes what it has to fit into.
+    let lastAvailable = -1;
+
+    const apply = (force: boolean) => {
+      const available = bar.clientWidth;
+      if (!force && available === lastAvailable) return;
+      lastAvailable = available;
+
+      const needed: (number | undefined)[] = [];
+      for (const density of BAR_DENSITIES) {
+        bar.dataset.density = String(density);
+        const need = neededWidth(bar);
+        needed[density] = need;
+        // The same test `pickDensity` applies, or a row that fits without the roomiest
+        // density's headroom would stop here and leave every tighter one unmeasured.
+        if (fitsAt(density, need, available)) break;
+      }
+      bar.dataset.density = String(pickDensity(available, needed));
+    };
+
+    apply(true);
+    const observer = new ResizeObserver(() => apply(false));
+    observer.observe(bar);
+    // A webfont landing after the first pass changes every label's width under us.
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) apply(true);
+    });
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [ref, enabled, signature]);
+}
+
+/** A tab that is a route rather than a client-side pane: Usage, Deploy, API. */
+type DocumentTab = {
+  key: NonNullable<RecipeTopBarProps["active_document_tab"]>;
+  label: string;
+  iconClass: string;
+  href: string;
+  /** Deploy and API: reachable from the switcher, never a tab of their own. */
+  switcherOnly?: boolean;
+};
+
+/** Which widths a tab is drawn at, as bootstrap display utilities.
+ *
+ * The strip is one element at every width, but the two ends of it differ by one tab each:
+ * Split has nowhere to fold below lg, and the supplied Preview is only a destination there.
+ * CSS rather than a viewport branch, so the markup is the same before and after hydration.
+ */
+function tabVisibility(
+  view: WorkspaceView,
+  declared: WorkspaceView[]
+): string | undefined {
+  if (view.desktop_only) return "d-none d-lg-inline-flex";
+  if (!declared.some((it) => it.key === view.key)) return "d-lg-none";
+  return undefined;
+}
 
 export function RecipeTopBar({
   config,
   title,
   title_href,
+  logo_image_url,
   photo_url,
   circle_photo,
   author,
@@ -100,13 +234,13 @@ export function RecipeTopBar({
   cost_href,
   cost_title,
   view_only,
-  crumb_label,
   deploy_href,
   builder_panel_key,
   builder_storage_key,
   builder_new_event,
+  builder_photo_url,
   usage_href,
-  usage_active,
+  active_document_tab,
   state,
 }: CustomComponentProps & RecipeTopBarProps) {
   const { copied: shareCopied, copyUrl } = useCopyToClipboard();
@@ -117,7 +251,6 @@ export function RecipeTopBar({
     copyUrl(share.url);
   };
 
-  const [sheetOpen, setSheetOpen] = useState(false);
   const builder = useAppShellPanel(
     builder_panel_key,
     Boolean(builder_panel_key && state[builder_panel_key]),
@@ -126,20 +259,45 @@ export function RecipeTopBar({
     // run - so saving a workflow closed the panel that had asked for the save.
     builder_storage_key
   );
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
-  const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { layout, storedLayout, hydrated, isNarrow, selectLayout } =
     useWorkspaceLayout(config);
-  const previewView =
-    config.views.find((view) => view.key === "preview") ?? PREVIEW_VIEW;
-  // Used wherever a layout has to be named. Not `config.views`, which is what the desktop
-  // pill strip draws - the supplied Preview is reachable from the header and the sheet, both
-  // of which are the narrow layout's, and a pill for it would be redundant beside them.
+  // Every layout the bar can name, which is what the strip draws below lg. Wider than
+  // `config.views` by the supplied Preview, which only the folded layout needs a tab for -
+  // `tabVisibility` is what keeps it off the desktop strip.
   const views = config.views.some((view) => view.key === "preview")
     ? config.views
-    : [...config.views, PREVIEW_VIEW];
+    : // Second, where an editor's own Preview tab sits - the design's order is About,
+      // Preview, then the tab that edits, and a visitor's set should read the same.
+      [config.views[0], PREVIEW_VIEW, ...config.views.slice(1)];
+  // Routes rather than panes, so they navigate instead of selecting a layout and the server
+  // says which is current. Only Usage is a tab; the other two are destinations the switcher
+  // offers, and the pill names whichever of the three you are on.
+  const documentTabs: DocumentTab[] = [
+    usage_href && {
+      key: "usage",
+      label: "Usage",
+      iconClass: "fa-regular fa-chart-line",
+      href: usage_href,
+    },
+    deploy_href && {
+      key: "deploy",
+      label: "Deploy",
+      iconClass: "fa-regular fa-rocket",
+      href: deploy_href,
+      switcherOnly: true,
+    },
+    api_href && {
+      key: "api",
+      label: "API",
+      iconClass: "fa-regular fa-code",
+      href: api_href,
+      switcherOnly: true,
+    },
+  ].filter((tab): tab is DocumentTab => !!tab);
   const activeViewSpec = activeViewForLayouts(
     views,
     layout,
@@ -188,14 +346,54 @@ export function RecipeTopBar({
         config.narrow_surface,
         isNarrow
       ));
-  // Ask Gooey carries its own title pill, so the bar neither repeats it nor goes on naming
-  // the view underneath the panel.
-  const crumb = builderOpen ? "" : crumb_label || activeViewSpec?.label || "";
-  // The two surfaces that talk *about* the bot rather than being it, so from either the eye
-  // is the way to it. Not on the work views: Edit pairs with the preview on a wide screen and
-  // swaps to it from the sheet, and Preview is already there - the slot gives way to Update.
-  const canShowPreview = builderOpen || activeViewSpec?.key === "about";
+  // About is the one surface with the strip, and the only one whose body names the workflow
+  // itself - so it leads with the wordmark and keeps the strip below. Every other surface
+  // collapses to a single row that names the workflow and carries the pill.
+  const onAbout =
+    !builderOpen && !active_document_tab && activeViewSpec?.key === "about";
+  // About leads with the wordmark only while its own surface is still showing the name.
+  // Scroll the name off and the bar takes it over, so the workflow is named exactly once.
+  // Narrow only: above lg the bar names the workflow whatever the surface is doing. The
+  // hook is called on every render - a `&&` in front of it would change the hook order.
+  const scrolledPastAboutTitle = useScrolledPastAboutTitle(onAbout && isNarrow);
+  const showsWordmark = onAbout && !scrolledPastAboutTitle;
+
+  // The panel's own mark wherever it names itself, falling back to a glyph when the
+  // deployment carries no branding.
+  const builderIcon: SurfaceIcon = builder_photo_url
+    ? { iconUrl: builder_photo_url }
+    : { iconClass: "fa-regular fa-sparkles" };
+  // What the pill says: the panel wins over the surface behind it, then a route names
+  // itself, then the pane you are on.
+  const surface: ({ label: string } & SurfaceIcon) | null = builderOpen
+    ? { label: "Ask", ...builderIcon }
+    : active_document_tab
+      ? (documentTabs.find((tab) => tab.key === active_document_tab) ?? null)
+      : activeViewSpec
+        ? {
+            label: activeViewSpec.label,
+            iconHtml: activeViewSpec.icon_html ?? undefined,
+          }
+        : null;
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
+  const barRef = useRef<HTMLDivElement>(null);
+  // Everything that changes how wide the row's contents are. The active view is in here
+  // because the tab that keeps its label is the active one, until the last step.
+  useBarDensity(
+    barRef,
+    !isNarrow,
+    [
+      title,
+      activeViewSpec?.key,
+      active_document_tab,
+      views.length,
+      integrations.length,
+      publish_label,
+      run_intent?.kind,
+      usage_href,
+      cost_label,
+    ].join("|")
+  );
   // Absent on a tab that carries no run control, where nothing is running as far as the
   // bar is concerned.
   const isRunning = run_intent?.kind === "stop";
@@ -244,10 +442,6 @@ export function RecipeTopBar({
     () => setTitleMenuOpen(false),
     titleMenuOpen
   );
-  const overflowRef = useDismissOnOutsideClick(
-    () => setOverflowOpen(false),
-    overflowOpen
-  );
   const publishMenuRef = useDismissOnOutsideClick(
     () => setPublishMenuOpen(false),
     publishMenuOpen
@@ -260,6 +454,7 @@ export function RecipeTopBar({
       label: publish_label,
       iconHtml: '<i class="fa-regular fa-floppy-disk"></i>',
       target: { kind: "submit", intent: publish_intent },
+      dot: has_unpublished_changes,
     });
   }
   if (share.kind !== "none") {
@@ -274,57 +469,35 @@ export function RecipeTopBar({
       onPick: share.kind === "copy" ? copyShareUrl : undefined,
     });
   }
-  if (api_href) {
+  for (const tab of documentTabs) {
+    if (tab.key === "usage") continue;
     publishEntries.push({
-      key: API_ITEM_KEY,
-      label: "API",
-      iconHtml: '<i class="fa-regular fa-code"></i>',
-      target: { kind: "link", href: api_href },
-    });
-  }
-
-  if (deploy_href) {
-    publishEntries.push({
-      key: DEPLOY_ITEM_KEY,
-      label: "Deploy",
-      iconHtml: '<i class="fa-regular fa-rocket"></i>',
-      target: { kind: "link", href: deploy_href },
+      key: `--topbar-item-${tab.key}`,
+      label: tab.label,
+      iconHtml: `<i class="${tab.iconClass}"></i>`,
+      target: { kind: "link", href: tab.href },
     });
   }
 
   const titleEntries = title_menu_items.map(menuEntryFromTopBarItem);
-  const overflowEntries: MenuEntry[] = [
-    ...publishEntries.map((it) => ({ ...it, mobileOnly: true })),
-    ...(integrations.length
-      ? [
-          {
-            key: "--topbar-heading-deployments",
-            label: "Deployments",
-            mobileOnly: true,
-            heading: true,
-          },
-        ]
-      : []),
-    ...integrations.map((it) => ({
-      key: it.key,
-      label: it.label,
-      iconHtml: it.icon_html,
-      target: it.target,
-      mobileOnly: true,
-    })),
-  ];
+
   const viewEntry = (key: string, label?: string): SheetEntry[] => {
     const view = views.find((candidate) => candidate.key === key);
-    // The sheet only exists below lg, so a view that asks to be desktop-only has no
-    // business in it - Split is one, and it is why this guard is here rather than assumed.
-    if (!view || view.desktop_only) {
+    // A view that asks to be desktop-only has no business here - Split is one. Nor does the
+    // surface you are already on: the pill names it, and this is what the pill opens.
+    if (!view || view.desktop_only) return [];
+    if (
+      view.key === activeViewSpec?.key &&
+      !builderOpen &&
+      !active_document_tab
+    ) {
       return [];
     }
     return [
       {
         key: `--sheet-view-${view.key}`,
-        // The sheet names a couple of the surfaces differently from the desktop pills, which
-        // have the room to be terser - so the label is overridable here.
+        // The sheet names a couple of the surfaces differently from the strip, which has
+        // the room to be terser - so the label is overridable here.
         label: label ?? view.label,
         iconHtml: view.icon_html ?? undefined,
         onPick: () => showView(view),
@@ -332,34 +505,28 @@ export function RecipeTopBar({
     ];
   };
 
-  // Usage is a page, not a pane, so it is a link rather than a view - but it belongs in the
-  // same list the panes do. Hidden while you are already looking at it.
-  const usageEntry: SheetEntry[] =
-    usage_href && !usage_active
-      ? [
-          {
-            key: "--sheet-usage",
-            label: "Usage",
-            iconClass: "fa-regular fa-chart-line",
-            href: usage_href,
-            onPick: () => setBuilder(false),
-          },
-        ]
-      : [];
+  // The routes, from the list the strip draws Usage from, so a tab and its row cannot
+  // disagree about where they lead. Hidden while you are already on one.
+  const documentEntry = (key: DocumentTab["key"]): SheetEntry[] => {
+    const tab = documentTabs.find((it) => it.key === key);
+    if (!tab || tab.key === active_document_tab) return [];
+    return [
+      {
+        key: `--sheet-${tab.key}`,
+        label: tab.label,
+        iconClass: tab.iconClass,
+        href: tab.href,
+        onPick: () => setBuilder(false),
+      },
+    ];
+  };
 
-  // The way into Ask Gooey. Not while the panel is already up, where the sheet offers New
-  // Chat instead. What it offers to do depends on whose published run it is: your own is
-  // edited, someone else's is remixed into a copy, and a saved run is just worked on.
+  // The way into Ask Gooey. Not while the panel is already up, where New Chat takes this
+  // row instead. What it offers depends on whose published run it is: your own is edited,
+  // someone else's is remixed into a copy, and a saved run is just worked on.
   const builderEntry = (label: string): SheetEntry[] =>
     !builderOpen && !!builder_panel_key
-      ? [
-          {
-            key: "--sheet-builder",
-            label,
-            iconClass: "fa-regular fa-sparkles",
-            onPick: showBuilder,
-          },
-        ]
+      ? [{ key: "--sheet-builder", label, ...builderIcon, onPick: showBuilder }]
       : [];
 
   // A control on the Ask Gooey panel, so it is only offered while that panel is up.
@@ -377,8 +544,8 @@ export function RecipeTopBar({
       : [];
 
   // The channels this published run is deployed to, as rows of their own. No group heading:
-  // the menu is one flat list, and with a channel or two at the top of it a heading is more
-  // furniture than help.
+  // the menu is one flat list, and with a channel or two in it a heading is more furniture
+  // than help.
   const integrationEntries: SheetEntry[] = integrations.map((it) => ({
     key: it.key,
     label: it.label,
@@ -400,16 +567,6 @@ export function RecipeTopBar({
           item.target?.kind === "submit" ? item.target.intent : undefined,
         onPick: item.onPick ?? (() => setBuilder(false)),
       }));
-
-  // Named so the three menus below read as the orders they are, rather than as index
-  // arithmetic over `publishEntries` and `title_menu_items`.
-  const saveEntry = sheetEntry(publishEntries, PUBLISH_ITEM_KEY);
-  const shareEntry = sheetEntry(publishEntries, SHARE_ITEM_KEY);
-  const apiEntry = sheetEntry(publishEntries, API_ITEM_KEY);
-  const deployEntry = sheetEntry(publishEntries, DEPLOY_ITEM_KEY);
-  const versionsEntry = sheetEntry(titleEntries, MENU_VERSION_HISTORY_KEY);
-  const duplicateEntry = sheetEntry(titleEntries, MENU_DUPLICATE_KEY);
-  const deleteEntry = sheetEntry(titleEntries, MENU_DELETE_KEY);
 
   // Where a saved run's menu leads: back to the published run it belongs to, opening on
   // About. The layout rides along in the navigation state, read while the next page
@@ -450,49 +607,40 @@ export function RecipeTopBar({
         editor: "Ask Gooey to Edit",
       }[audience]
     ),
-    usage: usageEntry,
-    save: saveEntry,
-    deploy: deployEntry,
-    share: shareEntry,
-    api: apiEntry,
-    versions: versionsEntry,
-    duplicate: duplicateEntry,
-    delete: deleteEntry,
+    usage: documentEntry("usage"),
+    save: sheetEntry(publishEntries, PUBLISH_ITEM_KEY),
+    deploy: documentEntry("deploy"),
+    share: sheetEntry(publishEntries, SHARE_ITEM_KEY),
+    api: documentEntry("api"),
+    versions: sheetEntry(titleEntries, MENU_VERSION_HISTORY_KEY),
+    duplicate: sheetEntry(titleEntries, MENU_DUPLICATE_KEY),
+    delete: sheetEntry(titleEntries, MENU_DELETE_KEY),
   };
 
-  const sheetEntries: SheetEntry[] = sheetSlots(audience).flatMap(
+  const switcherEntries: SheetEntry[] = sheetSlots(audience).flatMap(
     (slot) => slotEntries[slot]
   );
 
-  // Shared by the two forms the heading takes. The crumb sits inside it so a long name
-  // ellipsises against it rather than pushing it off the row.
+  // Shared by the two forms the heading takes.
   const titleContent = (
     <>
       <span className="gooey-topbar-title-text">{title}</span>
-      {/* Which level of the stack is on screen; above lg the active pill says so. */}
-      {!atRoot && !!crumb && (
-        <span className="gooey-topbar-crumb d-lg-none">
-          <i
-            className="fa-regular fa-chevron-right gooey-topbar-crumb-sep"
-            aria-hidden="true"
-          />
-          {crumb}
-        </span>
-      )}
     </>
   );
 
   const closeMenus = () => {
     setTitleMenuOpen(false);
-    setOverflowOpen(false);
     setPublishMenuOpen(false);
   };
 
   return (
     <div
+      ref={barRef}
       className={clsx(
         "gooey-topbar",
-        // a level down the mobile stack, which the design gives a shorter bar and a softer rule
+        // the strip is on a row of its own here, which moves the bar's rule up above it
+        onAbout && "gooey-topbar-with-strip",
+        // a level down the mobile stack, which the design rules with the softer line
         !atRoot && "gooey-topbar-stacked"
       )}
     >
@@ -520,18 +668,36 @@ export function RecipeTopBar({
           />
         </button>
 
+        {/* On About the bar says whose app this is rather than which workflow - the surface
+            below names it - and hands the name over once that name scrolls away. Beside the
+            drawer button rather than centred in the row, as drawn. */}
+        {showsWordmark && !!logo_image_url && (
+          <img
+            src={logo_image_url}
+            alt="Gooey.AI"
+            className="gooey-topbar-logo d-lg-none"
+          />
+        )}
+
         {photo_url && (
           <img
             src={photo_url}
             alt=""
             className={clsx(
               "gooey-topbar-avatar",
-              circle_photo && "gooey-topbar-avatar-circle"
+              circle_photo && "gooey-topbar-avatar-circle",
+              showsWordmark && "gooey-topbar-identity-hidden"
             )}
           />
         )}
 
-        <div className="gooey-topbar-titleblock" ref={titleMenuRef}>
+        <div
+          className={clsx(
+            "gooey-topbar-titleblock",
+            showsWordmark && "gooey-topbar-identity-hidden"
+          )}
+          ref={titleMenuRef}
+        >
           <div className="gooey-topbar-titlerow">
             {/* The page's h1, around the control only: `h1` takes phrasing content, which
                 `a` and `button` are and the row's `div` is not. */}
@@ -588,65 +754,130 @@ export function RecipeTopBar({
         </div>
       </div>
 
-      {/* A single-view recipe does not need a selector unless Usage is available. */}
-      {(config.views.length > 1 || !!usage_href) && (
+      {/* A single-view recipe does not need a selector unless a route tab joins it. Above lg
+          the strip is the bar's own navigation on every surface; below lg it is About's, and
+          the pill stands in for it everywhere else. */}
+      {(config.views.length > 1 || !!documentTabs.length) && (
         <div
           className={clsx(
             "gooey-topbar-tabs",
+            !onAbout && "d-none d-lg-flex",
             !hydrated && "gooey-until-hydrated"
           )}
         >
-          {config.views.map((view) => (
-            <button
-              type="button"
+          {views.map((view) => (
+            <GooeyTooltip
               key={view.key}
-              className={clsx(
-                "gooey-topbar-tab",
-                view.key === activeViewSpec?.key && "gooey-topbar-tab-active"
-              )}
-              onClick={() => chooseView(view)}
-              aria-pressed={view.key === activeViewSpec?.key}
+              content={view.label}
+              placement="bottom"
+              fitContent
             >
-              <Icon
-                html={view.icon_html ?? undefined}
-                className="gooey-topbar-tab-icon"
-              />
-              {view.label}
-            </button>
+              <button
+                type="button"
+                className={clsx(
+                  "gooey-topbar-tab",
+                  view.key === activeViewSpec?.key && "gooey-topbar-tab-active",
+                  tabVisibility(view, config.views)
+                )}
+                onClick={() => chooseView(view)}
+                aria-pressed={view.key === activeViewSpec?.key}
+                aria-label={view.label}
+              >
+                <Icon
+                  html={view.icon_html ?? undefined}
+                  className="gooey-topbar-tab-icon"
+                />
+                <span className="gooey-topbar-tab-label">{view.label}</span>
+              </button>
+            </GooeyTooltip>
           ))}
-          {usage_href && (
-            <Link
-              to={usage_href}
-              className={clsx(
-                "gooey-topbar-tab",
-                usage_active && "gooey-topbar-tab-active"
-              )}
-              onClick={() => setBuilder(false)}
-              aria-current={usage_active ? "page" : undefined}
-            >
-              <i className="fa-regular fa-chart-line gooey-topbar-tab-icon" />
-              Usage
-            </Link>
-          )}
+          {documentTabs
+            .filter((tab) => !tab.switcherOnly)
+            .map((tab) => (
+              <GooeyTooltip
+                key={tab.key}
+                content={tab.label}
+                placement="bottom"
+                fitContent
+              >
+                <Link
+                  to={tab.href}
+                  className={clsx(
+                    "gooey-topbar-tab",
+                    tab.key === active_document_tab && "gooey-topbar-tab-active"
+                  )}
+                  onClick={() => setBuilder(false)}
+                  aria-current={
+                    tab.key === active_document_tab ? "page" : undefined
+                  }
+                  aria-label={tab.label}
+                >
+                  <i className={clsx(tab.iconClass, "gooey-topbar-tab-icon")} />
+                  <span className="gooey-topbar-tab-label">{tab.label}</span>
+                </Link>
+              </GooeyTooltip>
+            ))}
         </div>
       )}
 
       <div className="gooey-topbar-right">
-        {/* Below lg only these two render; the desktop cluster is hidden by CSS, and cost
-            and Run return as the editor's own bottom bar. */}
-        {!!sheetEntries.length && (
-          <button
-            type="button"
-            className="gooey-topbar-menu-btn d-lg-none"
-            onClick={() => setSheetOpen(true)}
-            title="More actions"
-            aria-label="More actions"
-            aria-haspopup="menu"
-            aria-expanded={sheetOpen}
-          >
-            <i className="fa-solid fa-ellipsis-vertical" />
-          </button>
-        )}
+        {/* The only control here below lg; the desktop cluster is hidden by CSS, and cost
+            and Run return as the editor's own bottom bar.
+
+            The way into Ask Gooey, which below lg is a level of the stack rather than a
+            rail. Not while it is already up: Back is what closes it, and the panel's own
+            header carries New Chat. */}
+        {onAbout
+          ? !!builder_panel_key && (
+              <button
+                type="button"
+                className="gooey-topbar-askgooey d-lg-none"
+                onClick={showBuilder}
+                title="Ask Gooey"
+                aria-label="Ask Gooey"
+              >
+                {builder_photo_url ? (
+                  <img src={builder_photo_url} alt="" />
+                ) : (
+                  <i className="fa-regular fa-sparkles" />
+                )}
+              </button>
+            )
+          : !!surface && (
+              <button
+                type="button"
+                className="gooey-topbar-viewpill d-lg-none"
+                onClick={() => setSwitcherOpen(true)}
+                title="Menu"
+                aria-label={`Menu (currently ${surface.label})`}
+                aria-haspopup="menu"
+                aria-expanded={switcherOpen}
+              >
+                {surface.iconUrl ? (
+                  <img
+                    className="gooey-topbar-viewpill-mark"
+                    src={surface.iconUrl}
+                    alt=""
+                  />
+                ) : surface.iconHtml ? (
+                  <span
+                    className="gooey-topbar-viewpill-icon"
+                    dangerouslySetInnerHTML={{ __html: surface.iconHtml }}
+                  />
+                ) : (
+                  <i
+                    className={clsx(
+                      surface.iconClass,
+                      "gooey-topbar-viewpill-icon"
+                    )}
+                  />
+                )}
+                <span className="gooey-topbar-viewpill-label">
+                  {surface.label}
+                </span>
+                <i className="fa-regular fa-chevron-down" />
+              </button>
+            )}
 
         {/* Preview from About and from Ask Gooey, Update from the work views.
 
@@ -656,73 +887,11 @@ export function RecipeTopBar({
             behaviour, and the form posted the publish intent. The save dialog opened on top
             of the preview. The keys keep the nodes apart; `preventDefault` stays as the
             direct guard on a control that must never submit. */}
-        {canShowPreview ? (
-          <button
-            key="topbar-action-preview"
-            type="button"
-            className="gooey-topbar-action d-lg-none"
-            onClick={(e) => {
-              e.preventDefault();
-              showView(previewView);
-            }}
-            title="Preview"
-            aria-label="Preview"
-          >
-            <i className="fa-regular fa-play" />
-          </button>
-        ) : (
-          !!publish_label &&
-          !!publish_intent && (
-            <button
-              key="topbar-action-publish"
-              type="submit"
-              name={submit_intent_key}
-              value={encodeSubmitIntent(publish_intent)}
-              className="gooey-topbar-action d-lg-none"
-              title={
-                has_unpublished_changes
-                  ? `${publish_label} (unpublished changes)`
-                  : publish_label
-              }
-              aria-label={publish_label}
-            >
-              <i className="fa-regular fa-floppy-disk" />
-              {has_unpublished_changes && (
-                <span
-                  className="gooey-topbar-dot"
-                  title="Unpublished changes"
-                />
-              )}
-            </button>
-          )
-        )}
-
-        {!!overflowEntries.length && (
-          <div className="gooey-topbar-overflow-wrap" ref={overflowRef}>
-            <button
-              type="button"
-              className="gooey-topbar-overflow-btn d-lg-none"
-              onClick={() => setOverflowOpen((v) => !v)}
-              title="More actions"
-              aria-label="More actions"
-              aria-haspopup="menu"
-              aria-expanded={overflowOpen}
-            >
-              <i className="fa-solid fa-ellipsis" />
-            </button>
-            <Menu
-              items={overflowEntries}
-              open={overflowOpen}
-              submitIntentKey={submit_intent_key}
-              onDismiss={closeMenus}
-            />
-          </div>
-        )}
 
         {/* Labels only in the view-only bar, and at most one there: the centred pill group
             leaves the right cluster half the bar's slack, and an editor's bar spends that on
             the tabs and Update. Unlabelled chips keep their name in the tooltip and in the
-            ... menu. */}
+            tooltip. */}
         {integrations.map((integration, i) => {
           const labelled = isIntegrationLabelled({
             index: i,
@@ -750,30 +919,35 @@ export function RecipeTopBar({
           // aria-label as well as title: every chip past the first renders no text at all, so
           // the tooltip is the only thing naming it and `title` alone is not a reliable
           // accessible name
-          return integration.target.kind === "link" ? (
-            <a
+          return (
+            <GooeyTooltip
               key={integration.key}
-              href={integration.target.href}
-              className={className}
-              style={style}
-              title={integration.label}
-              aria-label={integration.label}
+              content={integration.label}
+              placement="bottom"
+              fitContent
             >
-              {content}
-            </a>
-          ) : (
-            <button
-              key={integration.key}
-              type="submit"
-              name={submit_intent_key}
-              value={encodeSubmitIntent(integration.target.intent)}
-              className={className}
-              style={style}
-              title={integration.label}
-              aria-label={integration.label}
-            >
-              {content}
-            </button>
+              {integration.target.kind === "link" ? (
+                <a
+                  href={integration.target.href}
+                  className={className}
+                  style={style}
+                  aria-label={integration.label}
+                >
+                  {content}
+                </a>
+              ) : (
+                <button
+                  type="submit"
+                  name={submit_intent_key}
+                  value={encodeSubmitIntent(integration.target.intent)}
+                  className={className}
+                  style={style}
+                  aria-label={integration.label}
+                >
+                  {content}
+                </button>
+              )}
+            </GooeyTooltip>
           );
         })}
 
@@ -784,29 +958,31 @@ export function RecipeTopBar({
             className="gooey-topbar-overflow-wrap d-none d-lg-block"
             ref={publishMenuRef}
           >
-            <button
-              type="button"
-              className="gooey-topbar-publish"
-              onClick={() => setPublishMenuOpen((v) => !v)}
-              title={
+            <GooeyTooltip
+              content={
                 has_unpublished_changes
                   ? "Publish (unpublished changes)"
                   : "Publish"
               }
-              aria-label="Publish"
-              aria-haspopup="menu"
-              aria-expanded={publishMenuOpen}
+              placement="bottom"
+              fitContent
             >
-              <i className="fa-regular fa-floppy-disk" />
-              <span className="gooey-topbar-btn-label">Publish</span>
-              <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
-              {has_unpublished_changes && (
-                <span
-                  className="gooey-topbar-dot"
-                  title="Unpublished changes"
-                />
-              )}
-            </button>
+              <button
+                type="button"
+                className="gooey-topbar-publish"
+                onClick={() => setPublishMenuOpen((v) => !v)}
+                aria-label="Publish"
+                aria-haspopup="menu"
+                aria-expanded={publishMenuOpen}
+              >
+                <i className="fa-regular fa-floppy-disk" />
+                <span className="gooey-topbar-btn-label">Publish</span>
+                <i className="fa-regular fa-chevron-down gooey-topbar-chevron" />
+                {has_unpublished_changes && (
+                  <span className="gooey-topbar-dot" />
+                )}
+              </button>
+            </GooeyTooltip>
             <Menu
               items={publishEntries}
               open={publishMenuOpen}
@@ -853,35 +1029,40 @@ export function RecipeTopBar({
         {/* Omitted, not disabled, where the server sends no run intent: Usage lists the
             saved runs already made, so a Run control has nothing to do there. */}
         {!!run_intent && (
-          <button
-            type="submit"
-            name={submit_intent_key}
-            value={encodeSubmitIntent(run_intent)}
-            className={clsx(
-              "gooey-topbar-run",
-              isRunning && "gooey-topbar-run-stop"
-            )}
-            onClick={handleRun}
-            title={isRunning ? "Stop this run" : "Run"}
-            aria-label={isRunning ? "Stop this run" : "Run"}
+          <GooeyTooltip
+            content={isRunning ? "Stop this run" : "Run"}
+            placement="bottom"
+            fitContent
           >
-            {isRunning ? (
-              <i className="fa-regular fa-xmark-large" />
-            ) : (
-              <i className="fa-solid fa-play" />
-            )}
-            <span className="gooey-topbar-btn-label">
-              {isRunning ? "Stop" : "Run"}
-            </span>
-          </button>
+            <button
+              type="submit"
+              name={submit_intent_key}
+              value={encodeSubmitIntent(run_intent)}
+              className={clsx(
+                "gooey-topbar-run",
+                isRunning && "gooey-topbar-run-stop"
+              )}
+              onClick={handleRun}
+              aria-label={isRunning ? "Stop this run" : "Run"}
+            >
+              {isRunning ? (
+                <i className="fa-regular fa-xmark-large" />
+              ) : (
+                <i className="fa-solid fa-play" />
+              )}
+              <span className="gooey-topbar-btn-label">
+                {isRunning ? "Stop" : "Run"}
+              </span>
+            </button>
+          </GooeyTooltip>
         )}
       </div>
 
-      {sheetOpen && (
+      {switcherOpen && (
         <MobileActionSheet
-          entries={sheetEntries}
+          entries={switcherEntries}
           submitIntentKey={submit_intent_key}
-          onDismiss={() => setSheetOpen(false)}
+          onDismiss={() => setSwitcherOpen(false)}
         />
       )}
     </div>
@@ -931,6 +1112,7 @@ function Menu({
               className="gooey-topbar-menu-icon"
             />
             {item.label}
+            {item.dot && <span className="gooey-topbar-menu-dot" />}
           </Link>
         ) : (
           <button
@@ -960,6 +1142,7 @@ function Menu({
               className="gooey-topbar-menu-icon"
             />
             {item.label}
+            {item.dot && <span className="gooey-topbar-menu-dot" />}
           </button>
         )
       )}

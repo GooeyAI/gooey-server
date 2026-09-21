@@ -942,6 +942,15 @@ button {
   min-width: 50vw !important;
 }
 
+/* Popper sets this when the thing the tooltip points at is no longer rendered - hidden by
+   a class rather than unmounted, which is how the top bar puts its tab strip away. Nothing
+   fires `mouseleave` for that, so the tooltip stayed up and was positioned against a 0x0
+   box, which put it in the corner of the page. */
+.tippy-box[data-reference-hidden] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .tippy-box[data-theme~="gooey-fit-content"] {
   width: max-content;
   min-width: 0 !important;

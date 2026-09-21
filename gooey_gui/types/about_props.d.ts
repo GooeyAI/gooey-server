@@ -55,19 +55,26 @@ export interface AboutCard {
   icon_html: string;
   label: string;
   target: AboutPaneTarget | AboutLinkTarget | AboutSubmitTarget;
+  accent: string | null;
 }
 /**
  * A heading and the grid of cards under it.
+ *
+ * `variant` is what lets the deployments read as full-width buttons below lg, where the
+ * design puts them under the description rather than in the card grid.
  */
 export interface AboutGroup {
   title: string;
   cards: AboutCard[];
+  variant: "cards" | "deployments";
 }
 /**
  * Everything the About surface draws. Structured rather than pre-rendered html, so the
  * component owns the markup and the payload carries only what varies.
  */
 export interface RecipeAboutProps {
+  heading: string;
+  heading_meta: string | null;
   photo_url: string | null;
   circle_photo: boolean;
   author: AboutAuthor | null;

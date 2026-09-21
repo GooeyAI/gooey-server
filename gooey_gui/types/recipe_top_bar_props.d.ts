@@ -33,9 +33,7 @@ export interface TopBarAuthor {
 /**
  * The published run a saved run belongs to.
  *
- * Present only while the url points at a saved run, so it doubles as that signal: the
- * mobile sheet leads with the way back to the published run rather than repeating the
- * actions that belong to it.
+ * Present only while the url points at a saved run, so it doubles as that signal.
  */
 export interface TopBarParent {
   label: string;
@@ -72,6 +70,7 @@ export interface RecipeTopBarProps {
   config: PageShellConfig;
   title: string;
   title_href: string | null;
+  logo_image_url: string | null;
   photo_url: string | null;
   circle_photo: boolean;
   author: TopBarAuthor | null;
@@ -86,12 +85,12 @@ export interface RecipeTopBarProps {
   deploy_href: string | null;
   share: NoShare | CopyShare | ManageShare;
   view_only: boolean;
-  crumb_label: string | null;
   builder_panel_key: string | null;
   builder_storage_key: string | null;
   builder_new_event: string | null;
+  builder_photo_url: string | null;
   usage_href: string | null;
-  usage_active: boolean;
+  active_document_tab: ("usage" | "deploy" | "api") | null;
   run_intent: (RunIntent | StopIntent) | null;
   cost_label: string | null;
   cost_href: string | null;
@@ -133,6 +132,9 @@ export interface WorkspaceView {
 export interface EditorRunBarProps {
   submit_intent_key: string;
   run_intent: RunIntent | StopIntent;
+  publish_label: string | null;
+  publish_intent: PublishIntent | null;
+  has_unpublished_changes: boolean;
   cost_label: string | null;
   cost_href: string | null;
   cost_title: string | null;
