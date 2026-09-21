@@ -203,7 +203,9 @@ def test_anonymous_chips_carry_a_login_url_that_replays_the_prompt():
     assert parse_qs(urlparse(inner).query)["builderprompt"] == ["Add a Hindi step"]
 
     # signed in there is nowhere to send them - the chip posts straight to the builder
-    assert all(s["login_url"] is None for s in _builder_suggestions(page, is_anonymous=False))
+    assert all(
+        s["login_url"] is None for s in _builder_suggestions(page, is_anonymous=False)
+    )
 
 
 def test_only_four_chips_are_ever_offered():

@@ -15,10 +15,16 @@ class SDG(models.IntegerChoices):
     clean_water_and_sanitation = 6, "Clean Water and Sanitation"
     affordable_and_clean_energy = 7, "Affordable and Clean Energy"
     decent_work_and_economic_growth = 8, "Decent Work and Economic Growth"
-    industry_innovation_and_infrastructure = 9, "Industry, Innovation and Infrastructure"
+    industry_innovation_and_infrastructure = (
+        9,
+        "Industry, Innovation and Infrastructure",
+    )
     reduced_inequalities = 10, "Reduced Inequalities"
     sustainable_cities_and_communities = 11, "Sustainable Cities and Communities"
-    responsible_consumption_and_production = 12, "Responsible Consumption and Production"
+    responsible_consumption_and_production = (
+        12,
+        "Responsible Consumption and Production",
+    )
     climate_action = 13, "Climate Action"
     life_below_water = 14, "Life Below Water"
     life_on_land = 15, "Life on Land"
