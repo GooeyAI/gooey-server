@@ -25,7 +25,7 @@ class AIModelCreator(models.Model):
             return ""
         size = size or "1.1rem"
         src = media_preview_img(src, size="40x40") or src
-        return f'<img src="{src}" alt="{html.escape(self.name)}" style="height: {size}; width: {size};">'
+        return f'<img src="{src}" alt="{html.escape(self.name)}" loading="lazy" decoding="async" style="height: {size}; width: {size};">'
 
 
 class ModelProvider(models.IntegerChoices):
