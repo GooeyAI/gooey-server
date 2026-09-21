@@ -1,7 +1,7 @@
 import "./RecipeTopBar.css";
 
 import clsx from "clsx";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   LinkTarget,
   RecipeTopBarProps,
@@ -19,6 +19,7 @@ import type { CustomComponentProps } from "~/components";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import { useCopyToClipboard } from "~/useCopyToClipboard";
 import { GooeyTooltip } from "../GooeyTooltip";
+import { BAR_DENSITIES, neededWidth, pickDensity } from "./barDensity";
 import {
   activeViewForLayouts,
   isRootLayout,
@@ -125,6 +126,64 @@ type SurfaceIcon = {
   iconHtml?: string;
   iconUrl?: string;
 };
+
+/** Sheds the bar's labels, roomiest density first, until the row fits.
+ *
+ * Writes `data-density` straight onto the node rather than through state: the CSS is what
+ * reads it, and a re-render per step would be four of them per resize. Nothing is applied
+ * until this runs, so the server sends - and a browser without JS keeps - the full row.
+ *
+ * `signature` is what the caller knows changed the row's contents. A resize alone will not
+ * say that the active tab's label went from "Edit" to "How it works".
+ */
+function useBarDensity(
+  ref: React.RefObject<HTMLDivElement>,
+  enabled: boolean,
+  signature: string
+) {
+  useLayoutEffect(() => {
+    const bar = ref.current;
+    if (!bar) return;
+    if (!enabled) {
+      // Below lg the bar is two rows and none of these rules apply; a stale attribute left
+      // behind would describe a row that is not laid out this way.
+      delete bar.dataset.density;
+      return;
+    }
+
+    // Guards the observer against the relayout our own write causes. The bar spans the
+    // header at every density, so a step never changes what it has to fit into.
+    let lastAvailable = -1;
+
+    const apply = (force: boolean) => {
+      const available = bar.clientWidth;
+      if (!force && available === lastAvailable) return;
+      lastAvailable = available;
+
+      const needed: (number | undefined)[] = [];
+      for (const density of BAR_DENSITIES) {
+        bar.dataset.density = String(density);
+        const need = neededWidth(bar);
+        needed[density] = need;
+        if (need <= available) break;
+      }
+      bar.dataset.density = String(pickDensity(available, needed));
+    };
+
+    apply(true);
+    const observer = new ResizeObserver(() => apply(false));
+    observer.observe(bar);
+    // A webfont landing after the first pass changes every label's width under us.
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) apply(true);
+    });
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [ref, enabled, signature]);
+}
 
 /** A tab that is a route rather than a client-side pane: Usage, Deploy, API. */
 type DocumentTab = {
@@ -315,6 +374,24 @@ export function RecipeTopBar({
           }
         : null;
   const { setOpen: setNavDrawerOpen } = useNavDrawer();
+  const barRef = useRef<HTMLDivElement>(null);
+  // Everything that changes how wide the row's contents are. The active view is in here
+  // because the tab that keeps its label is the active one, until the last step.
+  useBarDensity(
+    barRef,
+    !isNarrow,
+    [
+      title,
+      activeViewSpec?.key,
+      active_document_tab,
+      views.length,
+      integrations.length,
+      publish_label,
+      run_intent?.kind,
+      usage_href,
+      cost_label,
+    ].join("|")
+  );
   // Absent on a tab that carries no run control, where nothing is running as far as the
   // bar is concerned.
   const isRunning = run_intent?.kind === "stop";
@@ -556,6 +633,7 @@ export function RecipeTopBar({
 
   return (
     <div
+      ref={barRef}
       className={clsx(
         "gooey-topbar",
         // the strip is on a row of its own here, which moves the bar's rule up above it

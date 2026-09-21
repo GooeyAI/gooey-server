@@ -381,49 +381,49 @@ a.gooey-topbar-cost:hover {
   background: var(--gooey-danger);
 }
 
-/* Below that, every control in the bar but the title collapses to its icon. The title is
-   the one thing that cannot: an icon does not say which workflow you are on, and it has
-   somewhere to go anyway - it truncates.
+/* Shedding the bar's labels as the row runs out of width.
 
-   Hidden to the eye and not to the accessibility tree, so an icon-only tab keeps the name
-   it had. `display: none` would have left the tabs unnamed; Publish and Run carry an
-   `aria-label` of their own and would not have, but one rule for all three is a rule a
-   reader does not have to check twice.
+   `data-density` is set by `useBarDensity`, which measures rather than watching a
+   breakpoint - what this row needs is not a constant, so no single width is right for both
+   a visitor's two tabs and an editor's four with a chip beside them. 0 is every label; each
+   step sheds the next least useful one.
 
-   Inside a media query as well, because the container is the bar at every width: below lg
-   it is ~390 and matched this on its own, collapsing the mobile strip - which is labelled
-   by design and has a whole row to itself.
+   Two things never appear here. The title, which answers a shortage by truncating and is
+   the one part no icon stands in for. And the run cost, which is a number with no icon form
+   at all - it has neither of the classes below, so it is out of reach of these rules rather
+   than merely absent from them.
 
-   Placed after the controls it overrides: a container query carries no specificity of its
-   own, so source order is all that decides it against their own `.gooey-topbar-publish`. */
+   Hidden to the eye and not to the accessibility tree, so an icon-only control keeps the
+   name it had. */
 @media (min-width: 992px) {
-  @container topbar (max-width: 1127.98px) {
+  .gooey-topbar:is([data-density="1"], [data-density="2"])
+    .gooey-topbar-tab:not(.gooey-topbar-tab-active)
     .gooey-topbar-tab-label,
+  .gooey-topbar[data-density="3"] .gooey-topbar-tab-label,
+  .gooey-topbar:is([data-density="2"], [data-density="3"])
     .gooey-topbar-btn-label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
-    /* Run holds one glyph, so it squares off. Publish holds two - it keeps its chevron,
-       because that is what says it opens a menu rather than doing something - so it sizes
-       to them with even padding instead. Forcing both to a square left Publish with 30px
-       of glyph in a 12px content box, which is the lopsided padding it looked like. */
-    .gooey-topbar-run {
-      width: var(--topbar-control-h);
-      padding: 0;
-      justify-content: center;
-    }
+  /* Run holds one glyph, so it squares off. Publish holds two - it keeps its chevron,
+     because that is what says it opens a menu rather than doing something - so it sizes to
+     them with even padding instead. */
+  .gooey-topbar:is([data-density="2"], [data-density="3"]) .gooey-topbar-run {
+    width: var(--topbar-control-h);
+    padding: 0;
+    justify-content: center;
+  }
 
-    .gooey-topbar-publish {
-      width: auto;
-      gap: var(--gooey-space-1);
-      padding: 0 var(--gooey-space-2);
-      justify-content: center;
-    }
+  .gooey-topbar:is([data-density="2"], [data-density="3"]) .gooey-topbar-publish {
+    width: auto;
+    gap: var(--gooey-space-1);
+    padding: 0 var(--gooey-space-2);
+    justify-content: center;
   }
 }
 

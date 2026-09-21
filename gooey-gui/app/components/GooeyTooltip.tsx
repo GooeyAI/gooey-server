@@ -46,6 +46,9 @@ export function GooeyTooltip({
            1.2s after the pointer had gone; leaving is not something to wait out. */
         delay={[1200, 0]}
         interactive
+        /* A tap fires `mouseenter` and never `mouseleave`, so on a phone a tooltip opens
+           and has nothing to close it - and the control it named is often gone by then. */
+        touch={false}
         /* Tippy defaults to appending the popper to the reference's own parent, which put
            it inside whatever laid that reference out - a flex row, in every caller here -
            where it became a flex item and collapsed to 0x0. It mounted and never showed. */
