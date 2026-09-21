@@ -198,16 +198,6 @@ def render_slider_with_erase(
     default: int | None,
 ) -> int | None:
     slider_key = f"__ai_model_field:{key}"
-    # a range input can't be empty, so a field with no default is unset while
-    # its slider is parked at the start
-    unset_at_minimum = default is None
-    if default is None:
-        default = minimum
-    if value is None:
-        value = default
-    is_unset = unset_at_minimum and gui.session_state.get(slider_key, value) == minimum
-    if is_unset:
-        label += " _(not set)_"
 
     with gui.div(className="d-flex align-items-end gap-2"):
         with gui.div(className="flex-grow-1"):
@@ -219,6 +209,8 @@ def render_slider_with_erase(
                 step=1,
                 key=slider_key,
                 help=help_text,
+                # a field with no default can be left empty, i.e. unset
+                allow_none=default is None,
             )
         pressed_erase = gui.button(
             icons.erase,
@@ -233,8 +225,6 @@ def render_slider_with_erase(
     if pressed_erase:
         gui.session_state[slider_key] = default
         gui.rerun()
-    if is_unset:
-        return None
     return ret
 
 
