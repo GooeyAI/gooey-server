@@ -426,10 +426,40 @@ class PublishedRunStatInline(admin.TabularInline):
     extra = 0
 
 
+# The About-page fields, grouped at the foot of the form in their own section.
+ABOUT_EXTRA_FIELDS = [
+    "headline",
+    "banner_url",
+    "video_url",
+    "more_info_url",
+    "more_info_text",
+    "sdgs",
+    "stats_title",
+    "builder_prompts",
+]
+
+
 @admin.register(PublishedRun)
 class PublishedRunAdmin(GooeyModelAdmin):
     form = PublishedRunAdminForm
     inlines = [PublishedRunStatInline]
+
+    def get_fieldsets(self, request, obj=None):
+        """Everything as before, then the About fields last under their own heading.
+
+        Derived from `get_fields` rather than spelled out, so a field added to the model
+        later still appears instead of silently dropping off the form.
+        """
+        fields = list(self.get_fields(request, obj))
+        extra = [f for f in ABOUT_EXTRA_FIELDS if f in fields]
+        rest = [f for f in fields if f not in extra]
+        if not extra:
+            return [(None, {"fields": rest})]
+        return [
+            (None, {"fields": rest}),
+            ("Extra information", {"fields": extra}),
+        ]
+
     list_display = [
         "__str__",
         "public_access",
