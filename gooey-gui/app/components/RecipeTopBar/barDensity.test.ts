@@ -1,11 +1,27 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { pickDensity, TITLE_FLOOR } from "./barDensity";
+import {
+  FULL_LABEL_SLACK,
+  fitsAt,
+  pickDensity,
+  TITLE_FLOOR,
+} from "./barDensity";
 
 describe("pickDensity", () => {
   it("keeps every label when the row has room for them", () => {
     expect(pickDensity(1200, [900, 780, 700, 670])).toBe(0);
+  });
+
+  it("makes the fully-labelled row clear a chip's worth of headroom", () => {
+    // 900 fits in 920, but not with somewhere to put the next deployment chip.
+    expect(pickDensity(920, [900, 780, 700, 670])).toBe(1);
+    expect(pickDensity(900 + FULL_LABEL_SLACK, [900, 780, 700, 670])).toBe(0);
+  });
+
+  it("asks no headroom of the tighter steps", () => {
+    // Once it is shedding because it must, slack would only cost another label.
+    expect(pickDensity(780, [900, 780, 700, 670])).toBe(1);
   });
 
   it("sheds one step at a time rather than jumping to icons", () => {
@@ -25,8 +41,25 @@ describe("pickDensity", () => {
     expect(pickDensity(890, [900, 880, undefined, undefined])).toBe(1);
   });
 
-  it("treats an exact fit as fitting", () => {
-    expect(pickDensity(900, [900])).toBe(0);
+  it("agrees with the test the caller stops measuring on", () => {
+    /* These have to be the same rule. The caller stops at the first density that fits and
+       leaves the rest unmeasured; if it stopped on a looser test than this one, density 0
+       could be rejected here with nothing measured under it, and the row would drop
+       straight to icons. */
+    const needed = [900, 780, 700, 670];
+    for (const available of [860, 900, 920, 948, 1200]) {
+      const stopped = needed.findIndex((need, d) =>
+        fitsAt(d as 0 | 1 | 2 | 3, need, available)
+      );
+      const holes = needed.map((n, d) => (d <= stopped ? n : undefined));
+      expect(pickDensity(available, holes)).toBe(
+        pickDensity(available, needed)
+      );
+    }
+  });
+
+  it("treats an exact fit, headroom included, as fitting", () => {
+    expect(pickDensity(900 + FULL_LABEL_SLACK, [900])).toBe(0);
   });
 
   it("leaves the title a floor to truncate within", () => {

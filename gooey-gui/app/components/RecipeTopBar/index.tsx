@@ -19,7 +19,7 @@ import type { CustomComponentProps } from "~/components";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import { useCopyToClipboard } from "~/useCopyToClipboard";
 import { GooeyTooltip } from "../GooeyTooltip";
-import { BAR_DENSITIES, neededWidth, pickDensity } from "./barDensity";
+import { BAR_DENSITIES, fitsAt, neededWidth, pickDensity } from "./barDensity";
 import {
   activeViewForLayouts,
   isRootLayout,
@@ -165,7 +165,9 @@ function useBarDensity(
         bar.dataset.density = String(density);
         const need = neededWidth(bar);
         needed[density] = need;
-        if (need <= available) break;
+        // The same test `pickDensity` applies, or a row that fits without the roomiest
+        // density's headroom would stop here and leave every tighter one unmeasured.
+        if (fitsAt(density, need, available)) break;
       }
       bar.dataset.density = String(pickDensity(available, needed));
     };
