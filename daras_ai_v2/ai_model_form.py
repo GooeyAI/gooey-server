@@ -7,6 +7,7 @@ from textwrap import dedent
 import gooey_gui as gui
 
 from ai_models.models import AIModelSpec
+from daras_ai_v2 import icons
 from daras_ai_v2.safety_checker import safety_checker
 from daras_ai_v2.variables_widget import render_prompt_vars
 
@@ -56,9 +57,12 @@ def render_fields(
             label = "##### " + label
         value = old_inputs.get(name, field.get("default"))
 
-        new_inputs[name] = render_field(
-            field=field, name=name, label=label, value=value
+        value = render_field(
+            field=field, name=name, label=label, value=value, key=f"{key}:{name}"
         )
+        # leave unset fields out of the payload so the model uses its own default
+        if value is not None:
+            new_inputs[name] = value
 
     gui.session_state[key] = new_inputs
 
@@ -99,12 +103,13 @@ def build_combined_input_schema(
     return ret
 
 
-def render_field(*, field: dict, name: str, label: str, value: typing.Any):
+def render_field(*, field: dict, name: str, label: str, value: typing.Any, key: str):
     description = field.get("description")
     if description:
         help_text = dedent(description)
     else:
         help_text = None
+    default = field.get("default")
     field = resolve_field_anyof(field)
     match field["type"]:
         case ("string" | "integer" | "number") as _type if field.get("enum"):
@@ -132,13 +137,14 @@ def render_field(*, field: dict, name: str, label: str, value: typing.Any):
             minimum = field.get("minimum")
             maximum = field.get("maximum")
             if minimum is not None and maximum is not None:
-                return gui.slider(
+                return render_slider_with_erase(
+                    key=key,
                     label=label,
-                    min_value=minimum,
-                    max_value=maximum,
                     value=value,
-                    step=1,
-                    help=help_text,
+                    help_text=help_text,
+                    minimum=minimum,
+                    maximum=maximum,
+                    default=default,
                 )
             return gui.number_input(
                 label=label,
@@ -179,6 +185,57 @@ def render_field(*, field: dict, name: str, label: str, value: typing.Any):
                 gui.error("Value must be a JSON object")
                 return None
             return parsed_value
+
+
+def render_slider_with_erase(
+    *,
+    key: str,
+    label: str,
+    value: int | None,
+    help_text: str | None,
+    minimum: int,
+    maximum: int,
+    default: int | None,
+) -> int | None:
+    slider_key = f"__ai_model_field:{key}"
+    # a range input can't be empty, so a field with no default is unset while
+    # its slider is parked at the start
+    unset_at_minimum = default is None
+    if default is None:
+        default = minimum
+    if value is None:
+        value = default
+    is_unset = unset_at_minimum and gui.session_state.get(slider_key, value) == minimum
+    if is_unset:
+        label += " _(not set)_"
+
+    with gui.div(className="d-flex align-items-end gap-2"):
+        with gui.div(className="flex-grow-1"):
+            ret = gui.slider(
+                label=label,
+                min_value=minimum,
+                max_value=maximum,
+                value=value,
+                step=1,
+                key=slider_key,
+                help=help_text,
+            )
+        pressed_erase = gui.button(
+            icons.erase,
+            key=slider_key + ":erase",
+            type="tertiary",
+            title="Reset to default",
+            # vertically center the button with the slider's input row
+            style=dict(marginBottom="0.65rem"),
+            disabled=ret == default,
+        )
+
+    if pressed_erase:
+        gui.session_state[slider_key] = default
+        gui.rerun()
+    if is_unset:
+        return None
+    return ret
 
 
 def resolve_field_anyof(field: dict) -> dict:

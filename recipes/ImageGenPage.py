@@ -54,8 +54,7 @@ class ImageGenPage(BasePage):
 
         yield f"Running {model.label}"
         result = yield from generate_on_fal(
-            model.model_id,
-            inputs | dict(enable_safety_checker=False),
+            model.model_id, self.get_fal_payload(inputs)
         )
         if not isinstance(result, dict):
             raise UserError(f"Invalid image output from {model.label}: {result}")
@@ -108,6 +107,13 @@ class ImageGenPage(BasePage):
             self.available_models[selected_model],
             gui.session_state.get("inputs") or {},
         )
+
+    def render_steps(self):
+        gui.json(self.get_fal_payload(gui.session_state.get("inputs") or {}))
+
+    @staticmethod
+    def get_fal_payload(inputs: dict) -> dict:
+        return inputs | dict(enable_safety_checker=False)
 
     def render_output(self):
         self.render_run_preview_output(gui.session_state, preview=False)
