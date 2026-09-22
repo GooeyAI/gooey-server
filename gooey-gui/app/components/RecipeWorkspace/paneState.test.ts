@@ -20,7 +20,7 @@ import {
   workspaceLayoutFromNavigationState,
   workspaceLayoutNavigationState,
   workspaceHrefToNavigate,
-  workspaceHydrationToken,
+  workspaceHydrationTokens,
 } from "./paneState";
 
 const about = splitLayout("about", "preview");
@@ -369,33 +369,110 @@ describe("what counts as arriving somewhere new", () => {
     state,
   });
 
+  const place = (config: PageShellConfig, loc: ReturnType<typeof at>) =>
+    workspaceHydrationTokens(config, loc).place;
+  const arrival = (config: PageShellConfig, loc: ReturnType<typeof at>) =>
+    workspaceHydrationTokens(config, loc).arrival;
+
   it("ignores a form post, which keeps the url and only changes location.key", () => {
-    const a = workspaceHydrationToken(baseConfig, at("/agent/my-bot/"));
-    const b = workspaceHydrationToken(baseConfig, at("/agent/my-bot/"));
-    expect(a).toBe(b);
+    expect(place(baseConfig, at("/agent/my-bot/"))).toBe(
+      place(baseConfig, at("/agent/my-bot/"))
+    );
   });
 
   it("changes when the url does", () => {
-    expect(workspaceHydrationToken(baseConfig, at("/agent/my-bot/"))).not.toBe(
-      workspaceHydrationToken(baseConfig, at("/agent/other-bot/"))
+    expect(place(baseConfig, at("/agent/my-bot/"))).not.toBe(
+      place(baseConfig, at("/agent/other-bot/"))
     );
-    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
-      workspaceHydrationToken(baseConfig, at("/agent/", "?run_id=r1"))
+    expect(place(baseConfig, at("/agent/"))).not.toBe(
+      place(baseConfig, at("/agent/", "?run_id=r1"))
     );
   });
 
   it("changes when a run starts, so its own view can take over", () => {
     const running = { ...baseConfig, active_run_id: "run-1" };
-    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
-      workspaceHydrationToken(running, at("/agent/"))
+    expect(place(baseConfig, at("/agent/"))).not.toBe(
+      place(running, at("/agent/"))
     );
   });
 
   it("changes when a link names the view to open, even on the same url", () => {
     const nav = workspaceLayoutNavigationState(split);
-    expect(workspaceHydrationToken(baseConfig, at("/agent/"))).not.toBe(
-      workspaceHydrationToken(baseConfig, at("/agent/", "", nav))
+    expect(arrival(baseConfig, at("/agent/"))).not.toBe(
+      arrival(baseConfig, at("/agent/", "", nav))
     );
+  });
+
+  it("does not move the place token when a named view is only dropped", () => {
+    const nav = workspaceLayoutNavigationState(split);
+    // The whole point: a post drops location.state, and that must not read as an arrival.
+    expect(place(baseConfig, at("/agent/", "", nav))).toBe(
+      place(baseConfig, at("/agent/"))
+    );
+  });
+});
+
+/* Walks the sequence rather than one step of it: mirrors `useWorkspaceLayout`'s effect and
+   `hydrateWorkspace`'s bail-out, which is where the steps compose. */
+function walkNavigations(
+  config: PageShellConfig,
+  steps: ReturnType<typeof atLoc>[]
+) {
+  let storedToken: string | undefined;
+  let layout = config.initial_layout;
+  for (const loc of steps) {
+    const { arrival, place } = workspaceHydrationTokens(config, loc);
+    if (storedToken !== arrival) {
+      layout = initialWorkspaceState(config, loc.state).layout;
+      storedToken = place;
+    }
+  }
+  return layout;
+}
+
+const atLoc = (pathname: string, search = "", state: unknown = null) => ({
+  pathname,
+  search,
+  state,
+});
+
+describe("the view you pick on the way out of Usage", () => {
+  const config: PageShellConfig = {
+    ...baseConfig,
+    workspace_href: "/agent/my-bot/",
+  };
+  const pick = workspaceLayoutNavigationState(edit);
+
+  it("survives the form post that lands right behind it", () => {
+    // Usage -> pick Edit -> arrive -> gooey-gui posts the form (no location.state).
+    expect(
+      walkNavigations(config, [
+        atLoc("/agent/my-bot/usage/"),
+        atLoc("/agent/my-bot/", "", pick),
+        atLoc("/agent/my-bot/"),
+      ])
+    ).toEqual(edit);
+  });
+
+  it("survives every later post too, not just the first", () => {
+    expect(
+      walkNavigations(config, [
+        atLoc("/agent/my-bot/usage/"),
+        atLoc("/agent/my-bot/", "", pick),
+        atLoc("/agent/my-bot/"),
+        atLoc("/agent/my-bot/"),
+        atLoc("/agent/my-bot/"),
+      ])
+    ).toEqual(edit);
+  });
+
+  it("still gives way to a genuinely new url", () => {
+    expect(
+      walkNavigations(config, [
+        atLoc("/agent/my-bot/", "", pick),
+        atLoc("/agent/other-bot/"),
+      ])
+    ).toEqual(config.initial_layout);
   });
 });
 

@@ -55,21 +55,32 @@ export function initialWorkspaceState(
     );
 }
 
-/* What counts as arriving somewhere new, and so as grounds for putting the view back to the
-   one the url asks for. Deliberately not `location.key`: a form post is a navigation with a
-   fresh key and the same url, and the rail posts one to remember its width while a run posts
-   one per chunk - each of which used to throw away whichever view had been picked. */
-export function workspaceHydrationToken(
+export type WorkspaceHydrationTokens = {
+    /* What I was told to open. Grounds for re-hydrating: it moves when a link names a view,
+       even on a url already open. */
+    arrival: string;
+    /* Where I am. What gets stored, so the *loss* of a named view is not itself an arrival -
+       a form post drops `location.state`, and used to read as landing somewhere new. */
+    place: string;
+};
+
+/* Two tokens, because a named view appearing and disappearing are the same change to one.
+   Deliberately not `location.key`: a form post is a navigation with a fresh key and the same
+   url, and the rail posts one to remember its width while a run posts one per chunk. */
+export function workspaceHydrationTokens(
     config: PageShellConfig,
     location: { pathname: string; search: string; state?: unknown }
-): string {
-    const navLayout = workspaceLayoutFromNavigationState(location.state);
-    return [
+): WorkspaceHydrationTokens {
+    const place = [
         location.pathname + location.search,
         config.active_run_id ?? "",
         config.route_layout ? JSON.stringify(config.route_layout) : "",
-        navLayout ? JSON.stringify(navLayout) : "",
     ].join("|");
+    const navLayout = workspaceLayoutFromNavigationState(location.state);
+    return {
+        place,
+        arrival: navLayout ? `${place}|${JSON.stringify(navLayout)}` : place,
+    };
 }
 
 export function workspaceLayoutNavigationState(layout: WorkspaceLayout): {
