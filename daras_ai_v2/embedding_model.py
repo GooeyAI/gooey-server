@@ -2,6 +2,7 @@ import hashlib
 import io
 import mimetypes
 import typing
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from functools import partial
 
@@ -217,11 +218,11 @@ def create_multimodal_embeddings(
 def _embedding_input_to_part(inp: EmbeddingInput) -> dict:
     if inp.url:
         return {
-            "fileData": {
-                "mimeType": mimetypes.guess_type(inp.url)[0]
+            "file_data": {
+                "mime_type": mimetypes.guess_type(inp.url)[0]
                 or "application/octet-stream",
                 # vertex reads the file straight out of our own bucket
-                "fileUri": gs_url_to_uri(inp.url),
+                "file_uri": gs_url_to_uri(inp.url),
             }
         }
     return {"text": inp.text or ""}
@@ -295,47 +296,43 @@ def _run_openai_embedding(
 # into the Vespa `tensor<float>(x[3072])` field.
 GEMINI_EMBEDDING_DIMENSIONS = 3072
 
-# Max `requests` per batchEmbedContents call. Deliberately conservative -- confirm against
-# the current Vertex quota before raising it.
-VERTEX_EMBEDDING_BATCH_SIZE = 100
+# gemini-embedding-2 is only served from Vertex's multi-region "rep" endpoints, which take
+# just "us" or "eu" -- not a specific region like the classic {region}-aiplatform.googleapis.com
+# host this codebase uses elsewhere for Gemini chat/vision calls (see _call_gemini_api).
+# There is also no batch call for this model, unlike the older text embedding models: every
+# content needs its own :embedContent request, so we fan them out across a thread pool.
+GEMINI_EMBEDDING_LOCATION = "us"
+VERTEX_EMBEDDING_MAX_WORKERS = 10
 
 
 def _run_vertex_embedding(*, contents: list[dict], model_id: str) -> list[list[float]]:
     logger.info(f"{model_id=}, {len(contents)=}")
     session, project = get_google_auth_session()
-    # every request item must name the model by its fully qualified resource path
+    # the model is addressed by its fully qualified resource path
     model_uri = (
-        f"projects/{project}/locations/{settings.GCP_REGION}"
+        f"projects/{project}/locations/{GEMINI_EMBEDDING_LOCATION}"
         f"/publishers/google/models/{model_id}"
     )
-    ret = []
-    for i in range(0, len(contents), VERTEX_EMBEDDING_BATCH_SIZE):
-        ret += _vertex_batch_embed_contents(
-            session=session,
-            model_uri=model_uri,
-            contents=contents[i : i + VERTEX_EMBEDDING_BATCH_SIZE],
+    with ThreadPoolExecutor(max_workers=VERTEX_EMBEDDING_MAX_WORKERS) as pool:
+        return list(
+            pool.map(
+                lambda content: _vertex_embed_content(
+                    session=session, model_uri=model_uri, content=content
+                ),
+                contents,
+            )
         )
-    return ret
 
 
 @retry_if(http_should_retry)
-def _vertex_batch_embed_contents(
-    *, session, model_uri: str, contents: list[dict]
-) -> list[list[float]]:
-    # note: gemini-embedding-2 dropped the legacy :predict endpoint that the older
-    # text embedding models use, so this must go through :batchEmbedContents
+def _vertex_embed_content(*, session, model_uri: str, content: dict) -> list[float]:
     r = session.post(
-        f"https://{settings.GCP_REGION}-aiplatform.googleapis.com/v1/{model_uri}:batchEmbedContents",
+        f"https://aiplatform.{GEMINI_EMBEDDING_LOCATION}.rep.googleapis.com"
+        f"/v1/{model_uri}:embedContent",
         json={
-            "requests": [
-                {
-                    "model": model_uri,
-                    "content": content,
-                    "outputDimensionality": GEMINI_EMBEDDING_DIMENSIONS,
-                }
-                for content in contents
-            ]
+            "content": content,
+            "embedContentConfig": {"outputDimensionality": GEMINI_EMBEDDING_DIMENSIONS},
         },
     )
     raise_for_status(r)
-    return [item["values"] for item in r.json()["embeddings"]]
+    return r.json()["embedding"]["values"]
