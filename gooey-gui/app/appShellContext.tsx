@@ -17,7 +17,7 @@ import {
   clearWorkspaceLayoutNavigationState,
   foldForNarrowViewport,
   initialWorkspaceState,
-  workspaceHydrationToken,
+  workspaceHydrationTokens,
   peekCarriedRunLayout,
   type WorkspaceState,
   type WorkspaceLayout,
@@ -39,7 +39,11 @@ export type PanelEntry = {
 type AppShellContextValue = {
   workspaces: Record<string, WorkspaceEntry>;
   setWorkspace: (key: string, entry: WorkspaceEntry) => void;
-  hydrateWorkspace: (key: string, entry: WorkspaceEntry) => void;
+  hydrateWorkspace: (
+    key: string,
+    entry: WorkspaceEntry,
+    arrivalToken: string
+  ) => void;
   panels: Record<string, PanelEntry>;
   setPanel: (key: string, entry: PanelEntry) => void;
   setPanelOpen: (key: string, open: boolean) => void;
@@ -65,14 +69,19 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     setWorkspaces((current) => ({ ...current, [key]: entry }));
   }, []);
 
-  const hydrateWorkspace = useCallback((key: string, entry: WorkspaceEntry) => {
-    setWorkspaces((current) => {
-      if (current[key]?.hydrationToken === entry.hydrationToken) {
-        return current;
-      }
-      return { ...current, [key]: entry };
-    });
-  }, []);
+  // Compares the arrival token but stores `entry.hydrationToken`, which is the place token.
+  // Asymmetric on purpose: see `workspaceHydrationTokens`.
+  const hydrateWorkspace = useCallback(
+    (key: string, entry: WorkspaceEntry, arrivalToken: string) => {
+      setWorkspaces((current) => {
+        if (current[key]?.hydrationToken === arrivalToken) {
+          return current;
+        }
+        return { ...current, [key]: entry };
+      });
+    },
+    []
+  );
 
   const setPanel = useCallback((key: string, entry: PanelEntry) => {
     setPanels((current) => ({ ...current, [key]: entry }));
@@ -147,13 +156,13 @@ export function useWorkspaceLayout(config: PageShellConfig) {
   const [isNarrow, setIsNarrow] = useState(false);
 
   useHydrationEffect(() => {
-    const hydrationToken = workspaceHydrationToken(config, location);
+    const { arrival, place } = workspaceHydrationTokens(config, location);
     const next = initialWorkspaceState(config, location.state);
-    context.hydrateWorkspace(config.storage_key, {
-      value: next,
-      hydrated: true,
-      hydrationToken,
-    });
+    context.hydrateWorkspace(
+      config.storage_key,
+      { value: next, hydrated: true, hydrationToken: place },
+      arrival
+    );
     if (workspaceLayoutNavigationStatePresent(location.state)) {
       clearWorkspaceLayoutNavigationState();
     }
