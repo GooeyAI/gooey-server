@@ -1,4 +1,4 @@
-import { useLocation } from "@remix-run/react";
+import { useSearchParams } from "@remix-run/react";
 import {
   createContext,
   useCallback,
@@ -14,20 +14,12 @@ import type { ReactNode } from "react";
 import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
 import { WIDE_QUERY } from "./components/RecipeWorkspace/breakpoints";
 import {
-  clearWorkspaceLayoutNavigationState,
   foldForNarrowViewport,
-  initialWorkspaceState,
-  workspaceHydrationTokens,
-  peekCarriedRunLayout,
-  type WorkspaceState,
+  VIEW_PARAM,
+  viewParamForLayout,
+  workspaceLayoutFromUrl,
   type WorkspaceLayout,
 } from "./components/RecipeWorkspace/paneState";
-
-type WorkspaceEntry = {
-  value: WorkspaceState;
-  hydrated: boolean;
-  hydrationToken: string;
-};
 
 export type PanelEntry = {
   open: boolean;
@@ -37,13 +29,6 @@ export type PanelEntry = {
 };
 
 type AppShellContextValue = {
-  workspaces: Record<string, WorkspaceEntry>;
-  setWorkspace: (key: string, entry: WorkspaceEntry) => void;
-  hydrateWorkspace: (
-    key: string,
-    entry: WorkspaceEntry,
-    arrivalToken: string
-  ) => void;
   panels: Record<string, PanelEntry>;
   setPanel: (key: string, entry: PanelEntry) => void;
   setPanelOpen: (key: string, open: boolean) => void;
@@ -57,31 +42,10 @@ const useHydrationEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export function AppShellProvider({ children }: { children: ReactNode }) {
-  const [workspaces, setWorkspaces] = useState<Record<string, WorkspaceEntry>>(
-    {}
-  );
   const [panels, setPanels] = useState<Record<string, PanelEntry>>({});
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
   const panelsRef = useRef(panels);
   panelsRef.current = panels;
-
-  const setWorkspace = useCallback((key: string, entry: WorkspaceEntry) => {
-    setWorkspaces((current) => ({ ...current, [key]: entry }));
-  }, []);
-
-  // Compares the arrival token but stores `entry.hydrationToken`, which is the place token.
-  // Asymmetric on purpose: see `workspaceHydrationTokens`.
-  const hydrateWorkspace = useCallback(
-    (key: string, entry: WorkspaceEntry, arrivalToken: string) => {
-      setWorkspaces((current) => {
-        if (current[key]?.hydrationToken === arrivalToken) {
-          return current;
-        }
-        return { ...current, [key]: entry };
-      });
-    },
-    []
-  );
 
   const setPanel = useCallback((key: string, entry: PanelEntry) => {
     setPanels((current) => ({ ...current, [key]: entry }));
@@ -112,24 +76,13 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   // a real state change invalidates it.
   const value = useMemo(
     () => ({
-      workspaces,
-      setWorkspace,
-      hydrateWorkspace,
       panels,
       setPanel,
       setPanelOpen,
       navDrawerOpen,
       setNavDrawerOpen,
     }),
-    [
-      workspaces,
-      setWorkspace,
-      hydrateWorkspace,
-      panels,
-      setPanel,
-      setPanelOpen,
-      navDrawerOpen,
-    ]
+    [panels, setPanel, setPanelOpen, navDrawerOpen]
   );
 
   return (
@@ -140,68 +93,44 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
 }
 
 export function useWorkspaceLayout(config: PageShellConfig) {
-  const context = useAppShellContext();
-  const location = useLocation();
-  const entry = context.workspaces[config.storage_key];
-  // The carry too, not just the url's own view: after a run the storage key changes, so this
-  // first render has no entry and would lay out the work view before the effect corrects it.
-  const fallback: WorkspaceState = {
-    layout:
-      config.route_layout ??
-      peekCarriedRunLayout(config) ??
-      config.initial_layout,
-    handled_run_id: null,
-  };
-  const current = entry?.value ?? fallback;
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Only the narrow fold needs the client: the url is known during SSR, so the view itself
+  // renders right the first time and has nothing to swap in once hydrated.
   const [isNarrow, setIsNarrow] = useState(false);
-
-  useHydrationEffect(() => {
-    const { arrival, place } = workspaceHydrationTokens(config, location);
-    const next = initialWorkspaceState(config, location.state);
-    context.hydrateWorkspace(
-      config.storage_key,
-      { value: next, hydrated: true, hydrationToken: place },
-      arrival
-    );
-    if (workspaceLayoutNavigationStatePresent(location.state)) {
-      clearWorkspaceLayoutNavigationState();
-    }
-    setIsNarrow(!window.matchMedia(WIDE_QUERY).matches);
-  }, [
-    config.storage_key,
-    config.active_run_id,
-    location.pathname,
-    location.search,
-    location.state,
-  ]);
+  const [hydrated, setHydrated] = useState(false);
+  const layout = workspaceLayoutFromUrl(config, searchParams.get(VIEW_PARAM));
 
   useEffect(() => {
     const wide = window.matchMedia(WIDE_QUERY);
     const sync = () => setIsNarrow(!wide.matches);
+    sync();
+    setHydrated(true);
     wide.addEventListener("change", sync);
     return () => wide.removeEventListener("change", sync);
   }, []);
 
   const selectLayout = useCallback(
-    (layout: WorkspaceLayout) => {
-      const next = { ...current, layout };
-      context.setWorkspace(config.storage_key, {
-        value: next,
-        hydrated: true,
-        hydrationToken: entry?.hydrationToken ?? "",
-      });
+    (next: WorkspaceLayout) => {
+      const params = new URLSearchParams(searchParams);
+      const viewKey = viewParamForLayout(config.views, next);
+      if (viewKey) {
+        params.set(VIEW_PARAM, viewKey);
+      } else {
+        // a layout no declared view matches cannot be addressed; leave the url alone
+        params.delete(VIEW_PARAM);
+      }
+      // `replace` so picking views does not fill the back button with them, and
+      // `preventScrollReset` or the chat jumps to the top on every pick. `shouldRevalidate`
+      // in app.tsx reads `isViewOnlyNavigation`, so this costs no server render.
+      setSearchParams(params, { replace: true, preventScrollReset: true });
     },
-    [config.storage_key, context, current]
+    [config.views, searchParams, setSearchParams]
   );
 
   return {
-    layout: foldForNarrowViewport(
-      current.layout,
-      config.narrow_surface,
-      isNarrow
-    ),
-    storedLayout: current.layout,
-    hydrated: Boolean(entry?.hydrated),
+    layout: foldForNarrowViewport(layout, config.narrow_surface, isNarrow),
+    storedLayout: layout,
+    hydrated,
     isNarrow,
     selectLayout,
   };
@@ -306,12 +235,6 @@ function useAppShellContext(): AppShellContextValue {
     throw new Error("App shell hooks require AppShellProvider");
   }
   return context;
-}
-
-function workspaceLayoutNavigationStatePresent(state: unknown): boolean {
-  return Boolean(
-    state && typeof state === "object" && "workspaceLayout" in state
-  );
 }
 
 function restorePanelOpen(
