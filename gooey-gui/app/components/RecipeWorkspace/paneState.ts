@@ -1,59 +1,58 @@
 import type {
-  PageShellConfig,
-  SingleLayout,
-  SplitLayout,
-  SurfaceId,
-  WorkspaceEditorPane,
-  WorkspaceView,
+    PageShellConfig,
+    SingleLayout,
+    SplitLayout,
+    SurfaceId,
+    WorkspaceView,
 } from "@gooey-types/recipe_workspace_props";
 
 export type WorkspaceLayout = SingleLayout | SplitLayout;
 
 export type WorkspaceState = {
-  layout: WorkspaceLayout;
-  handled_run_id: string | null;
+    layout: WorkspaceLayout;
+    handled_run_id: string | null;
 };
 
 export type PaneRole = "closed" | "solo" | "major" | "minor";
 export type PaneRoles = Record<SurfaceId, PaneRole>;
 
 export type WorkspaceControls = {
-  addEditor: boolean;
-  addPreview: boolean;
-  closePreview: boolean;
+    addEditor: boolean;
+    addPreview: boolean;
+    closePreview: boolean;
 };
 
 /* The view a workspace opens on, derived from the url alone: the server sends
    `initial_layout` per url - About on a published run, the work view on a saved run - so
    the same url always opens the same way, for everyone. */
 export function initialWorkspaceState(
-  config: PageShellConfig,
-  navigationState: unknown
+    config: PageShellConfig,
+    navigationState: unknown
 ): WorkspaceState {
-  const carried = carriedLayoutFor(config);
-  if (config.route_layout) {
-    return {
-      layout: config.route_layout,
-      handled_run_id: config.active_run_id ?? null,
-    };
-  }
+    const carried = carriedLayoutFor(config);
+    if (config.route_layout) {
+        return {
+            layout: config.route_layout,
+            handled_run_id: config.active_run_id ?? null,
+        };
+    }
 
-  const navigationLayout = workspaceLayoutFromNavigationState(navigationState);
-  if (navigationLayout) {
-    // A view someone picked to arrive on is not the run's to override. Without the run
-    // marked handled, `revealRunLayout` reads Edit - a lone editor - as somewhere the
-    // output cannot be seen and swaps in the work view, so leaving Usage for Edit on a
-    // run landed on Split. That is the rule `revealRunLayout` already applies to a view
-    // picked after the run arrived; this is the same view, picked a moment earlier.
-    return {
-      layout: navigationLayout,
-      handled_run_id: config.active_run_id ?? null,
-    };
-  }
-  return revealRunLayout(
-    { layout: carried ?? config.initial_layout, handled_run_id: null },
-    config
-  );
+    const navigationLayout = workspaceLayoutFromNavigationState(navigationState);
+    if (navigationLayout) {
+        // A view someone picked to arrive on is not the run's to override. Without the run
+        // marked handled, `revealRunLayout` reads Edit - a lone editor - as somewhere the
+        // output cannot be seen and swaps in the work view, so leaving Usage for Edit on a
+        // run landed on Split. That is the rule `revealRunLayout` already applies to a view
+        // picked after the run arrived; this is the same view, picked a moment earlier.
+        return {
+            layout: navigationLayout,
+            handled_run_id: config.active_run_id ?? null,
+        };
+    }
+    return revealRunLayout(
+        {layout: carried ?? config.initial_layout, handled_run_id: null},
+        config
+    );
 }
 
 /* What counts as arriving somewhere new, and so as grounds for putting the view back to the
@@ -61,55 +60,55 @@ export function initialWorkspaceState(
    fresh key and the same url, and the rail posts one to remember its width while a run posts
    one per chunk - each of which used to throw away whichever view had been picked. */
 export function workspaceHydrationToken(
-  config: PageShellConfig,
-  location: { pathname: string; search: string; state?: unknown }
+    config: PageShellConfig,
+    location: { pathname: string; search: string; state?: unknown }
 ): string {
-  const navLayout = workspaceLayoutFromNavigationState(location.state);
-  return [
-    location.pathname + location.search,
-    config.active_run_id ?? "",
-    config.route_layout ? JSON.stringify(config.route_layout) : "",
-    navLayout ? JSON.stringify(navLayout) : "",
-  ].join("|");
+    const navLayout = workspaceLayoutFromNavigationState(location.state);
+    return [
+        location.pathname + location.search,
+        config.active_run_id ?? "",
+        config.route_layout ? JSON.stringify(config.route_layout) : "",
+        navLayout ? JSON.stringify(navLayout) : "",
+    ].join("|");
 }
 
 export function workspaceLayoutNavigationState(layout: WorkspaceLayout): {
-  workspaceLayout: WorkspaceLayout;
+    workspaceLayout: WorkspaceLayout;
 } {
-  return { workspaceLayout: layout };
+    return {workspaceLayout: layout};
 }
 
 export function workspaceLayoutFromNavigationState(
-  state: unknown
+    state: unknown
 ): WorkspaceLayout | null {
-  if (!state || typeof state !== "object") {
-    return null;
-  }
-  const { workspaceLayout } = state as { workspaceLayout?: unknown };
-  if (!isWorkspaceLayout(workspaceLayout)) {
-    return null;
-  }
-  return workspaceLayout;
+    if (!state || typeof state !== "object") {
+        return null;
+    }
+    const {workspaceLayout} = state as { workspaceLayout?: unknown };
+    if (!isWorkspaceLayout(workspaceLayout)) {
+        return null;
+    }
+    return workspaceLayout;
 }
 
 export function clearWorkspaceLayoutNavigationState() {
-  const historyState = window.history.state;
-  const userState = historyState?.usr;
-  if (
-    !userState ||
-    typeof userState !== "object" ||
-    !("workspaceLayout" in userState)
-  ) {
-    return;
-  }
-  const remainingUserState = {
-    ...(userState as Record<string, unknown>),
-  };
-  delete remainingUserState.workspaceLayout;
-  const nextUserState = Object.keys(remainingUserState).length
-    ? remainingUserState
-    : null;
-  window.history.replaceState({ ...historyState, usr: nextUserState }, "");
+    const historyState = window.history.state;
+    const userState = historyState?.usr;
+    if (
+        !userState ||
+        typeof userState !== "object" ||
+        !("workspaceLayout" in userState)
+    ) {
+        return;
+    }
+    const remainingUserState = {
+        ...(userState as Record<string, unknown>),
+    };
+    delete remainingUserState.workspaceLayout;
+    const nextUserState = Object.keys(remainingUserState).length
+        ? remainingUserState
+        : null;
+    window.history.replaceState({...historyState, usr: nextUserState}, "");
 }
 
 /** Move to the run layout when a run starts, from the views where that is wanted.
@@ -120,17 +119,17 @@ export function clearWorkspaceLayoutNavigationState() {
  *  of a timing assumption are two things to get wrong.
  */
 export function revealRunOutput(
-  layout: WorkspaceLayout,
-  runLayout: WorkspaceLayout,
-  selectLayout: (next: WorkspaceLayout) => void
+    layout: WorkspaceLayout,
+    runLayout: WorkspaceLayout,
+    selectLayout: (next: WorkspaceLayout) => void
 ) {
-  const next = shouldRevealRunOutput(layout) ? runLayout : layout;
-  // Running redirects to the run's own url, whose layout is the work view - so the view to
-  // end on rides across that one navigation, or Preview and About are swapped out by it.
-  carriedRunLayout = { layout: next, runId: null };
-  if (next !== layout) {
-    window.setTimeout(() => selectLayout(next), 0);
-  }
+    const next = shouldRevealRunOutput(layout) ? runLayout : layout;
+    // Running redirects to the run's own url, whose layout is the work view - so the view to
+    // end on rides across that one navigation, or Preview and About are swapped out by it.
+    carriedRunLayout = {layout: next, runId: null};
+    if (next !== layout) {
+        window.setTimeout(() => selectLayout(next), 0);
+    }
 }
 
 /* Set when Run is pressed, and held until the run it produced is over or replaced. A
@@ -139,29 +138,29 @@ export function revealRunOutput(
    Bound to a run id rather than read once: the workspace re-renders many times while a run
    is polled, and every one of those asks for the layout again. */
 let carriedRunLayout: { layout: WorkspaceLayout; runId: string | null } | null =
-  null;
+    null;
 
 /* Pure, so the first render can ask before the effect that binds it has run - that render
    is the one that would otherwise lay out the run url's own view and animate away from it. */
 export function peekCarriedRunLayout(
-  config: PageShellConfig
+    config: PageShellConfig
 ): WorkspaceLayout | null {
-  if (!carriedRunLayout) return null;
-  // still on the page Run was pressed from; the run's own url has not arrived yet
-  const runId = config.active_run_id ?? null;
-  if (!runId) return null;
-  if (carriedRunLayout.runId === null) return carriedRunLayout.layout;
-  return carriedRunLayout.runId === runId ? carriedRunLayout.layout : null;
+    if (!carriedRunLayout) return null;
+    // still on the page Run was pressed from; the run's own url has not arrived yet
+    const runId = config.active_run_id ?? null;
+    if (!runId) return null;
+    if (carriedRunLayout.runId === null) return carriedRunLayout.layout;
+    return carriedRunLayout.runId === runId ? carriedRunLayout.layout : null;
 }
 
 function carriedLayoutFor(config: PageShellConfig): WorkspaceLayout | null {
-  const layout = peekCarriedRunLayout(config);
-  if (layout) {
-    carriedRunLayout = { layout, runId: config.active_run_id ?? null };
-  } else if (carriedRunLayout && carriedRunLayout.runId !== null) {
-    carriedRunLayout = null;
-  }
-  return layout;
+    const layout = peekCarriedRunLayout(config);
+    if (layout) {
+        carriedRunLayout = {layout, runId: config.active_run_id ?? null};
+    } else if (carriedRunLayout && carriedRunLayout.runId !== null) {
+        carriedRunLayout = null;
+    }
+    return layout;
 }
 
 /** Whether starting a run should swap this layout for the one that shows the output.
@@ -173,239 +172,227 @@ function carriedLayoutFor(config: PageShellConfig): WorkspaceLayout | null {
  * screen, so nothing is hidden by staying put either.
  */
 export function shouldRevealRunOutput(layout: WorkspaceLayout): boolean {
-  return layout.kind === "single" && layout.surface === "editor";
+    return layout.kind === "single" && layout.surface === "editor";
 }
 
 export function revealRunLayout(
-  state: WorkspaceState,
-  config: PageShellConfig
+    state: WorkspaceState,
+    config: PageShellConfig
 ): WorkspaceState {
-  if (!config.active_run_id || config.active_run_id === state.handled_run_id) {
-    return state;
-  }
-  return {
-    // The run counts as handled either way, so a view the user picked for this run is not
-    // swapped out later by the same run arriving again.
-    layout: shouldRevealRunOutput(state.layout)
-      ? config.run_layout
-      : state.layout,
-    handled_run_id: config.active_run_id,
-  };
+    if (!config.active_run_id || config.active_run_id === state.handled_run_id) {
+        return state;
+    }
+    return {
+        // The run counts as handled either way, so a view the user picked for this run is not
+        // swapped out later by the same run arriving again.
+        layout: shouldRevealRunOutput(state.layout)
+            ? config.run_layout
+            : state.layout,
+        handled_run_id: config.active_run_id,
+    };
 }
 
 /** The key to write into the form state to ask for a deferred pane's body, or null if there
  *  is nothing to ask for. State-guarded, so each response offering it deferred gets one ask. */
-export function deferredPaneLoadKey(
-  panes: readonly WorkspaceEditorPane[],
-  selectedPane: string | null,
-  state: Record<string, unknown>
-): string | null {
-  if (!selectedPane) return null;
-  const pane = panes.find((it) => it.id === selectedPane);
-  if (!pane?.load_key) return null;
-  // already asked against this response, so the answer is in flight
-  if (state[pane.load_key]) return null;
-  return pane.load_key;
-}
 
 export function isRootLayout(
-  shown: WorkspaceLayout,
-  initial: WorkspaceLayout,
-  narrowSurface: SurfaceId,
-  isNarrow: boolean
+    shown: WorkspaceLayout,
+    initial: WorkspaceLayout,
+    narrowSurface: SurfaceId,
+    isNarrow: boolean
 ): boolean {
-  return layoutsEqual(
-    shown,
-    foldForNarrowViewport(initial, narrowSurface, isNarrow)
-  );
+    return layoutsEqual(
+        shown,
+        foldForNarrowViewport(initial, narrowSurface, isNarrow)
+    );
 }
 
 export function foldForNarrowViewport(
-  layout: WorkspaceLayout,
-  narrowSurface: SurfaceId,
-  isNarrow: boolean
+    layout: WorkspaceLayout,
+    narrowSurface: SurfaceId,
+    isNarrow: boolean
 ): WorkspaceLayout {
-  if (!isNarrow || layout.kind === "single") {
-    return layout;
-  }
-  if (layout.primary === "about") {
-    return singleLayout("about");
-  }
-  if (layoutHasSurface(layout, narrowSurface)) {
-    return singleLayout(narrowSurface);
-  }
-  return singleLayout(layout.primary);
+    if (!isNarrow || layout.kind === "single") {
+        return layout;
+    }
+    if (layout.primary === "about") {
+        return singleLayout("about");
+    }
+    if (layoutHasSurface(layout, narrowSurface)) {
+        return singleLayout(narrowSurface);
+    }
+    return singleLayout(layout.primary);
 }
 
 /* A card that names a config pane has to land somewhere that pane is on screen. On a phone a
    split folds to the half the recipe keeps - the chat, for an owner - which is not that pane. */
 export function layoutForEditorPane(
-  layout: WorkspaceLayout,
-  editorPane: string | null | undefined,
-  narrowSurface: SurfaceId,
-  isNarrow: boolean
+    layout: WorkspaceLayout,
+    editorPane: string | null | undefined,
+    narrowSurface: SurfaceId,
+    isNarrow: boolean
 ): WorkspaceLayout {
-  if (!editorPane) {
-    return layout;
-  }
-  const shown = foldForNarrowViewport(layout, narrowSurface, isNarrow);
-  return layoutHasSurface(shown, "editor") ? layout : singleLayout("editor");
+    if (!editorPane) {
+        return layout;
+    }
+    const shown = foldForNarrowViewport(layout, narrowSurface, isNarrow);
+    return layoutHasSurface(shown, "editor") ? layout : singleLayout("editor");
 }
 
 export function paneRolesForLayout(layout: WorkspaceLayout): PaneRoles {
-  const roles: PaneRoles = {
-    about: "closed",
-    editor: "closed",
-    preview: "closed",
-  };
-  if (layout.kind === "single") {
-    roles[layout.surface] = "solo";
+    const roles: PaneRoles = {
+        about: "closed",
+        editor: "closed",
+        preview: "closed",
+    };
+    if (layout.kind === "single") {
+        roles[layout.surface] = "solo";
+        return roles;
+    }
+    roles[layout.primary] = "major";
+    roles[layout.secondary] = "minor";
     return roles;
-  }
-  roles[layout.primary] = "major";
-  roles[layout.secondary] = "minor";
-  return roles;
 }
 
 export function viewForLayout(
-  views: readonly WorkspaceView[],
-  layout: WorkspaceLayout
+    views: readonly WorkspaceView[],
+    layout: WorkspaceLayout
 ): WorkspaceView | null {
-  return views.find((view) => layoutsEqual(view.layout, layout)) ?? null;
+    return views.find((view) => layoutsEqual(view.layout, layout)) ?? null;
 }
 
 export function activeViewForLayouts(
-  views: readonly WorkspaceView[],
-  shown: WorkspaceLayout,
-  stored: WorkspaceLayout,
-  workspaceActive: boolean
+    views: readonly WorkspaceView[],
+    shown: WorkspaceLayout,
+    stored: WorkspaceLayout,
+    workspaceActive: boolean
 ): WorkspaceView | null {
-  if (!workspaceActive) {
-    return null;
-  }
-  return viewForLayout(views, shown) ?? viewForLayout(views, stored);
+    if (!workspaceActive) {
+        return null;
+    }
+    return viewForLayout(views, shown) ?? viewForLayout(views, stored);
 }
 
 export function collapsePane(
-  layout: WorkspaceLayout,
-  surface: SurfaceId
+    layout: WorkspaceLayout,
+    surface: SurfaceId
 ): WorkspaceLayout {
-  if (layout.kind === "single" || !layoutHasSurface(layout, surface)) {
-    return layout;
-  }
-  if (layout.primary === surface) {
-    return singleLayout(layout.secondary);
-  }
-  return singleLayout(layout.primary);
+    if (layout.kind === "single" || !layoutHasSurface(layout, surface)) {
+        return layout;
+    }
+    if (layout.primary === surface) {
+        return singleLayout(layout.secondary);
+    }
+    return singleLayout(layout.primary);
 }
 
 export function workspaceControlsForLayout(
-  layout: WorkspaceLayout
+    layout: WorkspaceLayout
 ): WorkspaceControls {
-  const noControls: WorkspaceControls = {
-    addEditor: false,
-    addPreview: false,
-    closePreview: false,
-  };
-  if (layoutHasSurface(layout, "about")) {
-    return noControls;
-  }
-  if (layout.kind === "split") {
-    return {
-      ...noControls,
-      closePreview: layoutHasSurface(layout, "preview"),
+    const noControls: WorkspaceControls = {
+        addEditor: false,
+        addPreview: false,
+        closePreview: false,
     };
-  }
-  if (layout.surface === "editor") {
-    return { ...noControls, addPreview: true };
-  }
-  if (layout.surface === "preview") {
-    return { ...noControls, addEditor: true };
-  }
-  return noControls;
+    if (layoutHasSurface(layout, "about")) {
+        return noControls;
+    }
+    if (layout.kind === "split") {
+        return {
+            ...noControls,
+            closePreview: layoutHasSurface(layout, "preview"),
+        };
+    }
+    if (layout.surface === "editor") {
+        return {...noControls, addPreview: true};
+    }
+    if (layout.surface === "preview") {
+        return {...noControls, addEditor: true};
+    }
+    return noControls;
 }
 
 /** Where to navigate to reach the workspace, or null when we are already on it.
  *  Named for what it answers: there is no layout in the question. */
 export function workspaceHrefToNavigate(
-  workspaceActive: boolean,
-  workspaceHref: string
+    workspaceActive: boolean,
+    workspaceHref: string
 ): string | null {
-  if (workspaceActive || !workspaceHref) {
-    return null;
-  }
-  return appRelativeHref(workspaceHref);
+    if (workspaceActive || !workspaceHref) {
+        return null;
+    }
+    return appRelativeHref(workspaceHref);
 }
 
 export function singleLayout(surface: SurfaceId): SingleLayout {
-  return { kind: "single", surface };
+    return {kind: "single", surface};
 }
 
 export function splitLayout(
-  primary: SurfaceId,
-  secondary: SurfaceId
+    primary: SurfaceId,
+    secondary: SurfaceId
 ): SplitLayout {
-  if (primary === secondary) {
-    throw new Error("A split layout requires two different surfaces");
-  }
-  return { kind: "split", primary, secondary };
+    if (primary === secondary) {
+        throw new Error("A split layout requires two different surfaces");
+    }
+    return {kind: "split", primary, secondary};
 }
 
 export function layoutsEqual(
-  left: WorkspaceLayout,
-  right: WorkspaceLayout
+    left: WorkspaceLayout,
+    right: WorkspaceLayout
 ): boolean {
-  if (left.kind !== right.kind) {
+    if (left.kind !== right.kind) {
+        return false;
+    }
+    if (left.kind === "single" && right.kind === "single") {
+        return left.surface === right.surface;
+    }
+    if (left.kind === "split" && right.kind === "split") {
+        return left.primary === right.primary && left.secondary === right.secondary;
+    }
     return false;
-  }
-  if (left.kind === "single" && right.kind === "single") {
-    return left.surface === right.surface;
-  }
-  if (left.kind === "split" && right.kind === "split") {
-    return left.primary === right.primary && left.secondary === right.secondary;
-  }
-  return false;
 }
 
 function isWorkspaceLayout(value: unknown): value is WorkspaceLayout {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const layout = value as Partial<WorkspaceLayout>;
-  if (layout.kind === "single") {
-    return isSurfaceId(layout.surface);
-  }
-  if (layout.kind !== "split") {
-    return false;
-  }
-  return (
-    isSurfaceId(layout.primary) &&
-    isSurfaceId(layout.secondary) &&
-    layout.primary !== layout.secondary
-  );
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+    const layout = value as Partial<WorkspaceLayout>;
+    if (layout.kind === "single") {
+        return isSurfaceId(layout.surface);
+    }
+    if (layout.kind !== "split") {
+        return false;
+    }
+    return (
+        isSurfaceId(layout.primary) &&
+        isSurfaceId(layout.secondary) &&
+        layout.primary !== layout.secondary
+    );
 }
 
 function layoutHasSurface(
-  layout: WorkspaceLayout,
-  surface: SurfaceId
+    layout: WorkspaceLayout,
+    surface: SurfaceId
 ): boolean {
-  if (layout.kind === "single") {
-    return layout.surface === surface;
-  }
-  return layout.primary === surface || layout.secondary === surface;
+    if (layout.kind === "single") {
+        return layout.surface === surface;
+    }
+    return layout.primary === surface || layout.secondary === surface;
 }
 
 function isSurfaceId(value: unknown): value is SurfaceId {
-  return value === "about" || value === "editor" || value === "preview";
+    return value === "about" || value === "editor" || value === "preview";
 }
 
 /** Python sends absolute app urls; Remix's `navigate` wants a path. Handed an absolute one
  *  it resolves it against the origin, which doubles it - `/http://host/agent/` - and 404s.
  *  Every navigation off a server-sent href has to come through here. */
 export function appRelativeHref(href: string): string {
-  if (!href.startsWith("http://") && !href.startsWith("https://")) {
-    return href;
-  }
-  const url = new URL(href);
-  return `${url.pathname}${url.search}${url.hash}`;
+    if (!href.startsWith("http://") && !href.startsWith("https://")) {
+        return href;
+    }
+    const url = new URL(href);
+    return `${url.pathname}${url.search}${url.hash}`;
 }

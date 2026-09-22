@@ -1,15 +1,14 @@
 import "./RecipeWorkspace.css";
 
 import clsx from "clsx";
+import type { ReactNode } from "react";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
 
 import type { EditorRunBarProps } from "@gooey-types/recipe_top_bar_props";
 import type {
@@ -21,14 +20,13 @@ import type {
 } from "@gooey-types/recipe_workspace_props";
 import { useWorkspaceLayout } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
-import { RenderedChildren } from "~/renderer";
 import type { TreeNode } from "~/renderer";
+import { RenderedChildren } from "~/renderer";
 
 import { encodeSubmitIntent } from "../RecipeTopBar/submitIntent";
 import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
   collapsePane,
-  deferredPaneLoadKey,
   paneRolesForLayout,
   revealRunOutput,
   workspaceControlsForLayout,
@@ -153,18 +151,21 @@ export function RecipeWorkspacePanes({
   panes,
 }: CustomComponentProps & RecipeWorkspacePanesProps) {
   const { activeEditorPane, setActiveEditorPane } = useRecipeWorkspaceContext();
-  const selectedPane = panes.some((pane) => pane.id === activeEditorPane)
+  const selectedPaneId = panes.some((pane) => pane.id === activeEditorPane)
     ? activeEditorPane
     : panes[0]?.id;
 
   // A deferred pane's body arrives on a second pass: writing its key into the form state and
   // posting silently is what asks for it, and the skeleton below stands in until it lands.
   useEffect(() => {
-    const loadKey = deferredPaneLoadKey(panes, selectedPane ?? null, state);
-    if (!loadKey) return;
-    state[loadKey] = true;
-    onChange({ target: null, silent: true });
-  }, [panes, selectedPane, state, onChange]);
+    for (let pane of panes) {
+      if (!pane.load_key) continue;
+      let isSelected = pane.id == selectedPaneId;
+      if (state[pane.load_key] === isSelected) continue;
+      state[pane.load_key] = isSelected;
+      onChange({ target: null, silent: true });
+    }
+  }, [panes, selectedPaneId, state, onChange]);
 
   if (panes.length !== children.length) {
     throw new Error("RecipeWorkspacePanes requires one child per pane");
@@ -173,7 +174,7 @@ export function RecipeWorkspacePanes({
     <div className="d-flex flex-column h-100" style={{ minHeight: 0 }}>
       <div className="recipe-workspace-pane-tabs mb-1" role="tablist">
         {panes.map((pane) => {
-          const selected = pane.id === selectedPane;
+          const selected = pane.id === selectedPaneId;
           return (
             <button
               key={pane.id}
@@ -203,10 +204,10 @@ export function RecipeWorkspacePanes({
             className="recipe-workspace-pane-panel"
             role="tabpanel"
             aria-labelledby={`editor-pane-tab-${pane.id}`}
-            hidden={pane.id !== selectedPane}
+            hidden={pane.id !== selectedPaneId}
             aria-busy={pane.load_key ? true : undefined}
           >
-            {pane.load_key ? (
+            {children[index].children.length < 1 ? (
               <DeferredPaneSkeleton />
             ) : (
               <RenderedChildren

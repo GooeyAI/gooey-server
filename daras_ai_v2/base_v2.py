@@ -110,10 +110,8 @@ def deferred_pane(pane_id: str, label: str) -> tuple[WorkspaceEditorPane, bool]:
     """A pane whose body the server renders only once the client has asked for it.
     Returns the pane and whether to render its body."""
     key = PANE_LOAD_KEY_PREFIX + pane_id
+    pane = WorkspaceEditorPane(id=pane_id, label=label, load_key=key)
     loaded = bool(gui.session_state.get(key))
-    pane = WorkspaceEditorPane(
-        id=pane_id, label=label, load_key=None if loaded else key
-    )
     return pane, loaded
 
 

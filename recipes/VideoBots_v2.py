@@ -2,6 +2,8 @@ import json
 from enum import Enum
 from functools import cached_property
 
+from django.utils.text import get_text_list
+
 import gooey_gui as gui
 from ai_models.models import AIModelSpec
 from bots.models import BotIntegration, Platform
@@ -26,16 +28,15 @@ from daras_ai_v2.web_widget_embed import (
     get_chat_widget_messages,
     load_chat_widget_lib,
 )
-from django.utils.text import get_text_list
-from gooey_gui.types.recipe_top_bar_props import (
-    MenuIntent,
-    SubmitTarget,
-    TopBarIntegration,
-)
 from gooey_gui.types.about_props import (
     AboutCard,
     AboutGroup,
     AboutPaneTarget,
+)
+from gooey_gui.types.recipe_top_bar_props import (
+    MenuIntent,
+    SubmitTarget,
+    TopBarIntegration,
 )
 from gooey_gui.types.recipe_workspace_props import (
     RecipeWorkspacePanesProps,
