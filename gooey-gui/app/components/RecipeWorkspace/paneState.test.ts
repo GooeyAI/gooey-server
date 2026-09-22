@@ -1,14 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  PageShellConfig,
-  WorkspaceEditorPane,
-} from "@gooey-types/recipe_workspace_props";
+import type { PageShellConfig } from "@gooey-types/recipe_workspace_props";
 import {
   activeViewForLayouts,
   appRelativeHref,
   collapsePane,
-  deferredPaneLoadKey,
   foldForNarrowViewport,
   initialWorkspaceState,
   isRootLayout,
@@ -450,56 +446,5 @@ describe("leaving a document tab for a view", () => {
       src.indexOf("const handleRun")
     );
     expect(chooseView).toContain("workspaceLayoutNavigationState(view.layout)");
-  });
-});
-
-describe("deferredPaneLoadKey", () => {
-  const pane = (id: string, load_key: string | null): WorkspaceEditorPane => ({
-    id,
-    label: id,
-    load_key,
-  });
-  const panes = [
-    pane("llm-instructions", null),
-    pane("debug", "--pane-load:debug"),
-  ];
-
-  it("asks for nothing on a first load, where the deferred pane is not selected", () => {
-    expect(deferredPaneLoadKey(panes, "llm-instructions", {})).toBeNull();
-  });
-
-  it("asks for the body once the deferred pane is the selected one", () => {
-    expect(deferredPaneLoadKey(panes, "debug", {})).toBe("--pane-load:debug");
-  });
-
-  it("does not ask twice against the same response, while the answer is in flight", () => {
-    const state = { "--pane-load:debug": true };
-    expect(deferredPaneLoadKey(panes, "debug", state)).toBeNull();
-  });
-
-  it("keeps no memory between calls, so a fresh GET always gets a fresh ask", () => {
-    // A back-navigation to a run whose Debug pane was opened earlier in the page session
-    // offers the pane deferred anew; any record of having already asked strands the skeleton.
-    expect(deferredPaneLoadKey(panes, "debug", {})).toBe("--pane-load:debug");
-    expect(deferredPaneLoadKey(panes, "debug", {})).toBe("--pane-load:debug");
-  });
-
-  it("asks for nothing once the server has sent the body", () => {
-    const loaded = [pane("llm-instructions", null), pane("debug", null)];
-    expect(deferredPaneLoadKey(loaded, "debug", {})).toBeNull();
-  });
-
-  it("asks for nothing when no pane is selected", () => {
-    expect(deferredPaneLoadKey(panes, null, {})).toBeNull();
-  });
-
-  it("uses the key the server sent, rather than rebuilding it", async () => {
-    const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "app/components/RecipeWorkspace/index.tsx",
-      "utf8"
-    );
-    expect(src).toContain("state[loadKey] = true");
-    expect(src).not.toContain("--pane-load:");
   });
 });

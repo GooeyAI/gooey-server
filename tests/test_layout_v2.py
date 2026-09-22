@@ -151,11 +151,21 @@ def _render_input_col_capturing(monkeypatch) -> tuple[list[str], list]:
 
 DEBUG_PANE_LOAD_KEY = PANE_LOAD_KEY_PREFIX + "debug"
 
-EAGER_PANES = [
+EAGER_PANE_NAMES = [
+    "_render_llm_instructions_pane",
+    "_render_knowledge_pane",
+    "_render_functions",
+    "_render_settings_pane",
+]
+
+# `load_key` is the pane's stable channel, not a "deferred" flag: it rides on the pane in
+# every state, and the client writes the selection into it. Body rendering is separate.
+ALL_PANES = [
     {"id": "llm-instructions", "label": "LLM Instructions", "load_key": None},
     {"id": "knowledge", "label": "Knowledge", "load_key": None},
     {"id": "tools", "label": "Tools", "load_key": None},
     {"id": "settings", "label": "Settings", "load_key": None},
+    {"id": "debug", "label": "Debug", "load_key": DEBUG_PANE_LOAD_KEY},
 ]
 
 
@@ -165,19 +175,8 @@ def test_workspace_panes_defer_debug_until_asked_for(monkeypatch):
 
     rendered, components = _render_input_col_capturing(monkeypatch)
 
-    assert rendered == [
-        "_render_llm_instructions_pane",
-        "_render_knowledge_pane",
-        "_render_functions",
-        "_render_settings_pane",
-    ]
-    # the key travels on the pane, so the client never has to build it
-    assert components == [
-        RecipeWorkspacePanesProps(
-            panes=EAGER_PANES
-            + [{"id": "debug", "label": "Debug", "load_key": DEBUG_PANE_LOAD_KEY}]
-        )
-    ]
+    assert rendered == EAGER_PANE_NAMES
+    assert components == [RecipeWorkspacePanesProps(panes=ALL_PANES)]
 
 
 def test_workspace_panes_render_debug_once_the_load_key_is_set(monkeypatch):
@@ -186,19 +185,19 @@ def test_workspace_panes_render_debug_once_the_load_key_is_set(monkeypatch):
 
     rendered, components = _render_input_col_capturing(monkeypatch)
 
-    assert rendered == [
-        "_render_llm_instructions_pane",
-        "_render_knowledge_pane",
-        "_render_functions",
-        "_render_settings_pane",
-        "render_debug_pane",
-    ]
-    # cleared, or the client would ask for a body it can already see
-    assert components == [
-        RecipeWorkspacePanesProps(
-            panes=EAGER_PANES + [{"id": "debug", "label": "Debug", "load_key": None}]
-        )
-    ]
+    assert rendered == EAGER_PANE_NAMES + ["render_debug_pane"]
+    assert components == [RecipeWorkspacePanesProps(panes=ALL_PANES)]
+
+
+def test_workspace_panes_drop_debug_when_it_is_switched_away_from(monkeypatch):
+    """The client writes False on deselect, which has to read as "do not render" rather
+    than as a key that is merely present."""
+    gui.session_state.clear()
+    gui.session_state[DEBUG_PANE_LOAD_KEY] = False
+
+    rendered, _ = _render_input_col_capturing(monkeypatch)
+
+    assert rendered == EAGER_PANE_NAMES
 
 
 def test_deferred_pane_load_key_is_not_saved_to_the_run():
