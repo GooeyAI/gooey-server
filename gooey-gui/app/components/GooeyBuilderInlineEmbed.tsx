@@ -50,51 +50,40 @@ export function GooeyBuilderInlineEmbed(
         };
       }
 
+      async function sendMessage(input_data: any) {
+        let redirectUrl = await fetchServerAPI<string | null>(
+          "/__/gooey-builder/send-message",
+          {
+            // builder-only pages have no associated workflow to clone
+            workflow_url: propsRef.current.builder_only
+              ? null
+              : window.location.href,
+            builder_run_url: propsRef.current.builder_run_url,
+            workflow_state: propsRef.current.workflow_state,
+            input_data,
+          }
+        );
+        if (!redirectUrl) return;
+        let url = new URL(redirectUrl);
+        ctx.current.navigate(url.pathname + url.search);
+      }
+
       controllerRef.current = {
         messages,
-        onSendMessage: async (input_data: any) => {
-          let redirectUrl = await fetchServerAPI<string | null>(
-            "/__/gooey-builder/send-message",
-            {
-              // builder-only pages have no associated workflow to clone
-              workflow_url: propsRef.current.builder_only
-                ? null
-                : window.location.href,
-              builder_run_url: propsRef.current.builder_run_url,
-              workflow_state: propsRef.current.workflow_state,
-              input_data,
-            }
-          );
-          if (!redirectUrl) return;
-          let url = new URL(redirectUrl);
-          ctx.current.navigate(url.pathname + url.search);
-        },
+        onSendMessage: sendMessage,
         onEditQuery: (_messageId: string, input_data: any, webUrl?: string) => {
           // webUrl identifies the run that produced the edited turn, so the
           // server re-runs that turn rather than always the latest one
           if (!webUrl) return;
-          controllerRef.current?.onSendMessage({
-            ...input_data,
-            edit_run_url: webUrl,
-          });
+          sendMessage({ ...input_data, edit_run_url: webUrl });
+        },
+        // same server path as an edit, minus the prompt: the turn is replayed as-is
+        rerun: async (webUrl: string) => {
+          if (!webUrl) return;
+          sendMessage({ edit_run_url: webUrl });
         },
         onNewConversation: async () => {
           ctx.current.update_session_state({ builderOnNewConversation: true });
-        },
-        rerun: async (run_url: string) => {
-          let redirectUrl = await fetchServerAPI<string | null>(
-            "/__/gooey-builder/send-message",
-            {
-              workflow_url: propsRef.current.builder_only
-                ? null
-                : window.location.href,
-              builder_run_url: run_url,
-              workflow_state: propsRef.current.workflow_state,
-            }
-          );
-          if (!redirectUrl) return;
-          let url = new URL(redirectUrl);
-          ctx.current.navigate(url.pathname + url.search);
         },
       };
 
