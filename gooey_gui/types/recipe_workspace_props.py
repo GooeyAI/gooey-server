@@ -87,6 +87,9 @@ class RecipeSurfaceProps(StrictComponentModel):
 class WorkspaceEditorPane(StrictComponentModel):
     id: str
     label: str
+    # Set when the server has not rendered this pane's body: the client shows a skeleton and
+    # asks for the body by writing this key into the form state.
+    load_key: str | None = None
 
 
 class RecipeWorkspacePanesProps(StrictComponentModel):
