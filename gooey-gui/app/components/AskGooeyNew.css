@@ -151,7 +151,7 @@
   line-height: 20px;
   resize: none;
   padding: 0;
-  font-family: Inter, sans-serif;
+  font-family: var(--gooey-font-ui);
   overflow: hidden;
 }
 

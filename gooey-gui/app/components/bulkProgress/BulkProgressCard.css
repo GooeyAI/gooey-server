@@ -170,8 +170,10 @@
 
 .bulk-progress-headline {
   align-self: stretch;
-  font-family: avenir-lt-w01_85-heavy1475544, avenir-lt-w05_85-heavy,
-    "Space Grotesk", sans-serif;
+  /* The design system's UI face. Avenir 85 Heavy was one weight, so the old rule never
+     said one; Inter needs it spelled out or the headline lands at Regular. */
+  font-family: var(--gooey-font-ui);
+  font-weight: 600;
   font-size: 1.55rem;
   line-height: 1.15;
   margin: 0.55rem 0;
@@ -231,9 +233,8 @@
 
 .bulk-progress-current strong {
   color: #070b1a;
-  font-family: avenir-lt-w01_85-heavy1475544, avenir-lt-w05_85-heavy,
-    "Space Grotesk", sans-serif;
-  font-weight: 400;
+  font-family: var(--gooey-font-ui);
+  font-weight: 600;
 }
 
 .bulk-progress-workflow {
@@ -336,7 +337,7 @@
 .bulk-progress-input-text span,
 .bulk-progress-input > span {
   color: #59617d;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--gooey-font-mono);
 }
 
 .bulk-progress-last-completed {
@@ -353,8 +354,8 @@
 .bulk-progress-last-completed-label {
   color: #59617d;
   flex: 0 0 var(--bulk-progress-detail-label-width);
-  font-family: avenir-lt-w01_85-heavy1475544, avenir-lt-w05_85-heavy,
-    "Space Grotesk", sans-serif;
+  font-family: var(--gooey-font-ui);
+  font-weight: 600;
   font-size: 0.8rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -427,16 +428,16 @@
 
 .bulk-progress-stat-label {
   color: #59617d;
-  font-family: avenir-lt-w01_85-heavy1475544, avenir-lt-w05_85-heavy,
-    "Space Grotesk", sans-serif;
+  font-family: var(--gooey-font-ui);
+  font-weight: 600;
   font-size: 0.85rem;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .bulk-progress-stat-value {
-  font-family: avenir-lt-w01_85-heavy1475544, avenir-lt-w05_85-heavy,
-    "Space Grotesk", sans-serif;
+  font-family: var(--gooey-font-ui);
+  font-weight: 600;
   font-size: 1.55rem;
   line-height: 1.2;
   margin: 0.45rem 0;

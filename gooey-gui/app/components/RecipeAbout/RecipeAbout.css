@@ -80,7 +80,7 @@
   background: var(--gooey-bg-page);
   color: var(--gooey-ink);
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 600; /* the button weight app.css gives the rest of the shell */
   line-height: 1.2;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition:
@@ -237,10 +237,9 @@
 
 .v2-about .v2-about-section-title {
   /* h2/h3 for the outline, so the app's heading scale comes back off it here. `h3` also
-       carries `inline-block` and letter-spacing, which is what these two undo. */
+       carries `inline-block`, which `display` undoes. */
   font-family: inherit;
   display: block;
-  letter-spacing: normal;
   margin-top: 0;
   font-size: 0.875rem;
   font-weight: 500;

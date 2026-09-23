@@ -1,9 +1,3 @@
-/* @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"); */
-
-@import url("https://static.parastorage.com/services/santa-resources/resources/viewer/user-site-fonts/fonts/Avenir_Family_Pack/v1/AvenirLTW05-85Heavy.woff2");
-
-/* avenir-lt-w05_85-heavy,sans-serif */
-
 .no-margin * {
   margin: unset;
 }
@@ -13,7 +7,7 @@
 .streamlit-like-btn:hover,
 .streamlit-like-btn:active {
   cursor: pointer;
-  font-family: "avenir-lt-w05_85-heavy", "Space Grotesk", sans-serif;
+  font-family: "avenir-lt-w05_85-heavy", sans-serif;
   font-size: 15px;
   text-decoration: none !important;
   color: white !important;
@@ -187,7 +181,7 @@ h6,
 strong,
 .bold,
 .semibold {
-  font-family: "avenir-lt-w05_85-heavy", "Space Grotesk", sans-serif;
+  font-family: "avenir-lt-w05_85-heavy", sans-serif;
 }
 h1 {
   font-size: 32px;
@@ -875,7 +869,9 @@ button {
 
 /* Checked state */
 .gooey-switch:checked + label:before {
-  background-color: #02c4c8;
+  background-color: var(
+    --gooey-accent
+  ); /* the same cyan, now named in app.css */
 }
 
 /* Large Variant */

@@ -419,24 +419,246 @@ button .gui-html-container,
      the old picture rather than to Helvetica. */
   --gooey-font-ui: "Inter", basiercircle, sans-serif;
   --gooey-font-heading: "Domine", basiercircle, Georgia, serif;
+  /* Bootstrap's own stack, named so code, the editor and the bulk card's ids agree. */
+  --gooey-font-mono: var(
+    --bs-font-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace
+  );
+
+  /* Type scale. Named by step, not by use, so a component picks a size the way it picks a
+     space: from the scale, not by inventing a value. The px in each comment is at the 16px
+     root; the v2 surfaces were already using every one of these, spelled five ways. */
+  --gooey-text-xs: 0.75rem; /* 12 - meta labels, eyebrows */
+  --gooey-text-sm: 0.8125rem; /* 13 - captions, debug, tooltips */
+  --gooey-text-md: 0.875rem; /* 14 - controls, pills, card body, form labels */
+  --gooey-text-base: 1rem; /* 16 - body */
+  --gooey-text-lg: 1.25rem; /* 20 - section titles */
+  --gooey-text-xl: 1.5rem; /* 24 - h4 */
+  --gooey-text-2xl: 2rem; /* 32 - h1-h3 */
+
+  --gooey-leading-none: 1;
+  --gooey-leading-tight: 1.2;
+  --gooey-leading-normal: 1.5;
+
+  /* Inter is variable, so these are real stops. Avenir Heavy had one weight and the old
+     rules never named it; every 400 written for Avenir means "heavy" and reads Regular here. */
+  --gooey-weight-regular: 400;
+  --gooey-weight-medium: 500;
+  --gooey-weight-semibold: 600;
+  --gooey-weight-bold: 700;
+
+  --gooey-tracking-caps: 0.04em; /* uppercase eyebrow labels */
+
+  /* One height for text inputs, selects and the slider's number box. The top bar's
+     controls are 36; form controls in a pane get 40 so a 14px label sits inside comfortably. */
+  --gooey-control-height: 40px;
+
+  /* The brand cyan the toggle already paints its checked state with (custom.css
+     `.gooey-switch:checked`). Sliders, checkboxes and focus rings were on Bootstrap and
+     react-select blue, so one screen carried two accents. */
+  --gooey-accent: #02c4c8;
+  --gooey-accent-ring: rgb(2 196 200 / 30%);
 }
 
 /* The surfaces built on the design system; v1 stays on basiercircle. `.gooey-ds-page` is
-   the marker a converted React page adds, so the next one needs no change here. */
+   the marker a converted React page adds, so the next one needs no change here.
+   `.v2-topbar-container` is the bar base_v2.py renders as a sibling of the shell, not a
+   child - without it the recipe title inherits basiercircle from `body`. */
 .v2-app-shell,
+.v2-topbar-container,
 .nav-sidebar,
 .gooey-ds-page,
 .ask-gooey-page {
   font-family: var(--gooey-font-ui);
 }
 
-/* Mirrors the selector list custom.css hands the heavy face - headings, `strong`, and the
-   `.bold`/`.semibold` utilities - each of which declares its own family, so inheriting from
-   the page cannot reach them. Two `:is()`s keep this at two classes, which outranks both
-   `.bold` and `.gui-md-container strong`. */
-:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
-  :is(h1, h2, h3, h4, h5, h6, strong, .bold, .semibold) {
+/* Mirrors the selector list custom.css hands the heavy face - headings, table headers,
+   `strong`, `.streamlit-like-btn` and the `.bold`/`.semibold` utilities - each of which
+   declares its own family, so inheriting from the page cannot reach them. Two `:is()`s keep
+   this at two classes, which outranks both `.bold` and `.gui-md-container strong`. */
+:is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
+  :is(
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    strong,
+    .bold,
+    .semibold,
+    .streamlit-like-btn,
+    .table > thead > tr > th
+  ) {
   font-family: var(--gooey-font-ui);
+}
+
+/* Weights the heavy face never had to name. Avenir 85 Heavy is a single weight, so
+   custom.css leaves headings and `.streamlit-like-btn` at 400 and they still read bold; on
+   Inter, 400 is Regular. 600 matches what RecipeTopBar and the bulk card already chose.
+   `:where()` keeps this at one class: it outranks custom.css's bare `h1` but loses to any
+   component that names its own weight (`.v2-about .v2-about-section-title` at 500).
+   `.gui-input` is excluded because gooey-gui renders control labels as heading tags. */
+:is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
+  :where(h1, h2, h3, h4, h5, h6):not(:where(.gui-input *)) {
+  font-weight: 600;
+}
+
+/* Buttons to the same 600 as the Run button, headings and labels. custom.css gives
+   `.btn.btn-theme` `bold`, which on Avenir Heavy changed nothing and on Inter is a step
+   heavier than the label beside it; `.streamlit-like-btn` there is 400. Both load after this
+   file, so the selectors carry one class more than theirs to win. Pane pills and top bar
+   tabs are not `.btn` and keep their own 500.
+
+   14px too: Bootstrap's `.btn` is 1rem, the size of body text, so a 600 label in a button
+   read bulkier than the Run button and pane pills it sits among, which are 14px. */
+:is(.v2-app-shell, .v2-topbar-container, .gooey-ds-page, .ask-gooey-page)
+  :is(.btn, .btn.btn-theme, .streamlit-like-btn) {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Form controls inside the design-system scope. gooey-gui's own rules above are for v1 and
+   stay; these sit on top, scoped to the markers, and read every value off the tokens.
+
+   Labels: a `gui.text_input("Speaker")` label arrives as `<label><p>` and app.css paints
+   that `p` at 45% black, while `"###### Speaker"` arrives as an `h6` in full ink - so on one
+   screen labels were grey or black by how the Python author happened to spell them, and
+   `**bold**` checkbox labels outweighed the select above them. One label: 14px, medium,
+   ink, whatever tag the markdown produced. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input
+  label
+  :is(p, h1, h2, h3, h4, h5, h6) {
+  font-size: var(--gooey-text-md);
+  font-weight: var(--gooey-weight-medium);
+  line-height: var(--gooey-leading-tight);
+  color: var(--gooey-ink);
+  margin: 0 0 var(--gooey-space-2);
+}
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input
+  label
+  :is(strong, b) {
+  font-weight: inherit;
+}
+/* Checkbox and radio labels sit beside their box, so no bottom margin. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  :is(.gui-input-checkbox, .gui-input-radio)
+  label
+  :is(p, h1, h2, h3, h4, h5, h6) {
+  margin: 0;
+}
+
+/* Captions the same muted ink as every other secondary label, not Bootstrap's grey. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page) .gui-input .text-muted,
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-md-container.text-muted {
+  color: var(
+    --gooey-ink-muted
+  ) !important; /* Bootstrap's `.text-muted` is !important */
+}
+
+/* One control height and one text size for text inputs, the slider's number box and the
+   select. The number box was taller than the select beside it (0.5rem of extra padding on a
+   1rem font), and selects were 16px next to 14px pills. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input:not(.gui-input-select)
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]) {
+  height: var(--gooey-control-height);
+  padding: 0 var(--gooey-space-3);
+  font-size: var(--gooey-text-md);
+  border-radius: var(--gooey-radius-xs);
+}
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input-select
+  [class*="-control"] {
+  min-height: var(--gooey-control-height);
+  font-size: var(--gooey-text-md);
+  border-radius: var(--gooey-radius-xs);
+}
+/* The selected value is markdown, so it arrives as a `<p>` with a 1rem bottom margin that
+   pushed the control to 54px against the 40px number box beside it. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input-select
+  [class*="-control"]
+  p {
+  margin: 0;
+}
+
+/* One accent. Native checkboxes and radios take it through `accent-color`; text inputs and
+   the select get it as their focus ring in place of Bootstrap's and react-select's blues.
+   Three classes on the select outranks the emotion class react-select sets while focused. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--gooey-accent);
+}
+
+/* The range is drawn by hand rather than through `accent-color`: Chrome pairs a light accent
+   with a near-black track for contrast, which read as a different control. A quiet track in
+   the design's surface grey and a thumb in the accent, the same on every engine. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page) input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 6px;
+  margin-block: 0;
+  /* The travelled part of the track in the accent. `--gooey-range-fill` is the thumb's
+     position as a percentage, kept current by GooeySlider (renderer.tsx); a hand-drawn
+     track has no other way to know where its thumb is. */
+  background: linear-gradient(
+    to right,
+    var(--gooey-accent) 0 var(--gooey-range-fill, 0%),
+    var(--gooey-surface-200) var(--gooey-range-fill, 0%)
+  );
+  border-radius: var(--gooey-radius-full);
+  outline: 0;
+}
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--gooey-accent);
+  cursor: pointer;
+}
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--gooey-accent);
+  cursor: pointer;
+}
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  input[type="range"]:focus-visible {
+  box-shadow: 0 0 0 3px var(--gooey-accent-ring);
+}
+/* `:not(.gui-input-select)`: react-select keeps a zero-width search input inside the
+   control, and a ring on that drew a pill-shaped "caret" beside the selected value. The
+   select gets its own ring on the control below. */
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input:not(.gui-input-select)
+  input:focus,
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page) .gui-input textarea:focus,
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page) .form-control:focus {
+  border-color: var(--gooey-accent);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--gooey-accent-ring);
+}
+:is(.v2-app-shell, .gooey-ds-page, .ask-gooey-page)
+  .gui-input-select
+  [class*="-control"]:focus-within {
+  border-color: var(--gooey-accent);
+  box-shadow: 0 0 0 1px var(--gooey-accent);
 }
 
 /* The two headings the design actually draws in the display face. Everything else in v2 uses

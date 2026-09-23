@@ -164,7 +164,7 @@ export default function CodeEditor({
         ref={ref}
         theme={theme({
           settings: {
-            fontFamily: "monospace",
+            fontFamily: "var(--gooey-font-mono)",
             fontSize: "14px",
           },
         })}

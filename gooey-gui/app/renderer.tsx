@@ -579,6 +579,23 @@ function GooeySlider({
   const ref1 = useRef<HTMLInputElement>(null);
   const ref2 = useRef<HTMLInputElement>(null);
 
+  // The track is drawn by CSS (app.css `input[type="range"]` in the design-system scope),
+  // which cannot see the thumb's position, so the travelled fraction is handed to it as a
+  // custom property. Kept here rather than in the handlers alone so a server-side value
+  // change paints the track too.
+  const paintFill = () => {
+    const range = ref2.current;
+    if (!range) return;
+    const min = Number(range.min || 0);
+    const max = Number(range.max || 100);
+    const value = Number(range.value);
+    const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+    range.style.setProperty(
+      "--gooey-range-fill",
+      `${Math.min(100, Math.max(0, pct))}%`
+    );
+  };
+
   // if server changed the value, update both inputs
   useEffect(() => {
     for (const element of [ref1.current, ref2.current]) {
@@ -587,6 +604,7 @@ function GooeySlider({
         element.value = state[props.name];
       }
     }
+    paintFill();
   }, [state, props.name]);
   return (
     <div className={className}>
@@ -601,6 +619,7 @@ function GooeySlider({
           ref={ref1}
           onChange={(e) => {
             if (ref2.current) ref2.current.value = e.target.value;
+            paintFill();
           }}
           type="number"
           {...args}
@@ -609,6 +628,7 @@ function GooeySlider({
           ref={ref2}
           onChange={(e) => {
             if (ref1.current) ref1.current.value = e.target.value;
+            paintFill();
           }}
           id={id}
           name={name}
