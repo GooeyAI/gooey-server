@@ -96,6 +96,7 @@ export interface RecipeTopBarProps {
   cost_label: string | null;
   cost_href: string | null;
   cost_title: string | null;
+  eco: EcoLabelProps | null;
 }
 export interface PageShellConfig {
   storage_key: string;
@@ -123,6 +124,47 @@ export interface WorkspaceView {
   icon_html: string | null;
   layout: SingleLayout | SplitLayout;
   desktop_only: boolean;
+}
+/**
+ * Per-run figures for the "Run Cost & Environment Impact" modal, opened
+ * from the top bar's cost readout. The modal scales them client-side with a
+ * runs slider. Nested in RecipeTopBarProps.
+ */
+export interface EcoLabelProps {
+  run_cost: string;
+  run_cost_usd: number | null;
+  confidence: "low" | "medium" | "high";
+  reasons: string[];
+  methodology_url: string;
+  run_by: AuthorProps | null;
+  charged_to: AuthorProps | null;
+  balance_url: string | null;
+  co2e_grams: number;
+  co2e_min: number;
+  co2e_max: number;
+  energy_wh: number;
+  water_ml: number;
+  water_onsite_ml: number;
+  region: EcoRegionProps | null;
+}
+export interface AuthorProps {
+  name: string;
+  photo_url: string | null;
+  url: string | null;
+}
+/**
+ * Where the run's electricity came from, for the modal's region block.
+ */
+export interface EcoRegionProps {
+  country_code: string;
+  label: string;
+  assumption: string | null;
+  gco2e_per_kwh: number;
+  gco2e_per_kwh_min: number;
+  gco2e_per_kwh_max: number;
+  mix: {
+    [k: string]: number;
+  };
 }
 /**
  * The same Run control, at the foot of the editor pane rather than in the bar.

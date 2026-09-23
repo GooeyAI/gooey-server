@@ -1,0 +1,478 @@
+/* "Cost & Environment Impact". Tokens are the v2 layout's, from app.css. */
+.gooey-eco-modal {
+  background: var(--gooey-scrim);
+  z-index: 1080;
+}
+.gooey-eco-modal .modal-dialog {
+  max-width: 680px;
+}
+.gooey-eco-modal .modal-content {
+  max-height: calc(100vh - 3rem);
+}
+.gooey-eco-modal-content {
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgb(0 0 0 / 18%);
+  font-family: var(--gooey-font-ui);
+  color: var(--gooey-ink);
+}
+.gooey-eco-modal-content :not(i) {
+  font-family: var(--gooey-font-ui);
+}
+.gooey-eco-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--gooey-space-4);
+  padding: var(--gooey-space-4) var(--gooey-space-5) 0;
+}
+.gooey-eco-modal-title {
+  margin: 0;
+  font-family: var(--gooey-font-heading);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.gooey-eco-modal-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gooey-space-2);
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--gooey-ink-muted);
+}
+/* "Run by <avatar> Name" stays on one line: the Author body is a block flex row,
+   so each item is itself an inline flex row and the author is forced inline. */
+.gooey-eco-modal-sub > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gooey-space-2);
+  white-space: nowrap;
+}
+.gooey-eco-modal-sub .d-flex {
+  display: inline-flex !important;
+}
+.gooey-eco-modal-sub .run-debug-avatar {
+  width: 20px;
+  height: 20px;
+}
+.gooey-eco-modal-sub a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gooey-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.gooey-eco-dot::before {
+  content: "·";
+}
+.gooey-eco-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gooey-space-3);
+  padding: 24px var(--gooey-space-5) var(--gooey-space-4);
+  overflow-y: auto;
+}
+
+.gooey-eco-headline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gooey-space-3);
+}
+.gooey-eco-stat {
+  padding: var(--gooey-space-3) var(--gooey-space-4);
+  border: 1px solid var(--gooey-line-soft);
+  border-radius: var(--gooey-radius-lg);
+}
+.gooey-eco-stat-label {
+  font-size: 13px;
+  color: var(--gooey-ink-muted);
+}
+.gooey-eco-stat-value {
+  margin-top: 2px;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.gooey-eco-green {
+  color: var(--gooey-status-running-ink);
+}
+.gooey-eco-unit {
+  font-size: 16px;
+  font-weight: 500;
+}
+.gooey-eco-stat-range {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--gooey-ink-muted);
+}
+
+.gooey-eco-slider {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--gooey-space-3);
+  padding: var(--gooey-space-2) var(--gooey-space-3);
+  border-radius: var(--gooey-radius-lg);
+  background: var(--gooey-surface-100);
+}
+.gooey-eco-slider label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gooey-ink);
+  margin: 0;
+}
+.gooey-eco-slider-unit {
+  white-space: nowrap;
+}
+.gooey-eco-help-icon {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--gooey-ink-muted);
+  cursor: help;
+}
+.gooey-eco-help {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #1b1f1c;
+  color: #fff;
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: normal;
+}
+.gooey-eco-help-table {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.gooey-eco-help-table > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.gooey-eco-help-table dt {
+  font-weight: 400;
+  opacity: 0.75;
+}
+.gooey-eco-help-table dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.gooey-eco-slider-value {
+  display: grid;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Both spans share one grid cell: the invisible sizer fixes the width, the
+   visible one changes with the slider. */
+.gooey-eco-slider-value > span {
+  grid-area: 1 / 1;
+}
+.gooey-eco-slider-sizer {
+  visibility: hidden;
+}
+.gooey-eco-slider-track {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Custom range: a filled track from the left, a white thumb with a green ring. */
+.gooey-eco-slider input[type="range"] {
+  --pct: 0%;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.gooey-eco-slider input[type="range"]:focus {
+  outline: none;
+}
+.gooey-eco-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--gooey-status-running-ink) 0 var(--pct),
+    var(--gooey-line-default) var(--pct) 100%
+  );
+}
+.gooey-eco-slider input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--gooey-line-default);
+}
+.gooey-eco-slider input[type="range"]::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--gooey-status-running-ink);
+}
+.gooey-eco-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--gooey-status-running-ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+  transition: transform 0.12s;
+}
+.gooey-eco-slider input[type="range"]::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--gooey-status-running-ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+}
+.gooey-eco-slider input[type="range"]:hover::-webkit-slider-thumb,
+.gooey-eco-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px rgb(10 109 99 / 15%);
+}
+/* Each label is centred on the thumb's stop for its step: the thumb is 18px
+   wide, so its centre runs from 9px to (100% - 9px). */
+.gooey-eco-slider-ticks {
+  position: relative;
+  height: 14px;
+  font-size: 10.5px;
+  color: var(--gooey-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.gooey-eco-slider-ticks span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.gooey-eco-h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--gooey-space-1);
+  margin: 0;
+  font-family: var(--gooey-font-heading);
+  font-size: 15px;
+  font-weight: 600;
+}
+.gooey-eco-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gooey-space-3);
+}
+.gooey-eco-tile {
+  padding: var(--gooey-space-3) var(--gooey-space-2);
+  border: 1px solid var(--gooey-line-soft);
+  border-radius: var(--gooey-radius-lg);
+  text-align: center;
+}
+.gooey-eco-tile-icon {
+  font-size: 26px;
+  margin-bottom: var(--gooey-space-2);
+}
+.gooey-eco-tone-ink {
+  color: var(--gooey-ink-muted);
+}
+.gooey-eco-tone-blue {
+  color: #2f7fd6;
+}
+.gooey-eco-tone-amber {
+  color: #e0a028;
+}
+.gooey-eco-tile-value {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.gooey-eco-tile-unit {
+  font-size: 13px;
+  font-weight: 500;
+}
+.gooey-eco-tile-line1 {
+  margin-top: var(--gooey-space-1);
+  font-size: 12.5px;
+  color: var(--gooey-ink);
+}
+.gooey-eco-tile-line2:empty {
+  display: none;
+}
+.gooey-eco-tile-line2 {
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--gooey-ink-muted);
+  line-height: 1.3;
+}
+
+.gooey-eco-location {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gooey-space-3);
+}
+.gooey-eco-place {
+  padding: var(--gooey-space-3) var(--gooey-space-4);
+  border-radius: var(--gooey-radius-lg);
+  background: var(--gooey-surface-100);
+}
+.gooey-eco-place-name {
+  display: flex;
+  align-items: center;
+  gap: var(--gooey-space-2);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.gooey-eco-flag {
+  font-size: 22px;
+  line-height: 1;
+}
+.gooey-eco-place-note {
+  margin-top: var(--gooey-space-1);
+  font-size: 13px;
+  color: var(--gooey-ink-muted);
+}
+.gooey-eco-place-grid {
+  margin-top: var(--gooey-space-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.gooey-eco-muted {
+  color: var(--gooey-ink-muted);
+}
+.gooey-eco-mix {
+  padding: var(--gooey-space-2) var(--gooey-space-2) 0;
+}
+.gooey-eco-mix-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: var(--gooey-space-2);
+}
+.gooey-eco-mix-bar {
+  display: flex;
+  height: 10px;
+  border-radius: var(--gooey-radius-pill);
+  overflow: hidden;
+  background: var(--gooey-surface-100);
+}
+.gooey-eco-mix-bar span {
+  display: block;
+  height: 100%;
+}
+.gooey-eco-mix-list {
+  list-style: none;
+  margin: var(--gooey-space-2) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px var(--gooey-space-3);
+  font-size: 12.5px;
+}
+.gooey-eco-mix-list li {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: var(--gooey-space-2);
+}
+.gooey-eco-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.gooey-eco-mix-pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--gooey-ink);
+}
+
+/* Confidence pill and external links, shared by the footer. */
+.gooey-eco-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gooey-ink);
+  text-decoration: none;
+}
+.gooey-eco-card-link:hover {
+  text-decoration: underline;
+}
+.gooey-eco-card-link i {
+  font-size: 11px;
+}
+.gooey-eco-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--gooey-status-line);
+  border-radius: var(--gooey-radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--gooey-status-muted);
+  text-decoration: none;
+}
+.gooey-eco-pill span::first-letter {
+  text-transform: uppercase;
+}
+.gooey-eco-pill i {
+  font-size: 11px;
+}
+.gooey-eco-pill-low {
+  color: var(--gooey-status-warn);
+  background: var(--gooey-status-warn-bg);
+  border-color: var(--gooey-status-warn-line);
+}
+.gooey-eco-pill-high {
+  color: var(--gooey-status-running-ink);
+  background: var(--gooey-status-running-bg);
+  border-color: var(--gooey-status-running-line);
+}
+
+.gooey-eco-foot {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--gooey-space-3);
+  padding-top: var(--gooey-space-2);
+  border-top: 1px solid var(--gooey-line-soft);
+  font-size: 13px;
+}
+.gooey-eco-foot > .gooey-eco-pill,
+.gooey-eco-foot > .gooey-eco-card-link {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .gooey-eco-slider {
+    grid-template-columns: auto 1fr;
+  }
+  .gooey-eco-slider-value {
+    grid-column: 2;
+    text-align: left;
+  }
+  .gooey-eco-headline {
+    grid-template-columns: 1fr 1fr;
+  }
+  .gooey-eco-location {
+    grid-template-columns: 1fr;
+  }
+}
