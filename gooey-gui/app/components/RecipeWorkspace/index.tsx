@@ -23,6 +23,7 @@ import type { CustomComponentProps } from "~/components";
 import type { TreeNode } from "~/renderer";
 import { RenderedChildren } from "~/renderer";
 
+import { EcoCostButton } from "../EcoModal";
 import { encodeSubmitIntent } from "../RecipeTopBar/submitIntent";
 import { LocalWorkspacePaneControl } from "../WorkspacePaneControl";
 import {
@@ -283,6 +284,7 @@ export function EditorRunBar({
   cost_label,
   cost_href,
   cost_title,
+  eco_cost,
 }: CustomComponentProps & EditorRunBarProps) {
   const { config } = useRecipeWorkspaceContext();
   const { layout, selectLayout } = useWorkspaceLayout(config);
@@ -297,7 +299,12 @@ export function EditorRunBar({
   return (
     <div className="v2-editor-runbar d-lg-none">
       {!!cost_label && (
-        <CostReading label={cost_label} href={cost_href} title={cost_title} />
+        <CostReading
+          label={cost_label}
+          href={cost_href}
+          title={cost_title}
+          eco_cost={eco_cost}
+        />
       )}
       <button
         type="submit"
@@ -321,16 +328,20 @@ export function EditorRunBar({
   );
 }
 
-/** The estimate, as a link to top-ups where there is one. "Est." qualifies the number rather
- *  than being part of it, so it is left out of what gets read aloud. */
+/** The estimate, as a link to top-ups where there is one. With the run's eco figures it is a
+ *  button instead, "cost / CO2e", that opens the impact modal as the top bar's does. "Est."
+ *  qualifies the number rather than being part of it, so it is left out of what gets read
+ *  aloud. */
 function CostReading({
   label,
   href,
   title,
+  eco_cost,
 }: {
   label: string;
   href: string | null;
   title: string | null;
+  eco_cost: EditorRunBarProps["eco_cost"];
 }) {
   let tooltip = `Run cost: ${label}`;
   if (title) {
@@ -342,6 +353,20 @@ function CostReading({
       {label}
     </>
   );
+  if (eco_cost) {
+    return (
+      <EcoCostButton
+        eco_cost={eco_cost}
+        tooltip={tooltip}
+        className="v2-editor-runbar-cost v2-editor-runbar-cost-eco"
+      >
+        {inner}
+        <span className="v2-editor-runbar-sep" aria-hidden="true">
+          /
+        </span>
+      </EcoCostButton>
+    );
+  }
   if (href) {
     return (
       <a

@@ -10,6 +10,8 @@
  *  - 10 W LED bulb (a typical 60 W-equivalent)
  *  - EU household electricity 3,600 kWh/yr (Eurostat)
  *  - glass of water 250 mL; bathtub 150 L; Olympic pool 2,500,000 L
+ *  - grid bands in `gridNote` sit around the world average, about 480 gCO2 per
+ *    kWh in 2023 (Ember, Global Electricity Review 2024)
  */
 
 /** 1-5-10 steps per decade, so the slider moves in halves rather than tens. */
@@ -65,6 +67,14 @@ export function formatMl(ml: number): string {
   return `${sig(ml)} mL`;
 }
 
+/** A token count, compact: 850, 12k, 1.2M. */
+export function formatTokens(n: number): string {
+  if (n >= 1_000_000_000) return `${sig(n / 1_000_000_000)}B`;
+  if (n >= 1_000_000) return `${sig(n / 1_000_000)}M`;
+  if (n >= 1_000) return `${sig(n / 1_000)}k`;
+  return String(Math.round(n));
+}
+
 function duration(s: number): Amount {
   if (s >= YEAR_S) return { value: sig(s / YEAR_S), unit: "yr" };
   if (s >= 86400) return { value: sig(s / 86400), unit: "days" };
@@ -102,20 +112,44 @@ export function waterEquivalent(ml: number): Amount {
   return { value: sig(ml), unit: "mL" };
 }
 
+const ALPHA_2 = /^[A-Za-z]{2}$/;
+
 /** Flag emoji from an ISO 3166-1 alpha-2 code; empty for anything else. */
 export function flagEmoji(cc: string): string {
-  if (!/^[A-Za-z]{2}$/.test(cc)) return "";
+  if (!ALPHA_2.test(cc)) return "";
   return String.fromCodePoint(
     ...[...cc.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
   );
 }
 
-export function gridNote(gPerKwh: number): string {
-  if (gPerKwh < 100)
-    return "Very low-carbon grid: mostly hydro, nuclear or geothermal.";
-  if (gPerKwh < 300) return "Relatively low-carbon grid.";
-  if (gPerKwh < 500) return "Average grid intensity, gas-heavy.";
-  return "High-carbon grid, coal-heavy.";
+const REGION_NAMES = new Intl.DisplayNames(["en"], { type: "region" });
+
+/** English country name from an ISO 3166-1 alpha-2 code: "US" -> "United States".
+ * Anything else comes back as is: `Intl.DisplayNames` throws on it. */
+export function countryName(cc: string): string {
+  if (!ALPHA_2.test(cc)) return cc;
+  return REGION_NAMES.of(cc.toUpperCase()) ?? cc;
+}
+
+/** The grid in words: how carbon-heavy it is, then what it runs on, from the
+ * mix: "Moderate-carbon grid, led by wind and coal." One source with half or
+ * more of the generation reads "mostly": "Very low-carbon grid, mostly nuclear." */
+export function gridNote(gPerKwh: number, mix: Record<string, number>): string {
+  const level = carbonLevel(gPerKwh);
+  const [first, second] = Object.entries(mix).sort((a, b) => b[1] - a[1]);
+  const name = ([source]: [string, number]) =>
+    (MIX_LABELS[source] ?? source).toLowerCase();
+  if (!first) return `${level} grid.`;
+  if (first[1] >= 0.5 || !second)
+    return `${level} grid, mostly ${name(first)}.`;
+  return `${level} grid, led by ${name(first)} and ${name(second)}.`;
+}
+
+function carbonLevel(gPerKwh: number): string {
+  if (gPerKwh < 100) return "Very low-carbon";
+  if (gPerKwh < 300) return "Low-carbon";
+  if (gPerKwh < 500) return "Moderate-carbon";
+  return "High-carbon";
 }
 
 export const MIX_LABELS: Record<string, string> = {
@@ -146,18 +180,18 @@ export const MIX_COLORS: Record<string, string> = {
 
 /** Short nouns for the confidence tooltip: "Assumed: serving site, PUE". */
 export const REASON_LABELS: Record<string, string> = {
-  provider_unknown_fallback: "provider",
+  provider_unknown: "provider",
   provider_inferred_from_model: "provider",
-  region_inferred: "serving site",
-  hardware_assumed: "chip type",
   active_params_undisclosed: "model size",
-  active_params_estimated: "model size",
+  active_params_assumed: "model size",
+  region_assumed: "serving site",
+  chips_assumed: "chip type",
   pue_assumed: "PUE",
   wue_assumed: "cooling water",
-  utilization_assumed: "GPU utilization",
+  decode_utilization_assumed: "GPU utilization",
   serving_overhead_assumed: "server overhead",
-  grid_intensity_national_average: "grid average",
-  embodied_carbon_default: "hardware lifetime",
+  grid_intensity_assumed: "grid intensity",
+  embodied_carbon_assumed: "hardware lifetime",
 };
 
 /** Two significant figures, plain digits, thousands separators above 999. */

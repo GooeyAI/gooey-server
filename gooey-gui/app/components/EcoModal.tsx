@@ -15,11 +15,13 @@ import {
   RUN_STEPS,
   RUN_TICKS,
   carbonEquivalent,
+  countryName,
   energyEquivalent,
   flagEmoji,
   formatGrams,
   formatMl,
   formatRuns,
+  formatTokens,
   formatUsd,
   formatWh,
   gridNote,
@@ -27,15 +29,53 @@ import {
 } from "./ecoScale";
 
 /**
+ * A bar's cost readout when the run has eco figures: the cost (`children`),
+ * then its CO2e, as one button that opens the impact modal. Shared by the top
+ * bar and the editor run bar, which differ only in styling and cost markup.
+ */
+export function EcoCostButton({
+  eco_cost,
+  tooltip,
+  className,
+  children,
+}: {
+  eco_cost: EcoLabelProps;
+  tooltip: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const co2e = formatGrams(eco_cost.co2e_grams);
+  return (
+    <>
+      <button
+        type="button"
+        className={className}
+        title="Run cost and environment impact"
+        aria-label={`${tooltip}, ${co2e} CO2e. Open cost and environment impact`}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+      >
+        {children}
+        <span className="gooey-eco-co2e">
+          {co2e} CO<sub>2</sub>e
+        </span>
+      </button>
+      {open && <EcoModal eco_cost={eco_cost} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/**
  * "Run Cost & Environment Impact": the per-run figures the server sent,
  * scaled client-side by a slider so the comparisons stay readable from one
  * run to a million. Mounted under <body> like the other overlays.
  */
 export function EcoModal({
-  eco,
+  eco_cost,
   onClose,
 }: {
-  eco: EcoLabelProps;
+  eco_cost: EcoLabelProps;
   onClose: () => void;
 }) {
   const [stepIdx, setStepIdx] = useState(0);
@@ -52,13 +92,15 @@ export function EcoModal({
     };
   }, [onClose]);
 
-  const g = eco.co2e_grams * runs;
-  const ml = eco.water_ml * runs;
-  const mlOnsite = eco.water_onsite_ml * runs;
-  const wh = eco.energy_wh * runs;
+  const g = eco_cost.co2e_grams * runs;
+  const ml = eco_cost.water_ml * runs;
+  const mlDataCenter = eco_cost.water_data_center_ml * runs;
+  const wh = eco_cost.energy_wh * runs;
   const water = waterEquivalent(ml);
   const energy = energyEquivalent(wh);
-  const assumed = [...new Set(eco.reasons.map((r) => REASON_LABELS[r] ?? r))];
+  const assumed = [
+    ...new Set(eco_cost.reasons.map((r) => REASON_LABELS[r] ?? r)),
+  ];
 
   const modal = (
     <div
@@ -69,35 +111,51 @@ export function EcoModal({
       aria-labelledby="gooey-eco-modal-title"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+      <div className="modal-dialog modal-dialog-scrollable modal-lg">
         <div className="modal-content gooey-eco-modal-content">
+          {/* the action sheet's grab handle; shown only while this is a sheet */}
+          <div
+            className="gooey-sheet-handle-wrap gooey-eco-sheet-handle"
+            aria-hidden="true"
+          >
+            <div className="gooey-sheet-handle" />
+          </div>
           <div className="gooey-eco-modal-head">
             <div>
               <h2 id="gooey-eco-modal-title" className="gooey-eco-modal-title">
                 Run Cost &amp; Environment Impact
               </h2>
               <div className="gooey-eco-modal-sub">
-                {eco.run_by && (
+                {eco_cost.run_by && (
                   <span>
-                    Run by <Author author={eco.run_by} fallback="" />
+                    Run by <Author author={eco_cost.run_by} fallback="" />
                   </span>
                 )}
-                {eco.run_by && eco.charged_to && (
+                {eco_cost.run_by && eco_cost.charged_to && (
                   <span className="gooey-eco-dot" />
                 )}
-                {eco.charged_to && (
+                {eco_cost.charged_to && (
+                  // the balance is the charged workspace's, so it stays on
+                  // this line, dot and all, even where the other dots hide;
+                  // a long name is cut with an ellipsis instead
                   <span>
-                    Billed to <Author author={eco.charged_to} fallback="" />
+                    Charged to{" "}
+                    <Author author={eco_cost.charged_to} fallback="" />
+                    {eco_cost.balance && eco_cost.balance_url && (
+                      <>
+                        <span className="gooey-eco-dot" />
+                        <a
+                          href={eco_cost.balance_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="gooey-eco-balance"
+                        >
+                          Balance: {eco_cost.balance}{" "}
+                          <i className="fa-regular fa-arrow-up-right" />
+                        </a>
+                      </>
+                    )}
                   </span>
-                )}
-                {eco.balance_url && (
-                  <>
-                    <span className="gooey-eco-dot" />
-                    <a href={eco.balance_url} target="_blank" rel="noreferrer">
-                      View balance{" "}
-                      <i className="fa-regular fa-arrow-up-right" />
-                    </a>
-                  </>
                 )}
               </div>
             </div>
@@ -114,10 +172,19 @@ export function EcoModal({
               <div className="gooey-eco-stat">
                 <div className="gooey-eco-stat-label">Total cost</div>
                 <div className="gooey-eco-stat-value">
-                  {eco.run_cost_usd == null
-                    ? eco.run_cost
-                    : formatUsd(eco.run_cost_usd * runs)}
+                  {eco_cost.run_cost_usd == null
+                    ? eco_cost.run_cost
+                    : formatUsd(eco_cost.run_cost_usd * runs)}
                 </div>
+                {eco_cost.models.map((m) => (
+                  <div key={m.model_id} className="gooey-eco-stat-model">
+                    <div className="gooey-eco-stat-model-name">{m.label}</div>
+                    <div className="gooey-eco-stat-model-tokens">
+                      {formatTokens(m.input_tokens * runs)} in ·{" "}
+                      {formatTokens(m.output_tokens * runs)} out tokens
+                    </div>
+                  </div>
+                ))}
               </div>
               <div className="gooey-eco-stat">
                 <div className="gooey-eco-stat-label">Eco cost</div>
@@ -128,8 +195,8 @@ export function EcoModal({
                   </span>
                 </div>
                 <div className="gooey-eco-stat-range">
-                  range {formatGrams(eco.co2e_min * runs)} –{" "}
-                  {formatGrams(eco.co2e_max * runs)}
+                  range {formatGrams(eco_cost.co2e_min * runs)} –{" "}
+                  {formatGrams(eco_cost.co2e_max * runs)}
                 </div>
               </div>
             </div>
@@ -207,7 +274,7 @@ export function EcoModal({
                 value={`≈ ${water.value}`}
                 unit={water.unit}
                 line1="estimated water footprint"
-                line2={`${formatMl(mlOnsite)} cooling · ${formatMl(ml - mlOnsite)} power plants`}
+                line2={`${formatMl(mlDataCenter)} cooling · ${formatMl(ml - mlDataCenter)} power plants`}
               />
               <Tile
                 icon="fa-solid fa-bolt"
@@ -219,20 +286,23 @@ export function EcoModal({
               />
             </div>
 
-            {eco.region && <RegionBlock region={eco.region} />}
+            {eco_cost.region && <RegionBlock region={eco_cost.region} />}
 
             <div className="gooey-eco-foot">
-              <span
-                className={`gooey-eco-pill gooey-eco-pill-${eco.confidence}`}
-                title={
-                  assumed.length ? `Assumed: ${assumed.join(", ")}` : undefined
-                }
+              <Tip
+                content={`Assumed: ${assumed.join(", ")}`}
+                disabled={!assumed.length}
               >
-                <i className="fa-regular fa-circle-info" />
-                <span>{eco.confidence} confidence</span>
-              </span>
+                <span
+                  className={`gooey-eco-pill gooey-eco-pill-${eco_cost.confidence}`}
+                  tabIndex={assumed.length ? 0 : undefined}
+                >
+                  <i className="fa-regular fa-circle-info" />
+                  <span>{eco_cost.confidence} confidence</span>
+                </span>
+              </Tip>
               <a
-                href={eco.methodology_url}
+                href={eco_cost.methodology_url}
                 target="_blank"
                 rel="noreferrer"
                 className="gooey-eco-card-link"
@@ -259,15 +329,15 @@ function stepFraction(n: number): number {
 }
 
 /** The slider's tooltip: the count read as a month of traffic, assuming 30
- * days and about 10 messages per active user. Eco cost only shows on the
+ * days and about 10 messages a day per active user. Eco cost only shows on the
  * Agent page (the one layout-v2 recipe), where a run is one conversation turn. */
 function ScaleTable({ runs }: { runs: number }) {
   const approx = (n: number) =>
     n < 1 ? "< 1" : `≈ ${Number(n.toPrecision(2)).toLocaleString("en-US")}`;
   const rows: [string, string][] = [
-    ["Messages", runs.toLocaleString("en-US")],
+    ["Messages / month", runs.toLocaleString("en-US")],
     ["Daily messages", approx(runs / 30)],
-    ["Monthly active users", approx(Math.max(runs / 10, 1))],
+    ["Daily active users", approx(runs / 30 / 10)],
   ];
   return (
     <dl className="gooey-eco-help-table">
@@ -292,13 +362,13 @@ function RegionBlock({ region }: { region: EcoRegionProps }) {
         <div className="gooey-eco-place">
           <div className="gooey-eco-place-name">
             {flag && <span className="gooey-eco-flag">{flag}</span>}
-            <span>{region.label}</span>
+            <span>{countryName(region.country_code)}</span>
             {region.assumption && (
               <HelpTip content={region.assumption} label="What's assumed" />
             )}
           </div>
           <div className="gooey-eco-place-note">
-            {gridNote(region.gco2e_per_kwh)}
+            {gridNote(region.gco2e_per_kwh, region.mix)}
           </div>
           <div className="gooey-eco-place-grid">
             {Math.round(region.gco2e_per_kwh)} gCO<sub>2</sub>e per kWh{" "}
@@ -319,7 +389,7 @@ function RegionBlock({ region }: { region: EcoRegionProps }) {
             ))}
           </div>
           <ul className="gooey-eco-mix-list">
-            {mix.slice(0, 5).map(([k, v]) => (
+            {mix.map(([k, v]) => (
               <li key={k}>
                 <span
                   className="gooey-eco-swatch"
@@ -365,8 +435,7 @@ function Tile({
   );
 }
 
-/** The modal body scrolls, so an in-place tooltip would be clipped; this one
- * mounts under <body> like the modal itself. */
+/** An ⓘ that explains the thing beside it. */
 function HelpTip({
   content,
   label,
@@ -375,21 +444,42 @@ function HelpTip({
   label: string;
 }) {
   return (
-    <Tippy
-      content={<div className="gooey-eco-help">{content}</div>}
-      placement="top"
-      maxWidth={320}
-      animation="scale"
-      duration={80}
-      delay={100}
-      appendTo={() => document.body}
-    >
+    <Tip content={content}>
       <i
         role="button"
         tabIndex={0}
         aria-label={label}
         className="fa-regular fa-circle-info gooey-eco-help-icon"
       />
+    </Tip>
+  );
+}
+
+/** The modal's tooltip, on hover, focus or tap. The modal body scrolls, so an
+ * in-place tooltip would be clipped; this one mounts under <body> like the
+ * modal itself. */
+function Tip({
+  content,
+  disabled,
+  children,
+}: {
+  content: React.ReactNode;
+  disabled?: boolean;
+  children: React.ReactElement;
+}) {
+  return (
+    <Tippy
+      content={<div className="gooey-eco-help">{content}</div>}
+      disabled={disabled}
+      // a tap is a click; hiding on it would close the tip it just opened
+      hideOnClick={false}
+      placement="top"
+      maxWidth={320}
+      animation="scale"
+      duration={80}
+      appendTo={() => document.body}
+    >
+      {children}
     </Tippy>
   );
 }
