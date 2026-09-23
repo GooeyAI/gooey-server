@@ -217,9 +217,9 @@ def _rewrite_fal_asset_urls(
     match value:
         case str() if _is_fal_asset_url(value):
             filename = os.path.basename(urlparse(value).path) or "fal_asset"
-            if filename_stem:
-                filename = filename_stem + os.path.splitext(filename)[1]
-            return _reupload_fal_asset_url(value, filename=filename)
+            return _reupload_fal_asset_url(
+                value, filename=filename, filename_stem=filename_stem
+            )
         case dict():
             out = {}
             for key, child in value.items():
@@ -242,19 +242,20 @@ def _is_fal_asset_url(url: str) -> bool:
     return "fal.media" in f.origin
 
 
-def _reupload_fal_asset_url(url: str, *, filename: str) -> str:
+def _reupload_fal_asset_url(
+    url: str, *, filename: str, filename_stem: str | None = None
+) -> str:
     r = requests.get(url)
     raise_for_status(r)
 
     content_type = get_mimetype_from_response(r) or None
 
+    # take the extension from fal's name, not filename_stem (which may contain dots)
+    stem, ext = os.path.splitext(filename)
     # If FAL returns extensionless filenames, preserve a useful extension.
-    if (
-        not os.path.splitext(filename)[1]
-        and content_type
-        and (ext := mimetypes.guess_extension(content_type))
-    ):
-        filename += ext
+    if not ext and content_type:
+        ext = mimetypes.guess_extension(content_type) or ""
+    filename = (filename_stem or stem) + ext
 
     try:
         uploaded_url = upload_file_from_bytes(
