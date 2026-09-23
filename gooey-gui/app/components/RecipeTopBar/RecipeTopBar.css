@@ -359,6 +359,7 @@ button.gooey-topbar-cost-eco {
   border: 0;
   border-radius: var(--gooey-radius-sm);
   background: transparent;
+  font-weight: 400;
   line-height: 1.1;
   cursor: pointer;
 }
@@ -367,15 +368,8 @@ button.gooey-topbar-cost-eco:focus-visible {
   background: var(--gooey-ok-wash);
   outline: none;
 }
-.gooey-topbar-cost-eco-line {
+.gooey-topbar-cost-eco .gooey-eco-co2e {
   font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--gooey-status-running-ink);
-  white-space: nowrap;
-}
-.gooey-topbar-cost-eco-line sub {
-  font-size: 0.6em;
-  bottom: -0.15em;
 }
 
 .gooey-topbar-run {

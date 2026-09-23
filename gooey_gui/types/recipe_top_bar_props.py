@@ -155,7 +155,7 @@ class RecipeTopBarProps(StrictComponentModel):
     cost_href: str | None = None
     cost_title: str | None = None
     # Set once the run has recorded eco costs; replaces the cost's plain tooltip.
-    eco: EcoLabelProps | None = None
+    eco_cost: EcoLabelProps | None = None
 
 
 class EditorRunBarProps(StrictComponentModel):
@@ -172,3 +172,5 @@ class EditorRunBarProps(StrictComponentModel):
     cost_label: str | None = None
     cost_href: str | None = None
     cost_title: str | None = None
+    # below lg the top bar's cost is hidden, so the eco figures come here too
+    eco_cost: EcoLabelProps | None = None

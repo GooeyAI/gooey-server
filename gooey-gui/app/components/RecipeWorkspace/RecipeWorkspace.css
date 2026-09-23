@@ -385,6 +385,17 @@
   white-space: nowrap;
 }
 
+/* With eco figures the reading is a button: cost / CO2e, and a click opens the modal. */
+.v2-editor-runbar-cost-eco {
+  border: 0;
+  font-weight: 400;
+  cursor: pointer;
+}
+.v2-editor-runbar-sep {
+  font-weight: 400;
+  opacity: 0.4;
+}
+
 /* "Est." qualifies the number rather than being part of it, so it steps back a weight. */
 .v2-editor-runbar-est {
   font-weight: 400;

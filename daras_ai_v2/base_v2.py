@@ -50,6 +50,7 @@ from gooey_gui.types.about_props import (
     AboutTag,
     RecipeAboutProps,
 )
+from gooey_gui.types.eco_label_props import EcoLabelProps
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -83,6 +84,8 @@ from gooey_gui.types.recipe_workspace_props import (
 )
 from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
+from usage_costs.eco import RunEcoCost, run_eco_cost
+from widgets.author import user_author, workspace_author
 from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
 from widgets.run_debug_info import run_debug_info_props
@@ -768,8 +771,8 @@ class BasePage(BasePageV1):
                     None if usage_active else (self.get_credits_click_url() or None)
                 ),
                 cost_title=None if usage_active else (cost_title or None),
-                eco=(
-                    self.get_eco_label_props(run_cost=cost_label)
+                eco_cost=(
+                    self._eco_label_props(run_cost=cost_label)
                     if cost_label and not usage_active
                     else None
                 ),
@@ -1107,8 +1110,55 @@ class BasePage(BasePageV1):
                 cost_label=cost_label or None,
                 cost_href=self.get_credits_click_url() or None,
                 cost_title=cost_title or None,
+                eco_cost=(
+                    self._eco_label_props(run_cost=cost_label)
+                    if cost_label and not is_running
+                    else None
+                ),
             )
         )
+
+    def _eco_label_props(self, *, run_cost: str) -> EcoLabelProps | None:
+        eco_cost = self._run_eco_cost
+        if not eco_cost:
+            return None
+        user = self.current_sr_user
+        workspace = self.current_sr.workspace
+        current_workspace = self._current_workspace_or_none()
+        # the balance only of the viewer's own workspace, and only when it paid
+        balance = balance_url = None
+        if current_workspace is not None and current_workspace == workspace:
+            balance = format_credits_as_dollars(current_workspace.balance)
+            balance_url = self.get_credits_click_url()
+        credits = self.get_run_cost_credits()
+        run_cost_usd = None
+        if credits is not None:
+            run_cost_usd = credits / settings.ADDON_CREDITS_PER_DOLLAR
+        return EcoLabelProps(
+            run_cost=run_cost,
+            run_cost_usd=run_cost_usd,
+            confidence=eco_cost["confidence"],
+            reasons=eco_cost["reasons"],
+            methodology_url=settings.ECO_COST_METHODOLOGY_URL,
+            run_by=user and user_author(user),
+            charged_to=workspace
+            and workspace_author(workspace, current_workspace=current_workspace),
+            balance=balance,
+            balance_url=balance_url,
+            models=eco_cost["models"],
+            co2e_grams=eco_cost["co2e_grams"],
+            co2e_min=eco_cost["co2e_min"],
+            co2e_max=eco_cost["co2e_max"],
+            energy_wh=eco_cost["energy_wh"],
+            water_ml=eco_cost["water_ml"],
+            water_data_center_ml=eco_cost["water_data_center_ml"],
+            region=eco_cost["region"],
+        )
+
+    @cached_property
+    def _run_eco_cost(self) -> RunEcoCost | None:
+        """Once per request: the top bar and the editor run bar both show it."""
+        return run_eco_cost(self.current_sr)
 
     def _render_deleted_output_if_needed(self) -> bool:
         """True if this run's data is gone, in which case that is all there is to render."""

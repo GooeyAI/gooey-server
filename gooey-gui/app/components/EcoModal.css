@@ -1,4 +1,15 @@
 /* "Cost & Environment Impact". Tokens are the v2 layout's, from app.css. */
+
+/* EcoCostButton's CO2e reading, in both bars */
+.gooey-eco-co2e {
+  color: var(--gooey-status-running-ink);
+  white-space: nowrap;
+}
+.gooey-eco-co2e sub {
+  font-size: 0.6em;
+  bottom: -0.15em;
+}
+
 .gooey-eco-modal {
   background: var(--gooey-scrim);
   z-index: 1080;
@@ -44,27 +55,43 @@
   color: var(--gooey-ink-muted);
 }
 /* "Run by <avatar> Name" stays on one line: the Author body is a block flex row,
-   so each item is itself an inline flex row and the author is forced inline. */
+   so each item is itself an inline flex row and the author is forced inline.
+   A name too long for the width ends in an ellipsis; everything else keeps
+   its size. Each level of the chain needs min-width: 0 to be allowed to shrink. */
+.gooey-eco-modal-head > div {
+  min-width: 0;
+}
 .gooey-eco-modal-sub > span {
   display: inline-flex;
   align-items: center;
   gap: var(--gooey-space-2);
+  min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
 }
 .gooey-eco-modal-sub .d-flex {
   display: inline-flex !important;
+  min-width: 0;
+}
+.gooey-eco-modal-sub .d-flex > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .gooey-eco-modal-sub .run-debug-avatar {
+  flex-shrink: 0;
   width: 20px;
   height: 20px;
 }
+.gooey-eco-balance {
+  flex-shrink: 0;
+}
+/* underline and hover come from the app's global link style, as in Debug */
 .gooey-eco-modal-sub a {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   color: var(--gooey-ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 .gooey-eco-dot::before {
   content: "·";
@@ -110,6 +137,22 @@
   margin-top: 2px;
   font-size: 12px;
   color: var(--gooey-ink-muted);
+  white-space: nowrap;
+}
+/* under the total cost: each model and its tokens, scaled like the cost */
+.gooey-eco-stat-model {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--gooey-ink-muted);
+}
+.gooey-eco-stat-model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gooey-eco-stat-model-tokens {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .gooey-eco-slider {
@@ -436,6 +479,9 @@
 .gooey-eco-pill i {
   font-size: 11px;
 }
+.gooey-eco-pill[tabindex] {
+  cursor: help;
+}
 .gooey-eco-pill-low {
   color: var(--gooey-status-warn);
   background: var(--gooey-status-warn-bg);
@@ -461,16 +507,139 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
+/* Below lg, where the eco button sits in the run bar at the foot of the
+   editor, this is a bottom sheet like the top bar's action sheet: full width,
+   on the bottom edge, as tall as it needs up to 90% of the screen. It scrolls
+   as one, header included, since a pinned header would keep a fifth of a
+   phone screen. It rises from the bottom edge over a fading scrim, so it
+   reads as a sheet, and like the action sheet it has no close button: the
+   scrim and Escape dismiss it. */
+.gooey-eco-sheet-handle {
+  display: none;
+}
+@media (max-width: 991.98px) {
+  .gooey-eco-modal .modal-dialog {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    margin: 0;
+    animation: gooey-eco-sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .modal-dialog-scrollable .gooey-eco-modal-content {
+    max-height: 90dvh;
+    overflow-y: auto;
+    border-radius: var(--gooey-radius-pill) var(--gooey-radius-pill) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .gooey-eco-modal-body {
+    overflow-y: visible;
+  }
+  /* the handle stays on the sheet's top edge while the rest scrolls */
+  .gooey-eco-sheet-handle {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    padding-top: var(--gooey-space-2);
+    background: var(--bs-modal-bg, #fff);
+  }
+  /* The sheet scrolls itself; Bootstrap's .modal must not, or the sheet's
+     start position below the edge gives it a scrollbar for the length of the
+     slide, and the sheet widens when that goes. */
+  .modal.gooey-eco-modal {
+    overflow: hidden;
+    animation: gooey-eco-scrim-in 180ms ease-out;
+  }
+  .gooey-eco-modal-head {
+    padding-top: var(--gooey-space-2);
+  }
+  .gooey-eco-modal-head .btn-close {
+    display: none;
+  }
+}
+
+@keyframes gooey-eco-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes gooey-eco-scrim-in {
+  from {
+    background-color: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal.gooey-eco-modal,
+  .gooey-eco-modal .modal-dialog {
+    animation: none;
+  }
+}
+
+/* Too narrow for every decade's label: keep 1, 100, 10k and 1M. */
+@media (max-width: 400px) {
+  .gooey-eco-slider-ticks span:nth-child(even) {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
+  /* the byline wraps here, so separators would dangle at line ends */
+  .gooey-eco-modal-sub > .gooey-eco-dot {
+    display: none;
+  }
+  /* label and count on one row, the track full width beneath them */
   .gooey-eco-slider {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "label value" "track track";
+    row-gap: var(--gooey-space-1);
+  }
+  .gooey-eco-slider label {
+    grid-area: label;
   }
   .gooey-eco-slider-value {
-    grid-column: 2;
-    text-align: left;
+    grid-area: value;
+  }
+  .gooey-eco-slider-track {
+    grid-area: track;
   }
   .gooey-eco-headline {
     grid-template-columns: 1fr 1fr;
+  }
+  /* the unit always on its own line and the range given two, so the cards
+     keep one height whatever the slider shows */
+  .gooey-eco-stat-value .gooey-eco-unit {
+    display: block;
+  }
+  .gooey-eco-stat-range,
+  .gooey-eco-stat-model-tokens {
+    min-height: 2lh;
+    white-space: normal;
+  }
+  /* tiles as full-width rows, icon beside the text: three columns this narrow
+     re-wrap their captions on every step of the slider */
+  .gooey-eco-tiles {
+    grid-template-columns: 1fr;
+  }
+  .gooey-eco-tile {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    column-gap: var(--gooey-space-3);
+    align-items: center;
+    padding: var(--gooey-space-3);
+    text-align: left;
+  }
+  .gooey-eco-tile-icon {
+    grid-row: 1 / span 3;
+    margin: 0;
+    text-align: center;
   }
   .gooey-eco-location {
     grid-template-columns: 1fr;
