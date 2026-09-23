@@ -20,7 +20,9 @@ if typing.TYPE_CHECKING:
     from usage_costs.models import ModelPricing, ModelSku
 
 
-def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None, dict]:
+def generate_on_fal(
+    model_id: str, payload: dict, filename_stem: str | None = None
+) -> typing.Generator[str, None, dict]:
     r = requests.post(
         str(furl("https://queue.fal.run") / model_id),
         headers=_fal_auth_headers(),
@@ -34,7 +36,7 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
     r = requests.get(result["response_url"], headers=_fal_auth_headers())
     raise_for_status(r)
     _record_fal_cost(model_id, r.headers)
-    return _rewrite_fal_asset_urls(r.json())
+    return _rewrite_fal_asset_urls(r.json(), filename_stem=filename_stem)
 
 
 def _record_fal_cost(model_id: str, response_headers: typing.Mapping[str, str]) -> None:
@@ -209,18 +211,25 @@ def _fal_auth_headers():
     }
 
 
-def _rewrite_fal_asset_urls(value: typing.Any) -> typing.Any:
+def _rewrite_fal_asset_urls(
+    value: typing.Any, filename_stem: str | None = None
+) -> typing.Any:
     match value:
         case str() if _is_fal_asset_url(value):
             filename = os.path.basename(urlparse(value).path) or "fal_asset"
+            if filename_stem:
+                filename = filename_stem + os.path.splitext(filename)[1]
             return _reupload_fal_asset_url(value, filename=filename)
         case dict():
             out = {}
             for key, child in value.items():
-                out[key] = _rewrite_fal_asset_urls(child)
+                out[key] = _rewrite_fal_asset_urls(child, filename_stem=filename_stem)
             return out
         case list():
-            return [_rewrite_fal_asset_urls(item) for item in value]
+            return [
+                _rewrite_fal_asset_urls(item, filename_stem=filename_stem)
+                for item in value
+            ]
         case _:
             return value
 
