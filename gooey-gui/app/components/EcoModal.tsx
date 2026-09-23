@@ -11,7 +11,7 @@ import { Author } from "./RunDebugInfo";
 import {
   MIX_COLORS,
   MIX_LABELS,
-  REASON_LABELS,
+  REASON_TEXT,
   RUN_STEPS,
   RUN_TICKS,
   carbonEquivalent,
@@ -98,9 +98,6 @@ export function EcoModal({
   const wh = eco_cost.energy_wh * runs;
   const water = waterEquivalent(ml);
   const energy = energyEquivalent(wh);
-  const assumed = [
-    ...new Set(eco_cost.reasons.map((r) => REASON_LABELS[r] ?? r)),
-  ];
 
   const modal = (
     <div
@@ -289,13 +286,25 @@ export function EcoModal({
             {eco_cost.region && <RegionBlock region={eco_cost.region} />}
 
             <div className="gooey-eco-foot">
+              {/* ecocost's reason codes, most important first */}
               <Tip
-                content={`Assumed: ${assumed.join(", ")}`}
-                disabled={!assumed.length}
+                content={
+                  <>
+                    <div className="gooey-eco-reasons-title">
+                      Why the range is wide
+                    </div>
+                    <ul className="gooey-eco-reasons">
+                      {eco_cost.reasons.map((r) => (
+                        <li key={r}>{REASON_TEXT[r] ?? r}</li>
+                      ))}
+                    </ul>
+                  </>
+                }
+                disabled={!eco_cost.reasons.length}
               >
                 <span
                   className={`gooey-eco-pill gooey-eco-pill-${eco_cost.confidence}`}
-                  tabIndex={assumed.length ? 0 : undefined}
+                  tabIndex={eco_cost.reasons.length ? 0 : undefined}
                 >
                   <i className="fa-regular fa-circle-info" />
                   <span>{eco_cost.confidence} confidence</span>

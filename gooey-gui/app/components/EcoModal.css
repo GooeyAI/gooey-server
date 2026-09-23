@@ -190,6 +190,14 @@
   line-height: 1.4;
   white-space: normal;
 }
+.gooey-eco-reasons-title {
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.gooey-eco-reasons {
+  margin: 0;
+  padding-left: 1.1em;
+}
 .gooey-eco-help-table {
   display: grid;
   gap: 2px;

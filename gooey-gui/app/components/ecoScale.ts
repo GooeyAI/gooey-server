@@ -178,20 +178,22 @@ export const MIX_COLORS: Record<string, string> = {
   other: "#c4c4c4",
 };
 
-/** Short nouns for the confidence tooltip: "Assumed: serving site, PUE". */
-export const REASON_LABELS: Record<string, string> = {
-  provider_unknown: "provider",
-  provider_inferred_from_model: "provider",
-  active_params_undisclosed: "model size",
-  active_params_assumed: "model size",
-  region_assumed: "serving site",
-  chips_assumed: "chip type",
-  pue_assumed: "PUE",
-  wue_assumed: "cooling water",
-  decode_utilization_assumed: "GPU utilization",
-  serving_overhead_assumed: "server overhead",
-  grid_intensity_assumed: "grid intensity",
-  embodied_carbon_assumed: "hardware lifetime",
+/** ecocost's reason codes in plain words, for the confidence tooltip. Keys are
+ * the codes exactly as ecocost returns them (see its API.md); a code missing
+ * here, e.g. one added in a later release, shows as is. */
+export const REASON_TEXT: Record<string, string> = {
+  provider_unknown: "Provider unknown",
+  provider_inferred_from_model: "Provider inferred from the model",
+  active_params_undisclosed: "Model size not disclosed",
+  active_params_assumed: "Model size estimated",
+  region_assumed: "Data centre location not disclosed",
+  chips_assumed: "Chip type not disclosed",
+  pue_assumed: "Data centre efficiency (PUE) not published",
+  wue_assumed: "Cooling water use not published",
+  decode_utilization_assumed: "GPU utilization estimated",
+  serving_overhead_assumed: "Server overhead estimated",
+  grid_intensity_assumed: "Grid carbon intensity estimated",
+  embodied_carbon_assumed: "Hardware lifetime estimated",
 };
 
 /** Two significant figures, plain digits, thousands separators above 999. */
