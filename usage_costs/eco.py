@@ -101,7 +101,10 @@ def run_eco_cost(sr: SavedRun) -> RunEcoCost | None:
             (e["confidence"]["level"] for e in estimates),
             key=CONFIDENCE_LEVELS.index,
         ),
-        reasons=sorted({r for e in estimates for r in e["confidence"]["reasons"]}),
+        # ecocost's reason codes, in its most-important-first order
+        reasons=list(
+            dict.fromkeys(r for e in estimates for r in e["confidence"]["reasons"])
+        ),
         # the model that emitted the most carbon decides the region block
         region=eco_region_props(max(estimates, key=lambda e: e["carbon"]["value"])),
         models=[
