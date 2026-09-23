@@ -358,11 +358,6 @@ GOOGLE_MAPS_API_KEY_HOSTNAMES = config(
 # timeout for fetching external urls in the wild
 EXTERNAL_REQUEST_TIMEOUT_SEC = config("EXTERNAL_REQUEST_TIMEOUT_SEC", 10)
 
-# agents whose generated videos are named "<date> <time> UTC - <agent title>.mp4"
-DATETIME_VIDEO_FILENAME_PUBLISHED_RUN_IDS = config(
-    "DATETIME_VIDEO_FILENAME_PUBLISHED_RUN_IDS", cast=Csv(), default="bnrqocpt6gwa"
-)
-
 
 POSTMARK_API_TOKEN = config("POSTMARK_API_TOKEN", None)
 ADMIN_EMAILS = config("ADMIN_EMAILS", cast=Csv(), default="")

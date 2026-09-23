@@ -20,7 +20,6 @@ from ai_models.llm_openapi import AudioModelMarker, VideoModelMarker
 from ai_models.models import AIModelSpec
 from bots.models import Workflow
 from daras_ai.image_input import upload_file_from_bytes, truncate_text_words
-from daras_ai_v2 import settings
 from daras_ai_v2.base import BasePage
 from daras_ai_v2.exceptions import PaymentRequired, UserError, ffmpeg, ffprobe
 from daras_ai_v2.fal_ai import generate_on_fal, format_pricing_notes
@@ -111,7 +110,7 @@ class VideoGenPage(BasePage):
                     output_videos=response.output_videos,
                     filename_stem=(
                         f"{filename_stem} - {model.label}"
-                        if filename_stem and len(models) > 1
+                        if len(models) > 1
                         else filename_stem
                     ),
                 )
@@ -129,23 +128,23 @@ class VideoGenPage(BasePage):
             for fut in fs:
                 fut.result()
 
-    def get_datetime_filename_stem(self) -> str | None:
+    def get_datetime_filename_stem(self) -> str:
+        sr = self.current_sr
         called_fn = (
             CalledFunction.objects.select_related(
                 "saved_run__parent_version__published_run"
             )
-            .filter(function_run=self.current_sr)
+            .filter(function_run=sr)
             .first()
         )
-        agent_pr = called_fn and called_fn.saved_run.parent_published_run()
-        if (
-            not agent_pr
-            or agent_pr.published_run_id
-            not in settings.DATETIME_VIDEO_FILENAME_PUBLISHED_RUN_IDS
-        ):
-            return None
+        if called_fn:
+            # when called as a tool, name the video after the calling agent
+            sr = called_fn.saved_run
+        title = Workflow(sr.workflow).page_cls.get_run_title(
+            sr, sr.parent_published_run()
+        )
         # colons are stripped by safe_filename(), so use dashes in the time
-        return f"{timezone.now():%Y-%m-%d %H-%M-%S} UTC - {agent_pr.title}"
+        return f"{timezone.now():%Y-%m-%d %H-%M-%S} UTC - {title}"
 
     def run_safety_checker(
         self, request: VideoGenPage.RequestModel
@@ -334,7 +333,7 @@ def generate_video(
     audio_inputs: dict[str, typing.Any] | None,
     progress_q: Queue[tuple[str, str | None]],
     output_videos: dict[str, str],
-    filename_stem: str | None = None,
+    filename_stem: str,
 ):
     # print(f"{model=} {inputs=} {audio_model=} {audio_inputs=}")
     gen = generate_on_fal(model.model_id, inputs, filename_stem=filename_stem)
@@ -372,7 +371,7 @@ def generate_audio(
     inputs: dict,
     audio_model: AIModelSpec,
     audio_inputs: dict[str, typing.Any],
-    filename_stem: str | None = None,
+    filename_stem: str,
 ) -> str:
     duration = float(ffprobe(video_url)["streams"][0]["duration"])
     duration_props = resolve_field_anyof(
@@ -400,8 +399,7 @@ def generate_audio(
         return res_video
     elif res_audio:
         audio_url = get_url_from_result(res_audio)
-        filename = f"{filename_stem or audio_model.label + '_merged'}.mp4"
-        return merge_audio_and_video(filename, audio_url, video_url)
+        return merge_audio_and_video(f"{filename_stem}.mp4", audio_url, video_url)
     else:
         raise ValueError(f"No video/audio output from {audio_model.name}")
 
