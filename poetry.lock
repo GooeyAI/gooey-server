@@ -1379,6 +1379,21 @@ docs = ["pydoctor (>=25.4.0)"]
 test = ["pytest"]
 
 [[package]]
+name = "ecocost"
+version = "0.1.0"
+description = "Per-run carbon, energy and water estimates for AI inference, with computed confidence and sourced inputs"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "ecocost-0.1.0-py3-none-any.whl", hash = "sha256:a8c6420166a9a7296fb7c1b211f6ae9ca4598faf001e430782af23d68441001b"},
+    {file = "ecocost-0.1.0.tar.gz", hash = "sha256:58334bb1743c375fd3d11e3ac280c376ef16366cc3ef5e2a5c067c4910117826"},
+]
+
+[package.dependencies]
+pyyaml = ">=6.0.1,<7.0.0"
+
+[[package]]
 name = "emoji"
 version = "2.10.1"
 description = "Emoji for Python"
@@ -8241,4 +8256,4 @@ type = ["pytest-mypy (>=1.0.1) ; platform_python_implementation != \"PyPy\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "d6d4fa321e2d3912e076b4dc4a5adb7d85ee6cb59bf26a211a18617cf3b26619"
+content-hash = "54dc3d294d38b84fd9e935b1e80a20b15aae231f57d523152c50ff54b75222fa"

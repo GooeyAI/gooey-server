@@ -42,6 +42,7 @@ from bots.models import (
 from bots.models.published_run import Tag
 from daras_ai.image_input import truncate_text_words
 from daras_ai_v2 import exceptions, icons, settings
+from gooey_gui.types.eco_label_props import EcoLabelProps, EcoRegionProps
 from daras_ai_v2.api_examples_widget import api_example_generator
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.copy_to_clipboard_button_widget import copy_to_clipboard_button
@@ -1777,6 +1778,55 @@ class BasePage:
 
         return ret
 
+    def get_eco_label_props(self, *, run_cost: str) -> EcoLabelProps | None:
+        """None on any failure: the eco label is decoration on the cost readout,
+        and a broken knowledge base or a missing ``ecocost`` must not take the
+        page down with it."""
+        from loguru import logger
+
+        try:
+            return self._eco_label_props(run_cost=run_cost)
+        except Exception as e:
+            logger.warning(f"eco label unavailable for {self.current_sr}: {e!r}")
+            return None
+
+    def _eco_label_props(self, *, run_cost: str) -> EcoLabelProps | None:
+        # imported here, not at module level: a missing or broken ecocost
+        # install must degrade to "no eco label", not stop the server booting
+        from usage_costs.eco import run_eco_cost
+        from widgets.author import user_author, workspace_author
+
+        eco = run_eco_cost(self.current_sr)
+        if not eco:
+            return None
+        user = self.current_sr_user
+        workspace = self.current_sr.workspace
+        credits = self.get_run_cost_credits()
+        return EcoLabelProps(
+            run_cost=run_cost,
+            run_cost_usd=(
+                credits / settings.ADDON_CREDITS_PER_DOLLAR
+                if credits is not None
+                else None
+            ),
+            confidence=eco["confidence"],
+            reasons=eco["reasons"],
+            methodology_url=settings.ECO_COST_METHODOLOGY_URL,
+            run_by=user and user_author(user),
+            charged_to=workspace
+            and workspace_author(
+                workspace, current_workspace=self._current_workspace_or_none()
+            ),
+            balance_url=self.get_credits_click_url() or None,
+            co2e_grams=eco["co2e_grams"],
+            co2e_min=eco["co2e_min"],
+            co2e_max=eco["co2e_max"],
+            energy_wh=eco["energy_wh"],
+            water_ml=eco["water_ml"],
+            water_onsite_ml=eco["water_onsite_ml"],
+            region=_eco_region_props(eco["dominant"]),
+        )
+
     def get_run_cost_credits(self) -> int | None:
         if self.current_sr.price and not self._has_request_changed():
             return self.current_sr.price
@@ -2909,3 +2959,34 @@ NAV_TABS_CSS = """
     }
 }
 """
+
+
+def _eco_region_props(estimate: dict) -> EcoRegionProps:
+    """The modal's region block, from the estimate of the run's biggest emitter."""
+    from ecocost.loader import get_kb
+
+    kb = get_kb()
+    elec = estimate["electricity"]
+    lo, hi = elec["gco2e_per_kwh_range"]
+    return EcoRegionProps(
+        country_code=elec["country"],
+        # "United States, Texas (ERCOT)" or "United States (national average)"
+        # -> "United States"
+        label=kb.regions[elec["region"]].label.split(",")[0].split(" (")[0],
+        assumption=_eco_assumption(estimate, kb.providers[estimate["provider"]]),
+        gco2e_per_kwh=elec["gco2e_per_kwh"],
+        gco2e_per_kwh_min=lo,
+        gco2e_per_kwh_max=hi,
+        mix=dict(sorted(elec["mix"].items(), key=lambda kv: -kv[1])),
+    )
+
+
+def _eco_assumption(estimate: dict, provider) -> str | None:
+    """The region tooltip; None when the provider pins its site."""
+    reasons = estimate["confidence"]["reasons"]
+    if "provider_unknown_fallback" in reasons:
+        return "Provider unknown, so a US average is used"
+    if provider.region_candidates or "region_inferred" in reasons:
+        name = provider.label.split(" (")[0]
+        return f"{name} doesn't disclose which data centre served it"
+    return None

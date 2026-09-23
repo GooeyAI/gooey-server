@@ -17,6 +17,8 @@ import {
 } from "~/appShellContext";
 import type { CustomComponentProps } from "~/components";
 import { useCopyToClipboard } from "~/useCopyToClipboard";
+import { EcoModal } from "../EcoModal";
+import { formatGrams } from "../ecoScale";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 import {
   activeViewForLayouts,
@@ -99,6 +101,7 @@ export function RecipeTopBar({
   cost_label,
   cost_href,
   cost_title,
+  eco,
   view_only,
   crumb_label,
   deploy_href,
@@ -127,6 +130,7 @@ export function RecipeTopBar({
     builder_storage_key
   );
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
+  const [ecoOpen, setEcoOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -824,6 +828,29 @@ export function RecipeTopBar({
             const costTip = cost_title
               ? `${costName} (${cost_title})`
               : costName;
+            if (eco) {
+              // click opens the impact modal; the readout itself stays quiet
+              return (
+                <>
+                  <button
+                    type="button"
+                    className="gooey-topbar-cost gooey-topbar-cost-eco"
+                    title="Run cost and environment impact"
+                    aria-label={`${costTip}, ${formatGrams(eco.co2e_grams)} CO2e. Open cost and environment impact`}
+                    aria-haspopup="dialog"
+                    onClick={() => setEcoOpen(true)}
+                  >
+                    <span>{cost_label}</span>
+                    <span className="gooey-topbar-cost-eco-line">
+                      {formatGrams(eco.co2e_grams)} CO<sub>2</sub>
+                    </span>
+                  </button>
+                  {ecoOpen && (
+                    <EcoModal eco={eco} onClose={() => setEcoOpen(false)} />
+                  )}
+                </>
+              );
+            }
             return cost_href ? (
               <a
                 className="gooey-topbar-cost"

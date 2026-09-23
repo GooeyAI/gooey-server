@@ -99,6 +99,7 @@ livekit-agents = {extras = ["anthropic", "google", "groq", "mistralai", "openai"
 google-genai = "^1.73.1"
 livekit-plugins-noise-cancellation = "^0.2.5"
 composio = "^0.13.1"
+ecocost = "^0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 watchdog = "^2.1.9"

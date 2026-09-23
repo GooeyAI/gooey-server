@@ -768,6 +768,11 @@ class BasePage(BasePageV1):
                     None if usage_active else (self.get_credits_click_url() or None)
                 ),
                 cost_title=None if usage_active else (cost_title or None),
+                eco=(
+                    self.get_eco_label_props(run_cost=cost_label)
+                    if cost_label and not usage_active
+                    else None
+                ),
                 builder_panel_key=(
                     GOOEY_BUILDER_EVENT_KEY if can_launch_builder else None
                 ),

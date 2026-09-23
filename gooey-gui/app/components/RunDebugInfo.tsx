@@ -69,7 +69,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Author({
+export function Author({
   author,
   fallback,
 }: {
