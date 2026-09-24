@@ -13,6 +13,8 @@
 
 api: poetry run uvicorn server:app --host 127.0.0.1 --port 8080 --reload
 
+model_api: poetry run uvicorn model_api.server:app --host 127.0.0.1 --port 8090 --reload --reload-dir model_api
+
 admin: poetry run python manage.py runserver 127.0.0.1:8000
 
 dashboard: poetry run streamlit run Home.py --server.port 8501 --server.headless true
