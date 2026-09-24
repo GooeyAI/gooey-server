@@ -10,6 +10,7 @@ from queue import Queue
 import gooey_gui as gui
 import requests
 from django.db.models import Q
+from django.utils import timezone
 from pydantic import BaseModel
 from requests.utils import CaseInsensitiveDict
 
@@ -33,6 +34,7 @@ from daras_ai_v2.ai_model_form import (
     resolve_field_anyof,
     run_prompt_safety_checker,
 )
+from functions.models import CalledFunction
 from usage_costs.models import ModelSku
 from widgets.switch_with_section import switch_with_section
 
@@ -94,6 +96,8 @@ class VideoGenPage(BasePage):
         else:
             audio_model = None
 
+        filename_stem = self.get_datetime_filename_stem()
+
         progress_q = Queue()
         progress = {model.model_id: "" for model in models}
         response.output_videos = {model.name: None for model in models}
@@ -109,6 +113,11 @@ class VideoGenPage(BasePage):
                     audio_inputs=request.audio_inputs,
                     progress_q=progress_q,
                     output_videos=response.output_videos,
+                    filename_stem=(
+                        f"{filename_stem} - {model.label}"
+                        if len(models) > 1
+                        else filename_stem
+                    ),
                 )
                 for model in models
             ]
@@ -123,6 +132,24 @@ class VideoGenPage(BasePage):
                 yield "\n".join(progress.values())
             for fut in fs:
                 fut.result()
+
+    def get_datetime_filename_stem(self) -> str:
+        sr = self.current_sr
+        called_fn = (
+            CalledFunction.objects.select_related(
+                "saved_run__parent_version__published_run"
+            )
+            .filter(function_run=sr)
+            .first()
+        )
+        if called_fn:
+            # when called as a tool, name the video after the calling agent
+            sr = called_fn.saved_run
+        title = Workflow(sr.workflow).page_cls.get_run_title(
+            sr, sr.parent_published_run()
+        )
+        # colons are stripped by safe_filename(), so use dashes in the time
+        return f"{timezone.now():%Y-%m-%d %H-%M-%S} UTC - {title}"
 
     def run_safety_checker(
         self, request: VideoGenPage.RequestModel
@@ -304,9 +331,10 @@ def generate_video(
     audio_inputs: dict[str, typing.Any] | None,
     progress_q: Queue[tuple[str, str | None]],
     output_videos: dict[str, str],
+    filename_stem: str,
 ):
     # print(f"{model=} {inputs=} {audio_model=} {audio_inputs=}")
-    gen = generate_on_fal(model.model_id, inputs)
+    gen = generate_on_fal(model.model_id, inputs, filename_stem=filename_stem)
     try:
         while True:
             msg = next(gen)
@@ -330,6 +358,7 @@ def generate_video(
                 inputs,
                 audio_model,
                 audio_inputs,
+                filename_stem=filename_stem,
             )
     finally:
         progress_q.put((model.model_id, None))
@@ -340,6 +369,7 @@ def generate_audio(
     inputs: dict,
     audio_model: AIModelSpec,
     audio_inputs: dict[str, typing.Any],
+    filename_stem: str,
 ) -> str:
     duration = float(ffprobe(video_url)["streams"][0]["duration"])
     duration_props = resolve_field_anyof(
@@ -357,7 +387,9 @@ def generate_audio(
     payload = {"video_url": video_url, "duration": duration} | audio_inputs
     if not payload.get("prompt"):
         payload["prompt"] = inputs.get("prompt")
-    res = yield_from(generate_on_fal(audio_model.model_id, payload))
+    res = yield_from(
+        generate_on_fal(audio_model.model_id, payload, filename_stem=filename_stem)
+    )
     res_video = get_url_from_result(res.get("video"))
     res_audio = get_url_from_result(res.get("audio"))
 
@@ -365,8 +397,7 @@ def generate_audio(
         return res_video
     elif res_audio:
         audio_url = get_url_from_result(res_audio)
-        filename = f"{audio_model.label}_merged.mp4"
-        return merge_audio_and_video(filename, audio_url, video_url)
+        return merge_audio_and_video(f"{filename_stem}.mp4", audio_url, video_url)
     else:
         raise ValueError(f"No video/audio output from {audio_model.name}")
 

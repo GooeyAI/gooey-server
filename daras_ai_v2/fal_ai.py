@@ -20,7 +20,9 @@ if typing.TYPE_CHECKING:
     from usage_costs.models import ModelPricing, ModelSku
 
 
-def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None, dict]:
+def generate_on_fal(
+    model_id: str, payload: dict, filename_stem: str | None = None
+) -> typing.Generator[str, None, dict]:
     r = requests.post(
         str(furl("https://queue.fal.run") / model_id),
         headers=_fal_auth_headers(),
@@ -34,7 +36,7 @@ def generate_on_fal(model_id: str, payload: dict) -> typing.Generator[str, None,
     r = requests.get(result["response_url"], headers=_fal_auth_headers())
     raise_for_status(r)
     _record_fal_cost(model_id, r.headers)
-    return _rewrite_fal_asset_urls(r.json())
+    return _rewrite_fal_asset_urls(r.json(), filename_stem=filename_stem)
 
 
 def _record_fal_cost(model_id: str, response_headers: typing.Mapping[str, str]) -> None:
@@ -209,18 +211,25 @@ def _fal_auth_headers():
     }
 
 
-def _rewrite_fal_asset_urls(value: typing.Any) -> typing.Any:
+def _rewrite_fal_asset_urls(
+    value: typing.Any, filename_stem: str | None = None
+) -> typing.Any:
     match value:
         case str() if _is_fal_asset_url(value):
             filename = os.path.basename(urlparse(value).path) or "fal_asset"
-            return _reupload_fal_asset_url(value, filename=filename)
+            return _reupload_fal_asset_url(
+                value, filename=filename, filename_stem=filename_stem
+            )
         case dict():
             out = {}
             for key, child in value.items():
-                out[key] = _rewrite_fal_asset_urls(child)
+                out[key] = _rewrite_fal_asset_urls(child, filename_stem=filename_stem)
             return out
         case list():
-            return [_rewrite_fal_asset_urls(item) for item in value]
+            return [
+                _rewrite_fal_asset_urls(item, filename_stem=filename_stem)
+                for item in value
+            ]
         case _:
             return value
 
@@ -233,19 +242,20 @@ def _is_fal_asset_url(url: str) -> bool:
     return "fal.media" in f.origin
 
 
-def _reupload_fal_asset_url(url: str, *, filename: str) -> str:
+def _reupload_fal_asset_url(
+    url: str, *, filename: str, filename_stem: str | None = None
+) -> str:
     r = requests.get(url)
     raise_for_status(r)
 
     content_type = get_mimetype_from_response(r) or None
 
+    # take the extension from fal's name, not filename_stem (which may contain dots)
+    stem, ext = os.path.splitext(filename)
     # If FAL returns extensionless filenames, preserve a useful extension.
-    if (
-        not os.path.splitext(filename)[1]
-        and content_type
-        and (ext := mimetypes.guess_extension(content_type))
-    ):
-        filename += ext
+    if not ext and content_type:
+        ext = mimetypes.guess_extension(content_type) or ""
+    filename = (filename_stem or stem) + ext
 
     try:
         uploaded_url = upload_file_from_bytes(
