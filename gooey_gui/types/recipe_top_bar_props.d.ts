@@ -131,15 +131,8 @@ export interface WorkspaceView {
  * runs slider. Nested in RecipeTopBarProps.
  */
 export interface EcoLabelProps {
-  run_cost: string;
-  run_cost_usd: number | null;
   confidence: "low" | "medium" | "high";
   reasons: string[];
-  methodology_url: string;
-  run_by: AuthorProps | null;
-  charged_to: AuthorProps | null;
-  balance: string | null;
-  balance_url: string | null;
   models: EcoModelTokens[];
   co2e_grams: number;
   co2e_min: number;
@@ -148,11 +141,13 @@ export interface EcoLabelProps {
   water_ml: number;
   water_data_center_ml: number;
   region: EcoRegionProps | null;
-}
-export interface AuthorProps {
-  name: string;
-  photo_url: string | null;
-  url: string | null;
+  run_cost: string;
+  run_cost_usd: number | null;
+  methodology_url: string;
+  run_by: AuthorProps | null;
+  charged_to: AuthorProps | null;
+  balance: string | null;
+  balance_url: string | null;
 }
 /**
  * One model's tokens in the run, shown under the cost.
@@ -175,6 +170,11 @@ export interface EcoRegionProps {
   mix: {
     [k: string]: number;
   };
+}
+export interface AuthorProps {
+  name: string;
+  photo_url: string | null;
+  url: string | null;
 }
 /**
  * The same Run control, at the foot of the editor pane rather than in the bar.
