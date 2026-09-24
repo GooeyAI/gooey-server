@@ -134,7 +134,13 @@
 /* ---------------------------------------------------------------- tabs */
 
 /* The pill group is centred in the bar but never pushes the right cluster off
-   screen: it may shrink and scroll sideways instead of wrapping. */
+   screen: it may shrink and scroll sideways instead of wrapping.
+
+   Stretched, deliberately, like the two clusters either side of it. `justify-self: center`
+   sizes a grid item to its content and lets it overflow its track, so a strip too wide for
+   the row ran out over the deployment chip instead of scrolling inside itself. Stretched,
+   the track bounds it; the track is still content-sized while there is room, so the strip
+   is its natural width and the even side tracks still centre it. */
 .gooey-topbar-tabs {
   position: relative;
   display: flex;
@@ -142,7 +148,6 @@
   padding: var(--gooey-space-1);
   border-radius: 12px;
   background: var(--gooey-surface-200);
-  justify-self: center;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -200,7 +205,19 @@
 }
 
 /* One height and one box model for the right cluster. Height is set here and the vertical
-   padding left off each control, so a border cannot change how tall a control is. */
+   padding left off each control, so a border cannot change how tall a control is.
+
+   None of them shrink. They are fixed-size controls, and a squeezed one is both wrong to
+   look at and a lie to whatever measures the row - the density pass read the chip at 21px
+   of its 36 and concluded the bar had room it did not have. */
+.gooey-topbar-integration,
+.gooey-topbar-publish,
+.gooey-topbar-run,
+.gooey-topbar-cost,
+.gooey-topbar-sep {
+  flex: 0 0 auto;
+}
+
 .gooey-topbar-integration,
 .gooey-topbar-publish,
 .gooey-topbar-run {

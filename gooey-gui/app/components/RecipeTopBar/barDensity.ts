@@ -56,7 +56,9 @@ export function pickDensity(
  *
  * Not `scrollWidth`: these clusters are stretched to their grid track, so `scrollWidth`
  * reports the track whenever the content is narrower than it - which is exactly the case
- * this has to tell apart from the one where it is not.
+ * this has to tell apart from the one where it is not. Summing the children is only honest
+ * because none of them shrink; the CSS pins that, and a squeezed control would under-report
+ * the row exactly as the strip's own box did.
  */
 function contentWidth(el: Element | null): number {
   if (!el) return 0;
@@ -88,7 +90,9 @@ export function neededWidth(bar: HTMLElement): number {
     left = left - title.getBoundingClientRect().width + TITLE_FLOOR;
   }
 
-  const tabsWidth = tabs?.getBoundingClientRect().width ?? 0;
+  // `scrollWidth`, not the box: the strip shrinks and scrolls its tabs rather than pushing
+  // the row wider, so its rendered width is what it was given. Its content is what it wants.
+  const tabsWidth = tabs ? Math.max(tabs.scrollWidth, 0) : 0;
   const right = contentWidth(bar.querySelector(".gooey-topbar-right"));
 
   return left + (tabsWidth ? tabsWidth + gap : 0) + right + gap;
