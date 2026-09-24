@@ -108,7 +108,7 @@ export function EcoModal({
       aria-labelledby="gooey-eco-modal-title"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-dialog modal-dialog-scrollable modal-lg">
+      <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div className="modal-content gooey-eco-modal-content">
           {/* the action sheet's grab handle; shown only while this is a sheet */}
           <div
