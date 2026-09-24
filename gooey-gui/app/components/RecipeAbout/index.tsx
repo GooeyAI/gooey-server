@@ -385,6 +385,16 @@ function MediaSlot({ media }: { media: AboutMedia }) {
           preload="metadata"
         />
       );
+    case "embed":
+      return (
+        <iframe
+          className="v2-about-media"
+          src={media.url}
+          title="Video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      );
     case "banner":
       return (
         <img

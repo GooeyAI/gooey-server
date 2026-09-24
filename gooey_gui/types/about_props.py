@@ -32,6 +32,13 @@ class AboutVideoMedia(StrictComponentModel):
     url: str
 
 
+class AboutEmbedMedia(StrictComponentModel):
+    """A hosted video (YouTube) drawn in an iframe; `url` is the embed url, not the page."""
+
+    kind: Literal["embed"] = "embed"
+    url: str
+
+
 class AboutBannerMedia(StrictComponentModel):
     kind: Literal["banner"] = "banner"
     url: str
@@ -47,7 +54,7 @@ class AboutPhotoMedia(StrictComponentModel):
 
 
 AboutMedia = Annotated[
-    AboutVideoMedia | AboutBannerMedia | AboutPhotoMedia,
+    AboutVideoMedia | AboutEmbedMedia | AboutBannerMedia | AboutPhotoMedia,
     pydantic.Field(discriminator="kind"),
 ]
 

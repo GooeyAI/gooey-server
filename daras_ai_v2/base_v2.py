@@ -22,6 +22,7 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.loom_video_widget import youtube_embed_url
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
     GOOEY_BUILDER_STORAGE_KEY,
@@ -46,6 +47,7 @@ from gooey_gui.types.about_props import (
     AboutAuthor,
     AboutBannerMedia,
     AboutCard,
+    AboutEmbedMedia,
     AboutGroup,
     AboutLinkTarget,
     AboutMedia,
@@ -958,6 +960,8 @@ class BasePage(BasePageV1):
         from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
         if pr.video_url:
+            if embed_url := youtube_embed_url(pr.video_url):
+                return AboutEmbedMedia(url=embed_url)
             return AboutVideoMedia(url=pr.video_url)
         if pr.banner_url:
             return AboutBannerMedia(url=pr.banner_url)

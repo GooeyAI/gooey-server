@@ -7,6 +7,7 @@ import gooey_gui as gui
 from bots.sdg import SDG
 from daras_ai_v2.base_v2 import DEFAULT_STATS_TITLE
 from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+from daras_ai_v2.loom_video_widget import youtube_embed_url
 from daras_ai_v2.gooey_builder import (
     BUILDER_PROMPT_Q,
     _builder_prompts,
@@ -57,6 +58,45 @@ def test_media_precedence(fields, expected_kind, expected_url):
     page.workflow = 0
     media = page._about_media(make_pr(**fields))
     assert (media.kind, media.url) == (expected_kind, expected_url)
+
+
+def test_a_youtube_video_url_becomes_an_iframe_embed():
+    page = object.__new__(VideoBotsPageV2)
+    page.workflow = 0
+    media = page._about_media(
+        make_pr(video_url="https://www.youtube.com/watch?v=a0cBLQndN8s&list=PLx")
+    )
+    assert (media.kind, media.url) == (
+        "embed",
+        "https://www.youtube.com/embed/a0cBLQndN8s",
+    )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.youtube.com/watch?v=abc123&t=42s",
+        "https://youtu.be/abc123?si=x",
+        "https://m.youtube.com/watch?v=abc123",
+        "https://www.youtube.com/shorts/abc123",
+        "https://www.youtube.com/embed/abc123",
+    ],
+)
+def test_youtube_embed_url_accepts_every_link_shape(url):
+    assert youtube_embed_url(url) == "https://www.youtube.com/embed/abc123"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://cdn.example.com/clip.mp4",
+        "https://www.youtube.com/watch",
+        "https://www.youtube.com/@gooeyai",
+        "https://youtu.be/",
+    ],
+)
+def test_youtube_embed_url_rejects_anything_else(url):
+    assert youtube_embed_url(url) is None
 
 
 def test_no_media_at_all_leaves_the_slot_empty():

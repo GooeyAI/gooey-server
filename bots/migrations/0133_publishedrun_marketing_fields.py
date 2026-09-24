@@ -51,7 +51,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='publishedrun',
             name='video_url',
-            field=bots.custom_fields.CustomURLField(blank=True, default='', max_length=2048),
+            field=bots.custom_fields.CustomURLField(blank=True, default='', help_text='A YouTube link or a direct video file (.mp4, .webm).', max_length=2048),
         ),
         migrations.CreateModel(
             name='PublishedRunStat',

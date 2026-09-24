@@ -23,6 +23,13 @@ export interface AboutVideoMedia {
   kind: "video";
   url: string;
 }
+/**
+ * A hosted video (YouTube) drawn in an iframe; `url` is the embed url, not the page.
+ */
+export interface AboutEmbedMedia {
+  kind: "embed";
+  url: string;
+}
 export interface AboutBannerMedia {
   kind: "banner";
   url: string;
@@ -110,7 +117,7 @@ export interface AboutGroup {
  * component owns the markup and the payload carries only what varies.
  */
 export interface RecipeAboutProps {
-  media: (AboutVideoMedia | AboutBannerMedia | AboutPhotoMedia) | null;
+  media: (AboutVideoMedia | AboutEmbedMedia | AboutBannerMedia | AboutPhotoMedia) | null;
   headline: string | null;
   author: AboutAuthor | null;
   report_value: string | null;

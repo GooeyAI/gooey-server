@@ -177,7 +177,11 @@ class PublishedRun(models.Model):
     # deliberately absent from PublishedRunVersion - this is not run config.
     headline = StrippedTextField(blank=True, default="")
     banner_url = CustomURLField(blank=True, default="")
-    video_url = CustomURLField(blank=True, default="")
+    video_url = CustomURLField(
+        blank=True,
+        default="",
+        help_text="A YouTube link or a direct video file (.mp4, .webm).",
+    )
     more_info_url = CustomURLField(blank=True, default="")
     more_info_text = models.CharField(max_length=64, blank=True, default="")
     sdgs = ArrayField(

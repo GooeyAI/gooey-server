@@ -455,6 +455,11 @@
   background: var(--gooey-surface-100);
 }
 
+/* An iframe's UA border would sit inside the rounded corners. */
+.v2-about iframe.v2-about-media {
+  border: 0;
+}
+
 /* Figma's banner frame is 763x244; the video keeps 16:9 (Figma's 763x429.37). */
 .v2-about .v2-about-banner {
   aspect-ratio: 763 / 244;
