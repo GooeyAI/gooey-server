@@ -4,7 +4,7 @@ import type {
   EcoLabelProps,
   EcoRegionProps,
 } from "@gooey-types/eco_label_props";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import Tippy from "@tippyjs/react";
 import { Author } from "./RunDebugInfo";
@@ -80,6 +80,8 @@ export function EcoModal({
 }) {
   const [stepIdx, setStepIdx] = useState(0);
   const runs = RUN_STEPS[stepIdx];
+  const contentRef = useRef<HTMLDivElement>(null);
+  useSwipeDownToClose(contentRef, onClose);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -108,8 +110,8 @@ export function EcoModal({
       aria-labelledby="gooey-eco-modal-title"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="modal-dialog modal-dialog-scrollable modal-lg">
-        <div className="modal-content gooey-eco-modal-content">
+      <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div ref={contentRef} className="modal-content gooey-eco-modal-content">
           {/* the action sheet's grab handle; shown only while this is a sheet */}
           <div
             className="gooey-sheet-handle-wrap gooey-eco-sheet-handle"
@@ -328,6 +330,97 @@ export function EcoModal({
 
   if (typeof document === "undefined") return null;
   return ReactDOM.createPortal(modal, document.body);
+}
+
+const SWIPE_MS = 200;
+
+/**
+ * The sheet follows a finger pulling it down and closes past a quarter of its
+ * height. A pull only starts with the sheet's content scrolled to the top, so
+ * it never takes over scrolling back up.
+ */
+function useSwipeDownToClose(
+  contentRef: React.RefObject<HTMLDivElement>,
+  onClose: () => void
+) {
+  useEffect(() => {
+    const content = contentRef.current;
+    const sheet = content?.closest<HTMLElement>(".modal-dialog");
+    const handle = content?.querySelector<HTMLElement>(
+      ".gooey-eco-sheet-handle"
+    );
+    if (!content || !sheet || !handle) return;
+
+    let startX = 0;
+    let startY: number | null = null;
+    let dy = 0;
+    let closing = false;
+
+    const onStart = (e: TouchEvent) => {
+      // a touch during the slide down would pull the sheet back up
+      if (closing) return;
+      // only while the modal is a sheet, which is when its grab handle shows
+      if (getComputedStyle(handle).display === "none") return;
+      if (content.scrollTop > 0) return;
+      // the runs slider is dragged sideways and must keep its touches
+      if ((e.target as Element).closest("input[type=range]")) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dy = 0;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (startY === null) return;
+      const { clientX, clientY } = e.touches[0];
+      // a gesture that starts sideways is not a pull
+      if (!dy && Math.abs(clientX - startX) > Math.abs(clientY - startY)) {
+        startY = null;
+        return;
+      }
+      dy = Math.max(0, clientY - startY);
+      if (!dy) {
+        sheet.style.transform = "";
+        return;
+      }
+      // the pull moves the sheet, not the content under the finger
+      e.preventDefault();
+      sheet.style.transition = "none";
+      sheet.style.transform = `translateY(${dy}px)`;
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (startY === null) return;
+      startY = null;
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      sheet.style.transition = reduceMotion
+        ? "none"
+        : `transform ${SWIPE_MS}ms ease-out`;
+      // an interrupted touch is not a release, so it never closes the sheet
+      if (e.type === "touchcancel" || dy < sheet.offsetHeight / 4) {
+        sheet.style.transform = "";
+        return;
+      }
+      closing = true;
+      if (reduceMotion) {
+        onClose();
+        return;
+      }
+      sheet.style.transform = "translateY(100%)";
+      window.setTimeout(onClose, SWIPE_MS);
+    };
+
+    content.addEventListener("touchstart", onStart);
+    // not passive, so a pull can stop the content scrolling
+    content.addEventListener("touchmove", onMove, { passive: false });
+    content.addEventListener("touchend", onEnd);
+    content.addEventListener("touchcancel", onEnd);
+    return () => {
+      content.removeEventListener("touchstart", onStart);
+      content.removeEventListener("touchmove", onMove);
+      content.removeEventListener("touchend", onEnd);
+      content.removeEventListener("touchcancel", onEnd);
+    };
+  }, [contentRef, onClose]);
 }
 
 /** Where a count sits along the slider, 0..1. */
