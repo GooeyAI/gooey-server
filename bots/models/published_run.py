@@ -226,7 +226,7 @@ class PublishedRun(models.Model):
         workspace: "Workspace",
         title: str,
         notes: str,
-        public_access: WorkflowAccessLevel | None = None,
+        public_access: WorkflowAccessLevel | None = WorkflowAccessLevel.VIEW_ONLY,
     ) -> "PublishedRun":
         return PublishedRun.objects.create_with_version(
             workflow=Workflow(self.workflow),
