@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='publishedrun',
             name='builder_prompts',
-            field=models.JSONField(blank=True, default=list, help_text='Up to 4 prompts offered above the Gooey Builder input.'),
+            field=models.JSONField(blank=True, default=list, help_text="Up to 4 prompts shown as the Gooey Builder's starters."),
         ),
         migrations.AddField(
             model_name='publishedrun',

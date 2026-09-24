@@ -7,11 +7,11 @@ from django.db.models import F
 import pydantic
 
 from bots.models.workflow import Workflow
-from bots.sdg import MAX_BUILDER_PROMPTS
 import gooey_gui as gui
 import fastapi
 
 from bots.models import (
+    MAX_BUILDER_PROMPTS,
     BotIntegration,
     SavedRun,
     PublishedRun,
@@ -57,8 +57,8 @@ def render_gooey_builder(
 ):
     is_anonymous = not request.user or request.user.is_anonymous
     if is_anonymous:
-        # A logged-out visitor still sees the builder on a published run's About page; the
-        # chips and the input route them through login rather than a 401.
+        # A logged-out visitor still sees the builder on a published run's About page; its
+        # starters and input route them through login rather than a 401.
         if not settings.GOOEY_BUILDER_INTEGRATION_ID or not page.current_pr:
             return
     elif not can_launch_gooey_builder(request, page.current_workspace):
@@ -109,7 +109,7 @@ def render_gooey_builder(
 
 
 class BuilderPrompt(typing.TypedDict):
-    """One chip above the builder input. `login_url` is None for a signed-in visitor,
+    """One of the builder widget's starters. `login_url` is None for a signed-in visitor,
     who posts straight to the builder instead of going through login."""
 
     text: str
@@ -118,7 +118,7 @@ class BuilderPrompt(typing.TypedDict):
 
 def _builder_prompts(page: BasePage, *, is_anonymous: bool) -> list[BuilderPrompt]:
     """The published run's prompts, each carrying where an anonymous click should go. The
-    url is built per chip because the prompt has to ride inside login's `next`."""
+    url is built per prompt because the prompt has to ride inside login's `next`."""
     pr = page.current_pr
     prompts = (pr and pr.builder_prompts or [])[:MAX_BUILDER_PROMPTS]
     if not prompts:

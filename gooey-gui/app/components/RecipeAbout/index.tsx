@@ -9,10 +9,6 @@ import type {
   AboutMoreInfo,
   RecipeAboutProps,
 } from "@gooey-types/about_props";
-
-/** The generator inlines discriminated unions rather than naming them, so the media type
- *  is read back off the props it belongs to - it cannot drift from what the server sends. */
-type AboutMedia = NonNullable<RecipeAboutProps["media"]>;
 import { useWorkspaceLayout } from "~/appShellContext";
 import { useCopyToClipboard } from "~/useCopyToClipboard";
 import type { CustomComponentProps } from "~/components";
@@ -23,10 +19,14 @@ import { useRecipeWorkspaceContext } from "../RecipeWorkspace";
 import { layoutForEditorPane } from "../RecipeWorkspace/paneState";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 
+/** The generator inlines discriminated unions rather than naming them, so the media type
+ *  is read back off the props it belongs to - it cannot drift from what the server sends. */
+type AboutMedia = NonNullable<RecipeAboutProps["media"]>;
+
 /** Cards per row before a group takes a second line. */
 const MAX_COLS = 6;
 
-/** What this workflow is: its portrait, who published it, and one panel holding what it is
+/** What this workflow is: its media, who published it, and one panel holding what it is
  *  filed under, what it is, and how it is put together. */
 export function RecipeAbout({
   media,
@@ -117,8 +117,12 @@ export function RecipeAbout({
                   <div className="v2-about-stats">
                     {stats.cards.map((card) => (
                       <div key={card.label} className="v2-about-stat">
-                        <span className="v2-about-stat-value">{card.value}</span>
-                        <span className="v2-about-stat-label">{card.label}</span>
+                        <span className="v2-about-stat-value">
+                          {card.value}
+                        </span>
+                        <span className="v2-about-stat-label">
+                          {card.label}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -389,7 +393,7 @@ function MediaSlot({ media }: { media: AboutMedia }) {
           alt=""
         />
       );
-    default:
+    case "photo":
       return (
         <img
           className={clsx(

@@ -11,6 +11,7 @@ from bots.models import (
     SavedRun,
     WorkflowAccessLevel,
 )
+from bots.sdg import SDG
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import (
     BasePage as BasePageV1,
@@ -294,7 +295,7 @@ class BasePage(BasePageV1):
         if workspace:
             return can_launch_gooey_builder(self.request, workspace)
         # A logged-out visitor has no workspace but still sees the builder on a published
-        # run's About page - the chips and the input route them through login.
+        # run's About page - its starters and input route them through login.
         return bool(settings.GOOEY_BUILDER_INTEGRATION_ID and self.current_pr)
 
     def _hosts_builder(self) -> bool:
@@ -961,8 +962,6 @@ class BasePage(BasePageV1):
         return AboutMoreInfo(text=pr.more_info_text, href=pr.more_info_url)
 
     def _about_sdgs(self, pr: PublishedRun) -> list[AboutSDG]:
-        from bots.sdg import SDG
-
         return [
             AboutSDG(
                 number=sdg.value,

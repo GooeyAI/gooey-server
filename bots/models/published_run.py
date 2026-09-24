@@ -12,7 +12,7 @@ from django.utils.text import slugify
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
 from bots.custom_fields import CustomURLField, StrippedTextField
-from bots.sdg import MAX_BUILDER_PROMPTS, SDG
+from bots.sdg import SDG
 from daras_ai_v2.crypto import get_random_doc_id
 from gooey_gui.types.home_page_props import AccessBadgeData
 from .saved_run import SavedRun
@@ -23,6 +23,9 @@ if typing.TYPE_CHECKING:
 
     from functions.models import CalledFunction
     from workspaces.models import Workspace
+
+# How many builder prompts a published run may offer.
+MAX_BUILDER_PROMPTS = 4
 
 
 class PublishedRunQuerySet(models.QuerySet):
@@ -193,7 +196,7 @@ class PublishedRun(models.Model):
         default=list,
         blank=True,
         help_text=(
-            f"Up to {MAX_BUILDER_PROMPTS} prompts offered above the Gooey Builder input."
+            f"Up to {MAX_BUILDER_PROMPTS} prompts shown as the Gooey Builder's starters."
         ),
     )
 

@@ -27,6 +27,7 @@ from bots.models import (
     Message,
     MessageAttachment,
     Platform,
+    MAX_BUILDER_PROMPTS,
     PublishedRun,
     PublishedRunStat,
     PublishedRunVersion,
@@ -36,7 +37,7 @@ from bots.models import (
     WorkflowMetadata,
 )
 from bots.models.message_thread import MessageThread
-from bots.sdg import MAX_BUILDER_PROMPTS, SDG
+from bots.sdg import SDG
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
@@ -441,8 +442,8 @@ class PublishedRunStatInline(admin.TabularInline):
     extra = 0
 
 
-# The About-page fields, grouped at the foot of the form in their own section.
-ABOUT_EXTRA_FIELDS = [
+# Grouped at the foot of the form under their own "About Page" heading.
+ABOUT_PAGE_FIELDS = [
     "headline",
     "banner_url",
     "video_url",
@@ -465,14 +466,11 @@ class PublishedRunAdmin(GooeyModelAdmin):
         Derived from `get_fields` rather than spelled out, so a field added to the model
         later still appears instead of silently dropping off the form.
         """
-        fields = list(self.get_fields(request, obj))
-        extra = [f for f in ABOUT_EXTRA_FIELDS if f in fields]
-        rest = [f for f in fields if f not in extra]
-        if not extra:
-            return [(None, {"fields": rest})]
+        fields = self.get_fields(request, obj)
+        rest = [f for f in fields if f not in ABOUT_PAGE_FIELDS]
         return [
             (None, {"fields": rest}),
-            ("About Page", {"fields": extra}),
+            ("About Page", {"fields": ABOUT_PAGE_FIELDS}),
         ]
 
     list_display = [

@@ -1,4 +1,18 @@
+from types import SimpleNamespace
+from urllib.parse import parse_qs, unquote, urlparse
+
+import pytest
+
+import gooey_gui as gui
 from bots.sdg import SDG
+from daras_ai_v2.base_v2 import DEFAULT_STATS_TITLE
+from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
+from daras_ai_v2.gooey_builder import (
+    BUILDER_PROMPT_Q,
+    _builder_prompts,
+    builder_prompt_next_url,
+)
+from recipes.VideoBots_v2 import VideoBotsPageV2
 
 
 def test_sdg_covers_all_seventeen_goals():
@@ -13,14 +27,6 @@ def test_sdg_urls_are_derived_from_the_number():
     assert SDG(17).icon_url.endswith("E_SDG_Icons-17.jpg")
     assert SDG(1).un_url == "https://sdgs.un.org/goals/goal1"
     assert SDG(17).un_url == "https://sdgs.un.org/goals/goal17"
-
-
-from types import SimpleNamespace
-
-import pytest
-
-from daras_ai_v2.base_v2 import DEFAULT_STATS_TITLE
-from recipes.VideoBots_v2 import VideoBotsPageV2
 
 
 def make_pr(**kwargs):
@@ -93,24 +99,17 @@ def test_more_info_needs_both_a_url_and_a_label():
     assert (link.href, link.text) == ("/x", "View case study")
 
 
-from daras_ai_v2.gooey_builder import BUILDER_PROMPT_Q, builder_prompt_next_url
-
-
 def test_the_prompt_rides_inside_the_url_login_returns_to():
     """Appending to the login url itself would strand the prompt outside `next`, so it is
     added to the page url before that becomes `next`."""
     url = builder_prompt_next_url("https://gooey.ai/agent/", "Add a Hindi step")
     assert url.startswith("https://gooey.ai/agent/?")
     assert BUILDER_PROMPT_Q in url
-    from urllib.parse import parse_qs, urlparse
-
     assert parse_qs(urlparse(url).query)[BUILDER_PROMPT_Q] == ["Add a Hindi step"]
 
 
 def test_builder_prompt_url_keeps_existing_query_params():
     url = builder_prompt_next_url("https://gooey.ai/agent/?example_id=abc", "Hi")
-    from urllib.parse import parse_qs, urlparse
-
     q = parse_qs(urlparse(url).query)
     assert q["example_id"] == ["abc"]
     assert q[BUILDER_PROMPT_Q] == ["Hi"]
@@ -119,9 +118,6 @@ def test_builder_prompt_url_keeps_existing_query_params():
 def test_a_fully_dressed_about_page_serialises(monkeypatch):
     """Every marketing field set, rendered through the real component call - catches prop
     shape and pydantic validation that the per-method tests cannot."""
-    import gooey_gui as gui
-    from gooey_gui.core.renderer import NestingCtx, RenderTreeNode
-
     page = object.__new__(VideoBotsPageV2)
     pr = make_pr(
         headline="Transforming Smallholder Farming",
@@ -174,13 +170,9 @@ def test_a_fully_dressed_about_page_serialises(monkeypatch):
     assert [c["value"] for c in props["stats"]["cards"]] == ["1800+", "17,000"]
 
 
-def test_anonymous_chips_carry_a_login_url_that_replays_the_prompt():
-    """Logged out each chip is a link to login; the prompt rides inside `next` so it comes
+def test_anonymous_prompts_carry_a_login_url_that_replays_the_prompt():
+    """Logged out each prompt goes through login; the prompt rides inside `next` so it comes
     back and replays."""
-    from urllib.parse import parse_qs, unquote, urlparse
-
-    from daras_ai_v2.gooey_builder import _builder_prompts
-
     page = object.__new__(VideoBotsPageV2)
     pr = make_pr()
     pr.builder_prompts = ["Add a Hindi step", "Make replies shorter"]
@@ -194,15 +186,13 @@ def test_anonymous_chips_carry_a_login_url_that_replays_the_prompt():
     inner = unquote(parse_qs(urlparse(anon[0]["login_url"]).query)["next"][0])
     assert parse_qs(urlparse(inner).query)["builderprompt"] == ["Add a Hindi step"]
 
-    # signed in there is nowhere to send them - the chip posts straight to the builder
+    # signed in there is nowhere to send them - the prompt posts straight to the builder
     assert all(
         s["login_url"] is None for s in _builder_prompts(page, is_anonymous=False)
     )
 
 
 def test_only_four_prompts_are_ever_offered():
-    from daras_ai_v2.gooey_builder import _builder_prompts
-
     page = object.__new__(VideoBotsPageV2)
     pr = make_pr()
     pr.builder_prompts = [f"q{i}" for i in range(9)]
@@ -213,9 +203,7 @@ def test_only_four_prompts_are_ever_offered():
     assert len(_builder_prompts(page, is_anonymous=False)) == 4
 
 
-def test_a_run_with_no_prompts_offers_no_chips():
-    from daras_ai_v2.gooey_builder import _builder_prompts
-
+def test_a_run_with_no_prompts_offers_none():
     page = object.__new__(VideoBotsPageV2)
     pr = make_pr()
     pr.builder_prompts = []
