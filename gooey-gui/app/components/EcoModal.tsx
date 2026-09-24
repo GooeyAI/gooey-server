@@ -354,8 +354,11 @@ function useSwipeDownToClose(
     let startX = 0;
     let startY: number | null = null;
     let dy = 0;
+    let closing = false;
 
     const onStart = (e: TouchEvent) => {
+      // a touch during the slide down would pull the sheet back up
+      if (closing) return;
       // only while the modal is a sheet, which is when its grab handle shows
       if (getComputedStyle(handle).display === "none") return;
       if (content.scrollTop > 0) return;
@@ -383,12 +386,23 @@ function useSwipeDownToClose(
       sheet.style.transition = "none";
       sheet.style.transform = `translateY(${dy}px)`;
     };
-    const onEnd = () => {
+    const onEnd = (e: TouchEvent) => {
       if (startY === null) return;
       startY = null;
-      sheet.style.transition = `transform ${SWIPE_MS}ms ease-out`;
-      if (dy < sheet.offsetHeight / 4) {
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      sheet.style.transition = reduceMotion
+        ? "none"
+        : `transform ${SWIPE_MS}ms ease-out`;
+      // an interrupted touch is not a release, so it never closes the sheet
+      if (e.type === "touchcancel" || dy < sheet.offsetHeight / 4) {
         sheet.style.transform = "";
+        return;
+      }
+      closing = true;
+      if (reduceMotion) {
+        onClose();
         return;
       }
       sheet.style.transform = "translateY(100%)";
