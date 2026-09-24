@@ -472,7 +472,7 @@ class PublishedRunAdmin(GooeyModelAdmin):
             return [(None, {"fields": rest})]
         return [
             (None, {"fields": rest}),
-            ("Extra information", {"fields": extra}),
+            ("About Page", {"fields": extra}),
         ]
 
     list_display = [
