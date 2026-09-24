@@ -50,7 +50,7 @@ from gooey_gui.types.about_props import (
     AboutTag,
     RecipeAboutProps,
 )
-from gooey_gui.types.eco_label_props import EcoLabelProps
+from gooey_gui.types.eco_label_props import EcoCostProps, EcoLabelProps
 from gooey_gui.types.recipe_top_bar_props import (
     CopyShare,
     EditorRunBarProps,
@@ -84,7 +84,7 @@ from gooey_gui.types.recipe_workspace_props import (
 )
 from gooey_gui.types.run_grid_props import RunGridProps
 from routers.root import RecipeTabs
-from usage_costs.eco import RunEcoCost, run_eco_cost
+from usage_costs.eco import run_eco_cost
 from widgets.author import user_author, workspace_author
 from widgets.history import load_more_href
 from widgets.publish_form import clear_publish_form
@@ -1135,28 +1135,19 @@ class BasePage(BasePageV1):
         if credits is not None:
             run_cost_usd = credits / settings.ADDON_CREDITS_PER_DOLLAR
         return EcoLabelProps(
+            **eco_cost.model_dump(),
             run_cost=run_cost,
             run_cost_usd=run_cost_usd,
-            confidence=eco_cost["confidence"],
-            reasons=eco_cost["reasons"],
             methodology_url=settings.ECO_COST_METHODOLOGY_URL,
             run_by=user and user_author(user),
             charged_to=workspace
             and workspace_author(workspace, current_workspace=current_workspace),
             balance=balance,
             balance_url=balance_url,
-            models=eco_cost["models"],
-            co2e_grams=eco_cost["co2e_grams"],
-            co2e_min=eco_cost["co2e_min"],
-            co2e_max=eco_cost["co2e_max"],
-            energy_wh=eco_cost["energy_wh"],
-            water_ml=eco_cost["water_ml"],
-            water_data_center_ml=eco_cost["water_data_center_ml"],
-            region=eco_cost["region"],
         )
 
     @cached_property
-    def _run_eco_cost(self) -> RunEcoCost | None:
+    def _run_eco_cost(self) -> EcoCostProps | None:
         """Once per request: the top bar and the editor run bar both show it."""
         return run_eco_cost(self.current_sr)
 

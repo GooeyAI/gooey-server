@@ -23,20 +23,11 @@ export interface EcoModelTokens {
   output_tokens: number;
 }
 /**
- * Per-run figures for the "Run Cost & Environment Impact" modal, opened
- * from the top bar's cost readout. The modal scales them client-side with a
- * runs slider. Nested in RecipeTopBarProps.
+ * A run's summed eco estimate, as `usage_costs.eco.run_eco_cost` returns it.
  */
-export interface EcoLabelProps {
-  run_cost: string;
-  run_cost_usd: number | null;
+export interface EcoCostProps {
   confidence: "low" | "medium" | "high";
   reasons: string[];
-  methodology_url: string;
-  run_by: AuthorProps | null;
-  charged_to: AuthorProps | null;
-  balance: string | null;
-  balance_url: string | null;
   models: EcoModelTokens[];
   co2e_grams: number;
   co2e_min: number;
@@ -45,6 +36,30 @@ export interface EcoLabelProps {
   water_ml: number;
   water_data_center_ml: number;
   region: EcoRegionProps | null;
+}
+/**
+ * Per-run figures for the "Run Cost & Environment Impact" modal, opened
+ * from the top bar's cost readout. The modal scales them client-side with a
+ * runs slider. Nested in RecipeTopBarProps.
+ */
+export interface EcoLabelProps {
+  confidence: "low" | "medium" | "high";
+  reasons: string[];
+  models: EcoModelTokens[];
+  co2e_grams: number;
+  co2e_min: number;
+  co2e_max: number;
+  energy_wh: number;
+  water_ml: number;
+  water_data_center_ml: number;
+  region: EcoRegionProps | null;
+  run_cost: string;
+  run_cost_usd: number | null;
+  methodology_url: string;
+  run_by: AuthorProps | null;
+  charged_to: AuthorProps | null;
+  balance: string | null;
+  balance_url: string | null;
 }
 export interface AuthorProps {
   name: string;

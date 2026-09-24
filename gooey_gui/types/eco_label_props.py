@@ -29,20 +29,11 @@ class EcoModelTokens(BaseModel):
     output_tokens: int
 
 
-class EcoLabelProps(BaseModel):
-    """Per-run figures for the "Run Cost & Environment Impact" modal, opened
-    from the top bar's cost readout. The modal scales them client-side with a
-    runs slider. Nested in RecipeTopBarProps."""
+class EcoCostProps(BaseModel):
+    """A run's summed eco estimate, as `usage_costs.eco.run_eco_cost` returns it."""
 
-    run_cost: str
-    run_cost_usd: float | None = None
     confidence: Literal["low", "medium", "high"]
     reasons: list[str] = []
-    methodology_url: str
-    run_by: AuthorProps | None = None
-    charged_to: AuthorProps | None = None
-    balance: str | None = None
-    balance_url: str | None = None
     models: list[EcoModelTokens] = []
     co2e_grams: float
     co2e_min: float
@@ -51,3 +42,17 @@ class EcoLabelProps(BaseModel):
     water_ml: float
     water_data_center_ml: float
     region: EcoRegionProps | None = None
+
+
+class EcoLabelProps(EcoCostProps):
+    """Per-run figures for the "Run Cost & Environment Impact" modal, opened
+    from the top bar's cost readout. The modal scales them client-side with a
+    runs slider. Nested in RecipeTopBarProps."""
+
+    run_cost: str
+    run_cost_usd: float | None = None
+    methodology_url: str
+    run_by: AuthorProps | None = None
+    charged_to: AuthorProps | None = None
+    balance: str | None = None
+    balance_url: str | None = None

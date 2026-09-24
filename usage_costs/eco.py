@@ -8,17 +8,19 @@ moving, and lets `ecocost` live in its own repo as a plain dependency.
 
 from __future__ import annotations
 
-import typing
 from collections import defaultdict
 
 import ecocost
 from ecocost.loader import get_kb
 from ecocost.schema import Provider
 from loguru import logger
-from typing_extensions import TypedDict
 
 from bots.models import SavedRun
-from gooey_gui.types.eco_label_props import EcoModelTokens, EcoRegionProps
+from gooey_gui.types.eco_label_props import (
+    EcoCostProps,
+    EcoModelTokens,
+    EcoRegionProps,
+)
 
 # a run is as sure as its least sure model
 CONFIDENCE_LEVELS = ("high", "medium", "low")
@@ -36,20 +38,7 @@ MODEL_PREFIX_TO_PROVIDER: tuple[tuple[str, str], ...] = (
 )
 
 
-class RunEcoCost(TypedDict):
-    co2e_grams: float
-    co2e_min: float
-    co2e_max: float
-    energy_wh: float
-    water_ml: float
-    water_data_center_ml: float
-    confidence: typing.Literal["low", "medium", "high"]
-    reasons: list[str]
-    region: EcoRegionProps
-    models: list[EcoModelTokens]
-
-
-def run_eco_cost(sr: SavedRun) -> RunEcoCost | None:
+def run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
     """Summed estimate for a run, or None if it has no LLM token usage or
     ecocost has no data for one of its calls."""
     from ai_models.models import AIModelSpec, ModelProvider
@@ -90,7 +79,7 @@ def run_eco_cost(sr: SavedRun) -> RunEcoCost | None:
             logger.info(str(e))
             return None
 
-    return RunEcoCost(
+    return EcoCostProps(
         co2e_grams=sum(e["carbon"]["value"] for e in estimates),
         co2e_min=sum(e["carbon"]["min"] for e in estimates),
         co2e_max=sum(e["carbon"]["max"] for e in estimates),
