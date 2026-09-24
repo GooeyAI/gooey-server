@@ -1,13 +1,21 @@
-/* Three tracks so the pill group sits in the true centre of the bar. `minmax(0, 1fr)`
-   rather than `1fr` so the side tracks stay even and truncate their own content. The right
-   cluster therefore has only half the slack, which is what the chip-label rules enforce. */
+/* Three tracks so the pill group sits in the true centre of the bar: even side tracks put
+   the middle one in the middle.
+
+   They are even only while there is slack to be even with. The left floors at 0 because the
+   title truncates, and that is the one thing here that can. The right floors at `auto` - its
+   own content - because nothing in it can give: they are fixed-size controls that do not
+   shrink. Two `minmax(0, 1fr)` tracks forced them to the same width whatever they held, so a
+   right cluster needing more than half overflowed its track and ran in under the tab strip,
+   while the left sat on slack the title had no use for. Past that point the strip stops
+   being centred, which is the right trade: it is still legible off-centre, and the chip it
+   used to cover was not. */
 .gooey-topbar {
   /* One height for every control in the right cluster - see the shared rule below. */
   --topbar-control-h: 36px;
   /* 2px of track around a 32px pill. The mobile rule sits this far above the bar's foot. */
   --topbar-strip-h: 36px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(auto, 1fr);
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -195,13 +203,18 @@
 /* --------------------------------------------------------------- right */
 
 /* Right-aligned by the inner flex rather than by `justify-self: end`, for the same reason
-   as the left cluster: a non-stretch alignment escapes the track. */
+   as the left cluster: a non-stretch alignment escapes the track.
+
+   No `min-width: 0`, unlike the other two. It is what makes the track's `auto` floor mean
+   something: a floor of `auto` resolves to the item's min-content contribution, and
+   `min-width: 0` declares that to be nothing - so the track kept shrinking to half the
+   slack and the cluster overflowed it. Nothing in here shrinks, so its min-content is its
+   content, which is exactly the floor the track wants. */
 .gooey-topbar-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  min-width: 0;
 }
 
 /* One height and one box model for the right cluster. Height is set here and the vertical
@@ -662,6 +675,9 @@ a.gooey-topbar-cost:hover {
   .gooey-topbar-tabs {
     grid-area: 2 / 1 / 3 / 4;
     box-sizing: border-box;
+    /* Hugs its tabs here, where the desktop bar has it stretch. Alone on its own row, so
+       there is nothing beside it to overflow into - the reason the desktop one stretches. */
+    justify-self: center;
     height: var(--topbar-strip-h);
     gap: var(--gooey-space-2);
     padding: 2px;
