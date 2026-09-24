@@ -509,6 +509,7 @@ class SaveAsNewWorkflowLLMTool(GooeyBuilderLLMTool):
             tags=list(pr.tags.all()),
             title=new_title,
             notes=new_notes,
+            public_access=WorkflowAccessLevel.VIEW_ONLY,
         )
         self.url = new_pr.get_app_url()
         self.handle_redirect(background)
