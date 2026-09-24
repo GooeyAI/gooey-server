@@ -2121,6 +2121,7 @@ class BasePage:
             title=self._get_default_pr_title(),
             notes=self.current_pr.notes,
             tags=list(self.current_pr.tags.all()),
+            public_access=WorkflowAccessLevel.VIEW_ONLY,
         )
         raise gui.RedirectException(pr.get_app_url())
 
