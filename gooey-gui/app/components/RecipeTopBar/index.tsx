@@ -356,7 +356,10 @@ export function RecipeTopBar({
   // Narrow only: above lg the bar names the workflow whatever the surface is doing. The
   // hook is called on every render - a `&&` in front of it would change the hook order.
   const scrolledPastAboutTitle = useScrolledPastAboutTitle(onAbout && isNarrow);
-  const showsWordmark = onAbout && !scrolledPastAboutTitle;
+  // `logo_image_url` is part of it, not just a guard on the `img` below: without it the
+  // wordmark cannot draw, and hiding the name for a wordmark that never arrives leaves the
+  // header with nothing in it at all. The name is the fallback.
+  const showsWordmark = onAbout && !scrolledPastAboutTitle && !!logo_image_url;
 
   // The panel's own mark wherever it names itself, falling back to a glyph when the
   // deployment carries no branding.
