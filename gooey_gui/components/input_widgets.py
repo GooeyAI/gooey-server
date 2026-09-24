@@ -109,7 +109,12 @@ def slider(
     tooltip_placement: TooltipPlacement | None = None,
     *,
     disabled: bool = False,
-) -> float:
+    allow_none: bool = False,
+) -> float | None:
+    """
+    allow_none: let the slider be empty. An empty slider shows a blank number box,
+        rests at `min_value` and returns None instead of 0.
+    """
     value = _html_input(
         "range",
         label=label,
@@ -121,7 +126,10 @@ def slider(
         min=min_value,
         max=max_value,
         step=_step_value(min_value, max_value, step),
+        allowEmpty=allow_none,
     )
+    if allow_none and value is None:
+        return None
     return value or 0
 
 

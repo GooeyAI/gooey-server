@@ -1,6 +1,5 @@
 import datetime
 
-import pytest
 
 from app_users.models import AppUser
 from bots.models import (
@@ -12,10 +11,9 @@ from bots.models import (
     get_default_published_run_workspace,
 )
 from bots.models.message_thread import MessageThread
-from daras_ai_v2.exceptions import UserError
 from daras_ai_v2.language_model_body import LLMMessageExtraContent, to_llm_body
 from daras_ai_v2.web_widget_embed import (
-    chat_widget_input_to_request_body,
+    build_chat_widget_input_request_body,
     get_chat_widget_messages,
 )
 from recipes.VideoBots import VideoBotsPage
@@ -25,7 +23,7 @@ from workspaces.models import Workspace
 
 def test_chat_widget_new_conversation_returns_no_thread(db_fixtures):
     sr, thread = _make_sr_with_thread(uid="user-a", title="prior")
-    request_body, message_thread = chat_widget_input_to_request_body(
+    request_body, message_thread = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "",
@@ -45,7 +43,7 @@ def test_chat_widget_new_conversation_returns_no_thread(db_fixtures):
 
 def test_chat_widget_continues_thread_with_prior_input_prompt(db_fixtures):
     sr, thread = _make_sr_with_thread(uid="user-a", title="prior")
-    _, message_thread = chat_widget_input_to_request_body(
+    _, message_thread = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "hello",
@@ -60,7 +58,7 @@ def test_chat_widget_continues_thread_with_prior_input_prompt(db_fixtures):
 
 def test_chat_widget_continues_thread_with_raw_input_only(db_fixtures):
     sr, thread = _make_sr_with_thread(uid="user-a", title="prior")
-    _, message_thread = chat_widget_input_to_request_body(
+    _, message_thread = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "",
@@ -75,7 +73,7 @@ def test_chat_widget_continues_thread_with_raw_input_only(db_fixtures):
 
 def test_chat_widget_continues_thread_without_prior_output(db_fixtures):
     sr, thread = _make_sr_with_thread(uid="user-a", title="prior")
-    request_body, message_thread = chat_widget_input_to_request_body(
+    request_body, message_thread = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "hello",
@@ -91,7 +89,7 @@ def test_chat_widget_continues_thread_without_prior_output(db_fixtures):
 
 def test_chat_widget_continues_thread_with_prior_media(db_fixtures):
     sr, thread = _make_sr_with_thread(uid="user-a", title="prior")
-    _, message_thread = chat_widget_input_to_request_body(
+    _, message_thread = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "",
@@ -107,7 +105,7 @@ def test_chat_widget_continues_thread_with_prior_media(db_fixtures):
 
 def test_chat_widget_moves_run_metadata_into_history(db_fixtures):
     sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
-    request_body, _ = chat_widget_input_to_request_body(
+    request_body, _ = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "hello",
@@ -139,7 +137,7 @@ def test_chat_widget_records_the_turns_run_once(db_fixtures):
     extra_content or anywhere else.
     """
     sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
-    request_body, _ = chat_widget_input_to_request_body(
+    request_body, _ = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "hello",
@@ -239,11 +237,14 @@ def test_chat_widget_edit_truncates_history_at_edited_turn(db_fixtures):
         ]
     }
 
-    request_body, message_thread = chat_widget_input_to_request_body(
-        current_sr, state, {"input_prompt": "new question"}, edit_sr=edit_sr
+    request_body, message_thread = build_chat_widget_input_request_body(
+        current_sr,
+        state,
+        {"input_prompt": "new question", "edit_run_url": edit_sr.get_app_url()},
     )
 
-    # this fixture's edit_sr has no thread, so there is none to hand over
+    # an edit never forks or hands over a thread from here; create_new_run
+    # decides that from the conversation it is submitted into
     assert message_thread is None
     assert request_body["input_prompt"] == "new question"
     # the edited turn and everything after it are dropped
@@ -263,8 +264,10 @@ def test_chat_widget_edit_allows_current_run(db_fixtures):
         },
     )
 
-    request_body, _ = chat_widget_input_to_request_body(
-        current_sr, current_sr.state, {"input_prompt": "edited"}, edit_sr=current_sr
+    request_body, _ = build_chat_widget_input_request_body(
+        current_sr,
+        current_sr.state,
+        {"input_prompt": "edited", "edit_run_url": current_sr.get_app_url()},
     )
 
     assert request_body["input_prompt"] == "edited"
@@ -277,54 +280,54 @@ def test_chat_widget_rerun_keeps_the_turns_own_prompt(db_fixtures):
         run_id="run-current",
         state={
             "input_prompt": "newest question",
+            "input_images": ["https://example.com/a.png"],
             "messages": [{"role": "user", "content": "turn one"}],
         },
     )
 
     # a re-run names the run but sends no prompt
-    request_body, _ = chat_widget_input_to_request_body(
-        current_sr, current_sr.state, {}, edit_sr=current_sr
+    request_body, _ = build_chat_widget_input_request_body(
+        current_sr, current_sr.state, {"edit_run_url": current_sr.get_app_url()}
     )
 
     assert request_body["input_prompt"] == "newest question"
+    assert request_body["input_images"] == ["https://example.com/a.png"]
     assert request_body["messages"] == [{"role": "user", "content": "turn one"}]
 
 
-def test_chat_widget_edit_rejects_run_outside_conversation(db_fixtures):
-    current_sr, _ = _make_sr_with_thread(uid="user-a", title="current")
-    elsewhere_sr = _make_sr(
-        uid="user-a", run_id="run-elsewhere", state={"bot_script": "private prompt"}
+def test_chat_widget_edit_sends_only_inputs_and_history(db_fixtures):
+    """
+    Everything else (bot_script, documents, variables, ...) is layered from the
+    published run at submit time. Copying the edited run's whole state would
+    both pin stale settings and let a client lift another run's private
+    config into a run of their own just by naming its url.
+    """
+    edit_sr = _make_sr(
+        uid="user-b",
+        run_id="run-elsewhere",
+        state={
+            "input_prompt": "q",
+            "bot_script": "private prompt",
+            "variables": {"foo": "bar"},
+            "documents": ["https://example.com/secret.pdf"],
+            "messages": [{"role": "user", "content": "turn one"}],
+        },
     )
 
-    with pytest.raises(UserError):
-        chat_widget_input_to_request_body(
-            current_sr,
-            {"messages": []},
-            {"input_prompt": "steal it"},
-            edit_sr=elsewhere_sr,
-        )
-
-
-def test_chat_widget_edit_rejects_other_users_run(db_fixtures):
-    current_sr, _ = _make_sr_with_thread(uid="user-a", title="current")
-    stranger_sr = _make_sr(
-        uid="user-b", run_id="run-stranger", state={"bot_script": "private prompt"}
+    request_body, _ = build_chat_widget_input_request_body(
+        edit_sr,
+        {"messages": []},
+        {"input_prompt": "edited", "edit_run_url": edit_sr.get_app_url()},
     )
-    # even if the history is forged to reference it, the uid check rejects it
-    state = {
-        "messages": [
-            {
-                "role": "user",
-                "content": "x",
-                "run_url": stranger_sr.get_app_url(),
-            }
-        ]
+
+    assert set(request_body) == {
+        "input_prompt",
+        "input_audio",
+        "input_images",
+        "input_documents",
+        "messages",
     }
-
-    with pytest.raises(UserError):
-        chat_widget_input_to_request_body(
-            current_sr, state, {"input_prompt": "steal it"}, edit_sr=stranger_sr
-        )
+    assert request_body["messages"] == [{"role": "user", "content": "turn one"}]
 
 
 def test_chat_widget_edit_does_not_mutate_source_run_state(db_fixtures):
@@ -333,46 +336,18 @@ def test_chat_widget_edit_does_not_mutate_source_run_state(db_fixtures):
         run_id="run-current-2",
         state={
             "messages": [{"role": "user", "content": "turn one"}],
-            "variables": {"foo": "bar"},
         },
     )
 
-    request_body, _ = chat_widget_input_to_request_body(
-        current_sr, current_sr.state, {"input_prompt": "edited"}, edit_sr=current_sr
+    request_body, _ = build_chat_widget_input_request_body(
+        current_sr,
+        current_sr.state,
+        {"input_prompt": "edited", "edit_run_url": current_sr.get_app_url()},
     )
     request_body["messages"].append({"role": "user", "content": "injected"})
-    request_body["variables"]["foo"] = "mutated"
 
+    current_sr.refresh_from_db()
     assert current_sr.state["messages"] == [{"role": "user", "content": "turn one"}]
-    assert current_sr.state["variables"] == {"foo": "bar"}
-
-
-def test_chat_widget_edit_hands_the_thread_over_instead_of_forking(db_fixtures):
-    """
-    An edit keeps the conversation's own thread, so the sidebar shows one row
-    that moves - not a new row per edit, titled after the edited message.
-    """
-    r1, thread = _make_sr_with_thread(uid="user-a", title="first message")
-    r2 = _make_thread_run(thread, run_id="run-2", uid="user-a", prompt="second message")
-
-    _, message_thread = chat_widget_input_to_request_body(
-        r1,
-        {
-            "messages": [
-                {"role": "user", "content": "first message"},
-                {
-                    "role": "assistant",
-                    "content": "a1",
-                    "run_url": r2.get_app_url(),
-                },
-            ]
-        },
-        {"input_prompt": "second message edited"},
-        edit_sr=r2,
-    )
-
-    assert message_thread == thread
-    assert thread.title == "first message"  # not retitled to the edited message
 
 
 def test_chat_widget_edit_leaves_superseded_turns_attached(db_fixtures):
@@ -386,7 +361,7 @@ def test_chat_widget_edit_leaves_superseded_turns_attached(db_fixtures):
     r2 = _make_thread_run(thread, run_id="run-2", uid="user-a", prompt="second message")
     r3 = _make_thread_run(thread, run_id="run-3", uid="user-a", prompt="third message")
 
-    chat_widget_input_to_request_body(
+    build_chat_widget_input_request_body(
         r1,
         {
             "messages": [
@@ -397,8 +372,7 @@ def test_chat_widget_edit_leaves_superseded_turns_attached(db_fixtures):
                 }
             ]
         },
-        {"input_prompt": "second message edited"},
-        edit_sr=r2,
+        {"input_prompt": "second message edited", "edit_run_url": r2.get_app_url()},
     )
 
     for sr in (r1, r2, r3):
@@ -406,6 +380,7 @@ def test_chat_widget_edit_leaves_superseded_turns_attached(db_fixtures):
         assert sr.message_thread == thread
     thread.refresh_from_db()
     assert thread.first_run == r1
+    assert thread.title == "first message"  # not retitled to the edited message
 
 
 def test_chat_widget_records_created_at_in_extra_content(db_fixtures):
@@ -415,7 +390,7 @@ def test_chat_widget_records_created_at_in_extra_content(db_fixtures):
     persisted into the run's JSON state.
     """
     sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
-    request_body, _ = chat_widget_input_to_request_body(
+    request_body, _ = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "hello",
@@ -473,7 +448,7 @@ def test_chat_widget_stamps_run_time_in_assistant_extra_content(db_fixtures):
     sr.run_time = datetime.timedelta(seconds=3.5)
     sr.save(update_fields=["run_time"])
 
-    request_body, _ = chat_widget_input_to_request_body(
+    request_body, _ = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "hello",
@@ -492,7 +467,7 @@ def test_chat_widget_stamps_run_time_in_assistant_extra_content(db_fixtures):
 def test_chat_widget_omits_run_time_when_the_run_was_never_timed(db_fixtures):
     sr, _ = _make_sr_with_thread(uid="user-a", title="prior")
 
-    request_body, _ = chat_widget_input_to_request_body(
+    request_body, _ = build_chat_widget_input_request_body(
         sr,
         {
             "input_prompt": "hello",

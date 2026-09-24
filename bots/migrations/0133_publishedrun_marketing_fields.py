@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('bots', '0131_alter_savedrun_surface'),
+        ('bots', '0132_alter_publishedrun_workflow_alter_savedrun_workflow_and_more'),
     ]
 
     operations = [

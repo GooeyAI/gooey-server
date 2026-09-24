@@ -87,6 +87,7 @@ from gooey_gui.types.recipe_workspace_props import (
     PhotoIcon,
     RecipeSurfaceProps,
     RecipeWorkspaceProps,
+    WorkspaceEditorPane,
     WorkspacePaneControlProps,
 )
 from gooey_gui.types.run_grid_props import RunGridProps
@@ -110,6 +111,18 @@ DEFAULT_STATS_TITLE = "Community Engagement"
 def format_credits_as_dollars(credits: int) -> str:
     """A credit count as the price a user pays, via the one conversion rate billing uses."""
     return f"${credits / settings.ADDON_CREDITS_PER_DOLLAR:.2f}"
+
+
+PANE_LOAD_KEY_PREFIX = "--pane-load:"
+
+
+def deferred_pane(pane_id: str, label: str) -> tuple[WorkspaceEditorPane, bool]:
+    """A pane whose body the server renders only once the client has asked for it.
+    Returns the pane and whether to render its body."""
+    key = PANE_LOAD_KEY_PREFIX + pane_id
+    pane = WorkspaceEditorPane(id=pane_id, label=label, load_key=key)
+    loaded = bool(gui.session_state.get(key))
+    return pane, loaded
 
 
 class WorkflowIdentity(typing.NamedTuple):

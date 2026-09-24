@@ -575,19 +575,23 @@ function GooeySlider({
   props: Record<string, any>;
   state: Record<string, any>;
 }) {
-  const { label, name, type, help, tooltipPlacement, ...args } = props;
+  const { label, name, type, help, tooltipPlacement, allowEmpty, ...args } =
+    props;
   const ref1 = useRef<HTMLInputElement>(null);
   const ref2 = useRef<HTMLInputElement>(null);
 
+  // a range input can't be blank, so with allowEmpty the number input is the one submitted,
+  // and a blank value rests the slider at its start
+  const rangeValue = (value: any) =>
+    allowEmpty && (value ?? "") === "" ? args.min : value;
+
   // if server changed the value, update both inputs
   useEffect(() => {
-    for (const element of [ref1.current, ref2.current]) {
-      if (!element) continue;
-      if (state && state[props.name] !== element.value) {
-        element.value = state[props.name];
-      }
-    }
-  }, [state, props.name]);
+    if (!state) return;
+    const value = state[name] ?? "";
+    if (ref1.current) ref1.current.value = value;
+    if (ref2.current) ref2.current.value = rangeValue(value);
+  }, [state, name]);
   return (
     <div className={className}>
       <InputLabel
@@ -600,8 +604,9 @@ function GooeySlider({
         <input
           ref={ref1}
           onChange={(e) => {
-            if (ref2.current) ref2.current.value = e.target.value;
+            if (ref2.current) ref2.current.value = rangeValue(e.target.value);
           }}
+          name={allowEmpty ? name : undefined}
           type="number"
           {...args}
         />
@@ -611,9 +616,10 @@ function GooeySlider({
             if (ref1.current) ref1.current.value = e.target.value;
           }}
           id={id}
-          name={name}
+          name={allowEmpty ? undefined : name}
           type={type}
           {...args}
+          defaultValue={rangeValue(args.defaultValue)}
         />
       </div>
     </div>

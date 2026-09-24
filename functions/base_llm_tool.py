@@ -299,7 +299,11 @@ def functions_input(
 
 
 def render_called_functions(*, saved_run: SavedRun, trigger: FunctionTrigger):
-    qs = saved_run.called_functions.filter(trigger=trigger.db_value)
+    # `parent_published_run()` walks parent_version -> published_run, so without this the
+    # loop below costs three queries per row.
+    qs = saved_run.called_functions.filter(trigger=trigger.db_value).select_related(
+        "function_run__parent_version__published_run"
+    )
     for called_fn in qs:
         fn_sr = called_fn.function_run
         pr = fn_sr.parent_published_run()

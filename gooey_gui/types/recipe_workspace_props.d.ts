@@ -39,6 +39,7 @@ export interface RecipeSurfaceProps {
 export interface WorkspaceEditorPane {
   id: string;
   label: string;
+  load_key: string | null;
 }
 export interface RecipeWorkspacePanesProps {
   panes: WorkspaceEditorPane[];
