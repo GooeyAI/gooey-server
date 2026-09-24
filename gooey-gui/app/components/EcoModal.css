@@ -217,6 +217,11 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
+.gooey-eco-help-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.75;
+}
 
 .gooey-eco-slider-value {
   display: grid;

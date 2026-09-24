@@ -337,26 +337,34 @@ function stepFraction(n: number): number {
   );
 }
 
-/** The slider's tooltip: the count read as a month of traffic, assuming 30
- * days and about 10 messages a day per active user. Eco cost only shows on the
- * Agent page (the one layout-v2 recipe), where a run is one conversation turn. */
+const DAYS_PER_MONTH = 30;
+const MESSAGES_PER_USER_PER_MONTH = 8;
+
+/** The slider's tooltip: the count read as a month of traffic, assuming each
+ * user sends about 8 messages a month. Eco cost only shows on the Agent page
+ * (the one layout-v2 recipe), where a run is one conversation turn. */
 function ScaleTable({ runs }: { runs: number }) {
   const approx = (n: number) =>
     n < 1 ? "< 1" : `≈ ${Number(n.toPrecision(2)).toLocaleString("en-US")}`;
   const rows: [string, string][] = [
     ["Messages / month", runs.toLocaleString("en-US")],
-    ["Daily messages", approx(runs / 30)],
-    ["Daily active users", approx(runs / 30 / 10)],
+    ["Daily messages", approx(runs / DAYS_PER_MONTH)],
+    ["Users / month", approx(runs / MESSAGES_PER_USER_PER_MONTH)],
   ];
   return (
-    <dl className="gooey-eco-help-table">
-      {rows.map(([k, v]) => (
-        <div key={k}>
-          <dt>{k}</dt>
-          <dd>{v}</dd>
-        </div>
-      ))}
-    </dl>
+    <>
+      <dl className="gooey-eco-help-table">
+        {rows.map(([k, v]) => (
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="gooey-eco-help-note">
+        Assumes {MESSAGES_PER_USER_PER_MONTH} messages a month per user.
+      </p>
+    </>
   );
 }
 
