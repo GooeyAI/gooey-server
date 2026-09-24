@@ -535,6 +535,7 @@ class BasePage(BasePageV1):
                 tags=list(pr.tags.all()),
                 title=f"{pr.title} (Copy)",
                 notes="" if pr.is_root() else pr.notes,
+                public_access=WorkflowAccessLevel.VIEW_ONLY,
             )
         else:
             new_pr = pr.duplicate(
