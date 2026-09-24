@@ -382,7 +382,13 @@ function MediaSlot({ media }: { media: AboutMedia }) {
         />
       );
     case "banner":
-      return <img className="v2-about-media" src={media.url} alt="" />;
+      return (
+        <img
+          className="v2-about-media v2-about-banner"
+          src={media.url}
+          alt=""
+        />
+      );
     default:
       return (
         <img

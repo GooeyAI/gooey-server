@@ -455,6 +455,11 @@
   background: var(--gooey-surface-100);
 }
 
+/* Figma's banner frame is 763x244; the video keeps 16:9 (Figma's 763x429.37). */
+.v2-about .v2-about-banner {
+  aspect-ratio: 763 / 244;
+}
+
 .v2-about .v2-about-headline {
   font-size: 1.5rem;
   line-height: 1.25;
