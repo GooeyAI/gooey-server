@@ -18,7 +18,7 @@ export function GooeyBuilderInlineEmbed(
     builder_run_url: string;
     workflow_state: Record<string, any>;
     builder_only?: boolean;
-    /** Each prompt carries where an anonymous click goes; `login_url` is null when signed in. */
+    /** Rendered by the widget as its starters; `login_url` is where an anonymous click goes. */
     prompts?: { text: string; login_url?: string | null }[];
     /** Set only for a logged-out visitor: the send endpoint is login-required. */
     login_url?: string | null;
@@ -57,9 +57,14 @@ export function GooeyBuilderInlineEmbed(
       controllerRef.current = {
         messages,
         onSendMessage: async (input_data: any) => {
-          // Anonymous: the endpoint is login-required, so sign in rather than 401.
+          // Anonymous: the endpoint is login-required, so sign in rather than 401. A
+          // published run's prompt carries its own login url so it replays on return.
           if (propsRef.current.login_url) {
-            window.location.href = propsRef.current.login_url;
+            const prompt = propsRef.current.prompts?.find(
+              (p) => p.text === input_data?.input_prompt
+            );
+            window.location.href =
+              prompt?.login_url ?? propsRef.current.login_url;
             return;
           }
           let redirectUrl = await fetchServerAPI<string | null>(
@@ -156,33 +161,5 @@ export function GooeyBuilderInlineEmbed(
     controllerRef.current?.onSendMessage?.({ input_prompt: prompt });
   }, []);
 
-  const prompts = props.prompts ?? [];
-  return (
-    <>
-      {!!prompts.length && (
-        <div className="v2-builder-prompts">
-          {prompts.map((s) =>
-            s.login_url ? (
-              // Logged out: the prompt rides inside login's `next` and replays on return.
-              <a key={s.text} className="v2-builder-prompt" href={s.login_url}>
-                {s.text}
-              </a>
-            ) : (
-              <button
-                key={s.text}
-                type="button"
-                className="v2-builder-prompt"
-                onClick={() =>
-                  controllerRef.current?.onSendMessage?.({ input_prompt: s.text })
-                }
-              >
-                {s.text}
-              </button>
-            )
-          )}
-        </div>
-      )}
-      <div id="gooey-builder-embed" />
-    </>
-  );
+  return <div id="gooey-builder-embed" />;
 }

@@ -240,6 +240,9 @@ def render_gooey_builder_embed(
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
     branding["inputPlaceholderText"] = "Ask Gooey"
+    if prompts:
+        # Shown in the widget's own starter slot, replacing the builder bot's defaults.
+        branding["conversationStarters"] = [p["text"] for p in prompts]
 
     load_chat_widget_lib()
     gui.component(
