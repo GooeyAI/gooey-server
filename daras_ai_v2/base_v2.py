@@ -771,9 +771,12 @@ class BasePage(BasePageV1):
                     None if usage_active else (self.get_credits_click_url() or None)
                 ),
                 cost_title=None if usage_active else (cost_title or None),
+                # a running run's usage so far would read as its whole impact
                 eco_cost=(
                     self._eco_label_props(run_cost=cost_label)
-                    if cost_label and not usage_active
+                    if cost_label
+                    and not usage_active
+                    and not self._is_run_in_progress()
                     else None
                 ),
                 builder_panel_key=(
