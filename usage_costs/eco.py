@@ -39,8 +39,20 @@ MODEL_PREFIX_TO_PROVIDER: tuple[tuple[str, str], ...] = (
 
 
 def run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
-    """Summed estimate for a run, or None if it has no LLM token usage or
-    ecocost has no data for one of its calls."""
+    """Like `_run_eco_cost`, but any failure means no eco label rather than a
+    broken page."""
+    try:
+        return _run_eco_cost(sr)
+    except LookupError as e:  # ecocost's Unknown{Model,Provider,Region}Error
+        logger.info(str(e))
+    except Exception:
+        logger.exception("eco cost estimate failed")
+    return None
+
+
+def _run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
+    """Summed estimate for a run, or None if it has no LLM token usage.
+    Raises LookupError if ecocost has no data for one of its calls."""
     from ai_models.models import AIModelSpec, ModelProvider
     from usage_costs.models import ModelSku
 
@@ -72,12 +84,7 @@ def run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
             model_id=model_id,
             base_url=spec.get("base_url") or None,
         )
-        try:
-            estimates.append(ecocost.estimate(model_id, **route, **tokens))
-        # ecocost's Unknown{Model,Provider,Region}Error
-        except LookupError as e:
-            logger.info(str(e))
-            return None
+        estimates.append(ecocost.estimate(model_id, **route, **tokens))
 
     return EcoCostProps(
         co2e_grams=sum(e["carbon"]["value"] for e in estimates),
