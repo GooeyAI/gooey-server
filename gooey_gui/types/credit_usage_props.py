@@ -8,7 +8,9 @@ import pydantic
 class CreditUsageSeries(pydantic.BaseModel):
     id: str
     title: str
-    credits: list[int]  # one entry per month, aligned with `months`
+    # spend in USD (credits / ADDON_CREDITS_PER_DOLLAR), one entry per month,
+    # aligned with `months`
+    usd: list[float]
     color: str | None = None  # the series' colour in the chart; None is "Other"
 
 
@@ -24,7 +26,7 @@ class CreditUsagePageProps(pydantic.BaseModel):
     title: str = "Usage"
     workspace_name: str
     months: list[str]  # "YYYY-MM", oldest first
-    series: list[CreditUsageSeries] = []  # sorted by total credits, descending
+    series: list[CreditUsageSeries] = []  # sorted by total spend, descending
     billing_href: str
     current_month: str  # "YYYY-MM"
     month_options: list[str] = []  # months the custom range can pick, oldest first

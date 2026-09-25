@@ -45,7 +45,7 @@ export function CreditUsagePage({
   chart,
 }: CustomComponentProps & CreditUsagePageProps) {
   const monthTotals = months.map((_, i) =>
-    series.reduce((sum, s) => sum + s.credits[i], 0)
+    series.reduce((sum, s) => sum + s.usd[i], 0)
   );
   const grandTotal = monthTotals.reduce((a, b) => a + b, 0);
   const rangeLabel = `${formatMonth(months[0])} – ${formatMonth(months[months.length - 1])}`;
@@ -65,7 +65,7 @@ export function CreditUsagePage({
         </button>
       </div>
       <p className="text-muted mb-4">
-        Credits spent by <b>{workspace_name}</b> each month, by recipe. Months
+        What <b>{workspace_name}</b> spent each month, by recipe, in USD. Months
         are in UTC. See <Link to={billing_href}>Billing</Link> for purchases and
         your balance.
       </p>
@@ -101,7 +101,7 @@ export function CreditUsagePage({
           />
         </>
       ) : (
-        <p className="text-muted">No credits spent in {rangeLabel}.</p>
+        <p className="text-muted">Nothing spent in {rangeLabel}.</p>
       )}
     </div>
   );
@@ -212,10 +212,7 @@ function UsageStats({
         label={`Total, ${months.length} ${months.length === 1 ? "month" : "months"}`}
         value={grandTotal}
       />
-      <Stat
-        label="Monthly average"
-        value={Math.round(grandTotal / months.length)}
-      />
+      <Stat label="Monthly average" value={grandTotal / months.length} />
       {months[last] === currentMonth ? (
         <Stat
           label={`${formatMonth(months[last])} so far`}
@@ -235,10 +232,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="credit-usage-stat">
       <div className="credit-usage-stat-label">{label}</div>
-      <div className="credit-usage-stat-value">
-        {formatCredits(value)}{" "}
-        <span className="fs-6 text-muted fw-normal">Cr</span>
-      </div>
+      <div className="credit-usage-stat-value">{formatUsd(value)}</div>
     </div>
   );
 }
@@ -354,8 +348,8 @@ function UsageTooltip({
 }) {
   const i = hover.index;
   const rows = series
-    .filter((s) => s.credits[i] > 0)
-    .sort((a, b) => b.credits[i] - a.credits[i]);
+    .filter((s) => s.usd[i] > 0)
+    .sort((a, b) => b.usd[i] - a.usd[i]);
 
   // beside the band, flipping to its left when there's no room on the right,
   // and level with the top of the bar where it fits
@@ -386,9 +380,7 @@ function UsageTooltip({
       <div className="credit-usage-tooltip-month">
         {formatMonth(month, true)}
       </div>
-      <div className="credit-usage-tooltip-total">
-        {formatCredits(total)} credits
-      </div>
+      <div className="credit-usage-tooltip-total">{formatUsd(total)}</div>
       <hr />
       {rows.map((s) => (
         <div key={s.id} className="credit-usage-tooltip-row">
@@ -397,7 +389,7 @@ function UsageTooltip({
             style={{ background: s.color ?? OTHER_COLOR }}
           />
           <span className="credit-usage-tooltip-name">{s.title}</span>
-          <span>{formatCredits(s.credits[i])}</span>
+          <span>{formatUsd(s.usd[i])}</span>
         </div>
       ))}
     </div>
@@ -433,14 +425,12 @@ function UsageTable({
           {series.map((s) => (
             <tr key={s.id}>
               <td>{s.title}</td>
-              {s.credits.map((c, i) => (
+              {s.usd.map((c, i) => (
                 <td key={months[i]} className="text-end">
-                  {c ? formatCredits(c) : <span className="text-muted">–</span>}
+                  {c ? formatUsd(c) : <span className="text-muted">–</span>}
                 </td>
               ))}
-              <td className="text-end fw-semibold">
-                {formatCredits(sum(s.credits))}
-              </td>
+              <td className="text-end fw-semibold">{formatUsd(sum(s.usd))}</td>
             </tr>
           ))}
         </tbody>
@@ -449,10 +439,10 @@ function UsageTable({
             <td>Total</td>
             {monthTotals.map((t, i) => (
               <td key={months[i]} className="text-end">
-                {formatCredits(t)}
+                {formatUsd(t)}
               </td>
             ))}
-            <td className="text-end">{formatCredits(grandTotal)}</td>
+            <td className="text-end">{formatUsd(grandTotal)}</td>
           </tr>
         </tfoot>
       </table>
@@ -470,13 +460,13 @@ function downloadCsv(
     ["Recipe", ...months, "Total"],
     ...series.map((s) => [
       escape(s.title),
-      ...s.credits.map(String),
-      String(sum(s.credits)),
+      ...s.usd.map(toCsvUsd),
+      toCsvUsd(sum(s.usd)),
     ]),
     [
       "Total",
-      ...months.map((_, i) => String(sum(series.map((s) => s.credits[i])))),
-      String(sum(series.flatMap((s) => s.credits))),
+      ...months.map((_, i) => toCsvUsd(sum(series.map((s) => s.usd[i])))),
+      toCsvUsd(sum(series.flatMap((s) => s.usd))),
     ],
   ];
   const blob = new Blob([rows.map((r) => r.join(",")).join("\n")], {
@@ -485,7 +475,7 @@ function downloadCsv(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${workspaceName} credit usage ${months[0]} to ${months[months.length - 1]}.csv`;
+  a.download = `${workspaceName} usage (USD) ${months[0]} to ${months[months.length - 1]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -506,8 +496,13 @@ function formatMonth(month: string, long = false) {
   });
 }
 
-function formatCredits(value: number) {
-  return value.toLocaleString("en-US");
+function formatUsd(value: number) {
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+// plain numbers, so spreadsheets can sum them
+function toCsvUsd(value: number) {
+  return value.toFixed(2);
 }
 
 function sum(values: number[]) {
