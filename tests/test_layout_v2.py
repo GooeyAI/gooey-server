@@ -843,7 +843,16 @@ def test_the_top_bar_is_sent_the_name_that_becomes_the_pages_h1(monkeypatch):
                 workspace_id=None,
                 notes="",
                 tags=SimpleNamespace(all=list),
+                stats=SimpleNamespace(all=list),
                 photo_url=None,
+                # the About marketing fields, all unset: this stub is a plain published run
+                headline="",
+                banner_url="",
+                video_url="",
+                more_info_url="",
+                more_info_text="",
+                sdgs=[],
+                stats_title="",
             )
         ),
         raising=False,
@@ -896,7 +905,16 @@ def test_the_about_report_button_round_trips_to_the_pick_that_opens_the_dialog(
                 workspace_id=None,
                 notes="",
                 tags=SimpleNamespace(all=list),
+                stats=SimpleNamespace(all=list),
                 photo_url=None,
+                # the About marketing fields, all unset: this stub is a plain published run
+                headline="",
+                banner_url="",
+                video_url="",
+                more_info_url="",
+                more_info_text="",
+                sdgs=[],
+                stats_title="",
             )
         ),
         raising=False,

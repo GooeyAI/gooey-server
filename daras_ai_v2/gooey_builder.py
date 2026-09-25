@@ -9,6 +9,7 @@ from django.db.models import F
 
 import gooey_gui as gui
 from bots.models import (
+    MAX_BUILDER_PROMPTS,
     BotIntegration,
     PublishedRun,
     SavedRun,
@@ -34,6 +35,16 @@ GOOEY_BUILDER_EVENT_KEY = "builder-sidebar"
 # Whether the panel is open is the user's to say, so this names nothing about the page. Keyed
 # on the workspace it closed itself whenever that changed - which saving a workflow does.
 GOOEY_BUILDER_STORAGE_KEY = "gooey:builder-open"
+# The prompt a logged-out visitor clicked, carried through login and replayed on return.
+BUILDER_PROMPT_Q = "builderprompt"
+
+
+def builder_prompt_next_url(about_url: str, prompt: str) -> str:
+    """The page url login should return to, carrying the prompt. Added here rather than to
+    the login url, where it would sit outside `next` and be dropped on the way back."""
+    from furl import furl
+
+    return furl(about_url).add({BUILDER_PROMPT_Q: prompt}).url
 
 
 def render_gooey_builder(
@@ -42,17 +53,25 @@ def render_gooey_builder(
     request: fastapi.Request,
     page: BasePage,
 ):
-    if not can_launch_gooey_builder(request, page.current_workspace):
+    is_anonymous = not request.user or request.user.is_anonymous
+    if is_anonymous:
+        # A logged-out visitor still sees the builder on a published run's About page; its
+        # starters and input route them through login rather than a 401.
+        if not settings.GOOEY_BUILDER_INTEGRATION_ID or not page.current_pr:
+            return
+    elif not can_launch_gooey_builder(request, page.current_workspace):
         return
 
-    builder_sr = page.current_sr.parent_builder_saved_run
-    handle_gooey_builder_redirect(builder_sr)
     workflow_state = {
         field_name: gui.session_state[field_name]
         for field_name in page.RequestModel.model_fields
         if field_name in gui.session_state
     }
-    if builder_thread_is_empty(page):
+    builder_sr = None
+    if not is_anonymous:
+        builder_sr = page.current_sr.parent_builder_saved_run
+        handle_gooey_builder_redirect(builder_sr)
+    if is_anonymous or builder_thread_is_empty(page):
         builder_run_url = None
         messages = []
     else:
@@ -78,7 +97,42 @@ def render_gooey_builder(
         builder_run_url=builder_run_url,
         messages=messages,
         workflow_state=workflow_state,
+        prompts=_builder_prompts(page, is_anonymous=is_anonymous),
+        login_url=(
+            page.get_auth_url(next_url=page.current_app_url(page.tab))
+            if is_anonymous
+            else None
+        ),
     )
+
+
+class BuilderPrompt(typing.TypedDict):
+    """One of the builder widget's starters. `login_url` is None for a signed-in visitor,
+    who posts straight to the builder instead of going through login."""
+
+    text: str
+    login_url: str | None
+
+
+def _builder_prompts(page: BasePage, *, is_anonymous: bool) -> list[BuilderPrompt]:
+    """The published run's prompts, each carrying where an anonymous click should go. The
+    url is built per prompt because the prompt has to ride inside login's `next`."""
+    pr = page.current_pr
+    prompts = (pr and pr.builder_prompts or [])[:MAX_BUILDER_PROMPTS]
+    if not prompts:
+        return []
+    about_url = page.current_app_url(page.tab)
+    return [
+        BuilderPrompt(
+            text=q,
+            login_url=(
+                page.get_auth_url(next_url=builder_prompt_next_url(about_url, q))
+                if is_anonymous
+                else None
+            ),
+        )
+        for q in prompts
+    ]
 
 
 def render_standalone_gooey_builder(
@@ -151,6 +205,8 @@ def render_gooey_builder_embed(
     workflow_state: dict,
     builder_only: bool = False,
     page: BasePage | None = None,
+    prompts: list[BuilderPrompt] | None = None,
+    login_url: str | None = None,
 ):
     if not settings.GOOEY_BUILDER_INTEGRATION_ID:
         return
@@ -182,6 +238,9 @@ def render_gooey_builder_embed(
     branding = config.setdefault("branding", {})
     branding["showPoweredByGooey"] = False
     branding["inputPlaceholderText"] = "Ask Gooey"
+    if prompts:
+        # Shown in the widget's own starter slot, replacing the builder bot's defaults.
+        branding["conversationStarters"] = [p["text"] for p in prompts]
 
     load_chat_widget_lib()
     gui.component(
@@ -192,6 +251,8 @@ def render_gooey_builder_embed(
         builder_run_url=builder_run_url or bi.published_run.get_app_url(),
         workflow_state=workflow_state,
         builder_only=builder_only,
+        prompts=prompts or [],
+        login_url=login_url,
     )
 
 

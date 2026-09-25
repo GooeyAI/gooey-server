@@ -11,6 +11,7 @@ from bots.models import (
     SavedRun,
     WorkflowAccessLevel,
 )
+from bots.sdg import SDG
 from daras_ai_v2 import icons, settings
 from daras_ai_v2.base import (
     BasePage as BasePageV1,
@@ -21,6 +22,7 @@ from daras_ai_v2.base import (
 )
 from daras_ai_v2.breadcrumbs import get_title_breadcrumbs
 from daras_ai_v2.crypto import get_random_doc_id
+from daras_ai_v2.loom_video_widget import youtube_embed_url
 from daras_ai_v2.gooey_builder import (
     GOOEY_BUILDER_EVENT_KEY,
     GOOEY_BUILDER_STORAGE_KEY,
@@ -43,11 +45,20 @@ from functions.base_llm_tool import functions_input, render_called_functions
 from functions.models import FunctionTrigger
 from gooey_gui.types.about_props import (
     AboutAuthor,
+    AboutBannerMedia,
     AboutCard,
+    AboutEmbedMedia,
     AboutGroup,
     AboutLinkTarget,
+    AboutMedia,
+    AboutMoreInfo,
+    AboutPhotoMedia,
+    AboutSDG,
+    AboutStat,
+    AboutStats,
     AboutSubmitTarget,
     AboutTag,
+    AboutVideoMedia,
     RecipeAboutProps,
 )
 from gooey_gui.types.eco_label_props import EcoCostProps, EcoLabelProps
@@ -99,6 +110,7 @@ RUN_GRID_PAGE_SIZE = 24
 # About's description, before it gives way to a "more" link. Enough to say what a workflow is
 # without pushing the cards below it off the screen unread.
 ABOUT_NOTES_LINE_CLAMP = 6
+DEFAULT_STATS_TITLE = "Community Engagement"
 
 
 def format_credits_as_dollars(credits: int) -> str:
@@ -298,9 +310,11 @@ class BasePage(BasePageV1):
         hold the panel navigates to the workspace and opens it there.
         """
         workspace = self._current_workspace_or_none()
-        if not workspace:
-            return False
-        return can_launch_gooey_builder(self.request, workspace)
+        if workspace:
+            return can_launch_gooey_builder(self.request, workspace)
+        # A logged-out visitor has no workspace but still sees the builder on a published
+        # run's About page - its starters and input route them through login.
+        return bool(settings.GOOEY_BUILDER_INTEGRATION_ID and self.current_pr)
 
     def _hosts_builder(self) -> bool:
         """Whether this page draws the panel itself.
@@ -929,12 +943,11 @@ class BasePage(BasePageV1):
         """What this workflow is. Version history lives in the title menu and Related
         Workflows on /explore/, so neither appears here."""
         pr = self.current_pr
-        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
 
         gui.model_component(
             RecipeAboutProps(
-                photo_url=pr.photo_url or None,
-                circle_photo=self.workflow in CIRCLE_IMAGE_WORKFLOWS,
+                media=self._about_media(pr),
+                headline=pr.headline or None,
                 author=self._about_author(pr),
                 share_value=self._about_share_value(),
                 share_url=self._about_share_url(),
@@ -944,8 +957,54 @@ class BasePage(BasePageV1):
                 notes=pr.notes or None,
                 notes_line_clamp=ABOUT_NOTES_LINE_CLAMP,
                 groups=self._about_groups(),
+                more_info=self._about_more_info(pr),
+                sdgs=self._about_sdgs(pr),
+                stats=self._about_stats(pr),
             )
         )
+
+    def _about_media(self, pr: PublishedRun) -> AboutMedia | None:
+        """The one slot at the head of the surface. A video outranks a banner, and the
+        portrait About has always drawn is the fallback, so no existing page changes."""
+        from widgets.workflow_image import CIRCLE_IMAGE_WORKFLOWS
+
+        if pr.video_url:
+            if embed_url := youtube_embed_url(pr.video_url):
+                return AboutEmbedMedia(url=embed_url)
+            return AboutVideoMedia(url=pr.video_url)
+        if pr.banner_url:
+            return AboutBannerMedia(url=pr.banner_url)
+        if pr.photo_url:
+            return AboutPhotoMedia(
+                url=pr.photo_url, circle=self.workflow in CIRCLE_IMAGE_WORKFLOWS
+            )
+        return None
+
+    def _about_more_info(self, pr: PublishedRun) -> AboutMoreInfo | None:
+        """The outbound link beside Share. Both halves or neither - a button with no label
+        is unreadable and a label with no href goes nowhere."""
+        if not (pr.more_info_url and pr.more_info_text):
+            return None
+        return AboutMoreInfo(text=pr.more_info_text, href=pr.more_info_url)
+
+    def _about_sdgs(self, pr: PublishedRun) -> list[AboutSDG]:
+        return [
+            AboutSDG(
+                number=sdg.value,
+                title=sdg.label,
+                icon_url=sdg.icon_url,
+                href=sdg.un_url,
+            )
+            for sdg in map(SDG, pr.sdgs or [])
+        ]
+
+    def _about_stats(self, pr: PublishedRun) -> AboutStats | None:
+        """Hand-authored impact numbers. The rows are the switch: add them and the group
+        appears, delete them and it goes."""
+        cards = [AboutStat(value=s.value, label=s.label) for s in pr.stats.all()]
+        if not cards:
+            return None
+        return AboutStats(title=pr.stats_title or DEFAULT_STATS_TITLE, cards=cards)
 
     def _about_author(self, pr: PublishedRun) -> AboutAuthor | None:
         """Who published this: their mark, their name, and what else they have published.

@@ -18,6 +18,10 @@ export function GooeyBuilderInlineEmbed(
     builder_run_url: string;
     workflow_state: Record<string, any>;
     builder_only?: boolean;
+    /** Rendered by the widget as its starters; `login_url` is where an anonymous click goes. */
+    prompts?: { text: string; login_url?: string | null }[];
+    /** Set only for a logged-out visitor: the send endpoint is login-required. */
+    login_url?: string | null;
   }
 ) {
   const { config, messages } = props;
@@ -51,6 +55,16 @@ export function GooeyBuilderInlineEmbed(
       }
 
       async function sendMessage(input_data: any) {
+        // Anonymous: the endpoint is login-required, so sign in rather than 401. A
+        // published run's prompt carries its own login url so it replays on return.
+        if (propsRef.current.login_url) {
+          const prompt = propsRef.current.prompts?.find(
+            (p) => p.text === input_data?.input_prompt
+          );
+          window.location.href =
+            prompt?.login_url ?? propsRef.current.login_url;
+          return;
+        }
         let redirectUrl = await fetchServerAPI<string | null>(
           "/__/gooey-builder/send-message",
           {
@@ -115,6 +129,22 @@ export function GooeyBuilderInlineEmbed(
   useEffect(() => {
     controllerRef.current?.setMessages?.(messages);
   }, [messages]);
+
+  useEffect(() => {
+    // A prompt carried back from login. Cleared first so a reload cannot re-send it.
+    if (propsRef.current.login_url) return;
+    const params = new URLSearchParams(window.location.search);
+    const prompt = params.get("builderprompt");
+    if (!prompt) return;
+    params.delete("builderprompt");
+    const search = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (search ? `?${search}` : "")
+    );
+    controllerRef.current?.onSendMessage?.({ input_prompt: prompt });
+  }, []);
 
   return <div id="gooey-builder-embed" />;
 }

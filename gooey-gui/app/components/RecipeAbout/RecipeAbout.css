@@ -67,6 +67,16 @@
   min-width: 0;
 }
 
+/* Share and the optional outbound link, side by side. They sit in their own box so the
+   row's `space-between` pushes the pair away from the attribution, not one button away
+   from the other. `flex: 0 0 auto` opts out of the `> *` shrink rule above. */
+.v2-about .v2-about-author-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gooey-space-3);
+  flex: 0 0 auto;
+}
+
 /* The design's Button style. `flex: 0 0 auto` keeps it at its natural width while
    everything to its left gives way. */
 .v2-about .v2-about-share {
@@ -431,4 +441,89 @@
 /* Sized off the label rather than its own value, so the pair stays in proportion. */
 .v2-about .v2-about-footer-link > i {
   font-size: 1em;
+}
+
+/* The hero media: a banner or a video, full width of the surface. Distinct from
+   `.v2-about-photo`, which is the square portrait and remains the fallback. */
+.v2-about .v2-about-media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--gooey-radius-lg);
+  margin-bottom: var(--gooey-space-4);
+  background: var(--gooey-surface-100);
+}
+
+/* An iframe's UA border would sit inside the rounded corners. */
+.v2-about iframe.v2-about-media {
+  border: 0;
+}
+
+/* Figma's banner frame is 763x244; the video keeps 16:9 (Figma's 763x429.37). */
+.v2-about .v2-about-banner {
+  aspect-ratio: 763 / 244;
+}
+
+.v2-about .v2-about-headline {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  font-weight: 500;
+  margin: 0 0 var(--gooey-space-4);
+  color: var(--gooey-ink);
+}
+
+/* The goal tiles. The UN artwork is square and carries its own number and title, so the
+   tile is the image - no label and no chevron. */
+.v2-about .v2-about-sdgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gooey-space-4);
+}
+
+.v2-about .v2-about-sdg {
+  display: block;
+  width: var(--v2-about-card-size);
+  height: var(--v2-about-card-size);
+  border-radius: var(--gooey-radius-md);
+  overflow: hidden;
+}
+
+.v2-about .v2-about-sdg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* A number and what it counts. Inert - unlike a meta card there is nowhere to go. */
+.v2-about .v2-about-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gooey-space-4);
+}
+
+.v2-about .v2-about-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--gooey-space-1);
+  flex: 0 0 var(--v2-about-card-size);
+  min-height: var(--v2-about-card-size);
+  padding: var(--gooey-space-3);
+  border: 1px solid var(--gooey-line-default);
+  border-radius: var(--gooey-radius-md);
+}
+
+.v2-about .v2-about-stat-value {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--gooey-ink);
+}
+
+.v2-about .v2-about-stat-label {
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  color: var(--gooey-ink-muted);
 }

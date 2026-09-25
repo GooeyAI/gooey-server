@@ -6,6 +6,7 @@ import type {
   AboutAuthor,
   AboutCard,
   AboutGroup,
+  AboutMoreInfo,
   RecipeAboutProps,
 } from "@gooey-types/about_props";
 import { useWorkspaceLayout } from "~/appShellContext";
@@ -18,14 +19,18 @@ import { useRecipeWorkspaceContext } from "../RecipeWorkspace";
 import { layoutForEditorPane } from "../RecipeWorkspace/paneState";
 import type { WorkspaceLayout } from "../RecipeWorkspace/paneState";
 
+/** The generator inlines discriminated unions rather than naming them, so the media type
+ *  is read back off the props it belongs to - it cannot drift from what the server sends. */
+type AboutMedia = NonNullable<RecipeAboutProps["media"]>;
+
 /** Cards per row before a group takes a second line. */
 const MAX_COLS = 6;
 
-/** What this workflow is: its portrait, who published it, and one panel holding what it is
+/** What this workflow is: its media, who published it, and one panel holding what it is
  *  filed under, what it is, and how it is put together. */
 export function RecipeAbout({
-  photo_url,
-  circle_photo,
+  media,
+  headline,
   author,
   share_value,
   share_url,
@@ -35,30 +40,27 @@ export function RecipeAbout({
   notes,
   notes_line_clamp,
   groups,
+  more_info,
+  sdgs,
+  stats,
 }: CustomComponentProps & RecipeAboutProps) {
   const { config } = useRecipeWorkspaceContext();
   // One subscription for the surface. Called per card it was a media listener and a
   // hydration effect each, for the one callback a card actually uses.
   const { selectLayout, isNarrow } = useWorkspaceLayout(config);
-  const hasPanel = !!tags.length || !!notes || !!groups.length;
+  const hasPanel =
+    !!tags.length || !!notes || !!groups.length || !!sdgs.length || !!stats;
   return (
     <div className="v2-about">
-      {!!photo_url && (
-        <img
-          className={clsx(
-            "v2-about-photo",
-            circle_photo && "v2-about-photo-circle"
-          )}
-          src={photo_url}
-          alt=""
-        />
-      )}
+      {!!media && <MediaSlot media={media} />}
+      {!!headline && <h1 className="v2-about-headline">{headline}</h1>}
       {!!author && (
         <AuthorBlock
           author={author}
           shareValue={share_value}
           shareUrl={share_url}
           submitIntentKey={submit_intent_key}
+          moreInfo={more_info}
         />
       )}
       {hasPanel && (
@@ -88,8 +90,44 @@ export function RecipeAbout({
               </div>
             </div>
           )}
-          {!!groups.length && (
+          {(!!sdgs.length || !!stats || !!groups.length) && (
+            /* One flex row for all three kinds of group, so SDG, the stats and the config
+               cards sit side by side and wrap together rather than stacking. */
             <div className="v2-about-groups">
+              {!!sdgs.length && (
+                <div className="v2-about-group">
+                  <h3 className="v2-about-section-title">SDG</h3>
+                  <div className="v2-about-sdgs">
+                    {sdgs.map((sdg) => (
+                      <a
+                        key={sdg.number}
+                        className="v2-about-sdg"
+                        href={sdg.href}
+                        title={`Goal ${sdg.number}: ${sdg.title}`}
+                      >
+                        <img src={sdg.icon_url} alt={sdg.title} />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!!stats && (
+                <div className="v2-about-group">
+                  <h3 className="v2-about-section-title">{stats.title}</h3>
+                  <div className="v2-about-stats">
+                    {stats.cards.map((card) => (
+                      <div key={card.label} className="v2-about-stat">
+                        <span className="v2-about-stat-value">
+                          {card.value}
+                        </span>
+                        <span className="v2-about-stat-label">
+                          {card.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {groups.map((group) => (
                 <GroupBlock
                   key={group.title}
@@ -140,11 +178,13 @@ function AuthorBlock({
   shareValue,
   shareUrl,
   submitIntentKey,
+  moreInfo,
 }: {
   author: AboutAuthor;
   shareValue?: string | null;
   shareUrl?: string | null;
   submitIntentKey: string;
+  moreInfo?: AboutMoreInfo | null;
 }) {
   const { copied, shareNatively } = useNativeShare(shareUrl);
   const row = (
@@ -162,33 +202,46 @@ function AuthorBlock({
       </div>
     </div>
   );
+  const hasActions = !!shareValue || !!shareUrl || !!moreInfo;
   return (
     <div className="v2-about-author">
       {author.href ? <a href={author.href}>{row}</a> : row}
-      {!!shareValue && (
-        // The same ShareIntent the bar's button posts, so one dialog opens either way.
-        <button
-          type="submit"
-          className="v2-about-share"
-          name={submitIntentKey}
-          value={shareValue}
-        >
-          <i className="fa-regular fa-share-nodes" />
-          <span>Share</span>
-        </button>
-      )}
-      {!shareValue && !!shareUrl && (
-        // Nobody to open the share dialog for, so the browser's own sheet takes the url.
-        // `type="button"`: this must not submit the form it sits in.
-        <button
-          type="button"
-          className="v2-about-share"
-          onClick={shareNatively}
-          title="Share this workflow"
-        >
-          <i className="fa-regular fa-share-nodes" />
-          <span>{copied ? "Link copied" : "Share"}</span>
-        </button>
+      {hasActions && (
+        // Grouped, so `space-between` separates the attribution from the buttons rather
+        // than the buttons from each other.
+        <div className="v2-about-author-actions">
+          {!!shareValue && (
+            // The same ShareIntent the bar's button posts, so one dialog opens either way.
+            <button
+              type="submit"
+              className="v2-about-share"
+              name={submitIntentKey}
+              value={shareValue}
+            >
+              <i className="fa-regular fa-share-nodes" />
+              <span>Share</span>
+            </button>
+          )}
+          {!shareValue && !!shareUrl && (
+            // Nobody to open the share dialog for, so the browser's own sheet takes the
+            // url. `type="button"`: this must not submit the form it sits in.
+            <button
+              type="button"
+              className="v2-about-share"
+              onClick={shareNatively}
+              title="Share this workflow"
+            >
+              <i className="fa-regular fa-share-nodes" />
+              <span>{copied ? "Link copied" : "Share"}</span>
+            </button>
+          )}
+          {!!moreInfo && (
+            <a className="v2-about-share" href={moreInfo.href}>
+              <i className="fa-regular fa-arrow-up-right-from-square" />
+              <span>{moreInfo.text}</span>
+            </a>
+          )}
+        </div>
       )}
     </div>
   );
@@ -315,5 +368,51 @@ function MetaCard({
         </button>
       );
     }
+  }
+}
+
+/** The one slot at the head of the surface. Which of the three it is was decided server
+ *  side, so this only draws it. */
+function MediaSlot({ media }: { media: AboutMedia }) {
+  switch (media.kind) {
+    case "video":
+      return (
+        <video
+          className="v2-about-media"
+          src={media.url}
+          controls
+          playsInline
+          preload="metadata"
+        />
+      );
+    case "embed":
+      return (
+        <iframe
+          className="v2-about-media"
+          src={media.url}
+          title="Video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      );
+    case "banner":
+      return (
+        <img
+          className="v2-about-media v2-about-banner"
+          src={media.url}
+          alt=""
+        />
+      );
+    case "photo":
+      return (
+        <img
+          className={clsx(
+            "v2-about-photo",
+            media.circle && "v2-about-photo-circle"
+          )}
+          src={media.url}
+          alt=""
+        />
+      );
   }
 }

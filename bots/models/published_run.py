@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 
 from django.contrib import admin
+from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.functions import Upper
@@ -10,7 +11,8 @@ from django.utils.text import slugify
 
 from app_users.models import AppUser
 from bots.admin_links import open_in_new_tab
-from bots.custom_fields import CustomURLField
+from bots.custom_fields import CustomURLField, StrippedTextField
+from bots.sdg import SDG
 from daras_ai_v2.crypto import get_random_doc_id
 from gooey_gui.types.home_page_props import AccessBadgeData
 from .saved_run import SavedRun
@@ -21,6 +23,9 @@ if typing.TYPE_CHECKING:
 
     from functions.models import CalledFunction
     from workspaces.models import Workspace
+
+# How many builder prompts a published run may offer.
+MAX_BUILDER_PROMPTS = 4
 
 
 class PublishedRunQuerySet(models.QuerySet):
@@ -168,6 +173,36 @@ class PublishedRun(models.Model):
 
     objects = PublishedRunQuerySet.as_manager()
     photo_url = CustomURLField(default="", blank=True)
+    # About-page marketing fields. Admin-only, set on a handful of workflows, and
+    # deliberately absent from PublishedRunVersion - this is not run config.
+    headline = StrippedTextField(blank=True, default="")
+    banner_url = CustomURLField(blank=True, default="")
+    video_url = CustomURLField(
+        blank=True,
+        default="",
+        help_text="A YouTube link or a direct video file (.mp4, .webm).",
+    )
+    more_info_url = CustomURLField(blank=True, default="")
+    more_info_text = models.CharField(max_length=64, blank=True, default="")
+    sdgs = ArrayField(
+        models.IntegerField(choices=SDG.choices),
+        default=list,
+        blank=True,
+        help_text="UN Sustainable Development Goals this workflow contributes to.",
+    )
+    stats_title = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text='Heading above the stat cards. Defaults to "Community Engagement".',
+    )
+    builder_prompts = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            f"Up to {MAX_BUILDER_PROMPTS} prompts shown as the Gooey Builder's starters."
+        ),
+    )
 
     class Meta:
         get_latest_by = "updated_at"
@@ -500,3 +535,24 @@ class Tag(models.Model):
             )
         ]
         indexes = [models.Index(fields=["name"])]
+
+
+class PublishedRunStat(models.Model):
+    """One hand-authored impact number on the About page. Authored rather than counted:
+    "1800+ Farmers supported" is marketing copy, not a query result."""
+
+    published_run = models.ForeignKey(
+        "bots.PublishedRun", on_delete=models.CASCADE, related_name="stats"
+    )
+    value = models.CharField(max_length=32, help_text='e.g. "1800+"')
+    label = models.CharField(max_length=64, help_text='e.g. "Farmers supported"')
+    order = models.IntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.value} {self.label}"

@@ -27,7 +27,9 @@ from bots.models import (
     Message,
     MessageAttachment,
     Platform,
+    MAX_BUILDER_PROMPTS,
     PublishedRun,
+    PublishedRunStat,
     PublishedRunVersion,
     SavedRun,
     Tag,
@@ -35,6 +37,7 @@ from bots.models import (
     WorkflowMetadata,
 )
 from bots.models.message_thread import MessageThread
+from bots.sdg import SDG
 from bots.tasks import create_personal_channels_for_all_members
 from daras_ai_v2.fastapi_tricks import get_app_route_url
 from daras_ai_v2.language_model import CHATML_ROLE_ASSISTANT
@@ -403,8 +406,73 @@ class PublishedRunVersionAdmin(GooeyModelAdmin):
         return change_obj_url(published_run_version.saved_run)
 
 
+class PublishedRunAdminForm(forms.ModelForm):
+    """Renders `sdgs` as checkboxes. The raw ArrayField widget is a comma-separated text
+    box, which is unusable for a fixed set of 17 options."""
+
+    sdgs = forms.TypedMultipleChoiceField(
+        choices=SDG.choices,
+        coerce=int,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = PublishedRun
+        fields = "__all__"
+
+    def clean_builder_prompts(self):
+        """A JSON textarea accepts any shape, and a bad one reaches the renderer as a
+        sliced dict. Checked here like `fa_icon` and `color` are."""
+        value = self.cleaned_data.get("builder_prompts") or []
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
+            raise ValidationError(
+                'Must be a list of strings, e.g. ["Add a Hindi translation step"]'
+            )
+        value = [item.strip() for item in value if item.strip()]
+        if len(value) > MAX_BUILDER_PROMPTS:
+            raise ValidationError(f"At most {MAX_BUILDER_PROMPTS} prompts.")
+        return value
+
+
+class PublishedRunStatInline(admin.TabularInline):
+    model = PublishedRunStat
+    extra = 0
+
+
+# Grouped at the foot of the form under their own "About Page" heading.
+ABOUT_PAGE_FIELDS = [
+    "headline",
+    "banner_url",
+    "video_url",
+    "more_info_url",
+    "more_info_text",
+    "sdgs",
+    "stats_title",
+    "builder_prompts",
+]
+
+
 @admin.register(PublishedRun)
 class PublishedRunAdmin(GooeyModelAdmin):
+    form = PublishedRunAdminForm
+    inlines = [PublishedRunStatInline]
+
+    def get_fieldsets(self, request, obj=None):
+        """Everything as before, then the About fields last under their own heading.
+
+        Derived from `get_fields` rather than spelled out, so a field added to the model
+        later still appears instead of silently dropping off the form.
+        """
+        fields = self.get_fields(request, obj)
+        rest = [f for f in fields if f not in ABOUT_PAGE_FIELDS]
+        return [
+            (None, {"fields": rest}),
+            ("About Page", {"fields": ABOUT_PAGE_FIELDS}),
+        ]
+
     list_display = [
         "__str__",
         "public_access",
