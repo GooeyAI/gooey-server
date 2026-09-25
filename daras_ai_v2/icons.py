@@ -1,4 +1,5 @@
 billing = '<i class="fa-regular fa-square-dollar"></i>'
+usage = '<i class="fa-regular fa-chart-column"></i>'
 save = '<i class="fa-regular fa-floppy-disk"></i>'
 profile = '<i class="fa-regular fa-address-card"></i>'
 person = '<i class="fa-regular fa-person"></i>'
