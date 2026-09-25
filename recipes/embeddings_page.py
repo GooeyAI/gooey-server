@@ -104,7 +104,9 @@ class EmbeddingsPage(BasePage):
                 ),
                 key="input_documents",
                 accept=[".pdf"],
-                accept_multiple_files=model.max_documents > 1,
+                # a single-file uploader stores a bare url, but the request wants a list.
+                # max_documents is still enforced by collect_embedding_inputs
+                accept_multiple_files=True,
             )
 
     def render_output(self):
@@ -152,15 +154,26 @@ MEDIA_COUNT_LIMITS = {
     "input_documents": ("max_documents", "documents"),
 }
 
+# every input to a multimodal model becomes its own Vertex request, but a run is billed
+# at a flat price, so this caps how many requests one run can fan out into
+MAX_MULTIMODAL_INPUTS_PER_RUN = 100
+
 
 def collect_embedding_inputs(
     request: EmbeddingsPage.RequestModel, model: EmbeddingModels
 ) -> list[EmbeddingInput]:
-    inputs = [
-        EmbeddingInput(text=text)
-        for text in (request.texts or [])
-        if text and text.strip()
-    ]
+    texts = request.texts or []
+    if not any(text.strip() for text in texts):
+        # all blank, like the form's empty starting box: there's no text to embed
+        texts = []
+    for i, text in enumerate(texts):
+        if not text.strip():
+            # dropping it would shift every later embedding off the input it belongs to
+            raise UserError(
+                f"texts[{i}] is empty. Remove it or fill it in, so each embedding "
+                "lines up with its input."
+            )
+    inputs = [EmbeddingInput(text=text) for text in texts]
     if not model.supports_multimodal:
         return inputs
 
@@ -180,6 +193,11 @@ def collect_embedding_inputs(
                 )
         inputs += [EmbeddingInput(url=url) for url in urls]
 
+    if len(inputs) > MAX_MULTIMODAL_INPUTS_PER_RUN:
+        raise UserError(
+            f"{model.label} embeds at most {MAX_MULTIMODAL_INPUTS_PER_RUN} inputs per "
+            f"run, got {len(inputs)}. Split them across several runs."
+        )
     return inputs
 
 
