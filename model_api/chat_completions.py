@@ -1,12 +1,15 @@
 import asyncio
 import json
+import math
 import typing
+import uuid
 
 import anyio
 import litellm
 import sentry_sdk
+from asgiref.sync import sync_to_async
 from fastapi import APIRouter, Depends, HTTPException
-from litellm.types.utils import ModelResponseStream
+from litellm.types.utils import ModelResponseStream, Usage
 from openai.types.chat.completion_create_params import CompletionCreateParamsBase
 from pydantic import BaseModel, ConfigDict
 from starlette.requests import Request
@@ -15,18 +18,41 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from ai_models.models import AIModelSpec, ModelProvider
 from api_keys.models import ApiKey
 from auth.token_authentication import api_auth_header
+from bots.models import Workflow
+from daras_ai_v2 import settings
+from gooeysite.bg_db_conn import db_middleware
+from payments.plans import PricingPlan
+from recipes.CompareLLM import CompareLLMPage
+from usage_costs.cost_utils import get_model_pricing
+from usage_costs.models import ModelSku
+from workspaces.models import Workspace, WorkspaceMembership
 
 router = APIRouter()
 
+
+# CONN_MAX_AGE=None keeps connections open forever; db_middleware recycles stale ones
+@db_middleware
+def api_auth(request: Request) -> ApiKey:
+    return api_auth_header(request)
+
+
 # Only OpenAI Chat Completions params reach LiteLLM. Everything else (OpenRouter
 # extras, and LiteLLM kwargs like api_base / api_key) is dropped, so a caller can't
-# redirect the model row's credentials.
+# redirect the model row's credentials. Params whose cost isn't billed as prompt or
+# completion tokens (extra outputs, priority tiers, audio, web search) are dropped
+# too, since the charge only covers tokens.
 # TODO: a strict per-field whitelist that validates values; drop_params=True for now
 FORWARDED_PARAMS = frozenset(CompletionCreateParamsBase.__annotations__) - {
     "model",
     "messages",
     "stream",
     "stream_options",
+    "n",
+    "service_tier",
+    "web_search_options",
+    "audio",
+    "modalities",
+    "store",
 }
 
 ERROR_TYPES = {
@@ -53,12 +79,12 @@ class ChatCompletionRequest(BaseModel):
 async def chat_completions(
     request: Request,
     body: ChatCompletionRequest,
-    api_key: ApiKey = Depends(api_auth_header),
+    api_key: ApiKey = Depends(api_auth),
 ):
-    # TODO: check credits (ensure_credits_and_auto_recharge) and price the usage
     # TODO: persist a Saved Run, and stop the upstream call when it's cancelled
     # TODO: vision, audio and file content parts
-    spec = await get_model_spec(body.model)
+    spec = await sync_to_async(get_model_spec)(body.model)
+    payer = await sync_to_async(get_payer_with_credits)(api_key)
     kwargs = build_completion_kwargs(spec, body)
 
     if not body.stream:
@@ -66,6 +92,7 @@ async def chat_completions(
             response = await litellm.acompletion(**kwargs)
         except Exception as e:
             return upstream_error_response(e)
+        await charge(payer, api_key, spec, response.usage)
         response.model = spec.name
         return JSONResponse(response.model_dump(exclude_none=True))
 
@@ -79,19 +106,58 @@ async def chat_completions(
     stream, first_chunk = started
     # TODO: send `: keepalive` comments during long gaps between chunks
     return UpstreamClosingStreamingResponse(
-        stream_sse_events(spec, stream, first_chunk),
+        stream_sse_events(spec, payer, api_key, body.messages, stream, first_chunk),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )
 
 
-async def get_model_spec(name: str) -> AIModelSpec:
-    try:
-        return await AIModelSpec.objects.aget(
-            name=name, provider=ModelProvider.litellm_responses
-        )
-    except AIModelSpec.DoesNotExist:
+@db_middleware
+def get_model_spec(name: str) -> AIModelSpec:
+    """
+    Serve only allowlisted, non-deprecated LiteLLM rows that have token pricing, so
+    every call can be charged.
+    """
+    spec = None
+    if name in settings.MODEL_API_ALLOWED_MODELS:
+        spec = AIModelSpec.objects.filter(
+            name=name,
+            provider=ModelProvider.litellm_responses,
+            category=AIModelSpec.Categories.llm,
+            is_deprecated=False,
+        ).first()
+    if not spec or not all(
+        get_model_pricing(spec.model_id, sku)
+        for sku in (ModelSku.llm_prompt, ModelSku.llm_completion)
+    ):
         raise HTTPException(status_code=404, detail=f"Model {name!r} not found.")
+    return spec
+
+
+@db_middleware
+def get_payer_with_credits(api_key: ApiKey) -> Workspace | WorkspaceMembership:
+    """
+    Mirrors BasePage.ensure_credits_and_auto_recharge: TEAM plans pay from the
+    member's balance, everyone else from the workspace's.
+    """
+    # TODO: auto-recharge like ensure_credits_and_auto_recharge
+    workspace = api_key.workspace
+    payer = workspace
+    if PricingPlan.from_sub(workspace.subscription) == PricingPlan.TEAM:
+        payer = workspace.memberships.filter(
+            user=api_key.created_by, deleted__isnull=True
+        ).first()
+        if not payer:
+            raise HTTPException(
+                status_code=403,
+                detail="The creator of this API key is no longer part of the workspace.",
+            )
+    if payer.balance < price_in_credits(None, None):
+        raise HTTPException(
+            status_code=402,
+            detail="Insufficient credits. Add credits at https://gooey.ai/account/billing/",
+        )
+    return payer
 
 
 def build_completion_kwargs(spec: AIModelSpec, body: ChatCompletionRequest) -> dict:
@@ -100,6 +166,13 @@ def build_completion_kwargs(spec: AIModelSpec, body: ChatCompletionRequest) -> d
         for key, value in (body.model_extra or {}).items()
         if key in FORWARDED_PARAMS
     }
+    if "tools" in kwargs:
+        # provider-hosted tools (web search, grounding) are billed beyond tokens
+        kwargs["tools"] = [
+            tool
+            for tool in kwargs["tools"] or []
+            if isinstance(tool, dict) and tool.get("type") == "function"
+        ] or None
     kwargs.update(
         model=spec.model_id,
         messages=body.messages,
@@ -159,28 +232,109 @@ async def wait_for_disconnect(request: Request):
 
 async def stream_sse_events(
     spec: AIModelSpec,
+    payer: Workspace | WorkspaceMembership,
+    api_key: ApiKey,
+    messages: list[dict],
     stream: litellm.CustomStreamWrapper,
     first_chunk: ModelResponseStream,
 ) -> typing.AsyncIterator[str]:
+    chunks = [first_chunk]
     try:
         yield format_sse_chunk(spec, first_chunk)
         async for chunk in stream:
+            chunks.append(chunk)
             yield format_sse_chunk(spec, chunk)
     except Exception as e:
         yield "data: " + json.dumps(stream_error_chunk(e)) + "\n\n"
     finally:
         # CustomStreamWrapper.aclose() shields itself from cancellation
         await stream.aclose()
+        # charge even when the client disconnects, so leaving early isn't free
+        with anyio.CancelScope(shield=True):
+            await charge(payer, api_key, spec, stream_usage(chunks, messages))
     yield "data: [DONE]\n\n"
 
 
 def format_sse_chunk(spec: AIModelSpec, chunk: ModelResponseStream) -> str:
     # LiteLLM's final usage chunk keeps one empty choice (OpenAI sends none). OpenCode
     # accepts both, and clients that index choices[0] don't break on this one.
-    chunk.model = spec.name
+    chunk = chunk.model_copy(update={"model": spec.name})
     return (
         "data: " + chunk.model_dump_json(exclude_none=True, exclude_unset=True) + "\n\n"
     )
+
+
+def stream_usage(
+    chunks: list[ModelResponseStream], messages: list[dict]
+) -> Usage | None:
+    for chunk in reversed(chunks):
+        if getattr(chunk, "usage", None):
+            return chunk.usage
+    # the stream stopped before LiteLLM's final usage chunk: count what was streamed
+    try:
+        return litellm.stream_chunk_builder(chunks, messages=messages).usage
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        return None
+
+
+async def charge(
+    payer: Workspace | WorkspaceMembership,
+    api_key: ApiKey,
+    spec: AIModelSpec,
+    usage: Usage | None,
+):
+    # the response has already been generated; report a failed charge rather than
+    # break the response
+    try:
+        await sync_to_async(charge_for_usage)(payer, api_key, spec, usage)
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+
+
+@db_middleware
+def charge_for_usage(
+    payer: Workspace | WorkspaceMembership,
+    api_key: ApiKey,
+    spec: AIModelSpec,
+    usage: Usage | None,
+):
+    """Mirrors BasePage.deduct_credits."""
+    amount = price_in_credits(spec, usage)
+    invoice_id = f"gooey_in_{uuid.uuid1()}"
+    if isinstance(payer, WorkspaceMembership):
+        payer.add_balance(amount=-amount, invoice_id=invoice_id)
+    else:
+        payer.add_balance(
+            amount=-amount, invoice_id=invoice_id, user=api_key.created_by
+        )
+
+
+def price_in_credits(spec: AIModelSpec | None, usage: Usage | None) -> int:
+    """
+    The price the CompareLLM workflow charges for the same call: the tokens at
+    ModelPricing rates (as record_openai_llm_usage records them) rounded up to
+    credits, plus its profit credits, times its price multiplier. With no usage
+    this is the minimum charge.
+    """
+    dollars = 0
+    if spec and usage:
+        completion_tokens = usage.completion_tokens or (
+            usage.completion_tokens_details
+            and usage.completion_tokens_details.reasoning_tokens
+        )
+        for sku, quantity in (
+            (ModelSku.llm_prompt, usage.prompt_tokens),
+            (ModelSku.llm_completion, completion_tokens),
+        ):
+            pricing = get_model_pricing(spec.model_id, sku)
+            dollars += pricing.unit_cost * (quantity or 0) / pricing.unit_quantity
+    credits = (
+        math.ceil(dollars * settings.ADDON_CREDITS_PER_DOLLAR)
+        + CompareLLMPage.PROFIT_CREDITS
+    )
+    multiplier = Workflow.COMPARE_LLM.get_or_create_metadata().price_multiplier
+    return max(1, math.ceil(credits * multiplier))
 
 
 def stream_error_chunk(exc: Exception) -> dict:

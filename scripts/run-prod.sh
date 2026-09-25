@@ -21,6 +21,8 @@ elif [ "$RUN_CELERY" ]; then
   SENTRY_ENVIRONMENT="celery" exec celery -A celeryapp worker -l INFO -P prefork -c ${MAX_THREADS:-1} --max-tasks-per-child 1
 elif [ "$RUN_CELERY_BEAT" ]; then
   SENTRY_ENVIRONMENT="celery" exec celery -A celeryapp beat -l INFO --max-interval 300
+elif [ "$RUN_MODEL_API" ]; then
+  SENTRY_ENVIRONMENT="model_api" exec uvicorn model_api.server:app --host 0.0.0.0 --port 8000
 else
   SENTRY_ENVIRONMENT="fastapi" exec uvicorn server:app --host 0.0.0.0 --port 8000
 fi

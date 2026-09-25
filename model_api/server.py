@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
 from model_api import chat_completions
 from model_api.chat_completions import error_response
@@ -12,6 +13,12 @@ app = FastAPI(
     title="Gooey.AI Model API", docs_url=None, redoc_url=None, openapi_url=None
 )
 app.include_router(chat_completions.router)
+
+
+@app.get("/status")
+async def status():
+    # the Dockerfile HEALTHCHECK polls this
+    return PlainTextResponse("ok")
 
 
 @app.exception_handler(HTTPException)
