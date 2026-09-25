@@ -12,6 +12,7 @@ from aifail import (
     retry_if,
     try_all,
 )
+from furl import furl
 from jinja2.lexer import whitespace_re
 from loguru import logger
 
@@ -221,11 +222,41 @@ def _embedding_input_to_part(inp: EmbeddingInput) -> dict:
             "file_data": {
                 "mime_type": mimetypes.guess_type(inp.url)[0]
                 or "application/octet-stream",
-                # vertex reads the file straight out of our own bucket
-                "file_uri": gs_url_to_uri(inp.url),
+                "file_uri": _user_media_url_to_gs_uri(inp.url),
             }
         }
     return {"text": inp.text or ""}
+
+
+def _user_media_url_to_gs_uri(url: str) -> str:
+    """
+    Convert the url of a file uploaded to our own bucket into a gs:// uri for Vertex.
+
+    Vertex fetches the file with our own service account, so the url has to be checked
+    here: gs_url_to_uri alone throws away the host and turns whatever path it's given
+    into a bucket name, which would let any caller make us read any object that account
+    can see and hand back its embedding.
+    """
+    f = furl(url)
+    segments = f.path.segments
+    media_segments = furl(settings.GS_MEDIA_PATH).path.segments
+    prefix = [settings.GS_BUCKET_NAME, *media_segments]
+    if not (
+        settings.GS_BUCKET_NAME
+        and f.scheme == "https"
+        and f.host == "storage.googleapis.com"
+        and segments[: len(prefix)] == prefix
+        # something must follow the prefix, and nothing may climb back out of it once
+        # the segments are percent-decoded and rejoined into the uri
+        and len(segments) > len(prefix)
+        and not any(s in ("", ".", "..") or "/" in s for s in segments)
+    ):
+        raise UserError(
+            f"Can't embed {url!r}: only files uploaded to Gooey can be embedded. "
+            "Upload the file first (via the form, or the [Upload Files via Form Data] "
+            "option on https://gooey.ai/api/) and pass the url you get back."
+        )
+    return gs_url_to_uri(url)
 
 
 def _validate_embeddings(ret: list[list[float]], *, expected_len: int) -> np.ndarray:
