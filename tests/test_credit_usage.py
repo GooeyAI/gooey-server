@@ -46,12 +46,14 @@ def test_monthly_usage_groups_deductions_by_month_and_recipe(transactional_db):
     deduct(500, months[1], reason=TransactionReason.ADDON)  # a purchase
     deduct(-8, months[-1] + relativedelta(months=1), Workflow.VIDEO_BOTS)  # after
 
-    series = _monthly_usage_by_workflow(workspace, months)
+    with patch("daras_ai_v2.settings.ADDON_CREDITS_PER_DOLLAR", 100):
+        series = _monthly_usage_by_workflow(workspace, months)
 
-    assert [(s.id, s.credits) for s in series] == [
-        (Workflow.VIDEO_BOTS.short_slug, [15, 0, 0, 0, 0, 7]),
-        ("unattributed", [0, 0, 4, 0, 0, 0]),
-        (Workflow.COMPARE_LLM.short_slug, [0, 0, 3, 0, 0, 0]),
+    # 1 credit = 1 cent
+    assert [(s.id, s.usd) for s in series] == [
+        (Workflow.VIDEO_BOTS.short_slug, [0.15, 0, 0, 0, 0, 0.07]),
+        ("unattributed", [0, 0, 0.04, 0, 0, 0]),
+        (Workflow.COMPARE_LLM.short_slug, [0, 0, 0.03, 0, 0, 0]),
     ]
 
 

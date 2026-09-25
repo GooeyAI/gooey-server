@@ -13,6 +13,7 @@ from furl import furl
 import gooey_gui as gui
 from app_users.models import AppUserTransaction, TransactionReason
 from bots.models.workflow import Workflow
+from daras_ai_v2 import settings
 from gooey_gui.types.credit_usage_props import (
     CreditUsagePageProps,
     CreditUsageRangeOption,
@@ -105,9 +106,9 @@ def _usage_chart(
     for s in series:
         color = colors.get(s.id)
         if not color:
-            other = [a + b for a, b in zip(other, s.credits)]
+            other = [a + b for a, b in zip(other, s.usd)]
             continue
-        _add_usage_bar(fig, months, s.title, s.credits, color)
+        _add_usage_bar(fig, months, s.title, s.usd, color)
     if any(other):
         _add_usage_bar(fig, months, "Other", other, OTHER_COLOR)
 
@@ -132,16 +133,16 @@ def _usage_chart(
         showgrid=False,
         showspikes=False,
     )
-    fig.update_yaxes(tickformat=",d", rangemode="tozero")
+    fig.update_yaxes(tickprefix="$", tickformat=",.2~f", rangemode="tozero")
     return json.loads(fig.to_json())
 
 
 def _add_usage_bar(
-    fig, months: list[datetime], name: str, credits: list[int], color: str
+    fig, months: list[datetime], name: str, usd: list[float], color: str
 ):
     fig.add_bar(
         x=months,
-        y=credits,
+        y=usd,
         name=name,
         marker=dict(color=color, line=dict(color="white", width=1)),
         # still fires hover events, without plotly drawing its own box
@@ -158,10 +159,10 @@ def _series_in_range(
     hi = all_months.index(months[-1]) + 1
     series = []
     for s in all_series:
-        credits = s.credits[lo:hi]
-        if any(credits):
-            series.append(s.model_copy(update={"credits": credits}))
-    series.sort(key=lambda s: sum(s.credits), reverse=True)
+        usd = s.usd[lo:hi]
+        if any(usd):
+            series.append(s.model_copy(update={"usd": usd}))
+    series.sort(key=lambda s: sum(s.usd), reverse=True)
     return series
 
 
@@ -245,11 +246,10 @@ def _monthly_usage_by_workflow(
     for workflow, credits in credits_by_workflow.items():
         if not any(credits):
             continue
+        usd = [c / settings.ADDON_CREDITS_PER_DOLLAR for c in credits]
         if workflow is None:
             series.append(
-                CreditUsageSeries(
-                    id=UNATTRIBUTED_ID, title="Other charges", credits=credits
-                )
+                CreditUsageSeries(id=UNATTRIBUTED_ID, title="Other charges", usd=usd)
             )
         else:
             workflow = Workflow(workflow)
@@ -257,8 +257,8 @@ def _monthly_usage_by_workflow(
                 CreditUsageSeries(
                     id=workflow.short_slug,
                     title=workflow.short_title,
-                    credits=credits,
+                    usd=usd,
                 )
             )
-    series.sort(key=lambda s: sum(s.credits), reverse=True)
+    series.sort(key=lambda s: sum(s.usd), reverse=True)
     return series

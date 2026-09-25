@@ -3,7 +3,7 @@
 export interface CreditUsageSeries {
   id: string;
   title: string;
-  credits: number[];
+  usd: number[];
   color: string | null;
 }
 export interface CreditUsageRangeOption {
