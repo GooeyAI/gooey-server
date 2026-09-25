@@ -60,6 +60,12 @@ services:
     ports:
       - "8080:8080"
 
+  model-api:
+    <<: *gooey-app
+    command: uvicorn model_api.server:app --host 0.0.0.0 --port 8090 --reload --reload-dir model_api
+    ports:
+      - "8090:8090"
+
   admin:
     <<: *gooey-app
     command: >
