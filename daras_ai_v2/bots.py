@@ -3,6 +3,7 @@ import random
 import re
 import traceback
 import typing
+from functools import lru_cache
 from datetime import datetime
 
 import requests
@@ -56,7 +57,7 @@ PAGE_NOT_CONNECTED_ERROR = (
     "Please go to the Deploy Tab and connect this page."
 )
 RESET_KEYWORDS = {"reset", "new", "restart", "clear"}
-RESET_MSG = "♻️ Sure! Let's start fresh. How can I help you?"
+RESET_MSG = "♻️ OK - Let's start a new chat. What would you like to know?"
 
 DEFAULT_RESPONSE = (
     "🤔🤖 Well that was Unexpected! I seem to be lost. Could you please try again?."
@@ -119,6 +120,7 @@ class BotInterface:
     workspace: Workspace
     current_user: AppUser
     show_feedback_buttons: bool = False
+    show_new_conversation_button: bool = False
     streaming_enabled: bool = False
     input_glossary: str | None = None
     output_glossary: str | None = None
@@ -163,6 +165,7 @@ class BotInterface:
         self.current_user = self.bi.created_by
 
         self.show_feedback_buttons = self.bi.show_feedback_buttons
+        self.show_new_conversation_button = self.bi.show_new_conversation_button
         self.streaming_enabled = self.bi.streaming_enabled
 
     def lookup_bot_integration(
@@ -241,6 +244,7 @@ class BotInterface:
         audio: list[str] | None = None,
         video: list[str] | None = None,
         send_feedback_buttons: bool = False,
+        send_utility_buttons: bool = True,
         documents: list[str] | None = None,
         update_msg_id: str | None = None,
         should_translate: bool = False,
@@ -252,6 +256,7 @@ class BotInterface:
         :param audio: The audio URL to send
         :param video: The video URL to send
         :param send_feedback_buttons: Whether to send feedback buttons with the message
+        :param send_utility_buttons: Whether to send response utilities with this message
         :param documents: The document URLs to send
         :param update_msg_id: The message ID of the message to update in-place
         :param should_translate: The messages from the saved run itself should automatically be translated,
@@ -263,6 +268,32 @@ class BotInterface:
 
         buttons, text, thinking, disable_feedback = parse_bot_html(text)
         if disable_feedback:
+            send_feedback_buttons = False
+
+        if self.platform == Platform.WHATSAPP:
+            if send_utility_buttons:
+                utility_buttons = _options_menu_buttons(
+                    show_new_conversation_button=self.show_new_conversation_button,
+                    send_feedback_buttons=send_feedback_buttons,
+                    language=self.user_language,
+                    glossary_url=self.output_glossary,
+                )
+                menu_row_count = sum(bool(btn.get("menu")) for btn in buttons)
+                if menu_row_count + len(utility_buttons) <= 10:
+                    buttons += utility_buttons
+                elif utility_buttons:
+                    update_msg_id = self._send_msg(
+                        text=text,
+                        audio=audio,
+                        video=video,
+                        buttons=buttons,
+                        documents=documents,
+                        update_msg_id=update_msg_id,
+                    )
+                    return self._send_msg(
+                        buttons=utility_buttons,
+                        update_msg_id=update_msg_id,
+                    )
             send_feedback_buttons = False
 
         if buttons and send_feedback_buttons and self.platform != Platform.SLACK:
@@ -358,22 +389,42 @@ def parse_bot_html(text: str | None) -> tuple[list[ReplyButton], str, str, bool]
 
     buttons = []
     disable_feedback = False
-    for idx, btn in enumerate(doc("button") or []):
-        if "disable_feedback" in (btn.attrib.get("gui-action") or ""):
+    # <button> and <select><option> both become buttons / options menu rows
+    for idx, elem in enumerate(doc("button, select > option") or []):
+        attrs = dict(elem.attrib)
+        title = (elem.text or "").strip()
+        prompt = title
+        section = ""
+        if elem.tag == "option":
+            select = elem.getparent()
+            # options inherit gui-* attrs from their <select>
+            attrs = {**select.attrib, **attrs}
+            # like an html form, the label is shown but the value is what gets sent
+            prompt = (attrs.get("value") or "").strip() or title
+            # a wrapping <label> becomes the section title of the options menu
+            label = select.getparent()
+            if label is not None and label.tag == "label":
+                section = (label.text or "").strip()
+        if "disable_feedback" in (attrs.get("gui-action") or ""):
             disable_feedback = True
-        buttons.append(
-            ReplyButton(
-                # parsed by _handle_interactive_msg
-                id=csv_encode_row(
-                    idx + 1,
-                    btn.attrib.get("gui-target") or "input_prompt",
-                    btn.attrib.get("gui-action"),
-                    # title must be the last item because it might get truncated
-                    btn.text or "",
-                ),
-                title=btn.text or "",
-            )
+        reply = ReplyButton(
+            # parsed by _handle_interactive_msg
+            id=csv_encode_row(
+                idx + 1,
+                attrs.get("gui-target") or "input_prompt",
+                attrs.get("gui-action"),
+                # prompt must be the last item because it might get truncated
+                prompt,
+            ),
+            title=title,
         )
+        if description := (attrs.get("gui-description") or "").strip():
+            reply["description"] = description
+        if section:
+            reply["section"] = section
+        if elem.tag == "option":
+            reply["menu"] = True
+        buttons.append(reply)
 
     text = "".join(
         s for elem in doc.contents() if isinstance(elem, str) and (s := elem)
@@ -464,11 +515,7 @@ def msg_handler_raw(bot: BotInterface):
             return
     # handle reset keyword
     if input_text.lower().strip("/ ") in RESET_KEYWORDS:
-        # record the reset time so we don't send context
-        bot.convo.reset_at = timezone.now()
-        bot.convo.save(update_fields=["reset_at"])
-        # let the user know we've reset
-        bot.send_msg(text=RESET_MSG)
+        reset_convo(bot)
     else:
         _process_and_send_msg(
             bot=bot,
@@ -588,6 +635,7 @@ def _process_and_send_msg(
                         text=text.strip() + "...",
                         update_msg_id=update_msg_id,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        send_utility_buttons=bool(streaming_done),
                     )
                     last_idx = len(text)
                 else:
@@ -598,6 +646,7 @@ def _process_and_send_msg(
                     update_msg_id = bot.send_msg(
                         text=next_chunk,
                         send_feedback_buttons=streaming_done and send_feedback_buttons,
+                        send_utility_buttons=bool(streaming_done),
                     )
                 if streaming_done and not bot.can_update_message:
                     # if we send the buttons, this is the ID we need to record in the db for lookups later when the button is pressed
@@ -959,9 +1008,22 @@ def save_msg_pair_to_db(
         assistant_msg.save()
 
 
+def reset_convo(bot: BotInterface):
+    bot.convo.reset_at = timezone.now()
+    bot.convo.save(update_fields=["reset_at"])
+    bot.send_msg(
+        text=bot.bi.new_conversation_button_text or RESET_MSG,
+        should_translate=True,
+        send_utility_buttons=False,
+    )
+
+
 def _handle_interactive_msg(bot: BotInterface):
     button = bot.get_interactive_msg_info()
     match button.button_id:
+        case ButtonIds.new_conversation:
+            reset_convo(bot)
+            return True
         case ButtonIds.feedback_thumbs_up | ButtonIds.feedback_thumbs_down:
             _handle_feedback_button_press(bot, button)
             return True
@@ -973,6 +1035,57 @@ def _handle_interactive_msg(bot: BotInterface):
 class ButtonIds:
     feedback_thumbs_up = "FEEDBACK_THUMBS_UP"
     feedback_thumbs_down = "FEEDBACK_THUMBS_DOWN"
+    new_conversation = "NEW_CONVERSATION"
+
+
+def _options_menu_buttons(
+    *,
+    show_new_conversation_button: bool,
+    send_feedback_buttons: bool,
+    language: str | None = None,
+    glossary_url: str | None = None,
+) -> list[ReplyButton]:
+    """
+    Options shown alongside every response on platforms with an options menu
+    """
+    ret = []
+    if show_new_conversation_button:
+        ret.append(
+            {
+                "id": ButtonIds.new_conversation,
+                "title": "📝 New",
+                "description": "Start a new conversation",
+                "menu": True,
+            }
+        )
+    if send_feedback_buttons:
+        ret += [
+            {
+                "id": ButtonIds.feedback_thumbs_up,
+                "title": "👍🏾 Thumbs Up",
+                "description": "This answer was helpful",
+                "menu": True,
+            },
+            {
+                "id": ButtonIds.feedback_thumbs_down,
+                "title": "👎🏽 Thumbs Down",
+                "description": "This answer was not helpful",
+                "menu": True,
+            },
+        ]
+    if language:
+        for btn in ret:
+            btn["title"], btn["description"] = _translate_options_menu(
+                (btn["title"], btn["description"]), language, glossary_url
+            )
+    return ret
+
+
+@lru_cache
+def _translate_options_menu(
+    texts: tuple[str, ...], language: str, glossary_url: str | None
+) -> list[str]:
+    return run_google_translate(list(texts), language, glossary_url=glossary_url)
 
 
 def _feedback_buttons() -> list[ReplyButton]:
