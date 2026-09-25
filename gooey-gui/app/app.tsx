@@ -22,6 +22,7 @@ import { gooeyGuiRouteHeader, silentSubmitKey } from "~/consts";
 import { useEventSourceNullOk } from "~/event-source";
 import { fetchServerAPI } from "~/fetchServerAPI";
 import { handleRedirectResponse } from "~/handleRedirect";
+import { isViewOnlyNavigation } from "~/components/RecipeWorkspace/paneState";
 import { applyFormDataTransforms, RenderedChildren } from "~/renderer";
 import "~/styles/app.css";
 import "~/styles/custom.css";
@@ -111,6 +112,11 @@ export const shouldRevalidate: ShouldRevalidateFunction = (args) => {
     args.formMethod === "POST" &&
     args.currentUrl.toString() === args.nextUrl.toString()
   ) {
+    return false;
+  }
+  // Picking a workspace view only writes `?view=`, which changes nothing the server renders.
+  // Without this the switch costs a full round trip and a re-render of the whole page.
+  if (isViewOnlyNavigation(args.currentUrl, args.nextUrl)) {
     return false;
   }
   if (typeof window !== "undefined") {
