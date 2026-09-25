@@ -14,6 +14,7 @@ import ecocost
 from ecocost.loader import get_kb
 from ecocost.schema import Provider
 from loguru import logger
+from sentry_sdk import capture_exception
 
 from bots.models import SavedRun
 from gooey_gui.types.eco_label_props import (
@@ -39,20 +40,15 @@ MODEL_PREFIX_TO_PROVIDER: tuple[tuple[str, str], ...] = (
 
 
 def run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
-    """Like `_run_eco_cost`, but any failure means no eco label rather than a
-    broken page."""
     try:
         return _run_eco_cost(sr)
-    except LookupError as e:  # ecocost's Unknown{Model,Provider,Region}Error
-        logger.info(str(e))
-    except Exception:
-        logger.exception("eco cost estimate failed")
+    except Exception as e:
+        capture_exception(e)
+        logger.warning(e)
     return None
 
 
 def _run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
-    """Summed estimate for a run, or None if it has no LLM token usage.
-    Raises LookupError if ecocost has no data for one of its calls."""
     from ai_models.models import AIModelSpec, ModelProvider
     from usage_costs.models import ModelSku
 
@@ -71,11 +67,9 @@ def _run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
     specs = {
         spec["model_id"]: spec
         for spec in AIModelSpec.objects.filter(model_id__in=tokens_by_model)
-        .order_by("-is_deprecated", "updated_at")  # live, newest spec wins
+        .order_by("-is_deprecated", "updated_at")
         .values("model_id", "label", "provider", "base_url")
     }
-    # A run is labelled only if every model in it can be estimated: a partial
-    # sum would understate it with nothing to say so.
     estimates: list[ecocost.EstimateResult] = []
     for model_id, tokens in tokens_by_model.items():
         spec = specs.get(model_id) or {}
@@ -97,11 +91,9 @@ def _run_eco_cost(sr: SavedRun) -> EcoCostProps | None:
             (e["confidence"]["level"] for e in estimates),
             key=CONFIDENCE_LEVELS.index,
         ),
-        # ecocost's reason codes, in its most-important-first order
         reasons=list(
             dict.fromkeys(r for e in estimates for r in e["confidence"]["reasons"])
         ),
-        # the model that emitted the most carbon decides the region block
         region=eco_region_props(max(estimates, key=lambda e: e["carbon"]["value"])),
         models=[
             EcoModelTokens(
