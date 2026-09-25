@@ -4,6 +4,7 @@ export interface CreditUsageSeries {
   id: string;
   title: string;
   credits: number[];
+  color: string | null;
 }
 export interface CreditUsageRangeOption {
   title: string;
@@ -20,4 +21,7 @@ export interface CreditUsagePageProps {
   month_options: string[];
   range_href: string;
   presets: CreditUsageRangeOption[];
+  chart: {
+    [k: string]: unknown;
+  } | null;
 }

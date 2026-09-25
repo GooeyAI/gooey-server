@@ -1,17 +1,36 @@
 import "./CreditUsagePage.css";
 
 import { Link, useNavigate } from "@remix-run/react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import type { CustomComponentProps } from "~/components";
-import { RenderedChildren } from "~/renderer";
+import { lazyImport } from "~/lazyImports";
 import type {
   CreditUsagePageProps,
   CreditUsageRangeOption,
   CreditUsageSeries,
 } from "@gooey-types/credit_usage_props";
 
+const Plot = lazyImport(
+  () => import("react-plotly.js").then((mod) => mod.default)
+  // @ts-ignore
+).default;
+
 // narrowest a month gets in the chart before it scrolls sideways
 const MIN_MONTH_WIDTH = 44;
+const TOOLTIP_WIDTH = 240;
+const TOOLTIP_GAP = 8;
+// recipes past the chart's palette fold into one grey "Other" series
+const OTHER_COLOR = "#a3a29c";
+
+type ChartHover = {
+  index: number;
+  band: { left: number; width: number; top: number; height: number };
+  barTop: number;
+  chartWidth: number;
+  plotTop: number;
+  plotBottom: number;
+};
 
 export function CreditUsagePage({
   title,
@@ -23,9 +42,7 @@ export function CreditUsagePage({
   month_options,
   range_href,
   presets,
-  children,
-  onChange,
-  state,
+  chart,
 }: CustomComponentProps & CreditUsagePageProps) {
   const monthTotals = months.map((_, i) =>
     series.reduce((sum, s) => sum + s.credits[i], 0)
@@ -68,17 +85,14 @@ export function CreditUsagePage({
             monthTotals={monthTotals}
             grandTotal={grandTotal}
           />
-          {/* the plotly chart from the server; scrolls sideways on narrow
-              screens rather than squeezing the bars */}
-          <div className="credit-usage-chart-scroll">
-            <div style={{ minWidth: `${months.length * MIN_MONTH_WIDTH}px` }}>
-              <RenderedChildren
-                children={children}
-                onChange={onChange}
-                state={state}
-              />
-            </div>
-          </div>
+          {chart && (
+            <UsageChart
+              chart={chart}
+              months={months}
+              series={series}
+              monthTotals={monthTotals}
+            />
+          )}
           <UsageTable
             months={months}
             series={series}
@@ -229,6 +243,167 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function UsageChart({
+  chart,
+  months,
+  series,
+  monthTotals,
+}: {
+  chart: Record<string, any>;
+  months: string[];
+  series: CreditUsageSeries[];
+  monthTotals: number[];
+}) {
+  const [hover, setHover] = useState<ChartHover | null>(null);
+
+  // plotly draws the bars; the band behind the hovered month and the tooltip
+  // are ours, placed with the hovered point's axes
+  const onHover = (event: any) => {
+    const point = event.points?.[0];
+    if (!point) return;
+    const xa = point.xaxis;
+    const ya = point.yaxis;
+    const index = point.pointIndex;
+    const center = xa._offset + xa.d2p(point.x);
+    const slot = Math.abs(
+      xa.d2p(nextMonth(months[index])) - xa.d2p(`${months[index]}-01`)
+    );
+    const graph = event.event?.target?.closest?.(".js-plotly-plot");
+    setHover({
+      index,
+      band: {
+        left: center - slot / 2,
+        width: slot,
+        top: ya._offset,
+        height: ya._length,
+      },
+      barTop: ya._offset + ya.d2p(monthTotals[index]),
+      chartWidth: graph?.offsetWidth ?? xa._offset + xa._length,
+      plotTop: ya._offset,
+      plotBottom: ya._offset + ya._length,
+    });
+  };
+
+  return (
+    <>
+      <UsageLegend series={series} />
+      {/* scrolls sideways on narrow screens rather than squeezing the bars */}
+      <div className="credit-usage-chart-scroll">
+        <div
+          className="credit-usage-chart"
+          style={{ minWidth: `${months.length * MIN_MONTH_WIDTH}px` }}
+          onMouseLeave={() => setHover(null)}
+        >
+          {hover && (
+            <div className="credit-usage-hover-band" style={hover.band} />
+          )}
+          <Plot
+            data={chart.data}
+            layout={chart.layout}
+            style={{ width: "100%" }}
+            config={{ displayModeBar: false }}
+            onHover={onHover}
+            onUnhover={() => setHover(null)}
+          />
+          {hover && (
+            <UsageTooltip
+              hover={hover}
+              month={months[hover.index]}
+              series={series}
+              total={monthTotals[hover.index]}
+            />
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function UsageLegend({ series }: { series: CreditUsageSeries[] }) {
+  const items = series
+    .filter((s) => s.color)
+    .map((s) => ({ id: s.id, title: s.title, color: s.color! }));
+  if (series.some((s) => !s.color)) {
+    items.push({ id: "other", title: "Other", color: OTHER_COLOR });
+  }
+  return (
+    <div className="credit-usage-legend">
+      {items.map((item) => (
+        <span key={item.id} className="credit-usage-legend-item">
+          <span
+            className="credit-usage-swatch"
+            style={{ background: item.color }}
+          />
+          {item.title}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function UsageTooltip({
+  hover,
+  month,
+  series,
+  total,
+}: {
+  hover: ChartHover;
+  month: string;
+  series: CreditUsageSeries[];
+  total: number;
+}) {
+  const i = hover.index;
+  const rows = series
+    .filter((s) => s.credits[i] > 0)
+    .sort((a, b) => b.credits[i] - a.credits[i]);
+
+  // beside the band, flipping to its left when there's no room on the right,
+  // and level with the top of the bar where it fits
+  const { band } = hover;
+  const right = band.left + band.width + TOOLTIP_GAP;
+  const left =
+    right + TOOLTIP_WIDTH <= hover.chartWidth
+      ? right
+      : Math.max(0, band.left - TOOLTIP_GAP - TOOLTIP_WIDTH);
+  // level with the top of the bar, but kept inside the plot so it never covers
+  // the axis labels; the height is measured once the tooltip has rendered
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+  useLayoutEffect(() => {
+    setHeight(ref.current?.offsetHeight ?? 0);
+  }, [i]);
+  const top = Math.max(
+    hover.plotTop,
+    Math.min(hover.barTop, hover.plotBottom - height)
+  );
+
+  return (
+    <div
+      ref={ref}
+      className="credit-usage-tooltip"
+      style={{ left, top, width: TOOLTIP_WIDTH }}
+    >
+      <div className="credit-usage-tooltip-month">
+        {formatMonth(month, true)}
+      </div>
+      <div className="credit-usage-tooltip-total">
+        {formatCredits(total)} credits
+      </div>
+      <hr />
+      {rows.map((s) => (
+        <div key={s.id} className="credit-usage-tooltip-row">
+          <span
+            className="credit-usage-swatch"
+            style={{ background: s.color ?? OTHER_COLOR }}
+          />
+          <span className="credit-usage-tooltip-name">{s.title}</span>
+          <span>{formatCredits(s.credits[i])}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function UsageTable({
   months,
   series,
@@ -315,10 +490,17 @@ function downloadCsv(
   URL.revokeObjectURL(url);
 }
 
-function formatMonth(month: string) {
+function nextMonth(month: string) {
+  const [year, m] = month.split("-").map(Number);
+  return m === 12
+    ? `${year + 1}-01-01`
+    : `${year}-${String(m + 1).padStart(2, "0")}-01`;
+}
+
+function formatMonth(month: string, long = false) {
   const [year, m] = month.split("-").map(Number);
   return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString("en-US", {
-    month: "short",
+    month: long ? "long" : "short",
     year: "numeric",
     timeZone: "UTC",
   });

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from datetime import datetime, timezone as dt_timezone
 
@@ -17,7 +18,7 @@ from gooey_gui.types.credit_usage_props import (
     CreditUsageRangeOption,
     CreditUsageSeries,
 )
-from widgets.plotly_theme import apply_consistent_styling, defaultPlotlyConfig
+from widgets.plotly_theme import apply_consistent_styling
 from workspaces.models import Workspace
 
 DEFAULT_MONTHS = 6
@@ -70,8 +71,10 @@ def render_credit_usage(
     # whatever range is selected
     colors = {s.id: color for s, color in zip(all_series, CHART_COLORS)}
     series = _series_in_range(all_series, month_options, months)
+    for s in series:
+        s.color = colors.get(s.id)  # None folds into "Other"
 
-    with gui.model_component(
+    gui.model_component(
         CreditUsagePageProps(
             workspace_name=workspace_name,
             months=[_fmt_month(m) for m in months],
@@ -81,17 +84,20 @@ def render_credit_usage(
             month_options=[_fmt_month(m) for m in month_options],
             range_href=base_href,
             presets=_build_presets(base_href, this_month, months),
+            chart=_usage_chart(months, series, colors) if series else None,
         )
-    ):
-        if series:
-            _usage_chart(months, series, colors)
+    )
 
 
 def _usage_chart(
     months: list[datetime],
     series: list[CreditUsageSeries],
     colors: dict[str, str],
-):
+) -> dict:
+    """
+    Only the bars: the page draws the hover band and tooltip itself from plotly's
+    hover events, since plotly's own hover box can't be styled to match.
+    """
     import plotly.graph_objects as go
 
     fig = apply_consistent_styling(go.Figure())
@@ -111,19 +117,23 @@ def _usage_chart(
         barcornerradius=4,
         height=380,
         margin=dict(l=0, r=0, t=10, b=0),
-        legend=dict(
-            orientation="h", yanchor="bottom", y=1.02, x=0, traceorder="normal"
-        ),
+        hovermode="x",
+        # transparent, so the page's hover band shows through behind the bars
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        # the page draws the legend: plotly's overlaps the bars when it fits on one
+        # row, and scrolls away with the chart on narrow screens
+        showlegend=False,
     )
     fig.update_xaxes(
         type="date",
         dtick="M1" if len(months) <= 12 else "M3",
         tickformat="%b<br>%Y",
-        hoverformat="%B %Y",
         showgrid=False,
+        showspikes=False,
     )
     fig.update_yaxes(tickformat=",d", rangemode="tozero")
-    gui.plotly_chart(fig, config=defaultPlotlyConfig)
+    return json.loads(fig.to_json())
 
 
 def _add_usage_bar(
@@ -134,7 +144,8 @@ def _add_usage_bar(
         y=credits,
         name=name,
         marker=dict(color=color, line=dict(color="white", width=1)),
-        hovertemplate="%{y:,} Cr",
+        # still fires hover events, without plotly drawing its own box
+        hoverinfo="none",
     )
 
 

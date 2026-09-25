@@ -74,6 +74,87 @@
   margin-bottom: 24px;
 }
 
+.credit-usage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.credit-usage-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.credit-usage-chart {
+  position: relative;
+}
+
+/* behind the (transparent) plotly svg, so the bars sit on top of it */
+.credit-usage-hover-band {
+  position: absolute;
+  background: var(--gooey-surface-200, #f1f2f4);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.credit-usage-chart .js-plotly-plot {
+  position: relative; /* stack above the band */
+}
+
+.credit-usage-tooltip {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+  background: #fff;
+  border: 1px solid var(--usage-grid);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(10 16 33 / 10%);
+  padding: 12px 14px;
+  font-size: 0.875rem;
+}
+
+.credit-usage-tooltip-month {
+  color: var(--usage-muted);
+}
+
+.credit-usage-tooltip-total {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-usage-tooltip hr {
+  margin: 10px 0 8px;
+  border-color: var(--usage-grid);
+  opacity: 1;
+}
+
+.credit-usage-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-usage-tooltip-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credit-usage-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
 .credit-usage-table td,
 .credit-usage-table th {
   white-space: nowrap;
