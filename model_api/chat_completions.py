@@ -84,8 +84,8 @@ async def chat_completions(
     # TODO: persist a Saved Run, and stop the upstream call when it's cancelled
     # TODO: vision, audio and file content parts
     spec = await sync_to_async(get_model_spec)(body.model)
-    payer = await sync_to_async(get_payer_with_credits)(api_key)
     kwargs = build_completion_kwargs(spec, body)
+    payer = await sync_to_async(get_payer_with_credits)(api_key, spec, kwargs)
 
     if not body.stream:
         try:
@@ -115,8 +115,8 @@ async def chat_completions(
 @db_middleware
 def get_model_spec(name: str) -> AIModelSpec:
     """
-    Serve only allowlisted, non-deprecated LiteLLM rows that have token pricing, so
-    every call can be charged.
+    Serve only allowlisted, non-deprecated LiteLLM rows that have token pricing and
+    an output limit, so every call can be charged and its worst case is known.
     """
     spec = None
     if name in settings.MODEL_API_ALLOWED_MODELS:
@@ -125,6 +125,7 @@ def get_model_spec(name: str) -> AIModelSpec:
             provider=ModelProvider.litellm_responses,
             category=AIModelSpec.Categories.llm,
             is_deprecated=False,
+            llm_max_output_tokens__gt=0,
         ).first()
     if not spec or not all(
         get_model_pricing(spec.model_id, sku)
@@ -135,10 +136,13 @@ def get_model_spec(name: str) -> AIModelSpec:
 
 
 @db_middleware
-def get_payer_with_credits(api_key: ApiKey) -> Workspace | WorkspaceMembership:
+def get_payer_with_credits(
+    api_key: ApiKey, spec: AIModelSpec, kwargs: dict
+) -> Workspace | WorkspaceMembership:
     """
     Mirrors BasePage.ensure_credits_and_auto_recharge: TEAM plans pay from the
-    member's balance, everyone else from the workspace's.
+    member's balance, everyone else from the workspace's. The balance must cover
+    the most this call can cost, so one call can't overdraw it.
     """
     # TODO: auto-recharge like ensure_credits_and_auto_recharge
     workspace = api_key.workspace
@@ -152,12 +156,30 @@ def get_payer_with_credits(api_key: ApiKey) -> Workspace | WorkspaceMembership:
                 status_code=403,
                 detail="The creator of this API key is no longer part of the workspace.",
             )
-    if payer.balance < price_in_credits(None, None):
+    max_price = price_in_credits(spec, max_usage(spec, kwargs))
+    if payer.balance < max_price:
         raise HTTPException(
             status_code=402,
-            detail="Insufficient credits. Add credits at https://gooey.ai/account/billing/",
+            detail=f"Insufficient credits: this request can cost up to {max_price} "
+            f"credits and the balance is {payer.balance}. Lower max_tokens, or add "
+            "credits at https://gooey.ai/account/billing/",
         )
     return payer
+
+
+def max_usage(spec: AIModelSpec, kwargs: dict) -> Usage:
+    """The most a call can use: its counted prompt plus its capped output."""
+    try:
+        prompt_tokens = litellm.token_counter(
+            model=spec.model_id, messages=kwargs["messages"], tools=kwargs.get("tools")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid messages: {e}")
+    return Usage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=kwargs["max_tokens"],
+        total_tokens=prompt_tokens + kwargs["max_tokens"],
+    )
 
 
 def build_completion_kwargs(spec: AIModelSpec, body: ChatCompletionRequest) -> dict:
@@ -173,6 +195,15 @@ def build_completion_kwargs(spec: AIModelSpec, body: ChatCompletionRequest) -> d
             for tool in kwargs["tools"] or []
             if isinstance(tool, dict) and tool.get("type") == "function"
         ] or None
+    # cap the output at the row's limit, so the worst-case charge is known up front;
+    # LiteLLM maps max_tokens onto each provider's own field
+    requested = [
+        kwargs.pop(key, None) for key in ("max_completion_tokens", "max_tokens")
+    ]
+    kwargs["max_tokens"] = min(
+        [n for n in requested if isinstance(n, int) and n > 0]
+        + [spec.llm_max_output_tokens]
+    )
     kwargs.update(
         model=spec.model_id,
         messages=body.messages,
