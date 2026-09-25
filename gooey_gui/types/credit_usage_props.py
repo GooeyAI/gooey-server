@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import typing
+
 import pydantic
 
 
@@ -7,6 +9,7 @@ class CreditUsageSeries(pydantic.BaseModel):
     id: str
     title: str
     credits: list[int]  # one entry per month, aligned with `months`
+    color: str | None = None  # the series' colour in the chart; None is "Other"
 
 
 class CreditUsageRangeOption(pydantic.BaseModel):
@@ -27,3 +30,4 @@ class CreditUsagePageProps(pydantic.BaseModel):
     month_options: list[str] = []  # months the custom range can pick, oldest first
     range_href: str  # the page's own url, for the custom range's query params
     presets: list[CreditUsageRangeOption] = []
+    chart: dict[str, typing.Any] | None = None  # plotly figure json, bars only
