@@ -30,3 +30,4 @@ export * from "./ToolPage";
 export * from "./WorkspacePaneControl";
 export * from "./RunTimeline";
 export * from "./RunDebugInfo";
+export * from "./CreditUsagePage";

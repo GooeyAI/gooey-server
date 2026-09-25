@@ -25,6 +25,7 @@ from payments.webhooks import PaypalWebhookHandler
 from routers.base_auth import get_login_url
 from routers.custom_api_router import CustomAPIRouter
 from routers.root import explore_page, sidebar_page_wrapper, get_og_url_path
+from widgets.credit_usage import render_credit_usage
 from widgets.saved_workflow import render_saved_workflow_preview
 from workspaces.models import Workspace, WorkspaceInvite
 from workspaces.views import invitation_page, workspaces_page
@@ -110,6 +111,22 @@ def account_route(request: Request, plans_tab: typing.Literal["team"] | None = N
             canonical_url=url,
             title="Billing • Gooey.AI",
             description="Your billing details.",
+            robots="noindex,nofollow",
+        )
+    )
+
+
+@gui.route(app, "/account/usage/")
+def usage_route(request: Request, start: str | None = None, end: str | None = None):
+    with account_page_wrapper(request, AccountTabs.usage) as current_workspace:
+        usage_tab(request, current_workspace, start=start, end=end)
+    url = get_og_url_path(request)
+    return dict(
+        meta=raw_build_meta_tags(
+            url=url,
+            canonical_url=url,
+            title="Usage • Gooey.AI",
+            description="Your monthly credit usage.",
             robots="noindex,nofollow",
         )
     )
@@ -255,6 +272,7 @@ class AccountTabs(TabData, Enum):
     saved = TabData(title=f"{icons.save} Saved", route=saved_route)
     api_keys = TabData(title=f"{icons.api} API Keys", route=api_keys_route)
     memory = TabData(title=f"{icons.memory} Memory", route=memory_route)
+    usage = TabData(title=f"{icons.usage} Usage", route=usage_route)
     billing = TabData(title=f"{icons.billing} Billing", route=account_route)
 
     @property
@@ -272,6 +290,7 @@ class AccountTabs(TabData, Enum):
         else:
             ret.remove(cls.profile)
             if not workspace.memberships.get(user=user).can_edit_workspace():
+                ret.remove(cls.usage)
                 ret.remove(cls.billing)
 
         return ret
@@ -285,6 +304,24 @@ def billing_tab(request: Request, workspace: Workspace, plans_tab: str | None = 
         user=request.user,
         session=request.session,
         plans_tab=plans_tab,
+    )
+
+
+def usage_tab(
+    request: Request,
+    workspace: Workspace,
+    start: str | None = None,
+    end: str | None = None,
+):
+    if not workspace.memberships.get(user=request.user).can_edit_workspace():
+        raise gui.RedirectException(get_route_path(members_route))
+    render_credit_usage(
+        workspace=workspace,
+        workspace_name=workspace.display_name(request.user),
+        billing_href=get_route_path(account_route),
+        base_href=get_route_path(usage_route),
+        start=start,
+        end=end,
     )
 
 

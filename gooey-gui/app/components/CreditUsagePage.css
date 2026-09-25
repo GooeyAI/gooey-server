@@ -1,0 +1,88 @@
+.credit-usage {
+  --usage-surface: var(--gooey-bg-page, #fffefd);
+  --usage-grid: var(--gooey-line-soft, #e6e6e6);
+  --usage-muted: var(--gooey-ink-muted, #4b587a);
+}
+
+.credit-usage-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.credit-usage-filter .form-select {
+  width: auto;
+}
+
+.credit-usage-presets {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--gooey-surface-200, #f1f2f4);
+}
+
+.credit-usage-presets a {
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: var(--usage-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.credit-usage-presets a:hover {
+  color: var(--gooey-ink, #0a1021);
+}
+
+.credit-usage-presets a.active {
+  background: #fff;
+  color: var(--gooey-ink, #0a1021);
+  box-shadow: 0 1px 2px rgb(10 16 33 / 12%);
+}
+
+.credit-usage-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.credit-usage-stat {
+  border: 1px solid var(--usage-grid);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.credit-usage-stat-label {
+  font-size: 0.85rem;
+  color: var(--usage-muted);
+}
+
+.credit-usage-stat-value {
+  font-size: 1.6rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-usage-chart-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin-bottom: 24px;
+}
+
+.credit-usage-table td,
+.credit-usage-table th {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-usage-table th:first-child,
+.credit-usage-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--usage-surface);
+}
