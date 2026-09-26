@@ -410,13 +410,14 @@ class TextToSpeechPage(BasePage):
                 from daras_ai_v2.tts_supported_languages import (
                     MMS_TTS_SUPPORTED_LANGUAGES,
                 )
-                from modal_functions.mms_tts import app as modal_app
+                from modal_functions import mms_tts
+                from daras_ai_v2.modal_utils import get_modal_fn
 
                 language = state.get("mms_tts_language", "eng")
                 if language not in MMS_TTS_SUPPORTED_LANGUAGES:
                     raise UserError(f"Unsupported language: {language}")
 
-                run_mms_tts = modal.Function.from_name(modal_app.name, "run_mms_tts")
+                run_mms_tts = get_modal_fn(mms_tts, "run_mms_tts")
                 with (
                     modal.enable_output(),
                     generate_signed_url("mms_tts_gen.wav", "audio/wav") as (
